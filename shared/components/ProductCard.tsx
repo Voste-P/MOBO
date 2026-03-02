@@ -18,7 +18,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
   const imageSrc = rawImage || placeholderImage;
   const platformLabel = sanitizeLabel(product.platform) || 'DEAL';
   const brandLabel = sanitizeLabel(product.brandName) || 'PARTNER';
-  const mediatorLabel = sanitizeLabel(product.mediatorCode) || 'PARTNER';
+  const mediatorLabel = sanitizeLabel(product.mediatorName || product.mediatorCode) || 'PARTNER';
   const effectiveOriginal =
     product.originalPrice > product.price ? product.originalPrice : null;
 

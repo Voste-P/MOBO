@@ -71,14 +71,9 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
   const { notifications, removeNotification, unreadCount, markAllRead } = useNotification();
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [_isListening, setIsListening] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
-
-  const [_attachment, setAttachment] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const _fileInputRef = useRef<HTMLInputElement>(null);
 
   const placeholders = useMemo(() => [
     'Find me deals...',
@@ -95,7 +90,6 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
     setUserId(user?.id ?? null);
   }, [user?.id, setUserId]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const recognitionRef = useRef<any>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -136,19 +130,6 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
     return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   };
 
-  const previewUrlRef = useRef<string | null>(null);
-
-  // Revoke the preview blob URL when the component unmounts to avoid leaks.
-  useEffect(() => {
-    return () => {
-      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    previewUrlRef.current = previewUrl;
-  }, [previewUrl]);
-
   useEffect(() => {
     // Keep placeholder suggestions helpful, but avoid distraction while typing/focused.
     if (isInputFocused || inputText.trim().length > 0) return;
@@ -174,172 +155,21 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
     });
   }, [isVisible]);
 
-  useEffect(() => {
-    // Stop and clean up any previous recognition instance to prevent leaks
-    if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch { /* ignore */ }
-      recognitionRef.current = null;
-    }
-
-    if (
-      typeof window !== 'undefined' &&
-      ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
-    ) {
-      const SpeechRecognition =
-        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
-
-      recognition.onresult = (event: any) => {
-        const rawTranscript = event.results?.[0]?.[0]?.transcript;
-        if (!rawTranscript) { setIsListening(false); return; }
-        const transcript = rawTranscript.toLowerCase();
-
-        // [AI] Voice Command Expansion (Legacy Fallback)
-        if (
-          transcript.includes('order') ||
-          transcript.includes('purchase') ||
-          transcript.includes('status')
-        ) {
-          onNavigate?.('orders');
-          addMessage({
-            id: makeMessageId(),
-            role: 'model',
-            text: 'Opening your **Orders** tab.',
-            timestamp: Date.now(),
-          });
-        } else if (
-          transcript.includes('deal') ||
-          transcript.includes('loot') ||
-          transcript.includes('explore')
-        ) {
-          onNavigate?.('explore');
-          addMessage({
-            id: makeMessageId(),
-            role: 'model',
-            text: "Sure  let's explore some **Deals**.",
-            timestamp: Date.now(),
-          });
-        } else if (
-          transcript.includes('profile') ||
-          transcript.includes('account') ||
-          transcript.includes('wallet')
-        ) {
-          onNavigate?.('profile');
-          addMessage({
-            id: makeMessageId(),
-            role: 'model',
-            text: 'Navigating to your **Profile & Wallet**.',
-            timestamp: Date.now(),
-          });
-        } else {
-          setInputText((prev) => (prev ? `${prev} ${transcript}` : transcript));
-        }
-        setIsListening(false);
-      };
-
-      recognition.onerror = () => setIsListening(false);
-      recognition.onend = () => setIsListening(false);
-      recognitionRef.current = recognition;
-    }
-
-    return () => {
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch { /* ignore */ }
-      }
-    };
-  }, [onNavigate, addMessage]);
-
-  const _toggleListening = () => {
-    if (_isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
-    } else {
-      try {
-        recognitionRef.current?.start();
-        setIsListening(true);
-      } catch (e) {
-        console.error('Mic Error', e);
-      }
-    }
-  };
-
-  const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB
-
-  const _handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      if (file.size > MAX_ATTACHMENT_BYTES) {
-        addMessage({
-          id: makeMessageId(),
-          role: 'model',
-          text: 'That image is too large (max 10 MB). Please upload a smaller screenshot.',
-          isError: true,
-          timestamp: Date.now(),
-        });
-        if (_fileInputRef.current) _fileInputRef.current.value = '';
-        return;
-      }
-      // Revoke previous object URL to prevent memory leaks.
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      setAttachment(file);
-      setPreviewUrl(URL.createObjectURL(file));
-    }
-  };
-
-  const _clearAttachment = () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setAttachment(null);
-    setPreviewUrl(null);
-    if (_fileInputRef.current) _fileInputRef.current.value = '';
-  };
-
   const handleSendMessage = async (e?: React.FormEvent, overrideText?: string) => {
     e?.preventDefault();
     if (isTyping) return;
     const textToSend = overrideText || inputText;
-    if (!textToSend.trim() && !_attachment) return;
+    if (!textToSend.trim()) return;
     const safeText = textToSend.trim().slice(0, 400);
-
-    let base64Image: string | undefined = undefined;
-    if (_attachment) {
-      const rawBase64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error('Failed to read file'));
-        reader.onabort = () => reject(new Error('File read aborted'));
-        reader.readAsDataURL(_attachment);
-      }).catch((readErr) => {
-        console.warn('FileReader error:', readErr);
-        addMessage({
-          id: makeMessageId(),
-          role: 'model',
-          text: 'Failed to read the attached image. Please try a different file.',
-          isError: true,
-          timestamp: Date.now(),
-        });
-        return '';
-      });
-      if (rawBase64) base64Image = rawBase64;
-      // If file read failed and there's no text, bail out entirely
-      if (!rawBase64 && !safeText) {
-        setIsTyping(false);
-        return;
-      }
-    }
 
     addMessage({
       id: makeMessageId(),
       role: 'user',
       text: safeText,
-      image: base64Image,
       timestamp: Date.now(),
     });
 
     setInputText('');
-    _clearAttachment();
     setIsTyping(true);
     setLastFailedText(null);
 
@@ -832,19 +662,6 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
           ))}
         </div>
 
-        {previewUrl && (
-          <div className="bg-white p-3 rounded-[1.5rem] shadow-xl border border-slate-100 mb-2 w-fit relative animate-slide-up">
-            <img loading="lazy" src={previewUrl} className="h-20 w-auto rounded-xl object-cover" alt="Preview" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-            <button
-              onClick={_clearAttachment}
-              aria-label="Remove attachment"
-              className="absolute -top-2 -right-2 w-6 h-6 bg-black text-white rounded-full flex items-center justify-center hover:bg-red-500 shadow-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-            >
-              <X size={12} />
-            </button>
-          </div>
-        )}
-
         <div className="bg-white p-2 rounded-[2rem] shadow-xl border border-slate-100 flex items-center gap-2 relative">
           <form onSubmit={(e) => handleSendMessage(e)} className="flex-1 min-w-0">
             <input
@@ -860,9 +677,9 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
           </form>
           <button
             onClick={(e) => handleSendMessage(e)}
-            disabled={!inputText.trim() && !_attachment}
+            disabled={!inputText.trim()}
             aria-label="Send message"
-            className={`w-11 h-11 rounded-full flex items-center justify-center shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${!inputText.trim() && !_attachment ? 'bg-slate-100 text-slate-300 shadow-none cursor-not-allowed' : 'bg-black text-white hover:bg-lime-300 hover:text-black'}`}
+            className={`w-11 h-11 rounded-full flex items-center justify-center shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${!inputText.trim() ? 'bg-slate-100 text-slate-300 shadow-none cursor-not-allowed' : 'bg-black text-white hover:bg-lime-300 hover:text-black'}`}
           >
             <ArrowRight size={20} strokeWidth={3} />
           </button>

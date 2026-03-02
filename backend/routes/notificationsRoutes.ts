@@ -18,7 +18,10 @@ export function notificationsRoutes(env: Env): Router {
     legacyHeaders: false,
   });
 
-  router.get('/', requireAuth(env), controller.list);
+  router.get('/', requireAuth(env), (_req, res, next) => {
+    res.setHeader('Cache-Control', 'private, max-age=10');
+    next();
+  }, controller.list);
 
   router.get('/push/public-key', push.publicKey);
   router.post('/push/subscribe', requireAuth(env), pushWriteLimiter, push.subscribe);

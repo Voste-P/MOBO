@@ -89,6 +89,7 @@ export interface Product {
   dealType: 'Discount' | 'Review' | 'Rating';
   brandName: string;
   mediatorCode: string;
+  mediatorName?: string;
   campaignId: string;
   active: boolean;
   inventoryCount?: number;
