@@ -946,12 +946,14 @@ export const api = {
         headers: { ...authHeaders(), 'X-Confirm-Delete': 'true' },
       });
     },
-    getAuditLogs: async (filters?: { action?: string; entityType?: string; limit?: number; page?: number }) => {
+    getAuditLogs: async (filters?: { action?: string; entityType?: string; limit?: number; page?: number; from?: string; to?: string }) => {
       const params = new URLSearchParams();
       if (filters?.action) params.append('action', filters.action);
       if (filters?.entityType) params.append('entityType', filters.entityType);
       if (filters?.limit) params.append('limit', String(filters.limit));
       if (filters?.page) params.append('page', String(filters.page));
+      if (filters?.from) params.append('from', filters.from);
+      if (filters?.to) params.append('to', filters.to);
       const qs = params.toString();
       return fetchJson(`/admin/audit-logs${qs ? '?' + qs : ''}`, {
         headers: { ...authHeaders() },
