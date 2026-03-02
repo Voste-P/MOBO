@@ -168,7 +168,6 @@ export const Orders: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [tickets, setTickets] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -206,10 +205,6 @@ export const Orders: React.FC = () => {
     productName: 'match' | 'mismatch' | 'none';
   }>({ id: 'none', amount: 'none', productName: 'none' });
   const [orderIdLocked, setOrderIdLocked] = useState(false);
-
-  const [ticketModal, setTicketModal] = useState<Order | null>(null);
-  const [ticketIssue, setTicketIssue] = useState('Cashback Delay');
-  const [ticketDesc, setTicketDesc] = useState('');
   const [sheetsExporting, setSheetsExporting] = useState(false);
 
 
@@ -268,7 +263,6 @@ export const Orders: React.FC = () => {
         console.error('Failed to load products:', err);
         setAvailableProducts([]);
       });
-      loadTickets();
     } else {
       setIsLoading(false);
     }
@@ -292,16 +286,6 @@ export const Orders: React.FC = () => {
     }
   };
 
-  const loadTickets = async () => {
-    try {
-      const data = await api.tickets.getAll();
-      setTickets(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.error('Failed to load tickets:', e);
-      setTickets([]);
-    }
-  };
-
   // Realtime: refresh order list when any order changes.
   useEffect(() => {
     if (!user) return;
@@ -315,9 +299,6 @@ export const Orders: React.FC = () => {
     };
     const unsub = subscribeRealtime((msg) => {
       if (msg.type === 'orders.changed' || msg.type === 'notifications.changed') schedule();
-      if (msg.type === 'tickets.changed') {
-        loadTickets();
-      }
       if (msg.type === 'deals.changed') {
         // Keep filters/product titles in sync (non-critical, but avoids stale UI).
         api.products
@@ -687,29 +668,7 @@ export const Orders: React.FC = () => {
     }
   };
 
-  const submitTicket = async () => {
-    if (!ticketModal || !ticketDesc || !user) return;
-    setIsUploading(true);
-    try {
-      await api.tickets.create({
-        userId: user.id,
-        userName: user.name,
-        role: 'user',
-        orderId: ticketModal.id,
-        issueType: ticketIssue,
-        description: ticketDesc,
-      });
-      toast.success('Ticket raised! Support will contact you shortly.');
-      setTicketModal(null);
-      setTicketDesc('');
-      await loadTickets();
-    } catch (err) {
-      console.error('submitTicket error:', err);
-      toast.error(formatErrorMessage(err, 'Failed to raise ticket.'));
-    } finally {
-      setIsUploading(false);
-    }
-  };
+
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-[#f8f9fa]">
@@ -782,8 +741,8 @@ export const Orders: React.FC = () => {
               const h = [
                 'External Order ID', 'Date', 'Time', 'Product', 'Platform', 'Brand', 'Deal Type',
                 'Unit Price (₹)', 'Quantity', 'Total (₹)', 'Commission/Cashback (₹)',
-                'Workflow Status', 'Affiliate Status', 'Payment Status',
-                'Mediator', 'Reviewer Name', 'Sold By', 'Order Date', 'Extracted Product', 'Internal Ref',
+                'Workflow Status', 'Affiliate Status', 'Payment Status', 'Settlement Date',
+                'Mediator', 'Agency', 'Reviewer Name', 'Sold By', 'Order Date', 'Extracted Product', 'Internal Ref',
               ];
               const csvRows = orders.map(o => {
                 const d = new Date(o.createdAt);
@@ -803,7 +762,9 @@ export const Orders: React.FC = () => {
                   csvSafe(o.workflowStatus || ''),
                   csvSafe(o.affiliateStatus || ''),
                   csvSafe(o.paymentStatus || ''),
+                  csvSafe((o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString() : ''),
                   csvSafe(o.managerName || ''),
+                  csvSafe(o.agencyName || ''),
                   csvSafe((o as any).reviewerName || ''),
                   csvSafe(o.soldBy || ''),
                   csvSafe(o.orderDate ? new Date(o.orderDate).toLocaleDateString() : ''),
@@ -927,9 +888,6 @@ export const Orders: React.FC = () => {
             } else if (order.affiliateStatus === 'Frozen_Disputed') {
               displayStatus = 'FROZEN';
               statusClass = 'bg-red-50 text-red-700 border-red-200';
-            } else if (order.affiliateStatus === 'Fraud_Alert') {
-              displayStatus = 'FRAUD FLAGGED';
-              statusClass = 'bg-red-100 text-red-800 border-red-300';
             } else if (order.affiliateStatus === 'Rejected') {
               displayStatus = 'REJECTED';
               statusClass = 'bg-red-50 text-red-700 border-red-200';
@@ -1625,117 +1583,6 @@ export const Orders: React.FC = () => {
                   <Check size={18} />
                 )}
                 {isUploading ? 'Submitting...' : 'Submit Claim'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TICKET MODAL */}
-      {ticketModal && (
-        <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
-          onClick={() => setTicketModal(null)}
-        >
-          <div
-            className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-slide-up relative"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setTicketModal(null)}
-              aria-label="Close"
-              className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-            >
-              <X size={16} />
-            </button>
-            <h3 className="text-xl font-extrabold text-slate-900 mb-1 flex items-center gap-2">
-              <AlertTriangle className="text-red-500" /> Dispute Order
-            </h3>
-            <p className="text-xs text-slate-500 font-bold uppercase mb-6">
-              Order {getPrimaryOrderId(ticketModal)}
-            </p>
-            <div className="space-y-4">
-              {tickets.filter((t) => String(t.orderId || '') === String(ticketModal.id)).length > 0 && (
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">
-                    Existing tickets
-                  </label>
-                  {tickets
-                    .filter((t) => String(t.orderId || '') === String(ticketModal.id))
-                    .map((t) => (
-                      <div
-                        key={t.id}
-                        className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
-                      >
-                        <div className="min-w-0">
-                          <div className="text-[11px] font-bold text-slate-700 truncate">
-                            {String(t.issueType || 'Ticket')}
-                          </div>
-                          <div className="text-[10px] text-slate-500 truncate">
-                            Status: {String(t.status || '')}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            try {
-                              if (String(t.status || '').toLowerCase() === 'open') {
-                                toast.error('Ticket must be resolved or rejected before deletion.');
-                                return;
-                              }
-                              await api.tickets.delete(t.id);
-                              toast.success('Ticket deleted.');
-                              await loadTickets();
-                            } catch (err: any) {
-                              toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
-                            }
-                          }}
-                          className="px-3 py-1 rounded-lg text-[10px] font-bold bg-white border border-slate-200 text-slate-600 hover:text-red-600 hover:border-red-200"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    ))}
-                </div>
-              )}
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-2">
-                  Issue Type
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {['Cashback Delay', 'Wrong Amount', 'Other'].map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => setTicketIssue(type)}
-                      className={`px-3 py-2 rounded-lg text-xs font-bold border transition-all ${ticketIssue === type ? 'bg-red-50 text-red-600 border-red-200' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'}`}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-2">
-                  Details
-                </label>
-                <textarea
-                  value={ticketDesc}
-                  onChange={(e) => setTicketDesc(e.target.value)}
-                  maxLength={2000}
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-red-400 h-24 resize-none"
-                  placeholder="Describe the issue..."
-                />
-              </div>
-              <button
-                onClick={submitTicket}
-                disabled={isUploading || !ticketDesc}
-                className="w-full py-4 bg-black text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-red-600 transition-all disabled:opacity-50 active:scale-95"
-              >
-                {isUploading ? (
-                  <Loader2 size={18} className="animate-spin motion-reduce:animate-none" />
-                ) : (
-                  'Open Dispute'
-                )}
               </button>
             </div>
           </div>

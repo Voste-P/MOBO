@@ -1,18 +1,35 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
+import { z } from 'zod';
 import type { Env } from '../config/env.js';
 import { requireAuth } from '../middleware/auth.js';
-import { exportToGoogleSheet, refreshUserGoogleToken, type SheetExportRequest } from '../services/sheetsService.js';
+import { exportToGoogleSheet, refreshUserGoogleToken } from '../services/sheetsService.js';
 import { writeAuditLog } from '../services/audit.js';
 import { logAccessEvent, logChangeEvent, logErrorEvent } from '../config/appLogs.js';
 import { businessLog } from '../config/logger.js';
 import { prisma, isPrismaAvailable } from '../database/prisma.js';
 import { idWhere } from '../utils/idWhere.js';
 
+const sheetExportSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  sheetName: z.string().trim().min(1).max(100).optional(),
+  headers: z.array(z.string().min(1)).min(1).max(500),
+  rows: z.array(z.array(z.union([z.string(), z.number(), z.null()]))).max(50_000),
+});
+
 export function sheetsRoutes(env: Env): Router {
   const router = Router();
 
   // All sheets endpoints require authentication
   router.use(requireAuth(env));
+
+  // Rate limiter: 10 exports per 15 min in production (protects Google API quota)
+  const sheetsWriteLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: process.env.NODE_ENV === 'production' ? 10 : 100,
+    keyGenerator: (req) => (req as any).auth?.userId || req.ip || 'anon',
+    message: { error: { code: 'RATE_LIMITED', message: 'Too many export requests. Please wait and try again.' } },
+  });
 
   /**
    * POST /api/sheets/export
@@ -22,31 +39,13 @@ export function sheetsRoutes(env: Env): Router {
    * Body: { title, sheetName?, headers: string[], rows: (string|number|null)[][] }
    * Returns: { spreadsheetId, spreadsheetUrl, sheetTitle }
    */
-  router.post('/export', async (req, res, next) => {
+  router.post('/export', sheetsWriteLimiter, async (req, res, next) => {
     try {
-      const { title, sheetName, headers, rows } = req.body as SheetExportRequest;
+      const { title, sheetName, headers, rows } = sheetExportSchema.parse(req.body);
 
-      if (!title || typeof title !== 'string') {
-        return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'title is required' } });
-      }
-      if (!Array.isArray(headers) || headers.length === 0) {
-        return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'headers must be a non-empty array' } });
-      }
-      // Validate individual header types
-      if (!headers.every((h: unknown) => typeof h === 'string' && h.length > 0)) {
-        return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'All headers must be non-empty strings' } });
-      }
-      if (!Array.isArray(rows)) {
-        return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'rows must be an array' } });
-      }
-      // Safety limit: max 50,000 rows per export
-      if (rows.length > 50_000) {
-        return res.status(400).json({ error: { code: 'TOO_MANY_ROWS', message: 'Maximum 50,000 rows per export' } });
-      }
       // Sanitize rows: coerce cells to string/number/null only
-      const sanitizedRows = rows.map((row: unknown[]) => {
-        if (!Array.isArray(row)) return [];
-        return row.map((cell: unknown) => {
+      const sanitizedRows = rows.map((row) => {
+        return row.map((cell) => {
           if (cell === null || cell === undefined) return null;
           if (typeof cell === 'number') return cell;
           return String(cell);

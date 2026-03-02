@@ -9,7 +9,6 @@ export type AffiliateStatus =
   | 'Pending_Cooling'
   | 'Approved_Settled'
   | 'Rejected'
-  | 'Fraud_Alert'
   | 'Cap_Exceeded'
   | 'Frozen_Disputed';
 export type WithdrawalStatus = 'Pending' | 'Approved' | 'Rejected' | 'Processed';
