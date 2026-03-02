@@ -257,7 +257,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
         productsForAi,
         ordersForAi,
         ticketsForAi,
-        base64Image,
+        undefined,
         history,
         controller.signal,
       );
