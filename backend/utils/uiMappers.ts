@@ -421,7 +421,7 @@ export function toUiOrder(o: any) {
       detectedReturnWindow: o.returnWindowAiVerification.detectedReturnWindow,
       discrepancyNote: o.returnWindowAiVerification.discrepancyNote,
     } : undefined,
-    returnWindowDays: o.returnWindowDays ?? 10,
+    returnWindowDays: o.returnWindowDays ?? 7,
     missingProofRequests: Array.isArray(o.missingProofRequests)
       ? o.missingProofRequests.map((r: any) => ({
           type: r?.type,

@@ -35,13 +35,28 @@ function buildCorsMatchers(allowed: string[]): CorsMatcher[] {
   const key = allowed.join(',');
   if (corsMatcherCache.has(key)) return corsMatcherCache.get(key)!;
 
-  const matchers: CorsMatcher[] = allowed.map((entryRaw) => {
+  const matchers: CorsMatcher[] = [];
+
+  for (const entryRaw of allowed) {
     const entry = String(entryRaw || '').trim();
-    if (!entry) return () => false;
+    if (!entry) { matchers.push(() => false); continue; }
 
     // Exact match (full origin string).
     if (!entry.includes('*') && (entry.startsWith('http://') || entry.startsWith('https://'))) {
-      return (origin: string) => entry === origin;
+      matchers.push((origin: string) => entry === origin);
+
+      // Auto-allow Vercel preview/branch deployments.
+      // e.g. https://mobobrand.vercel.app → also allow
+      //      https://mobobrand-git-*-*.vercel.app
+      //      https://mobobrand-*-*.vercel.app
+      const vercelMatch = entry.match(/^(https?):\/\/([a-z0-9-]+)\.vercel\.app$/);
+      if (vercelMatch) {
+        const proto = vercelMatch[1];
+        const slug = vercelMatch[2];
+        const previewRe = new RegExp(`^${proto}://${slug}(-[a-z0-9-]+)?\\.vercel\\.app$`);
+        matchers.push((origin: string) => previewRe.test(origin));
+      }
+      continue;
     }
 
     // Wildcard — pre-compile regex once.
@@ -50,17 +65,19 @@ function buildCorsMatchers(allowed: string[]): CorsMatcher[] {
         .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
         .replace(/\*/g, '.*');
       const re = new RegExp(`^${escaped}$`);
-      return (origin: string, host: string) => re.test(origin) || re.test(host);
+      matchers.push((origin: string, host: string) => re.test(origin) || re.test(host));
+      continue;
     }
 
     // Hostname suffix match.
     if (entry.startsWith('.')) {
-      return (_origin: string, host: string) => host.endsWith(entry);
+      matchers.push((_origin: string, host: string) => host.endsWith(entry));
+      continue;
     }
 
     // Hostname exact match.
-    return (_origin: string, host: string) => host === entry;
-  });
+    matchers.push((_origin: string, host: string) => host === entry);
+  }
 
   corsMatcherCache.set(key, matchers);
   return matchers;

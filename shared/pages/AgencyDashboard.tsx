@@ -2203,8 +2203,9 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                               try {
                                 const res = await api.ops.copyCampaign(c.id);
                                 if (res.ok) {
-                                  toast.success('Campaign copied as Draft below');
+                                  toast.success('Campaign copied as Draft — see Active Inventory');
                                   await onRefresh();
+                                  setSubTab('inventory');
                                 } else {
                                   toast.error((res as any).error || 'Copy failed');
                                 }

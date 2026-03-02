@@ -62,6 +62,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({ role }) => {
                   key={s}
                   type="button"
                   onClick={() => setRating(s)}
+                  aria-label={`Rate ${s} of 5 stars`}
                   className="transition-transform hover:scale-110 active:scale-95"
                 >
                   <Star
@@ -85,6 +86,9 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({ role }) => {
               className="w-full p-3 bg-zinc-50 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-lime-400 h-20 resize-none"
               placeholder="What do you like? What can be better?"
             />
+            {text.length > 0 && (
+              <p className="text-[10px] text-zinc-300 font-bold text-right mt-1">{text.length}/2000</p>
+            )}
           </div>
 
           <button
