@@ -6,7 +6,7 @@ import { api, asArray } from '../services/api';
 import { getApiBaseAbsolute } from '../utils/apiBaseUrl';
 import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage } from '../components/ProxiedImage';
-import { RaiseTicketModal } from '../components/RaiseTicketModal';
+
 import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
 import { Button, EmptyState, IconButton, Input, Spinner } from '../components/ui';
@@ -70,6 +70,7 @@ type ViewMode =
   | 'settings'
   | 'invites'
   | 'support'
+  | 'feedback'
   | 'audit-logs';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
@@ -179,7 +180,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [sheetsExporting, setSheetsExporting] = useState(false);
-  const [ticketOpen, setTicketOpen] = useState(false);
+
 
   const switchView = (next: ViewMode) => {
     setView(next);
@@ -346,6 +347,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
           api.admin.getProducts().then((p) => setProducts(asArray(p))).catch(() => {});
           break;
         case 'support':
+        case 'feedback':
           api.tickets.getAll().then((t) => setTickets(asArray(t))).catch(() => {});
           break;
         case 'invites':
@@ -940,7 +942,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                 label="Support Desk"
                 active={view === 'support'}
                 onClick={() => switchView('support')}
-                badge={tickets.filter((t) => t.status === 'Open').length}
+                badge={tickets.filter((t) => t.status === 'Open' && t.issueType !== 'Feedback').length}
+              />
+              <SidebarItem
+                icon={Star}
+                label="Feedbacks"
+                active={view === 'feedback'}
+                onClick={() => switchView('feedback')}
+                badge={tickets.filter((t) => t.issueType === 'Feedback').length}
               />
               <SidebarItem
                 icon={Key}
@@ -965,13 +974,6 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
           </div>
 
           <div className="mt-auto p-4 border-t border-slate-800">
-            <button
-              type="button"
-              onClick={() => setTicketOpen(true)}
-              className="w-full py-3 flex items-center justify-center gap-2 text-amber-400 hover:bg-slate-800 rounded-xl transition-colors text-xs font-bold uppercase tracking-wider mb-1"
-            >
-              <AlertTriangle size={16} /> Raise Ticket
-            </button>
             <button
               type="button"
               onClick={logout}
@@ -1161,7 +1163,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
             )}
 
             {/* SUPPORT VIEW */}
-            {view === 'support' && (
+            {view === 'support' && (() => {
+              const supportTickets = tickets.filter((t) => t.issueType !== 'Feedback');
+              return (
               <div className="space-y-6 animate-enter">
                 <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between">
                   <div className="flex items-center gap-4">
@@ -1176,7 +1180,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     </div>
                   </div>
                   <div className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-xl text-xs font-bold">
-                    {tickets.filter((t) => t.status === 'Open').length} Pending
+                    {supportTickets.filter((t) => t.status === 'Open').length} Pending
                   </div>
                 </div>
 
@@ -1190,7 +1194,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         className="border-slate-200"
                       />
                     </div>
-                  ) : tickets.length === 0 ? (
+                  ) : supportTickets.length === 0 ? (
                     <div className="col-span-full">
                       <EmptyState
                         title="No tickets"
@@ -1199,7 +1203,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       />
                     </div>
                   ) : (
-                    tickets.map((t) => (
+                    supportTickets.map((t) => (
                       <div
                         key={t.id}
                         className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col hover:shadow-md transition-all"
@@ -1232,7 +1236,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                             </div>
                             <div className="text-[10px]">
                               <p className="font-bold text-slate-900">{t.userName}</p>
-                              <p className="text-slate-400 font-mono">User</p>
+                              <p className="text-slate-400 font-mono capitalize">{t.role || 'User'}</p>
                             </div>
                           </div>
 
@@ -1275,7 +1279,128 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   )}
                 </div>
               </div>
-            )}
+              );
+            })()}
+
+            {/* FEEDBACK VIEW */}
+            {view === 'feedback' && (() => {
+              const feedbacks = tickets.filter((t) => t.issueType === 'Feedback');
+              const extractRating = (desc: string) => {
+                const match = desc.match(/Rating:\s*(\d)/);
+                return match ? parseInt(match[1], 10) : 0;
+              };
+              const extractComment = (desc: string) => {
+                return desc.replace(/^Rating:\s*\d\/5\n?/, '').trim();
+              };
+              const avgRating = feedbacks.length > 0
+                ? feedbacks.reduce((acc, f) => acc + extractRating(f.description), 0) / feedbacks.length
+                : 0;
+              return (
+              <div className="space-y-6 animate-enter">
+                <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl">
+                      <Star size={24} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-extrabold text-slate-900">User Feedbacks</h3>
+                      <p className="text-xs font-bold text-slate-400">
+                        Reviews and ratings from all portal users
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="bg-amber-50 text-amber-700 px-4 py-2 rounded-xl text-xs font-bold">
+                      {feedbacks.length} Total
+                    </div>
+                    {avgRating > 0 && (
+                      <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1">
+                        <Star size={12} className="fill-amber-400 text-amber-400" /> {avgRating.toFixed(1)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {isLoading ? (
+                    <div className="col-span-full">
+                      <EmptyState
+                        title="Loading feedbacks"
+                        description="Loading user feedbacks..."
+                        icon={<Spinner className="w-6 h-6 text-slate-400" />}
+                        className="border-slate-200"
+                      />
+                    </div>
+                  ) : feedbacks.length === 0 ? (
+                    <div className="col-span-full">
+                      <EmptyState
+                        title="No feedbacks yet"
+                        description="When users submit feedback about the platform, their reviews will appear here."
+                        className="border-slate-200"
+                      />
+                    </div>
+                  ) : (
+                    feedbacks.map((f) => {
+                      const rating = extractRating(f.description);
+                      const comment = extractComment(f.description);
+                      return (
+                        <div
+                          key={f.id}
+                          className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col hover:shadow-md transition-all"
+                        >
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center font-bold text-sm text-amber-600">
+                                {(f.userName || '?').charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-900 text-sm">{f.userName}</p>
+                                <p className="text-[10px] text-slate-400 font-bold capitalize">{f.role || 'User'}</p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded">
+                              {new Date(f.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+
+                          {/* Star Rating */}
+                          <div className="flex items-center gap-0.5 mb-3">
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <Star
+                                key={s}
+                                size={16}
+                                className={s <= rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}
+                              />
+                            ))}
+                            <span className="text-xs font-bold text-slate-600 ml-2">{rating}/5</span>
+                          </div>
+
+                          {comment && (
+                            <div className="bg-slate-50 p-3 rounded-xl flex-1">
+                              <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                                "{comment}"
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-end mt-3">
+                            <button
+                              type="button"
+                              onClick={() => deleteTicket(f.id)}
+                              className="p-2 bg-slate-100 text-slate-400 rounded-lg hover:bg-rose-100 hover:text-rose-500 transition-colors"
+                              title="Delete feedback"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+              );
+            })()}
 
             {/* USERS VIEW */}
             {view === 'users' && (
@@ -2036,7 +2161,6 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         </div>
       )}
     </DesktopShell>
-    <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />
     </>
   );
 };

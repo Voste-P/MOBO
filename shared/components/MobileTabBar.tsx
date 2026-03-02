@@ -63,7 +63,7 @@ export const MobileTabBar = React.memo(function MobileTabBar({
               >
                 {item.icon}
                 {(item.badge ?? 0) > 0 ? (
-                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 text-white text-[9px] font-bold flex items-center justify-center rounded-full border border-[#18181B]">
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border border-[#18181B]">
                     {item.badge}
                   </span>
                 ) : null}

@@ -399,6 +399,7 @@ export const Profile: React.FC = () => {
                       key={s}
                       type="button"
                       onClick={() => setFeedbackRating(s)}
+                      aria-label={`Rate ${s} of 5 stars`}
                       className="transition-transform hover:scale-110 active:scale-95"
                     >
                       <Star

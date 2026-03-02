@@ -442,7 +442,7 @@ model Campaign {
   originalPricePaise Int @map("original_price_paise")
   pricePaise         Int @map("price_paise")
   payoutPaise        Int @map("payout_paise")
-  returnWindowDays   Int @default(14) @map("return_window_days")
+  returnWindowDays   Int @default(7) @map("return_window_days")
 
   dealType   DealType?      @map("deal_type")
   totalSlots Int            @map("total_slots")
@@ -559,7 +559,7 @@ model Order {
   screenshotRating       String? @map("screenshot_rating")
   screenshotReturnWindow String? @map("screenshot_return_window")
   reviewLink             String? @map("review_link")
-  returnWindowDays       Int     @default(14) @map("return_window_days")
+  returnWindowDays       Int     @default(7) @map("return_window_days")
 
   // AI verification results (JSONB because deeply nested)
   orderAiVerification        Json? @map("order_ai_verification")
