@@ -4,7 +4,6 @@ import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../components/ui/ConfirmDialog';
 import { api, asArray } from '../services/api';
 import { getApiBaseAbsolute } from '../utils/apiBaseUrl';
-import { filterAuditLogs, auditActionLabel } from '../utils/auditDisplay';
 import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage } from '../components/ProxiedImage';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
@@ -45,9 +44,6 @@ import {
   MessageCircle,
   ExternalLink,
   AlertCircle,
-  ChevronDown,
-  ChevronUp,
-  Clock,
   Sparkles,
 } from 'lucide-react';
 import {
@@ -148,7 +144,6 @@ const StatusBadge = ({ status }: { status: string }) => {
     Delivered: 'bg-blue-50 text-blue-700 border-blue-200',
     Ordered: 'bg-indigo-50 text-indigo-700 border-indigo-200',
     Shipped: 'bg-violet-50 text-violet-700 border-violet-200',
-    Fraud_Alert: 'bg-rose-50 text-rose-700 border-rose-200',
     Approved_Settled: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     used: 'bg-slate-100 text-slate-400 border-slate-200 line-through',
     Cancelled: 'bg-rose-50 text-rose-700 border-rose-200',
@@ -160,7 +155,6 @@ const StatusBadge = ({ status }: { status: string }) => {
   const labels: any = {
     Pending_Cooling: 'Cooling Period',
     Approved_Settled: 'Settled',
-    Fraud_Alert: 'High Risk',
   };
 
   return (
@@ -218,30 +212,10 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('All');
   const [inventorySearch, setInventorySearch] = useState('');
   const [proofModal, setProofModal] = useState<Order | null>(null);
-  const [orderAuditLogs, setOrderAuditLogs] = useState<any[]>([]);
-  const [_orderAuditEvents, setOrderAuditEvents] = useState<any[]>([]);
-  const [orderAuditLoading, setOrderAuditLoading] = useState(false);
-  const [orderAuditExpanded, setOrderAuditExpanded] = useState(false);
 
 
   // Admin-specific: show up to 2 decimal places
   const formatCurrency = (amount: number) => formatCurrencyBase(amount, { maximumFractionDigits: 2 });
-
-  const fetchOrderAudit = async (orderId: string) => {
-    setOrderAuditLoading(true);
-    try {
-      const resp = await api.orders.getOrderAudit(orderId);
-      setOrderAuditLogs(Array.isArray(resp?.logs) ? resp.logs : []);
-      setOrderAuditEvents(Array.isArray(resp?.events) ? resp.events : []);
-    } catch (e) {
-      console.error('Order audit fetch error:', e);
-      toast.error('Failed to load audit trail for this order.');
-      setOrderAuditLogs([]);
-      setOrderAuditEvents([]);
-    } finally {
-      setOrderAuditLoading(false);
-    }
-  };
 
 
 
@@ -615,7 +589,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   };
 
   const handleExport = (reportType: 'orders' | 'finance') => {
-    const dataToExport = orders;
+    const dataToExport = filteredOrders;
     if (!dataToExport || dataToExport.length === 0) {
       toast.info('No data available to export.');
       return;
@@ -644,9 +618,11 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       'Quantity',
       'Unit Price',
       'Total Amount',
+      'Settlement Date',
       'Order Status',
       'Payment Status',
       'Verification Status',
+      'Mediator Name',
       'Mediator Code',
       'Agency Name',
       'Internal Ref',
@@ -682,11 +658,13 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         item?.quantity ?? 1,
         item?.priceAtPurchase ?? 0,
         order.total,
+        (order as any).expectedSettlementDate ? new Date((order as any).expectedSettlementDate).toLocaleDateString() : '',
         csvSafe(order.status || ''),
         csvSafe(order.paymentStatus || ''),
         csvSafe(order.affiliateStatus || ''),
-        csvSafe(order.managerName || 'N/A'),
-        csvSafe(order.agencyName || 'Partner Agency'),
+        csvSafe(order.managerName || ''),
+        csvSafe((order as any).mediatorCode || (order as any).managerCode || ''),
+        csvSafe(order.agencyName || 'Direct'),
         order.id,
         csvSafe(order.soldBy || ''),
         order.orderDate ? new Date(order.orderDate).toLocaleDateString() : '',
@@ -709,12 +687,12 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   };
 
   const handleExportToSheets = (reportType: 'orders' | 'finance') => {
-    const dataToExport = orders;
+    const dataToExport = filteredOrders;
     if (!dataToExport || dataToExport.length === 0) {
       toast.info('No data available to export.');
       return;
     }
-    const sheetHeaders = ['Order ID','Date','Time','Customer Name','Customer Mobile','Reviewer Name','Brand','Product','Platform','Deal Type','Quantity','Unit Price','Total Amount','Order Status','Payment Status','Verification Status','Mediator Code','Agency Name','Internal Ref','Sold By','Order Date','Extracted Product'];
+    const sheetHeaders = ['Order ID','Date','Time','Customer Name','Customer Mobile','Reviewer Name','Brand','Product','Platform','Deal Type','Quantity','Unit Price','Total Amount','Settlement Date','Order Status','Payment Status','Verification Status','Mediator Name','Mediator Code','Agency Name','Internal Ref','Sold By','Order Date','Extracted Product'];
     const sheetRows = dataToExport.map((order) => {
       const dateObj = new Date(order.createdAt);
       const item = order.items?.[0];
@@ -732,11 +710,13 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         item?.quantity ?? 1,
         item?.priceAtPurchase ?? 0,
         order.total,
+        (order as any).expectedSettlementDate ? new Date((order as any).expectedSettlementDate).toLocaleDateString() : '',
         order.status,
         order.paymentStatus,
         order.affiliateStatus || '',
-        order.managerName || 'N/A',
-        order.agencyName || 'Partner Agency',
+        order.managerName || '',
+        (order as any).mediatorCode || (order as any).managerCode || '',
+        order.agencyName || 'Direct',
         order.id,
         order.soldBy || '',
         order.orderDate ? new Date(order.orderDate).toLocaleDateString() : '',
@@ -1589,7 +1569,6 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     <option value="Pending">Pending</option>
                     <option value="Pending_Cooling">Cooling</option>
                     <option value="Approved_Settled">Settled</option>
-                    <option value="Rejected_Fraud">Fraud</option>
                     <option value="Rejected_Expired">Expired</option>
                     <option value="Paid">Paid</option>
                   </select>
@@ -1899,14 +1878,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
 
       {/* Proof Viewer Modal */}
       {proofModal && (
-        <div className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => { setProofModal(null); setOrderAuditExpanded(false); setOrderAuditLogs([]); setOrderAuditEvents([]); }}>
+        <div className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => { setProofModal(null); }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
               <div>
-                <h3 className="font-extrabold text-lg text-slate-900">Order Proofs &amp; Audit</h3>
+                <h3 className="font-extrabold text-lg text-slate-900">Order Proofs</h3>
                 <p className="text-xs text-slate-500 font-mono mt-1">{proofModal.externalOrderId || proofModal.id}</p>
               </div>
-              <button type="button" aria-label="Close proof modal" onClick={() => { setProofModal(null); setOrderAuditExpanded(false); setOrderAuditLogs([]); setOrderAuditEvents([]); }} className="p-2 rounded-lg hover:bg-slate-100">
+              <button type="button" aria-label="Close proof modal" onClick={() => { setProofModal(null); }} className="p-2 rounded-lg hover:bg-slate-100">
                 <span className="text-slate-400 text-xl font-bold">&times;</span>
               </button>
             </div>
@@ -2049,49 +2028,6 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   <ProofImage orderId={proofModal.id} proofType="payment" existingSrc={proofModal.screenshots.payment !== 'exists' ? proofModal.screenshots.payment : undefined} alt="Payment Proof" className="w-full max-h-[300px] object-contain rounded-xl border border-green-200 bg-green-50" />
                 ) : (
                   <div className="py-4 text-center text-xs text-slate-400 font-bold bg-slate-50 rounded-xl border border-dashed border-slate-200">Not uploaded</div>
-                )}
-              </div>
-
-              {/* 6. Per-Order Audit Trail */}
-              <div className="border-t border-slate-100 pt-4">
-                <button
-                  type="button"
-                  className="flex items-center justify-between w-full text-left"
-                  onClick={() => {
-                    if (!orderAuditExpanded) {
-                      setOrderAuditExpanded(true);
-                      fetchOrderAudit(proofModal.id);
-                    } else {
-                      setOrderAuditExpanded(false);
-                    }
-                  }}
-                >
-                  <h4 className="flex items-center gap-2 text-xs font-extrabold text-indigo-500 uppercase tracking-wider">
-                    <ClipboardList size={14} /> Order Audit Trail
-                  </h4>
-                  {orderAuditExpanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
-                </button>
-                {orderAuditExpanded && (
-                  <div className="mt-3">
-                    {orderAuditLoading ? (
-                      <div className="flex items-center justify-center py-4"><Spinner /> <span className="text-xs text-slate-400 ml-2">Loading audit...</span></div>
-                    ) : orderAuditLogs.length > 0 ? (
-                      <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                        {filterAuditLogs(orderAuditLogs).map((log: any, i: number) => (
-                          <div key={log.id || `audit-${i}`} className="flex items-start gap-3 p-2 bg-slate-50 rounded-lg border border-slate-100">
-                            <Clock size={12} className="text-slate-400 mt-0.5 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[10px] font-bold text-slate-600 uppercase">{auditActionLabel(log.action)}</p>
-                              <p className="text-[9px] text-slate-400">{log.at ? new Date(log.at).toLocaleString() : log.createdAt ? new Date(log.createdAt).toLocaleString() : ''}</p>
-                              {log.metadata?.proofType && <p className="text-[9px] text-slate-400">Proof: {log.metadata.proofType}</p>}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-slate-400 text-center py-3">No audit events recorded.</p>
-                    )}
-                  </div>
                 )}
               </div>
 

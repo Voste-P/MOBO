@@ -9,7 +9,7 @@ import { PortalGuard } from '../components/PortalGuard';
 import { MobileTabBar } from '../components/MobileTabBar';
 import { Button, Card, CardContent } from '../components/ui';
 import { AuthScreen } from '../pages/Auth';
-import { Package, User, LogOut, Search, MessageCircle } from 'lucide-react';
+import { Package, User, LogOut, Home as HomeIcon, Bot } from 'lucide-react';
 
 // Lazy-load heavy page components to reduce initial bundle size.
 // Orders alone is 102KB, Explore and Profile are also significant.
@@ -110,8 +110,8 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
               <div className="absolute bottom-[calc(0.75rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 w-[92vw] max-w-[360px]">
                 <MobileTabBar
                   items={[
-                    { id: 'explore', label: 'Explore', ariaLabel: 'Explore Deals', icon: <Search size={22} strokeWidth={2.5} /> },
-                    { id: 'home', label: 'Chat', ariaLabel: 'Chat', icon: <MessageCircle size={22} strokeWidth={2.5} /> },
+                    { id: 'explore', label: 'Home', ariaLabel: 'Home', icon: <HomeIcon size={22} strokeWidth={2.5} /> },
+                    { id: 'home', label: 'Chat', ariaLabel: 'Chat', icon: <Bot size={22} strokeWidth={2.5} /> },
                     { id: 'orders', label: 'Orders', ariaLabel: 'Orders', icon: <Package size={22} strokeWidth={2.5} /> },
                     { id: 'profile', label: 'Profile', ariaLabel: 'Profile', icon: <User size={22} strokeWidth={2.5} /> },
                   ]}

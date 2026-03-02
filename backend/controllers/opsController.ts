@@ -1317,8 +1317,8 @@ export function makeOpsController(env: Env) {
 
         updateData.rejectionType = body.type;
         updateData.rejectionReason = body.reason;
-        updateData.rejectedAt = new Date();
-        updateData.rejectedBy = req.auth?.userId;
+        updateData.rejectionAt = new Date();
+        updateData.rejectionBy = req.auth?.userId;
         updateData.affiliateStatus = 'Rejected';
         updateData.verification = v;
 

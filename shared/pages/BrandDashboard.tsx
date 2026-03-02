@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getApiBaseAbsolute } from '../utils/apiBaseUrl';
-import { filterAuditLogs, auditActionLabel } from '../utils/auditDisplay';
 import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage } from '../components/ProxiedImage';
 import { useAuth } from '../context/AuthContext';
@@ -60,6 +59,7 @@ import { User, Campaign, Order } from '../types';
 import { EmptyState, Spinner } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
+import { FeedbackCard } from '../components/FeedbackCard';
 import { RatingVerificationBadge, ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
 import { formatCurrency } from '../utils/formatCurrency';
 import { getPrimaryOrderId } from '../utils/orderHelpers';
@@ -370,9 +370,11 @@ const DashboardView = ({
   agencies: User[];
   orders: Order[];
 }) => {
-  const totalRevenue = orders.reduce((acc, o) => acc + o.total, 0);
-  const activeCampaigns = campaigns.filter((c) => c.status === 'Active').length;
-  const totalReach = campaigns.reduce((acc, c) => acc + c.totalSlots, 0);
+  const { totalRevenue, activeCampaigns, totalReach } = useMemo(() => ({
+    totalRevenue: orders.reduce((acc, o) => acc + o.total, 0),
+    activeCampaigns: campaigns.filter((c) => c.status === 'Active').length,
+    totalReach: campaigns.reduce((acc, c) => acc + c.totalSlots, 0),
+  }), [orders, campaigns]);
 
   const formatRupees = (value: number) => {
     const n = Number(value || 0);
@@ -591,11 +593,6 @@ const OrdersView = ({ user }: any) => {
   const [orderViewMode, setOrderViewMode] = useState<'orders' | 'orderSheet' | 'financeSheet'>('orders');
   const [isLoading, setIsLoading] = useState(true);
   const [sheetsExporting, setSheetsExporting] = useState(false);
-  // Audit trail state for proof modal
-  const [auditExpanded, setAuditExpanded] = useState(false);
-  const [auditLoading, setAuditLoading] = useState(false);
-  const [orderAuditLogs, setOrderAuditLogs] = useState<any[]>([]);
-  const [_orderAuditEvents, setOrderAuditEvents] = useState<any[]>([]);
 
   const getOrderStatusBadge = (o: Order) => {
     const wf = String(o.workflowStatus || '').trim();
@@ -606,7 +603,7 @@ const OrdersView = ({ user }: any) => {
     const label = wf || aff || pay || 'Unknown';
 
     const isGood = pay === 'Paid' || wf === 'COMPLETED' || aff === 'Approved_Settled';
-    const isBad = wf === 'REJECTED' || wf === 'FAILED' || aff === 'Rejected' || aff === 'Fraud_Alert' || aff === 'Frozen_Disputed' || pay === 'Failed';
+    const isBad = wf === 'REJECTED' || wf === 'FAILED' || aff === 'Rejected' || aff === 'Frozen_Disputed' || pay === 'Failed';
     const isAction = wf === 'UNDER_REVIEW' || wf === 'PROOF_SUBMITTED' || aff === 'Unchecked' || aff === 'Pending_Cooling';
 
     const cls = isGood
@@ -714,6 +711,7 @@ const OrdersView = ({ user }: any) => {
   }), [orders, search, statusFilter, dealTypeFilter, mediatorFilter, productFilter]);
 
   const handleExport = () => {
+    if (filtered.length === 0) { toast.info('No orders to export'); return; }
     const apiBase = getApiBaseAbsolute();
     const buildProofUrl = (orderId: string, type: 'order' | 'payment' | 'rating' | 'review' | 'returnWindow') => {
       return `${apiBase}/orders/${encodeURIComponent(orderId)}/proof/${type}`;
@@ -724,20 +722,30 @@ const OrdersView = ({ user }: any) => {
     const hyperlinkYes = (url?: string) =>
       url ? csvEscape(`=HYPERLINK("${url}","Yes")`) : 'No';
 
+    // Build filter summary for metadata
+    const activeFilters: string[] = [];
+    if (statusFilter !== 'All') activeFilters.push(`Status: ${statusFilter}`);
+    if (dealTypeFilter !== 'All') activeFilters.push(`Deal Type: ${dealTypeFilter}`);
+    if (mediatorFilter !== 'All') activeFilters.push(`Mediator: ${mediatorFilter}`);
+    if (productFilter !== 'All') activeFilters.push(`Product: ${productFilter}`);
+    if (search) activeFilters.push(`Search: ${search}`);
+
     const headers = [
       'Order ID',
       'Date',
       'Time',
       'Product',
-      'Category',
+      'Brand',
       'Platform',
       'Deal Type',
       'Unit Price',
       'Quantity',
       'Total Value',
       'Commission (₹)',
+      'Settlement Date',
       'Agency Name',
-      'Partner ID',
+      'Mediator Name',
+      'Mediator Code',
       'Buyer Name',
       'Buyer Mobile',
       'Reviewer Name',
@@ -755,28 +763,39 @@ const OrdersView = ({ user }: any) => {
       'Proof: Return Window',
     ];
 
-    const csvRows = [headers.join(',')];
+    const csvRows: string[] = [];
+    // Metadata header
+    csvRows.push(`"Brand Orders Report - ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}","Generated: ${new Date().toLocaleString()}","Total Orders: ${filtered.length}","${activeFilters.length ? 'Filters: ' + activeFilters.join(' | ') : 'Filters: None'}"`);
+    csvRows.push(''); // blank separator row
+    csvRows.push(headers.join(','));
+
+    let totalValue = 0;
+    let totalCommission = 0;
 
     filtered.forEach((o) => {
       const dateObj = new Date(o.createdAt);
       const date = dateObj.toLocaleDateString();
       const time = dateObj.toLocaleTimeString();
       const item = o.items?.[0];
+      totalValue += o.total || 0;
+      totalCommission += item?.commission || 0;
 
       const row = [
         csvSafe(getPrimaryOrderId(o)),
         date,
         time,
         csvSafe(item?.title || ''),
-        csvSafe(item?.dealType || 'General'),
+        csvSafe(o.brandName || item?.brandName || ''),
         csvSafe(item?.platform || ''),
         csvSafe(item?.dealType || 'Discount'),
         item?.priceAtPurchase,
         item?.quantity || 1,
         o.total,
         item?.commission || 0,
+        (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString() : '',
         csvSafe(o.agencyName || 'Direct'),
         csvSafe(o.managerName || ''),
+        csvSafe(o.mediatorCode || (o as any).managerCode || ''),
         csvSafe(o.buyerName || ''),
         csvSafe(o.buyerMobile || ''),
         csvSafe(o.reviewerName || ''),
@@ -800,13 +819,18 @@ const OrdersView = ({ user }: any) => {
       csvRows.push(row.join(','));
     });
 
+    // Totals row
+    csvRows.push('');
+    csvRows.push(`"TOTALS","","","","","","","","",${totalValue.toFixed(2)},${totalCommission.toFixed(2)},"","","","","","","","","","","","","","","","","","","",""`);
+
+    const filterSlug = activeFilters.length ? '_filtered' : '';
     const csvString = csvRows.join('\n');
-    downloadCsv(`brand_orders_report_${new Date().toISOString().slice(0, 10)}.csv`, csvString);
+    downloadCsv(`brand_orders_report_${new Date().toISOString().slice(0, 10)}${filterSlug}.csv`, csvString);
   };
 
   const handleExportToSheets = () => {
     if (!filtered.length) { toast.info('No orders to export'); return; }
-    const sheetHeaders = ['Order ID','Date','Time','Product','Category','Platform','Deal Type','Unit Price','Quantity','Total Value','Commission (₹)','Agency Name','Partner ID','Buyer Name','Buyer Mobile','Reviewer Name','Workflow Status','Payment Status','Verification Status','Internal Ref','Sold By','Order Date','Extracted Product'];
+    const sheetHeaders = ['Order ID','Date','Time','Product','Platform','Deal Type','Unit Price','Quantity','Total Value','Commission (₹)','Settlement Date','Agency Name','Mediator Name','Mediator Code','Buyer Name','Buyer Mobile','Reviewer Name','Workflow Status','Payment Status','Verification Status','Internal Ref','Sold By','Order Date','Extracted Product'];
     const sheetRows = filtered.map((o) => {
       const dateObj = new Date(o.createdAt);
       const item = o.items?.[0];
@@ -815,15 +839,16 @@ const OrdersView = ({ user }: any) => {
         dateObj.toLocaleDateString(),
         dateObj.toLocaleTimeString(),
         item?.title || '',
-        item?.dealType || 'General',
         item?.platform || '',
         item?.dealType || 'Discount',
         item?.priceAtPurchase ?? 0,
         item?.quantity || 1,
         o.total,
         item?.commission || 0,
+        (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString() : '',
         o.agencyName || 'Direct',
         o.managerName || '',
+        o.mediatorCode || (o as any).managerCode || '',
         o.buyerName || '',
         o.buyerMobile || '',
         o.reviewerName || '',
@@ -887,7 +912,6 @@ const OrdersView = ({ user }: any) => {
               <option value="Pending_Cooling">Cooling</option>
               <option value="Approved_Settled">Settled</option>
               <option value="Paid">Paid</option>
-              <option value="Rejected_Fraud">Fraud</option>
             </select>
             <select
               value={dealTypeFilter}
@@ -1020,7 +1044,10 @@ const OrdersView = ({ user }: any) => {
                         </span>
                       </td>
                       <td className="p-6 text-sm text-zinc-700">
-                        <span className="font-mono text-xs text-zinc-500">{o.managerName || '-'}</span>
+                        <div className="text-xs font-bold text-zinc-700">{o.managerName || '-'}</div>
+                        {o.mediatorCode && o.mediatorCode !== o.managerName && (
+                          <div className="text-[9px] text-zinc-400 font-mono">{o.mediatorCode}</div>
+                        )}
                       </td>
                       <td className="p-6 text-right font-bold text-zinc-900">{formatCurrency(o.total)}</td>
                       <td className="p-6 text-right">
@@ -1080,6 +1107,9 @@ const OrdersView = ({ user }: any) => {
                         </td>
                         <td className="p-6">
                           <div className="text-xs font-bold text-zinc-700">{o.managerName || '-'}</div>
+                          {o.mediatorCode && o.mediatorCode !== o.managerName && (
+                            <div className="text-[9px] text-zinc-400 font-mono">{o.mediatorCode}</div>
+                          )}
                         </td>
                         <td className="p-6">
                           <span className="text-sm font-bold text-zinc-900 line-clamp-1">{o.items?.[0]?.title || 'Product'}</span>
@@ -1133,6 +1163,9 @@ const OrdersView = ({ user }: any) => {
                         </td>
                         <td className="p-6">
                           <div className="text-xs font-bold text-zinc-700">{o.managerName || '-'}</div>
+                          {o.mediatorCode && o.mediatorCode !== o.managerName && (
+                            <div className="text-[9px] text-zinc-400 font-mono">{o.mediatorCode}</div>
+                          )}
                         </td>
                         <td className="p-6">
                           <span className="text-sm font-bold text-zinc-900 line-clamp-1">{o.items?.[0]?.title || 'Product'}</span>
@@ -1422,61 +1455,9 @@ const OrdersView = ({ user }: any) => {
                 )}
             </div>
 
-            {/* AUDIT TRAIL */}
-            <div className="bg-zinc-50 rounded-2xl border border-zinc-100 p-4">
-              <button
-                onClick={async () => {
-                  if (auditExpanded) {
-                    setAuditExpanded(false);
-                    return;
-                  }
-                  setAuditExpanded(true);
-                  setAuditLoading(true);
-                  try {
-                    const resp = await api.orders.getOrderAudit(viewProofOrder.id);
-                    setOrderAuditLogs(resp?.logs ?? []);
-                    setOrderAuditEvents(resp?.events ?? []);
-                  } catch (err) {
-                    console.error('Failed to load activity log:', err);
-                    toast.error('Failed to load activity log');
-                    setOrderAuditLogs([]);
-                    setOrderAuditEvents([]);
-                  } finally {
-                    setAuditLoading(false);
-                  }
-                }}
-                className="flex items-center gap-2 text-xs font-bold text-zinc-400 hover:text-zinc-700 transition-colors w-full"
-              >
-                <History size={14} />
-                <span>Order Activity Log</span>
-                <span className="ml-auto">{auditExpanded ? '▲' : '▼'}</span>
-              </button>
-              {auditExpanded && (
-                <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
-                  {auditLoading ? (
-                    <p className="text-xs text-zinc-400 text-center py-2">Loading...</p>
-                  ) : orderAuditLogs.length === 0 ? (
-                    <p className="text-xs text-zinc-400 text-center py-2">No activity yet</p>
-                  ) : (
-                    <>
-                    {filterAuditLogs(orderAuditLogs).map((log: any, i: number) => (
-                      <div key={log.id || `audit-${i}`} className="flex items-start gap-2 text-[10px] text-zinc-500 border-l-2 border-zinc-200 pl-3 py-1">
-                        <span className="font-bold text-zinc-600 shrink-0">{auditActionLabel(log.action)}</span>
-                        <span className="flex-1">{log.createdAt ? new Date(log.createdAt).toLocaleString() : log.at ? new Date(log.at).toLocaleString() : ''}</span>
-                        {log.metadata?.proofType && (
-                          <span className="bg-zinc-100 px-1.5 py-0.5 rounded text-[9px] font-bold">{log.metadata.proofType}</span>
-                        )}
-                      </div>
-                    ))}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
             <div className="pt-4 mt-2 border-t border-zinc-100">
               <button
-                onClick={() => { setViewProofOrder(null); setAuditExpanded(false); setOrderAuditLogs([]); setOrderAuditEvents([]); }}
+                onClick={() => { setViewProofOrder(null); }}
                 className="w-full py-3 bg-zinc-900 text-white rounded-xl font-bold text-sm hover:bg-black transition-colors shadow-lg"
               >
                 Close Viewer
@@ -1493,7 +1474,6 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
   const { toast } = useToast();
   const { confirm, ConfirmDialogElement } = useConfirm();
   const [view, setView] = useState<'list' | 'create'>('list');
-  const [, setDetailView] = useState<Campaign | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
@@ -1601,7 +1581,6 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
     setSelAgencies(campaign.allowedAgencies || []);
     setIsEditing(true);
     setEditingId(campaign.id);
-    setDetailView(null);
     setView('create');
   };
 
@@ -2461,6 +2440,7 @@ export const BrandDashboard: React.FC = () => {
             >
               <LogOut size={16} /> Sign Out
             </button>
+            <FeedbackCard role="brand" />
           </div>
         </>
       }

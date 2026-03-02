@@ -208,7 +208,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
               </button>
             ) : (
               <div className="relative rounded-2xl border border-gray-200 overflow-hidden">
-                <img src={preview} alt="Order proof" className="w-full max-h-48 object-contain bg-gray-50" />
+                <img src={preview} alt="Order proof" loading="lazy" className="w-full max-h-48 object-contain bg-gray-50" />
                 <button
                   type="button"
                   onClick={() => { setScreenshot(null); setPreview(null); setExtractedDetails({ orderId: '', amount: '' }); }}

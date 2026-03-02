@@ -10,7 +10,6 @@ import { normalizeMobileTo10Digits } from '../utils/mobiles';
 import { formatCurrency } from '../utils/formatCurrency';
 import { getPrimaryOrderId } from '../utils/orderHelpers';
 import { csvSafe, downloadCsv as downloadCsvFile } from '../utils/csvHelpers';
-import { filterAuditLogs, auditActionLabel } from '../utils/auditDisplay';
 import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage } from '../components/ProxiedImage';
 import { User, Campaign, Order, Product, Ticket } from '../types';
@@ -43,13 +42,9 @@ import {
   HelpCircle,
   AlertTriangle,
   Sparkles,
-  Loader2,
   Search,
   Download,
   Package,
-  History,
-  ChevronDown,
-  ChevronUp,
   FileSpreadsheet,
 } from 'lucide-react';
 
@@ -306,8 +301,8 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
             if (!allOrders.length) { toast.error('No orders to export'); return; }
             const mediatorHeaders = [
               'External Order ID', 'Date', 'Time', 'Product', 'Platform', 'Brand', 'Deal Type',
-              'Unit Price (₹)', 'Quantity', 'Total (₹)', 'Commission (₹)',
-              'Buyer Name', 'Buyer Mobile', 'Reviewer Name',
+              'Unit Price (₹)', 'Quantity', 'Total (₹)', 'Commission (₹)', 'Settlement Date',
+              'Agency Name', 'Buyer Name', 'Buyer Mobile', 'Reviewer Name',
               'Workflow Status', 'Affiliate Status', 'Payment Status',
               'Sold By', 'Order Date', 'Extracted Product',
               'Internal Ref',
@@ -330,6 +325,8 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                   String(item?.quantity || 1),
                   String(o.total || 0),
                   String(item?.commission || 0),
+                  (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString() : '',
+                  o.agencyName || 'Direct',
                   o.buyerName || '',
                   o.buyerMobile || '',
                   (o as any).reviewerName || '',
@@ -361,8 +358,8 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
               title: `Mediator Orders - ${new Date().toISOString().slice(0, 10)}`,
               headers: [
                 'External Order ID', 'Date', 'Time', 'Product', 'Platform', 'Brand', 'Deal Type',
-                'Unit Price (₹)', 'Quantity', 'Total (₹)', 'Commission (₹)',
-                'Buyer Name', 'Buyer Mobile', 'Reviewer Name',
+                'Unit Price (₹)', 'Quantity', 'Total (₹)', 'Commission (₹)', 'Settlement Date',
+                'Agency Name', 'Buyer Name', 'Buyer Mobile', 'Reviewer Name',
                 'Workflow Status', 'Affiliate Status', 'Payment Status',
                 'Sold By', 'Order Date', 'Extracted Product', 'Internal Ref',
               ],
@@ -381,6 +378,8 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                   item?.quantity || 1,
                   o.total || 0,
                   item?.commission || 0,
+                  (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString() : '',
+                  o.agencyName || 'Direct',
                   o.buyerName || '',
                   o.buyerMobile || '',
                   (o as any).reviewerName || '',
@@ -1634,11 +1633,6 @@ export const MediatorDashboard: React.FC = () => {
   const [rejectReason, setRejectReason] = useState('');
   const [rejectType, setRejectType] = useState<'order' | 'review' | 'rating' | 'returnWindow'>('order');
   const [dealBuilder, setDealBuilder] = useState<Campaign | null>(null);
-  // Audit trail state
-  const [auditExpanded, setAuditExpanded] = useState(false);
-  const [orderAuditLogs, setOrderAuditLogs] = useState<any[]>([]);
-  const [_orderAuditEvents, setOrderAuditEvents] = useState<any[]>([]);
-  const [auditLoading, setAuditLoading] = useState(false);
   const [commission, setCommission] = useState('');
   const [selectedBuyer, setSelectedBuyer] = useState<User | null>(null);
   const [ticketOpen, setTicketOpen] = useState(false);
@@ -1664,7 +1658,7 @@ export const MediatorDashboard: React.FC = () => {
     } else {
       setCommission('');
     }
-  }, [dealBuilder]);
+  }, [dealBuilder, deals]);
 
   // AI Analysis — now reads stored data from order, no Gemini calls needed
 
@@ -2365,69 +2359,6 @@ export const MediatorDashboard: React.FC = () => {
                 )}
               </div>
             )}
-
-            {/* AUDIT TRAIL / ACTIVITY LOG */}
-            <div className="bg-zinc-900/50 rounded-2xl border border-zinc-800 p-4">
-              <button
-                onClick={async () => {
-                  if (auditExpanded) {
-                    setAuditExpanded(false);
-                    return;
-                  }
-                  setAuditExpanded(true);
-                  setAuditLoading(true);
-                  try {
-                    const resp = await api.orders.getOrderAudit(proofModal.id);
-                    setOrderAuditLogs(resp?.logs ?? []);
-                    setOrderAuditEvents(resp?.events ?? []);
-                  } catch (err) {
-                    console.error('Failed to load activity log:', err);
-                    toast.error('Failed to load activity log');
-                    setOrderAuditLogs([]);
-                    setOrderAuditEvents([]);
-                  } finally {
-                    setAuditLoading(false);
-                  }
-                }}
-                className="flex items-center gap-2 text-xs font-bold text-zinc-400 hover:text-zinc-200 transition-colors w-full"
-              >
-                <History size={14} />
-                Activity Log
-                <span className="ml-auto">
-                  {auditExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </span>
-              </button>
-              {auditExpanded && (
-                <div className="mt-3 max-h-48 overflow-y-auto space-y-2 scrollbar-hide">
-                  {auditLoading ? (
-                    <div className="flex justify-center py-3">
-                      <Loader2 size={16} className="animate-spin text-zinc-500" />
-                    </div>
-                  ) : orderAuditLogs.length === 0 ? (
-                    <p className="text-[10px] text-zinc-600 italic">No activity recorded yet.</p>
-                  ) : (
-                    <>
-                    {filterAuditLogs(orderAuditLogs).map((log: any, i: number) => (
-                      <div key={log._id || i} className="flex items-start gap-2 text-[10px]">
-                        <div className="w-1.5 h-1.5 rounded-full bg-zinc-600 mt-1.5 shrink-0" />
-                        <div className="min-w-0">
-                          <span className="font-bold text-zinc-300">
-                            {auditActionLabel(log.action)}
-                          </span>
-                          <span className="text-zinc-500 ml-1.5">
-                            {log.createdAt ? new Date(log.createdAt).toLocaleString() : ''}
-                          </span>
-                          {log.metadata?.proofType && (
-                            <span className="ml-1 text-zinc-500">({log.metadata.proofType})</span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
           </div>
 
           {/* ACTION BAR */}

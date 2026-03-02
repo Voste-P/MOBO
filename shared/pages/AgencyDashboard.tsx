@@ -5,9 +5,9 @@ import { useConfirm } from '../components/ui/ConfirmDialog';
 import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage } from '../components/ProxiedImage';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
+import { FeedbackCard } from '../components/FeedbackCard';
 import { api, asArray } from '../services/api';
 import { getApiBaseAbsolute } from '../utils/apiBaseUrl';
-import { filterAuditLogs, auditActionLabel } from '../utils/auditDisplay';
 import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
@@ -62,7 +62,6 @@ import {
   BookmarkPlus,
   Package,
   FileSpreadsheet,
-  History,
   Sparkles,
   Loader2,
 } from 'lucide-react';
@@ -508,6 +507,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
   };
 
   const handleExport = () => {
+    if (ledger.length === 0) { toast.info('No orders to export'); return; }
     const apiBase = getApiBaseAbsolute();
     const buildProofUrl = (orderId: string, type: 'order' | 'payment' | 'rating' | 'review' | 'returnWindow') => {
       return `${apiBase}/orders/${encodeURIComponent(orderId)}/proof/${type}`;
@@ -518,20 +518,30 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
     const hyperlinkYes = (url?: string) =>
       url ? csvEscape(`=HYPERLINK("${url}","Yes")`) : 'No';
 
+    // Build filter summary for metadata row
+    const activeFilters: string[] = [];
+    if (financeStatusFilter !== 'All') activeFilters.push(`Status: ${financeStatusFilter}`);
+    if (financeDealTypeFilter !== 'All') activeFilters.push(`Deal Type: ${financeDealTypeFilter}`);
+    if (financeMediatorFilter !== 'All') activeFilters.push(`Mediator: ${financeMediatorFilter}`);
+    if (financeProductFilter !== 'All') activeFilters.push(`Product: ${financeProductFilter}`);
+    if (financeSearch) activeFilters.push(`Search: ${financeSearch}`);
+
     const headers = [
       'Order ID',
       'Date',
       'Time',
       'Product',
-      'Category',
+      'Brand',
       'Platform',
       'Deal Type',
       'Unit Price',
       'Quantity',
       'Total Value',
       'Commission (₹)',
+      'Settlement Date',
       'Agency Name',
-      'Partner ID',
+      'Mediator Name',
+      'Mediator Code',
       'Buyer Name',
       'Buyer Mobile',
       'Reviewer Name',
@@ -549,28 +559,39 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
       'Proof: Return Window',
     ];
 
-    const csvRows = [headers.join(',')];
+    const csvRows: string[] = [];
+    // Metadata header
+    csvRows.push(`"Agency Orders Report - ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}","Generated: ${new Date().toLocaleString()}","Total Orders: ${ledger.length}","${activeFilters.length ? 'Filters: ' + activeFilters.join(' | ') : 'Filters: None'}"`);
+    csvRows.push(''); // blank separator row
+    csvRows.push(headers.join(','));
+
+    let totalValue = 0;
+    let totalCommission = 0;
 
     ledger.forEach((o: Order) => {
       const dateObj = new Date(o.createdAt);
       const date = dateObj.toLocaleDateString();
       const time = dateObj.toLocaleTimeString();
       const item = o.items?.[0];
+      totalValue += o.total || 0;
+      totalCommission += item?.commission || 0;
 
       const row = [
         csvSafe(getPrimaryOrderId(o)),
         date,
         time,
         csvSafe(item?.title || ''),
-        csvSafe(item?.dealType || 'General'),
+        csvSafe(item?.brandName || ''),
         csvSafe(item?.platform || ''),
         csvSafe(item?.dealType || 'Discount'),
         item?.priceAtPurchase,
         item?.quantity || 1,
         o.total,
         item?.commission || 0,
+        (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString() : '',
         csvSafe(o.agencyName || user?.name || 'Agency'),
         csvSafe(o.managerName || ''),
+        csvSafe(o.mediatorCode || (o as any).managerCode || ''),
         csvSafe(o.buyerName || ''),
         csvSafe(o.buyerMobile || ''),
         csvSafe(o.reviewerName || ''),
@@ -594,8 +615,13 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
       csvRows.push(row.join(','));
     });
 
+    // Totals row
+    csvRows.push('');
+    csvRows.push(`"TOTALS","","","","","","","","",${totalValue.toFixed(2)},${totalCommission.toFixed(2)},"","","","","","","","","","","","","","","","","","",""`);
+
+    const filterSlug = activeFilters.length ? '_filtered' : '';
     const csvString = csvRows.join('\n');
-    downloadCsv(`agency_orders_report_${new Date().toISOString().slice(0, 10)}.csv`, csvString);
+    downloadCsv(`agency_orders_report_${new Date().toISOString().slice(0, 10)}${filterSlug}.csv`, csvString);
   };
 
   const handleExportToSheets = () => {
@@ -607,15 +633,17 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
         dateObj.toLocaleDateString(),
         dateObj.toLocaleTimeString(),
         item?.title || '',
-        item?.dealType || 'General',
+        item?.brandName || '',
         item?.platform || '',
         item?.dealType || 'Discount',
         item?.priceAtPurchase ?? 0,
         item?.quantity || 1,
         o.total,
         item?.commission || 0,
+        (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString() : '',
         o.agencyName || user?.name || 'Agency',
         o.managerName || '',
+        o.mediatorCode || (o as any).managerCode || '',
         o.buyerName || '',
         o.buyerMobile || '',
         (o as any).reviewerName || '',
@@ -631,7 +659,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
 
     exportToGoogleSheet({
       title: `Agency Orders Report - ${new Date().toISOString().slice(0, 10)}`,
-      headers: ['Order ID','Date','Time','Product','Category','Platform','Deal Type','Unit Price','Quantity','Total Value','Commission (₹)','Agency Name','Partner ID','Buyer Name','Buyer Mobile','Reviewer Name','Workflow Status','Payment Status','Verification Status','Internal Ref','Sold By','Order Date','Extracted Product'],
+      headers: ['Order ID','Date','Time','Product','Brand','Platform','Deal Type','Unit Price','Quantity','Total Value','Commission (₹)','Settlement Date','Agency Name','Mediator Name','Mediator Code','Buyer Name','Buyer Mobile','Reviewer Name','Workflow Status','Payment Status','Verification Status','Internal Ref','Sold By','Order Date','Extracted Product'],
       rows: orderRows,
       sheetName: 'Agency Orders',
       onStart: () => setSheetsExporting(true),
@@ -725,7 +753,6 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
             <option value="Pending_Cooling">Cooling</option>
             <option value="Approved_Settled">Settled</option>
             <option value="Paid">Paid</option>
-            <option value="Rejected_Fraud">Fraud</option>
           </select>
           <select
             value={financeDealTypeFilter}
@@ -1655,7 +1682,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     const base = campaigns.filter(
       (c: Campaign) =>
         c.allowedAgencies.includes(user.mediatorCode) &&
-        Object.keys(c.assignments || {}).some((code) => myMediatorCodes.includes(code))
+        (c.status === 'Draft' || Object.keys(c.assignments || {}).some((code) => myMediatorCodes.includes(code)))
     );
     return applyFilters(base);
   }, [campaigns, user.mediatorCode, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
@@ -1665,6 +1692,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     const base = campaigns.filter(
       (c: Campaign) =>
         c.allowedAgencies.includes(user.mediatorCode) &&
+        c.status !== 'Draft' &&
         !Object.keys(c.assignments || {}).some((code) => myMediatorCodes.includes(code))
     );
     return applyFilters(base);
@@ -2175,9 +2203,8 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                               try {
                                 const res = await api.ops.copyCampaign(c.id);
                                 if (res.ok) {
-                                  toast.success('Campaign copied as Draft — edit it in Inventory tab');
+                                  toast.success('Campaign copied as Draft below');
                                   await onRefresh();
-                                  setSubTab('inventory');
                                 } else {
                                   toast.error((res as any).error || 'Copy failed');
                                 }
@@ -2871,11 +2898,6 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
   const [selectedMediator, setSelectedMediator] = useState<User | null>(null);
   const [payoutAmount, setPayoutAmount] = useState('');
   const [proofOrder, setProofOrder] = useState<Order | null>(null);
-  // Audit trail state for proof modal
-  const [auditExpanded, setAuditExpanded] = useState(false);
-  const [auditLoading, setAuditLoading] = useState(false);
-  const [orderAuditLogs, setOrderAuditLogs] = useState<any[]>([]);
-  const [_orderAuditEvents, setOrderAuditEvents] = useState<any[]>([]);
 
 
   // Keep proof modal in sync when allOrders updates from real-time
@@ -3670,60 +3692,8 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
               )}
             </div>
 
-            {/* AUDIT TRAIL */}
-            <div className="bg-zinc-50 rounded-2xl border border-zinc-100 p-4">
-              <button
-                onClick={async () => {
-                  if (auditExpanded) {
-                    setAuditExpanded(false);
-                    return;
-                  }
-                  setAuditExpanded(true);
-                  setAuditLoading(true);
-                  try {
-                    const resp = await api.orders.getOrderAudit(proofOrder.id);
-                    setOrderAuditLogs(resp?.logs ?? []);
-                    setOrderAuditEvents(resp?.events ?? []);
-                  } catch (err) {
-                    console.error('Failed to load activity log:', err);
-                    toast.error('Failed to load activity log');
-                    setOrderAuditLogs([]);
-                    setOrderAuditEvents([]);
-                  } finally {
-                    setAuditLoading(false);
-                  }
-                }}
-                className="flex items-center gap-2 text-xs font-bold text-zinc-400 hover:text-zinc-700 transition-colors w-full"
-              >
-                <History size={14} />
-                <span>Order Activity Log</span>
-                <span className="ml-auto">{auditExpanded ? '▲' : '▼'}</span>
-              </button>
-              {auditExpanded && (
-                <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
-                  {auditLoading ? (
-                    <p className="text-xs text-zinc-400 text-center py-2">Loading...</p>
-                  ) : orderAuditLogs.length === 0 ? (
-                    <p className="text-xs text-zinc-400 text-center py-2">No activity yet</p>
-                  ) : (
-                    <>
-                    {filterAuditLogs(orderAuditLogs).map((log: any, i: number) => (
-                      <div key={log.id || `audit-${i}`} className="flex items-start gap-2 text-[10px] text-zinc-500 border-l-2 border-zinc-200 pl-3 py-1">
-                        <span className="font-bold text-zinc-600 shrink-0">{auditActionLabel(log.action)}</span>
-                        <span className="flex-1">{log.createdAt ? new Date(log.createdAt).toLocaleString() : log.at ? new Date(log.at).toLocaleString() : ''}</span>
-                        {log.metadata?.proofType && (
-                          <span className="bg-zinc-100 px-1.5 py-0.5 rounded text-[9px] font-bold">{log.metadata.proofType}</span>
-                        )}
-                      </div>
-                    ))}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
             <button
-              onClick={() => { setProofOrder(null); setAuditExpanded(false); setOrderAuditLogs([]); setOrderAuditEvents([]); }}
+              onClick={() => { setProofOrder(null); }}
               className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-black transition-colors shadow-lg"
             >
               Close Viewer
@@ -3961,6 +3931,7 @@ export const AgencyDashboard: React.FC = () => {
             >
               <LogOut size={16} /> Sign Out
             </button>
+            <FeedbackCard role="agency" />
           </div>
         </>
       }
