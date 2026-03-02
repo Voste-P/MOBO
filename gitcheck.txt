@@ -1,0 +1,9 @@
+fed3f78 fix: CORS preview auto-allow, 7-day cooling, admin feedback view, copy campaign UX, accessibility
+df165c8 fix: CORS preview auto-allow, 7-day cooling, admin feedback view, copy campaign UX, accessibility
+6694705 feat: comprehensive ecosystem hardening & quality audit
+42f2416 fix(ci): sync schema drift migration, create RaiseTicketModal component, fix Chatbot base64Image reference
+1d08179 perf+ux: mediator name in deal cards, Chatbot cleanup, query parallelization, Cache-Control headers, useMemo optimizations
+
+---
+?? git-check.txt
+?? git-log-check.txt
