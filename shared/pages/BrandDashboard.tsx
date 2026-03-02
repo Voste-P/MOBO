@@ -249,8 +249,8 @@ const BrandProfileView = () => {
             />
           </div>
           <div className="flex-1 pb-2">
-            <h2 className="text-4xl font-black text-zinc-900 tracking-tight">{user?.name}</h2>
-            <div className="flex wrap items-center gap-3 mt-3">
+            <h2 className="text-4xl font-black text-zinc-900 tracking-tight truncate">{user?.name}</h2>
+            <div className="flex flex-wrap items-center gap-3 mt-3">
               <span className="px-3 py-1 bg-lime-100 text-lime-700 rounded-lg text-xs font-bold border border-lime-200">
                 Verified Brand
               </span>

@@ -74,8 +74,8 @@ Set these in Render:
 - `NODE_ENV=production`
 - `PORT=8080` (Render may set `PORT` automatically; keep it if they do)
 - `DATABASE_URL=<your PostgreSQL connection string>`
-- `JWT_ACCESS_SECRET=<strong random secret, >= 20 chars>`
-- `JWT_REFRESH_SECRET=<strong random secret, >= 20 chars>`
+- `JWT_ACCESS_SECRET=<strong random secret, >= 32 chars>`
+- `JWT_REFRESH_SECRET=<strong random secret, >= 32 chars>`
 - `CORS_ORIGINS=<comma-separated list of portal origins>`
 
 Example **without custom domains** (use your actual Vercel URLs):

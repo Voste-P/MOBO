@@ -1,153 +1,178 @@
 # Domain Model (Current Implementation)
 
-This document summarizes the current backend domain entities and how they relate. It is meant to be an “as built” map, not a final product spec.
+> **20 Prisma models, 22 enums** — PostgreSQL via Prisma ORM. Last updated: June 2025.
 
-## Core entities
+Source: [backend/prisma/schema.prisma](../backend/prisma/schema.prisma)
 
-### User
+This document summarizes the current backend domain entities and how they relate. It is an "as built" map, not a final product spec.
 
-Source: [backend/models/User.ts](../backend/models/User.ts)
+## Enums
 
-Roles:
+| Enum                  | Values                                                                                                                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `UserRole`            | shopper, mediator, agency, brand, admin, ops                                                                                                                                                           |
+| `UserStatus`          | active, suspended, pending                                                                                                                                                                             |
+| `KycStatus`           | none, pending, verified, rejected                                                                                                                                                                      |
+| `BrandStatus`         | active, suspended, pending                                                                                                                                                                             |
+| `AgencyStatus`        | active, suspended, pending                                                                                                                                                                             |
+| `MediatorStatus`      | active, suspended, pending                                                                                                                                                                             |
+| `OrderWorkflowStatus` | CREATED → REDIRECTED → ORDERED → PROOF_SUBMITTED → UNDER_REVIEW → APPROVED → REWARD_PENDING → COMPLETED / REJECTED / FAILED                                                                            |
+| `OrderStatus`         | Ordered, Shipped, Delivered, Cancelled, Returned                                                                                                                                                       |
+| `PaymentStatus`       | Pending, Paid, Refunded, Failed                                                                                                                                                                        |
+| `AffiliateStatus`     | Unchecked, Pending_Cooling, Approved_Settled, Rejected, Fraud_Alert, Cap_Exceeded, Frozen_Disputed                                                                                                     |
+| `SettlementMode`      | wallet, external                                                                                                                                                                                       |
+| `DealType`            | Discount, Review, Rating                                                                                                                                                                               |
+| `CampaignStatus`      | draft, active, paused, completed                                                                                                                                                                       |
+| `TransactionType`     | brand_deposit, platform_fee, commission_lock/settle, cashback_lock/settle, order_settlement_debit, commission_reversal, margin_reversal, agency_payout/receipt, payout_request/complete/failed, refund |
+| `TransactionStatus`   | pending, completed, failed, reversed                                                                                                                                                                   |
+| `PayoutStatus`        | requested, processing, paid, failed, canceled, recorded                                                                                                                                                |
+| `InviteStatus`        | active, used, revoked, expired                                                                                                                                                                         |
+| `TicketStatus`        | Open, Resolved, Rejected                                                                                                                                                                               |
+| `SuspensionAction`    | suspend, unsuspend                                                                                                                                                                                     |
+| `PushApp`             | buyer, mediator                                                                                                                                                                                        |
+| `RejectionType`       | order, review, rating, returnWindow                                                                                                                                                                    |
+| `MissingProofType`    | review, rating, returnWindow                                                                                                                                                                           |
 
-- `shopper` (buyer)
-- `mediator`
-- `agency`
-- `brand`
-- `ops`
-- `admin`
+## Core Entities
+
+### User (table: `users`)
+
+Roles: `shopper` (buyer), `mediator`, `agency`, `brand`, `ops`, `admin`
 
 Key linkage fields:
 
-- `mediatorCode`: stable code for `agency` and `mediator` users.
-- `parentCode`:
-  - for `mediator`: the parent agency’s `mediatorCode`
-  - for `shopper`: the parent mediator’s `mediatorCode`
-- `brandCode`: stable code for brand connection requests.
-- Brand connection state:
-  - `pendingConnections[]` (agencyCode + timestamp)
-  - `connectedAgencies[]` (agency codes)
+- `mediatorCode`: stable code for agency and mediator users
+- `parentCode`: for mediator → parent agency's mediatorCode; for shopper → parent mediator's mediatorCode
+- `brandCode`: stable code for brand connection requests
+- `connectedAgencies[]`: agency codes connected to this brand user
 
 Status & enforcement:
 
-- `status`: `active|suspended|pending`
-- Backend auth middleware enforces upstream suspension:
-  - shopper depends on mediator + agency
-  - mediator depends on agency
+- `status`: active / suspended / pending
+- `kycStatus`: none / pending / verified / rejected
+- Backend auth middleware enforces upstream suspension (shopper → mediator → agency)
 
-### Invite
+### Brand (table: `brands`)
 
-Source: [backend/models/Invite.ts](../backend/models/Invite.ts)
+Dedicated brand entity with `brandCode` (unique), `ownerUserId`, `connectedAgencyCodes[]`, `status`.
 
-- `code`: used for registration
+### Agency (table: `agencies`)
+
+Dedicated agency entity with `agencyCode` (unique), `ownerUserId`, `status`.
+
+### MediatorProfile (table: `mediator_profiles`)
+
+Linked to User via `userId` (unique). Has `mediatorCode` (unique), `parentAgencyCode`, `status`.
+
+### ShopperProfile (table: `shopper_profiles`)
+
+Linked to User via `userId` (unique). Has `defaultMediatorCode`.
+
+### PendingConnection (table: `pending_connections`)
+
+Join table for brand-agency connection requests. Fields: `userId` (FK→User), `agencyId`, `agencyName`, `agencyCode`.
+
+### Invite (table: `invites`)
+
+- `code` (unique): used for registration
 - `role`: role to be created (must match)
-- `parentCode`: code of upstream parent (mediator for shopper invites; agency for mediator invites)
-- `status`: `active|used|revoked|expired`
-- Supports `maxUses` with usage log (`uses[]`).
+- `parentCode`: upstream parent code
+- `status`: active / used / revoked / expired
+- Supports `maxUses` with usage log (`uses[]` JSONB)
 
-### Campaign
+### Campaign (table: `campaigns`)
 
-Source: [backend/models/Campaign.ts](../backend/models/Campaign.ts)
-
-Represents a brand-owned offer “template” that can be distributed to agencies/mediators.
-
-Key fields:
+Brand-owned offer "template" distributed to agencies/mediators.
 
 - Ownership: `brandUserId` + `brandName`
-- Visibility:
-  - `allowedAgencyCodes[]` (agencies allowed to see the campaign)
-  - `assignments` map: `mediatorCode -> { limit, payout? }`
-- Economics:
-  - `pricePaise`, `originalPricePaise`, `payoutPaise`
-- Capacity:
-  - `totalSlots`, `usedSlots`
-- Immutability:
-  - `locked` + `lockedReason` (locked after slot assignment or after first order; status-only updates remain allowed)
+- Visibility: `allowedAgencyCodes[]`, `assignments` (JSONB: mediatorCode → { limit, payout? })
+- Economics: `pricePaise`, `originalPricePaise`, `payoutPaise`
+- Capacity: `totalSlots`, `usedSlots`
+- Immutability: `locked` + `lockedReason` (locked after slot assignment or first order)
 
-### Deal
+### Deal (table: `deals`)
 
-Source: [backend/models/Deal.ts](../backend/models/Deal.ts)
-
-A published, mediator-scoped offer derived from a campaign.
+Published mediator-scoped offer from a campaign.
 
 - Uniqueness: one deal per `(campaignId, mediatorCode)`
-- Snapshots campaign fields to remain stable.
-- Economics:
-  - `commissionPaise` (buyer commission)
-  - `payoutPaise` (total payout allocated to mediator via agency; margin is `payoutPaise - commissionPaise`)
+- Snapshots campaign fields for stability
+- Economics: `commissionPaise` (buyer), `payoutPaise` (mediator via agency; margin = payoutPaise − commissionPaise)
 
-### Order
+### Order (table: `orders`)
 
-Source: [backend/models/Order.ts](../backend/models/Order.ts)
+Buyer claiming a deal/campaign.
 
-Represents a buyer claiming a deal/campaign.
+- Linkages: `userId` (buyer), `brandUserId` (brand), `managerName` (= mediatorCode)
+- State machine: `workflowStatus` (enforced in services)
+- Business statuses: `affiliateStatus`, `paymentStatus`
+- Fraud: unique `externalOrderId`, unique `(userId, items[0].productId)` for non-terminal workflows
+- `events` (JSONB): audit trail of state transitions
+- `frozen`: locks order from further mutations
 
-Key linkages:
+### OrderItem (table: `order_items`)
 
-- Buyer: `userId`
-- Brand (for filtering): `brandUserId`
-- Mediator attribution: `managerName` stores mediatorCode
-- Items:
-  - `items[0].campaignId`
-  - `items[0].productId` is typically the `Deal` id
+Line items linked to Order and Campaign. Fields: `productId`, `title`, `priceAtPurchasePaise`, `commissionPaise`, `campaignId`, `dealType`, `quantity`.
 
-State:
+### Wallet (table: `wallets`)
 
-- Strict workflow `workflowStatus` (state machine enforced in services)
-- Business statuses:
-  - `affiliateStatus` (Unchecked/Pending_Cooling/Approved_Settled/Rejected/Fraud_Alert/Cap_Exceeded/Frozen_Disputed)
-  - `paymentStatus` (Pending/Paid/Refunded/Failed)
+Per-user balances: `availablePaise`, `pendingPaise`, `lockedPaise`, `version` (optimistic concurrency).
 
-Anti-fraud / uniqueness:
+### Transaction (table: `transactions`)
 
-- Unique `externalOrderId` when provided (system-wide).
-- Unique `(userId, items.0.productId)` for non-terminal workflows (prevents duplicate deal claims).
+Idempotent ledger entries with unique `idempotencyKey`. 15 transaction types covering deposits, settlements, payouts, reversals.
 
-### Ticket
+### Payout (table: `payouts`)
 
-Source: [backend/models/Ticket.ts](../backend/models/Ticket.ts)
+Withdrawal requests: `beneficiaryUserId`, `walletId`, `amountPaise`, `status`, `provider`, `providerRef`. Unique constraint on `(provider, providerRef)`.
 
-- Created by any authenticated user.
-- Can optionally reference an order by `orderId` (string).
-- Used to freeze settlement when open disputes exist.
+### Ticket (table: `tickets`)
 
-### Wallet / Transaction / Payout
+Support tickets. Can reference an order via `orderId`. Fields: `issueType`, `description`, `status`, `resolvedBy`, `resolutionNote`.
 
-Sources:
+### PushSubscription (table: `push_subscriptions`)
 
-- [backend/models/Wallet.ts](../backend/models/Wallet.ts)
-- [backend/models/Transaction.ts](../backend/models/Transaction.ts)
-- [backend/models/Payout.ts](../backend/models/Payout.ts)
+Web push subscriptions per user/app (buyer or mediator). Unique on `endpoint`.
 
-- Wallet represents balances (currently only `availablePaise` is actively mutated in code paths found).
-- Transaction is the idempotent ledger for mutations (unique `idempotencyKey`).
-- Payout represents a withdrawal request/result; current ops flow records payouts as manual and debits wallet.
+### Suspension (table: `suspensions`)
 
-### AuditLog
+Audit record: `targetUserId`, `action` (suspend/unsuspend), `reason`, `adminUserId`.
 
-Source: [backend/models/AuditLog.ts](../backend/models/AuditLog.ts)
+### AuditLog (table: `audit_logs`)
 
-Append-only record of actor/action/entity/metadata; used across invites, approvals, payouts, campaign actions, etc.
+Append-only: `actorUserId`, `actorRoles[]`, `action`, `entityType`, `entityId`, `ip`, `metadata` (JSONB).
 
-## High-level relationship diagram (text)
+### SystemConfig (table: `system_configs`)
 
-- Agency (`User.roles=agency`, has `mediatorCode=AGY...`)
+System key-value config. Unique key (default `"system"`). Fields: `adminContactEmail`.
 
-  - creates mediator invites
-  - owns mediators via `mediator.parentCode == agency.mediatorCode`
+### MigrationSync (table: `migration_sync`)
 
-- Mediator (`User.roles=mediator`, has `mediatorCode=MED...`)
+Mongo→PG migration tracking. Unique on `collection`. Fields: `status`, `syncedCount`, `errorCount`.
 
-  - creates buyer invites
-  - owns buyers via `shopper.parentCode == mediator.mediatorCode`
-  - publishes deals for a campaign (one per mediator)
+## Relationship Diagram
 
-- Brand (`User.roles=brand`, has `brandCode=BRD...`)
+```
+Brand ──────────── Campaign ───── Deal
+  │                   │              │
+  │ connectedAgencies │ assignments  │ mediatorCode
+  │                   │              │
+Agency ─── MediatorProfile ─── User ─── ShopperProfile
+              │                  │
+              │ parentAgencyCode │ parentCode
+              │                  │
+              └──────────────────┘
+                     │
+                   Order ──── OrderItem
+                     │
+              Wallet ─── Transaction ─── Payout
+```
 
-  - connects to agencies (via `connectedAgencies[]`)
-  - owns campaigns (`Campaign.brandUserId == brand._id`)
-  - views orders by `brandUserId` (with legacy fallback by brand name)
+- **Agency** creates mediator invites; owns mediators via `mediator.parentCode == agency.mediatorCode`
+- **Mediator** creates buyer invites; owns buyers via `shopper.parentCode == mediator.mediatorCode`; publishes deals
+- **Brand** connects to agencies via `connectedAgencyCodes[]`; owns campaigns via `brandUserId`
+- **Buyer** sees deals for their mediator; creates orders against available campaigns
+- **Admin** manages all entities; append-only audit log tracks all admin actions
 
-- Buyer (`User.roles=shopper`)
-  - sees deals only for their mediator
-  - creates orders against campaigns available to their lineage (agency allow list or explicit mediator assignment)
+## Soft-Delete Rule
+
+Every destructive operation sets `deletedAt` — **no hard deletes in production code**. Only test cleanup scripts use `.delete()`.

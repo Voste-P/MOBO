@@ -66,9 +66,22 @@ erDiagram
 
 ## Docs
 
-- `docs/ARCHITECTURE.md`
-- `docs/API.md` (UI contract endpoints)
-- `docs/DEPLOYMENT.md` (quick) and `docs/DEPLOYMENT_RENDER_VERCEL_NO_DOMAIN.md` (detailed)
+| Document                                     | Description                               |
+| -------------------------------------------- | ----------------------------------------- |
+| `docs/ARCHITECTURE.md`                       | System diagram, auth model, ER diagram    |
+| `docs/API.md`                                | Complete API surface — 83 endpoints       |
+| `docs/BACKEND_API_SURFACE.md`                | Detailed endpoint behavior notes          |
+| `docs/DOMAIN_MODEL.md`                       | 20 Prisma models, 22 enums, relationships |
+| `docs/RBAC_MATRIX.md`                        | Role-based access matrix                  |
+| `docs/MONEY_FLOW.md`                         | Wallet, transaction, payout flows         |
+| `docs/REALTIME.md`                           | SSE contract and event types              |
+| `docs/DEPLOYMENT.md`                         | Quick deployment guide                    |
+| `docs/DEPLOYMENT_RENDER_VERCEL_NO_DOMAIN.md` | Full Render + Vercel setup                |
+| `docs/PRODUCTION_READINESS_CHECKLIST.md`     | Pre-launch checklist                      |
+| `docs/PRODUCTION_AUDIT.md`                   | Security and production audit             |
+| `docs/LOGGING_AUDIT.md`                      | Controller logging coverage               |
+| `docs/SHARED_DIRECTORY_AUDIT.md`             | Shared package audit                      |
+| `docs/CLEANUP.md`                            | Safe deletion rules                       |
 
 ## Prerequisites
 

@@ -17,8 +17,8 @@ Required:
 - `NODE_ENV=production`
 - `PORT` (often set by host)
 - `DATABASE_URL=<PostgreSQL connection string>`
-- `JWT_ACCESS_SECRET=<secure random string, >= 20 chars>`
-- `JWT_REFRESH_SECRET=<secure random string, >= 20 chars>`
+- `JWT_ACCESS_SECRET=<secure random string, >= 32 chars>`
+- `JWT_REFRESH_SECRET=<secure random string, >= 32 chars>`
 - `CORS_ORIGINS=<comma-separated list of allowed portal origins>`
 
 Notes:

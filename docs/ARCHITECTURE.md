@@ -51,26 +51,46 @@ All tables implement soft delete:
 
 ## Core data model (conceptual)
 
+> 20 Prisma models. Full details: `docs/DOMAIN_MODEL.md`
+
 ```mermaid
 erDiagram
   USER ||--o{ WALLET : owns
   USER ||--o{ ORDER : places
   USER ||--o{ CAMPAIGN : creates
+  USER ||--|| BRAND : "owns (brand role)"
+  USER ||--|| AGENCY : "owns (agency role)"
+  USER ||--|| MEDIATOR_PROFILE : "has (mediator role)"
+  USER ||--|| SHOPPER_PROFILE : "has (shopper role)"
+  AGENCY ||--o{ MEDIATOR_PROFILE : "parents via agencyCode"
+  BRAND ||--o{ PENDING_CONNECTION : "receives requests"
   CAMPAIGN ||--o{ DEAL : publishes
-  ORDER }o--|| CAMPAIGN : references
+  CAMPAIGN ||--o{ ORDER_ITEM : references
+  ORDER ||--o{ ORDER_ITEM : contains
   ORDER }o--|| USER : buyer
   ORDER }o--|| USER : brandOwner
   USER ||--o{ TICKET : creates
+  USER ||--o{ PUSH_SUBSCRIPTION : registers
   WALLET ||--o{ TRANSACTION : records
   WALLET ||--o{ PAYOUT : requests
+  USER ||--o{ SUSPENSION : "target of"
+  USER ||--o{ AUDIT_LOG : acts
 
   USER {
     string role
-    string[] roles
     string mediatorCode
     string parentCode
     string brandCode
     date deletedAt
+  }
+
+  BRAND {
+    string brandCode
+    string[] connectedAgencyCodes
+  }
+
+  AGENCY {
+    string agencyCode
   }
 
   CAMPAIGN {
@@ -92,7 +112,8 @@ erDiagram
     string workflowStatus
     string affiliateStatus
     string managerName
-    object screenshots
+    json events
+    bool frozen
     date deletedAt
   }
 
@@ -109,14 +130,12 @@ erDiagram
     string type
     string status
     int amountPaise
-    date deletedAt
   }
 
   PAYOUT {
     string status
     int amountPaise
     string providerRef
-    date deletedAt
   }
 
   TICKET {
