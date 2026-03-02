@@ -109,22 +109,40 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
     [orders, searchQuery]
   );
 
-  // Identify disputed orders
-  const disputedOrderIds = new Set(
+  // [PERF] Memoize disputed order IDs
+  const disputedOrderIds = useMemo(() => new Set(
     tickets.filter((t: Ticket) => t.status === 'Open').map((t: Ticket) => t.orderId)
-  );
+  ), [tickets]);
 
   const [viewMode, setViewMode] = useState<'todo' | 'cooling'>('todo');
   const [sheetsExporting, setSheetsExporting] = useState(false);
 
-  const todayEarnings = orders
-    .filter((o: Order) => {
-      if (new Date(o.createdAt).toDateString() !== new Date().toDateString()) return false;
-      // Only count settled or cooling orders — exclude rejected/fraud/frozen.
-      const status = String(o.affiliateStatus || '');
-      return status === 'Approved_Settled' || status === 'Pending_Cooling';
-    })
-    .reduce((acc: number, o: Order) => acc + (o.items[0]?.commission || 0), 0);
+  // [PERF] Memoize all earnings/stats calculations
+  const { todayEarnings, totalDeals, totalEarnings, totalOrderValue, settledOrders, pendingOrders } = useMemo(() => {
+    const todayStr = new Date().toDateString();
+    return {
+      todayEarnings: orders
+        .filter((o: Order) => {
+          if (new Date(o.createdAt).toDateString() !== todayStr) return false;
+          const status = String(o.affiliateStatus || '');
+          return status === 'Approved_Settled' || status === 'Pending_Cooling';
+        })
+        .reduce((acc: number, o: Order) => acc + (o.items[0]?.commission || 0), 0),
+      totalDeals: orders.length,
+      totalEarnings: orders
+        .filter((o: Order) => {
+          const status = String(o.affiliateStatus || '');
+          return status === 'Approved_Settled' || status === 'Pending_Cooling';
+        })
+        .reduce((acc: number, o: Order) => acc + (o.items[0]?.commission || 0), 0),
+      totalOrderValue: orders.reduce((acc: number, o: Order) => acc + (o.total || 0), 0),
+      settledOrders: orders.filter((o: Order) => String(o.affiliateStatus || '') === 'Approved_Settled'),
+      pendingOrders: orders.filter((o: Order) => {
+        const s = String(o.affiliateStatus || '');
+        return s === 'Pending_Cooling' || s === 'Pending_Verification';
+      }),
+    };
+  }, [orders]);
 
   const getDealTypeBadge = (dealType: string) => {
     switch (dealType) {
@@ -136,20 +154,6 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
         return 'bg-blue-100 text-blue-700 border-blue-200';
     }
   };
-
-  const totalDeals = orders.length;
-  const totalEarnings = orders
-    .filter((o: Order) => {
-      const status = String(o.affiliateStatus || '');
-      return status === 'Approved_Settled' || status === 'Pending_Cooling';
-    })
-    .reduce((acc: number, o: Order) => acc + (o.items[0]?.commission || 0), 0);
-  const totalOrderValue = orders.reduce((acc: number, o: Order) => acc + (o.total || 0), 0);
-  const settledOrders = orders.filter((o: Order) => String(o.affiliateStatus || '') === 'Approved_Settled');
-  const pendingOrders = orders.filter((o: Order) => {
-    const s = String(o.affiliateStatus || '');
-    return s === 'Pending_Cooling' || s === 'Pending_Verification';
-  });
 
   return (
     <div className="space-y-6 animate-enter">

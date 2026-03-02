@@ -414,12 +414,12 @@ const DashboardView = ({
     return points;
   }, [orders]);
 
-  const campaignPerformance = campaigns.slice(0, 5).map((c) => ({
+  const campaignPerformance = useMemo(() => campaigns.slice(0, 5).map((c) => ({
     name: c.title.split(' ')[0],
     sold: c.usedSlots,
     remaining: Math.max(0, c.totalSlots - c.usedSlots),
     total: c.totalSlots,
-  }));
+  })), [campaigns]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-enter">
@@ -688,7 +688,7 @@ const OrdersView = ({ user }: any) => {
     return Array.from(titles).sort();
   }, [orders]);
 
-  const filtered = orders.filter((o) => {
+  const filtered = useMemo(() => orders.filter((o) => {
     const q = search.toLowerCase();
     const title = String(o.items?.[0]?.title || '').toLowerCase();
     const internal = String(o.id || '').toLowerCase();
@@ -711,7 +711,7 @@ const OrdersView = ({ user }: any) => {
       if (t !== productFilter) return false;
     }
     return textMatch;
-  });
+  }), [orders, search, statusFilter, dealTypeFilter, mediatorFilter, productFilter]);
 
   const handleExport = () => {
     const apiBase = getApiBaseAbsolute();

@@ -473,18 +473,20 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
     return result;
   }, [allOrders, financeSearch, financeStatusFilter, financeDealTypeFilter, financeMediatorFilter, financeProductFilter]);
 
-  // Updated Calc Logic
-  const settledVolume = ledger
-    .filter((o: Order) => o.paymentStatus === 'Paid' && o.affiliateStatus === 'Approved_Settled')
-    .reduce((sum: number, o: Order) => sum + o.total, 0);
-  const coolingVolume = ledger
-    .filter((o: Order) => o.affiliateStatus === 'Pending_Cooling')
-    .reduce((sum: number, o: Order) => sum + o.total, 0);
-  const pendingReviewVolume = ledger
-    .filter((o: Order) => o.affiliateStatus === 'Unchecked')
-    .reduce((sum: number, o: Order) => sum + o.total, 0);
-  const grossPayableAmount = ledger
-    .reduce((sum: number, o: Order) => sum + (o.items?.[0]?.commission || 0), 0);
+  // [PERF] Memoize volume calculations — only recalculate when ledger changes
+  const { settledVolume, coolingVolume, pendingReviewVolume, grossPayableAmount } = useMemo(() => ({
+    settledVolume: ledger
+      .filter((o: Order) => o.paymentStatus === 'Paid' && o.affiliateStatus === 'Approved_Settled')
+      .reduce((sum: number, o: Order) => sum + o.total, 0),
+    coolingVolume: ledger
+      .filter((o: Order) => o.affiliateStatus === 'Pending_Cooling')
+      .reduce((sum: number, o: Order) => sum + o.total, 0),
+    pendingReviewVolume: ledger
+      .filter((o: Order) => o.affiliateStatus === 'Unchecked')
+      .reduce((sum: number, o: Order) => sum + o.total, 0),
+    grossPayableAmount: ledger
+      .reduce((sum: number, o: Order) => sum + (o.items?.[0]?.commission || 0), 0),
+  }), [ledger]);
 
   const handleUpdate = async () => {
     if (!editingOrder) return;
@@ -2885,14 +2887,17 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
     });
   }, [allOrders]);
 
-  const activeMediators = mediators.filter((m: User) => m.status === 'active');
-  const pendingMediators = mediators.filter((m: User) => m.status === 'pending');
+  // [PERF] Memoize mediator list filtering
+  const { activeMediators, pendingMediators } = useMemo(() => ({
+    activeMediators: mediators.filter((m: User) => m.status === 'active'),
+    pendingMediators: mediators.filter((m: User) => m.status === 'pending'),
+  }), [mediators]);
 
-  const filtered = (subTab === 'roster' ? activeMediators : pendingMediators).filter(
+  const filtered = useMemo(() => (subTab === 'roster' ? activeMediators : pendingMediators).filter(
     (m: User) =>
       m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.mediatorCode?.includes(searchTerm.toUpperCase())
-  );
+  ), [subTab, activeMediators, pendingMediators, searchTerm]);
 
   // Filter orders for selected mediator (Sanitized for Privacy)
   const mediatorOrders = useMemo(() => {

@@ -199,20 +199,21 @@ export function makeOpsController(env: Env) {
         if (!brand) throw new AppError(404, 'BRAND_NOT_FOUND', 'Brand not found');
         if (brand.status !== 'active') throw new AppError(409, 'BRAND_SUSPENDED', 'Brand is not active');
 
-        const pendingCount = await db().pendingConnection.count({ where: { userId: brand.id, deletedAt: null } });
-        if (pendingCount >= 100) {
-          throw new AppError(409, 'TOO_MANY_PENDING', 'Brand has too many pending connection requests');
+        // Check if already connected
+        if (Array.isArray(brand.connectedAgencies) && brand.connectedAgencies.includes(agencyCode)) {
+          throw new AppError(409, 'ALREADY_REQUESTED', 'Connection already exists or is already pending');
         }
 
         const agencyName = String((requester as any)?.name || 'Agency');
 
-        // Check if already connected or pending
-        if (Array.isArray(brand.connectedAgencies) && brand.connectedAgencies.includes(agencyCode)) {
-          throw new AppError(409, 'ALREADY_REQUESTED', 'Connection already exists or is already pending');
+        // [PERF] Parallel fetch: pendingCount + existingPending are independent
+        const [pendingCount, existingPending] = await Promise.all([
+          db().pendingConnection.count({ where: { userId: brand.id, deletedAt: null } }),
+          db().pendingConnection.findFirst({ where: { userId: brand.id, agencyCode, deletedAt: null } }),
+        ]);
+        if (pendingCount >= 100) {
+          throw new AppError(409, 'TOO_MANY_PENDING', 'Brand has too many pending connection requests');
         }
-        const existingPending = await db().pendingConnection.findFirst({
-          where: { userId: brand.id, agencyCode, deletedAt: null },
-        });
         if (existingPending) {
           throw new AppError(409, 'ALREADY_REQUESTED', 'Connection already exists or is already pending');
         }

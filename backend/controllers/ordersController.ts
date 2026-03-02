@@ -497,20 +497,21 @@ export function makeOrdersController(env: Env) {
         const campaignWhere = UUID_RE.test(item.campaignId)
           ? { OR: [{ id: item.campaignId }, { mongoId: item.campaignId }], deletedAt: null }
           : { mongoId: item.campaignId, deletedAt: null };
-        const campaign = await db().campaign.findFirst({
-          where: campaignWhere as any,
-        });
+
+        // [PERF] Parallel fetch: campaign + mediatorUser are independent
+        const [campaign, mediatorUser] = await Promise.all([
+          db().campaign.findFirst({ where: campaignWhere as any }),
+          db().user.findFirst({
+            where: { roles: { has: 'mediator' as any }, mediatorCode: upstreamMediatorCode, deletedAt: null },
+            select: { parentCode: true },
+          }),
+        ]);
         if (!campaign) throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
 
         if (String((campaign as any).status || '').toLowerCase() !== 'active') {
           throw new AppError(409, 'CAMPAIGN_NOT_ACTIVE', 'Campaign is not active');
         }
 
-        // Non-negotiable isolation: buyer can only place orders for campaigns accessible to their lineage.
-        const mediatorUser = await db().user.findFirst({
-          where: { roles: { has: 'mediator' as any }, mediatorCode: upstreamMediatorCode, deletedAt: null },
-          select: { parentCode: true },
-        });
         const upstreamAgencyCode = String((mediatorUser as any)?.parentCode || '').trim();
 
         // Resolve actual agency name for the order record
@@ -548,30 +549,36 @@ export function makeOrdersController(env: Env) {
             ? assignmentVal
             : Number((assignmentVal as any)?.limit ?? 0)
           : 0;
-        if (upstreamMediatorCode && assigned > 0) {
-          const mediatorSales = await db().order.count({
-            where: {
-              managerName: upstreamMediatorCode,
-              items: { some: { campaignId: campaign.id } },
-              status: { not: 'Cancelled' as any },
-              deletedAt: null,
-            },
-          });
-          if (mediatorSales >= assigned) {
-            throw new AppError(
-              409,
-              'SOLD_OUT_FOR_PARTNER',
-              `Sold out for your partner (${upstreamMediatorCode}).`
-            );
-          }
-        }
 
         // Commission snapshot: prefer published Deal record if productId is a Deal id.
         let commissionPaise = rupeesToPaise(item.commission);
         const dealWhere = UUID_RE.test(item.productId)
           ? { OR: [{ id: item.productId }, { mongoId: item.productId }] as any, deletedAt: null }
           : { mongoId: item.productId, deletedAt: null };
-        const maybeDeal = await db().deal.findFirst({ where: dealWhere as any });
+
+        // [PERF] Parallel fetch: mediatorSales + maybeDeal are independent
+        const [mediatorSales, maybeDeal] = await Promise.all([
+          (upstreamMediatorCode && assigned > 0)
+            ? db().order.count({
+                where: {
+                  managerName: upstreamMediatorCode,
+                  items: { some: { campaignId: campaign.id } },
+                  status: { not: 'Cancelled' as any },
+                  deletedAt: null,
+                },
+              })
+            : Promise.resolve(0),
+          db().deal.findFirst({ where: dealWhere as any }),
+        ]);
+
+        if (upstreamMediatorCode && assigned > 0 && mediatorSales >= assigned) {
+          throw new AppError(
+            409,
+            'SOLD_OUT_FOR_PARTNER',
+            `Sold out for your partner (${upstreamMediatorCode}).`
+          );
+        }
+
         if (maybeDeal) {
           commissionPaise = maybeDeal.commissionPaise;
         }

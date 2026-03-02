@@ -28,10 +28,16 @@ export function brandRoutes(env: Env): Router {
     legacyHeaders: false,
   });
 
-  router.get('/agencies', brand.getAgencies);
-  router.get('/campaigns', brand.getCampaigns);
-  router.get('/orders', brand.getOrders);
-  router.get('/transactions', brand.getTransactions);
+  // Short-lived cache for dashboard read endpoints
+  const dashboardCache = (_req: any, res: any, next: any) => {
+    res.setHeader('Cache-Control', 'private, max-age=15');
+    next();
+  };
+
+  router.get('/agencies', dashboardCache, brand.getAgencies);
+  router.get('/campaigns', dashboardCache, brand.getCampaigns);
+  router.get('/orders', dashboardCache, brand.getOrders);
+  router.get('/transactions', dashboardCache, brand.getTransactions);
 
   router.post('/payout', financialLimiter, brand.payoutAgency);
   router.post('/requests/resolve', brand.resolveRequest);

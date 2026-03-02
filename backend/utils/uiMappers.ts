@@ -124,7 +124,7 @@ export function toUiCampaign(c: any) {
   };
 }
 
-export function toUiDeal(d: any) {
+export function toUiDeal(d: any, mediatorName?: string) {
   const placeholderImage =
     'data:image/svg+xml;utf8,' +
     encodeURIComponent(
@@ -152,6 +152,7 @@ export function toUiDeal(d: any) {
     dealType: safeText(d.dealType),
     brandName: safeText(d.brandName),
     mediatorCode: safeText(d.mediatorCode),
+    mediatorName: safeText(mediatorName || d.mediatorName),
     campaignId: String(d.campaignId),
     active: !!d.active,
     inventoryCount: d.inventoryCount ?? 0,

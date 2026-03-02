@@ -39,7 +39,7 @@ export function makeProductsController() {
           deletedAt: null,
         };
 
-        const [deals, total] = await Promise.all([
+        const [deals, total, mediatorUser] = await Promise.all([
           db().deal.findMany({
             where,
             orderBy: { createdAt: 'desc' },
@@ -47,9 +47,14 @@ export function makeProductsController() {
             take: limit,
           }),
           db().deal.count({ where }),
+          db().user.findFirst({
+            where: { mediatorCode: { equals: mediatorCode, mode: 'insensitive' }, deletedAt: null },
+            select: { name: true },
+          }),
         ]);
 
-        res.json(paginatedResponse(deals.map(d => toUiDeal(pgDeal(d))), total, page, limit, isPaginated));
+        const mediatorName = mediatorUser?.name || '';
+        res.json(paginatedResponse(deals.map(d => toUiDeal(pgDeal(d), mediatorName)), total, page, limit, isPaginated));
 
         businessLog.info(`[Buyer] User ${req.auth?.userId} listed products — ${deals.length} deals, mediator: ${mediatorCode || 'none'}`, { actorUserId: req.auth?.userId, mediatorCode, resultCount: deals.length, total, ip: req.ip });
         logAccessEvent('RESOURCE_ACCESS', {

@@ -290,7 +290,7 @@ export function aiRoutes(env: Env): Router {
               });
               deals = pgDeals;
             }
-            effectiveProducts = deals.map(toUiDeal);
+            effectiveProducts = deals.map(d => toUiDeal(d));
           }
         }
       }

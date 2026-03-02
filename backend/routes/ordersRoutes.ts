@@ -37,7 +37,11 @@ export function ordersRoutes(env: Env): Router {
   router.get('/orders/user/:userId', requireAuth(env), ownerOrPrivileged, orders.getUserOrders);
   router.post('/orders', requireAuth(env), orderWriteLimiter, orders.createOrder);
   router.post('/orders/claim', requireAuth(env), orderWriteLimiter, orders.submitClaim);
-  router.get('/orders/:orderId/proof/:type', requireAuth(env), orders.getOrderProof);
+  router.get('/orders/:orderId/proof/:type', requireAuth(env), (_req, res, next) => {
+    // Proof screenshots are immutable once uploaded — cache aggressively
+    res.setHeader('Cache-Control', 'private, max-age=3600, immutable');
+    next();
+  }, orders.getOrderProof);
   // Public proof endpoint removed — use authenticated endpoint above.
   // Old: router.get('/public/orders/:orderId/proof/:type', publicProofLimiter, orders.getOrderProofPublic);
 
