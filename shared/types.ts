@@ -122,7 +122,7 @@ export interface Order {
   frozenAt?: string;
   frozenReason?: string;
   settlementRef?: string;
-  screenshots: { order?: string; payment?: string; review?: string; rating?: string; returnWindow?: string };
+  screenshots?: { order?: string; payment?: string; review?: string; rating?: string; returnWindow?: string };
   reviewLink?: string;
   managerName: string;
   agencyName?: string;

@@ -292,6 +292,7 @@ async function fetchJson(path: string, init?: RequestInit): Promise<any> {
     }
     // Refresh failed — session is dead. Notify listeners (AuthContext) for redirect.
     notifyAuthExpired();
+    throw toErrorFromPayload(payload, 'Your session has expired. Please log in again.');
   }
 
   if (!res.ok) throw toErrorFromPayload(payload, httpStatusToFriendlyMessage(res.status));
@@ -317,6 +318,7 @@ async function fetchOk(path: string, init?: RequestInit): Promise<void> {
     }
     // Refresh failed — session is dead. Notify listeners.
     notifyAuthExpired();
+    throw toErrorFromPayload(payload, 'Your session has expired. Please log in again.');
   }
 
   if (!res.ok) throw toErrorFromPayload(payload, httpStatusToFriendlyMessage(res.status));

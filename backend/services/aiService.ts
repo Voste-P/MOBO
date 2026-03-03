@@ -124,7 +124,7 @@ async function _initOcrPool(): Promise<void> {
 }
 
 /** Maximum total OCR workers (pool + temporary) to prevent OOM under burst load. */
-const MAX_TOTAL_OCR_WORKERS = Math.max(OCR_POOL_SIZE + 4, 8);
+function getMaxOcrWorkers(): number { return Math.max(OCR_POOL_SIZE + 4, 8); }
 let _activeOcrWorkerCount = 0;
 
 /** Get a worker from the pool or create a fresh one on demand (bounded). */
@@ -139,15 +139,16 @@ async function acquireOcrWorker(): Promise<Awaited<ReturnType<typeof createWorke
     return w;
   }
 
+  const maxWorkers = getMaxOcrWorkers();
   // Cap total workers to prevent memory exhaustion
-  if (_activeOcrWorkerCount >= MAX_TOTAL_OCR_WORKERS) {
-    aiLog.warn(`[OCR] Worker limit reached (${_activeOcrWorkerCount}/${MAX_TOTAL_OCR_WORKERS}). Waiting for release...`);
+  if (_activeOcrWorkerCount >= maxWorkers) {
+    aiLog.warn(`[OCR] Worker limit reached (${_activeOcrWorkerCount}/${maxWorkers}). Waiting for release...`);
     // Wait briefly for a worker to be returned to the pool
     await new Promise((r) => setTimeout(r, 500));
     const retryW = _ocrPool.pop();
     if (retryW) { _activeOcrWorkerCount++; return retryW; }
-    // If still none available, create one anyway but log a warning
-    aiLog.warn('[OCR] Creating overflow worker beyond limit — request will proceed but memory pressure is high');
+    // Hard-reject instead of creating overflow workers — prevents OOM on Render
+    throw new Error('OCR_CAPACITY_EXCEEDED: All OCR workers are busy. Please try again shortly.');
   }
 
   _activeOcrWorkerCount++;

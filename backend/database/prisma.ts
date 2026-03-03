@@ -253,14 +253,18 @@ export async function pingPg(): Promise<boolean> {
     return true;
   } catch (err) {
     // Connection may have dropped — attempt a single reconnection.
+    // Keep stale _prisma reference alive so in-flight requests don't crash
+    // with "Prisma client is not connected" during the reconnection window.
     dbLog.warn('PG ping failed — attempting reconnection', {
       error: err instanceof Error ? err.message : String(err),
     });
     try {
-      _prisma = null; // Clear stale client
-      await connectPrisma(1); // Single attempt reconnect
-      if (_prisma) {
+      const stale = _prisma;
+      await connectPrisma(1); // Single attempt reconnect (overwrites _prisma on success)
+      if (_prisma && _prisma !== stale) {
         dbLog.info('PG reconnected successfully after ping failure');
+        // Disconnect stale client in background (best-effort)
+        stale?.$disconnect().catch(() => {});
         return true;
       }
     } catch { /* reconnection failed — fall through */ }
@@ -297,5 +301,10 @@ export async function disconnectPrisma(): Promise<void> {
     } catch (err) {
       dbLog.warn('Prisma disconnect error (best-effort)', { error: err instanceof Error ? err.message : String(err) });
     }
+  }
+  // Also drain the pg pool so idle connections don't linger.
+  if (_pool) {
+    try { await _pool.end(); } catch { /* best-effort */ }
+    _pool = null;
   }
 }

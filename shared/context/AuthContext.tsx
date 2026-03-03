@@ -90,6 +90,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           return;
         }
 
+        // Hydrate cached user immediately so the UI renders without a login screen
+        // even before the network call finishes (or if it fails).
+        try {
+          const cached = JSON.parse(storedUser);
+          if (cached && cached.id) setUser(cached);
+        } catch { /* corrupt cache — will be overwritten below */ }
+
         // Validate token and refresh user from backend.
         const me = await api.auth.me();
         setUser(me);
@@ -107,7 +114,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setUser(null);
           emitAuthChange();
         }
-        // On network errors, keep stale session so user isn't force-logged-out
+        // On network errors, the cached user from above remains in state —
+        // user stays logged in with stale data until network recovers.
       }
     };
 
