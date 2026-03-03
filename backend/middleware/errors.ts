@@ -18,10 +18,17 @@ export class AppError extends Error {
   }
 }
 
+// Paths that indicate probing/scanning — log as security incident
+const PROBE_PATTERNS = /\.(env|php|asp|cgi|bak|old|sql|config)|wp-admin|phpmyadmin|\/etc\/|\/proc\/|__debug__|actuator|graphql/i;
+
 export function notFoundHandler(req: Request, res: Response): void {
-  // Don't leak internal route paths in production — only expose the HTTP method.
   const isProd = process.env.NODE_ENV === 'production';
-  logSecurityIncident('SUSPICIOUS_PATTERN', { severity: 'low', userId: (req as any).auth?.userId, ip: req.ip, route: req.path, method: req.method, pattern: 'ROUTE_NOT_FOUND', userAgent: req.get('user-agent'), metadata: { query: req.query } });
+  // Only log probing-style 404s as security incidents; legitimate misses are just info
+  if (PROBE_PATTERNS.test(req.path)) {
+    logSecurityIncident('SUSPICIOUS_PATTERN', { severity: 'medium', userId: (req as any).auth?.userId, ip: req.ip, route: req.path, method: req.method, pattern: 'PROBE_DETECTED', userAgent: req.get('user-agent'), metadata: { query: req.query } });
+  } else {
+    logger.debug('Route not found', { method: req.method, path: req.path, ip: req.ip });
+  }
   res.status(404).json({
     error: {
       code: 'NOT_FOUND',
@@ -424,7 +431,6 @@ export function errorHandler(
     error: {
       code: 'INTERNAL_SERVER_ERROR',
       message,
-      ...(requestId ? { requestId } : {}),
     },
   });
 }

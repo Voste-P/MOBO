@@ -1,7 +1,7 @@
 import { Router } from 'express';
 
 import type { Env } from '../config/env.js';
-import { prisma, isPrismaAvailable, pingPg } from '../database/prisma.js';
+import { prisma, isPrismaAvailable, pingPg, getPoolMetrics } from '../database/prisma.js';
 import { isReady } from '../config/lifecycle.js';
 import { logAvailabilityEvent } from '../config/appLogs.js';
 
@@ -104,6 +104,10 @@ export function healthRoutes(env: Env): Router {
       heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
       pid: process.pid,
       nodeVersion: process.version,
+      database: {
+        status: pgOk ? 'connected' : 'disconnected',
+        pool: getPoolMetrics(),
+      },
     });
   });
 

@@ -62,6 +62,12 @@ export function getApiBaseUrl(): string {
 
   let base = (fromGlobal || fromVite || fromNext || fromProxy || '/api').trim();
 
+  // Defense-in-depth: reject obviously unsafe URL schemes
+  if (base && !base.startsWith('/') && !base.startsWith('http://') && !base.startsWith('https://')) {
+    console.warn('[MOBO] Ignoring unsafe API base URL scheme:', base);
+    base = '/api';
+  }
+
   // Local dev fallback: if apps run on Next (300x) and backend on 8080,
   // talk to the backend directly unless overridden.
   if (base === '/api' && typeof window !== 'undefined') {
