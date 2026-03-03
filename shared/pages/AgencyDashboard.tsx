@@ -1636,7 +1636,13 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
 
   useEffect(() => {
     if (!assignModal) return;
-    setAssignments(assignModal.assignments || {});
+    // Normalize existing assignments: DB stores either number or {limit, payout} objects
+    const raw = assignModal.assignments || {};
+    const normalized: Record<string, number> = {};
+    for (const [code, val] of Object.entries(raw)) {
+      normalized[code] = typeof val === 'number' ? val : Number((val as any)?.limit ?? 0);
+    }
+    setAssignments(normalized);
     setAssignSearch('');
     setMediatorPayouts({});
   }, [assignModal]);
