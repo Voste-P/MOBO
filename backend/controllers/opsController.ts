@@ -193,7 +193,7 @@ export function makeOpsController(env: Env) {
         if (!agencyCode) throw new AppError(409, 'MISSING_AGENCY_CODE', 'Agency is missing a code');
 
         const brand = await db().user.findFirst({
-          where: { brandCode: body.brandCode, roles: { has: 'brand' as any }, deletedAt: null },
+          where: { brandCode: body.brandCode, roles: { has: 'brand' as any }, isDeleted: false },
           select: { id: true, mongoId: true, status: true, connectedAgencies: true },
         });
         if (!brand) throw new AppError(404, 'BRAND_NOT_FOUND', 'Brand not found');
@@ -208,8 +208,8 @@ export function makeOpsController(env: Env) {
 
         // [PERF] Parallel fetch: pendingCount + existingPending are independent
         const [pendingCount, existingPending] = await Promise.all([
-          db().pendingConnection.count({ where: { userId: brand.id, deletedAt: null } }),
-          db().pendingConnection.findFirst({ where: { userId: brand.id, agencyCode, deletedAt: null } }),
+          db().pendingConnection.count({ where: { userId: brand.id, isDeleted: false } }),
+          db().pendingConnection.findFirst({ where: { userId: brand.id, agencyCode, isDeleted: false } }),
         ]);
         if (pendingCount >= 100) {
           throw new AppError(409, 'TOO_MANY_PENDING', 'Brand has too many pending connection requests');
@@ -274,7 +274,7 @@ export function makeOpsController(env: Env) {
         const where: any = {
           roles: { has: 'mediator' as any },
           parentCode: agencyCode,
-          deletedAt: null,
+          isDeleted: false,
         };
         if (queryParams.search) {
           const search = queryParams.search;
@@ -294,7 +294,7 @@ export function makeOpsController(env: Env) {
           orderBy: { createdAt: 'desc' },
           skip,
           take: limit,
-          select: { ...userListSelect, wallets: { where: { deletedAt: null }, take: 1, select: { id: true, availablePaise: true, pendingPaise: true } } },
+          select: { ...userListSelect, wallets: { where: { isDeleted: false }, take: 1, select: { id: true, availablePaise: true, pendingPaise: true } } },
         });
 
         const mediatorList = mediators.map((m: any) => {
@@ -372,7 +372,7 @@ export function makeOpsController(env: Env) {
         } else {
           campaigns = await db().campaign.findMany({
             where: {
-              deletedAt: null,
+              isDeleted: false,
               ...(statusFilter ? { status: statusFilter as any } : {}),
             },
             orderBy: { createdAt: 'desc' },
@@ -458,7 +458,7 @@ export function makeOpsController(env: Env) {
         const deals = await db().deal.findMany({
           where: {
             mediatorCode: { in: mediatorCodes },
-            deletedAt: null,
+            isDeleted: false,
           },
           orderBy: { createdAt: 'desc' },
           skip: (dPage - 1) * dLimit,
@@ -512,7 +512,7 @@ export function makeOpsController(env: Env) {
         }
 
         const { page: oPage, limit: oLimit, skip: oSkip, isPaginated: oIsPaginated } = parsePagination(req.query, { limit: 200 });
-        const oWhere = { managerName: { in: managerCodes }, deletedAt: null };
+        const oWhere = { managerName: { in: managerCodes }, isDeleted: false };
         const [orders, oTotal] = await Promise.all([
           db().order.findMany({
             where: oWhere,
@@ -548,7 +548,7 @@ export function makeOpsController(env: Env) {
         const uniqueCodes = [...new Set(managerCodes)];
         if (uniqueCodes.length > 0) {
           const mediatorUsers = await db().user.findMany({
-            where: { mediatorCode: { in: uniqueCodes }, deletedAt: null },
+            where: { mediatorCode: { in: uniqueCodes }, isDeleted: false },
             select: { mediatorCode: true, name: true },
           });
           const codeToName = new Map<string, string>();
@@ -594,7 +594,7 @@ export function makeOpsController(env: Env) {
           role: 'shopper',
           parentCode: code,
           isVerifiedByMediator: false,
-          deletedAt: null,
+          isDeleted: false,
         };
         if (queryParams.search) {
           const search = queryParams.search;
@@ -611,7 +611,7 @@ export function makeOpsController(env: Env) {
           orderBy: { createdAt: 'desc' },
           skip: (puPage - 1) * puLimit,
           take: puLimit,
-          select: { ...userListSelect, wallets: { where: { deletedAt: null }, take: 1, select: { id: true, availablePaise: true, pendingPaise: true } } },
+          select: { ...userListSelect, wallets: { where: { isDeleted: false }, take: 1, select: { id: true, availablePaise: true, pendingPaise: true } } },
         });
 
         res.json(users.map((u: any) => {
@@ -638,7 +638,7 @@ export function makeOpsController(env: Env) {
           role: 'shopper',
           parentCode: code,
           isVerifiedByMediator: true,
-          deletedAt: null,
+          isDeleted: false,
         };
         if (queryParams.search) {
           const search = queryParams.search;
@@ -655,7 +655,7 @@ export function makeOpsController(env: Env) {
           orderBy: { createdAt: 'desc' },
           skip: (vuPage - 1) * vuLimit,
           take: vuLimit,
-          select: { ...userListSelect, wallets: { where: { deletedAt: null }, take: 1, select: { id: true, availablePaise: true, pendingPaise: true } } },
+          select: { ...userListSelect, wallets: { where: { isDeleted: false }, take: 1, select: { id: true, availablePaise: true, pendingPaise: true } } },
         });
 
         res.json(users.map((u: any) => {
@@ -682,7 +682,7 @@ export function makeOpsController(env: Env) {
       try {
         const { roles, userId: _userId, pgUserId, user } = getRequester(req);
 
-        const payoutWhere: any = { deletedAt: null };
+        const payoutWhere: any = { isDeleted: false };
 
         if (!isPrivileged(roles)) {
           if (roles.includes('mediator')) {
@@ -699,7 +699,7 @@ export function makeOpsController(env: Env) {
               return;
             }
             const mediators = await db().user.findMany({
-              where: { roles: { has: 'mediator' as any }, mediatorCode: { in: mediatorCodes }, deletedAt: null },
+              where: { roles: { has: 'mediator' as any }, mediatorCode: { in: mediatorCodes }, isDeleted: false },
               select: { id: true },
             });
             payoutWhere.beneficiaryUserId = { in: mediators.map((m: any) => m.id) };
@@ -760,7 +760,7 @@ export function makeOpsController(env: Env) {
         const { roles, user: requester } = getRequester(req);
         const body = approveByIdSchema.parse(req.body);
 
-        const mediator = await db().user.findFirst({ where: { ...idWhere(body.id), deletedAt: null }, select: { id: true, mongoId: true, parentCode: true, mediatorCode: true, kycStatus: true, status: true } });
+        const mediator = await db().user.findFirst({ where: { ...idWhere(body.id), isDeleted: false }, select: { id: true, mongoId: true, parentCode: true, mediatorCode: true, kycStatus: true, status: true } });
         if (!mediator) {
           throw new AppError(404, 'USER_NOT_FOUND', 'Mediator not found');
         }
@@ -815,7 +815,7 @@ export function makeOpsController(env: Env) {
         const { roles, user: requester } = getRequester(req);
         const body = rejectByIdSchema.parse(req.body);
 
-        const mediator = await db().user.findFirst({ where: { ...idWhere(body.id), deletedAt: null }, select: { id: true, mongoId: true, parentCode: true, mediatorCode: true, kycStatus: true, status: true } });
+        const mediator = await db().user.findFirst({ where: { ...idWhere(body.id), isDeleted: false }, select: { id: true, mongoId: true, parentCode: true, mediatorCode: true, kycStatus: true, status: true } });
         if (!mediator) {
           throw new AppError(404, 'USER_NOT_FOUND', 'Mediator not found');
         }
@@ -871,7 +871,7 @@ export function makeOpsController(env: Env) {
         const body = approveByIdSchema.parse(req.body);
         const { roles, user: requester } = getRequester(req);
 
-        const buyerBefore = await db().user.findFirst({ where: { ...idWhere(body.id), deletedAt: null }, select: { id: true, mongoId: true, parentCode: true, status: true } });
+        const buyerBefore = await db().user.findFirst({ where: { ...idWhere(body.id), isDeleted: false }, select: { id: true, mongoId: true, parentCode: true, status: true } });
         if (!buyerBefore) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
         const upstreamMediatorCode = String(buyerBefore.parentCode || '').trim();
 
@@ -936,7 +936,7 @@ export function makeOpsController(env: Env) {
         const body = rejectByIdSchema.parse(req.body);
         const { roles, user: requester } = getRequester(req);
 
-        const buyerBefore = await db().user.findFirst({ where: { ...idWhere(body.id), deletedAt: null }, select: { id: true, mongoId: true, parentCode: true, status: true } });
+        const buyerBefore = await db().user.findFirst({ where: { ...idWhere(body.id), isDeleted: false }, select: { id: true, mongoId: true, parentCode: true, status: true } });
         if (!buyerBefore) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
         const upstreamMediatorCode = String(buyerBefore.parentCode || '').trim();
 
@@ -1000,7 +1000,7 @@ export function makeOpsController(env: Env) {
       try {
         const body = verifyOrderSchema.parse(req.body);
         const { roles, user: requester } = getRequester(req);
-        const order = await db().order.findFirst({ where: { ...idWhere(body.orderId), deletedAt: null }, include: { items: { where: { deletedAt: null } } } });
+        const order = await db().order.findFirst({ where: { ...idWhere(body.orderId), isDeleted: false }, include: { items: { where: { isDeleted: false } } } });
         if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
 
         const agencyCode = await assertOrderAccess(order, roles, requester);
@@ -1034,7 +1034,7 @@ export function makeOpsController(env: Env) {
           actorUserId: req.auth?.userId,
           metadata: { step: 'order', missingProofs },
         });
-        const updatedOrder = await db().order.update({ where: { id: order.id }, data: { verification: v, events: newEvents as any }, include: { items: { where: { deletedAt: null } } } });
+        const updatedOrder = await db().order.update({ where: { id: order.id }, data: { verification: v, events: newEvents as any }, include: { items: { where: { isDeleted: false } } } });
         const finalize = await finalizeApprovalIfReady(updatedOrder!, String(req.auth?.userId || ''), env);
 
         await writeAuditLog({ req, action: 'ORDER_VERIFIED', entityType: 'Order', entityId: order.mongoId! });
@@ -1064,7 +1064,7 @@ export function makeOpsController(env: Env) {
 
         // Only re-fetch if finalize modified the order; otherwise use the update result
         const finalOrder = (finalize as any).approved
-          ? await db().order.findFirst({ where: { id: order.id }, include: { items: { where: { deletedAt: null } } } })
+          ? await db().order.findFirst({ where: { id: order.id }, include: { items: { where: { isDeleted: false } } } })
           : updatedOrder;
         res.json({
           ok: true,
@@ -1083,7 +1083,7 @@ export function makeOpsController(env: Env) {
         const body = verifyOrderRequirementSchema.parse(req.body);
         const { roles, user: requester } = getRequester(req);
 
-        const order = await db().order.findFirst({ where: { ...idWhere(body.orderId), deletedAt: null }, include: { items: { where: { deletedAt: null } } } });
+        const order = await db().order.findFirst({ where: { ...idWhere(body.orderId), isDeleted: false }, include: { items: { where: { isDeleted: false } } } });
         if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
 
         const agencyCode = await assertOrderAccess(order, roles, requester);
@@ -1128,7 +1128,7 @@ export function makeOpsController(env: Env) {
           actorUserId: req.auth?.userId,
           metadata: { step: body.type },
         });
-        const updatedOrder = await db().order.update({ where: { id: order.id }, data: { verification: v, events: newEvents as any }, include: { items: { where: { deletedAt: null } } } });
+        const updatedOrder = await db().order.update({ where: { id: order.id }, data: { verification: v, events: newEvents as any }, include: { items: { where: { isDeleted: false } } } });
         const finalize = await finalizeApprovalIfReady(updatedOrder!, String(req.auth?.userId || ''), env);
         await writeAuditLog({ req, action: 'ORDER_VERIFIED', entityType: 'Order', entityId: order.mongoId! });
         orderLog.info('Order requirement verified', { orderId: order.mongoId, step: body.type, approved: (finalize as any).approved });
@@ -1155,7 +1155,7 @@ export function makeOpsController(env: Env) {
 
         // Only re-fetch if finalize modified the order; otherwise use the update result
         const finalOrder = (finalize as any).approved
-          ? await db().order.findFirst({ where: { id: order.id }, include: { items: { where: { deletedAt: null } } } })
+          ? await db().order.findFirst({ where: { id: order.id }, include: { items: { where: { isDeleted: false } } } })
           : updatedOrder;
         res.json({
           ok: true,
@@ -1178,7 +1178,7 @@ export function makeOpsController(env: Env) {
       try {
         const body = verifyOrderSchema.parse(req.body);
         const { roles, user: requester } = getRequester(req);
-        const order = await db().order.findFirst({ where: { ...idWhere(body.orderId), deletedAt: null }, include: { items: { where: { deletedAt: null } } } });
+        const order = await db().order.findFirst({ where: { ...idWhere(body.orderId), isDeleted: false }, include: { items: { where: { isDeleted: false } } } });
         if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
 
         const agencyCode = await assertOrderAccess(order, roles, requester);
@@ -1224,7 +1224,7 @@ export function makeOpsController(env: Env) {
           }
         }
 
-        const updatedOrder = await db().order.update({ where: { id: order.id }, data: { verification: v, events: evts as any }, include: { items: { where: { deletedAt: null } } } });
+        const updatedOrder = await db().order.update({ where: { id: order.id }, data: { verification: v, events: evts as any }, include: { items: { where: { isDeleted: false } } } });
         const finalize = await finalizeApprovalIfReady(updatedOrder!, String(req.auth?.userId || ''), env);
         await writeAuditLog({ req, action: 'ORDER_VERIFIED', entityType: 'Order', entityId: order.mongoId! });
         orderLog.info('All order steps verified', { orderId: order.mongoId, stepsVerified: required, approved: (finalize as any).approved });
@@ -1246,7 +1246,7 @@ export function makeOpsController(env: Env) {
 
         // Only re-fetch if finalize modified the order; otherwise use the update result
         const finalOrder = (finalize as any).approved
-          ? await db().order.findFirst({ where: { id: order.id }, include: { items: { where: { deletedAt: null } } } })
+          ? await db().order.findFirst({ where: { id: order.id }, include: { items: { where: { isDeleted: false } } } })
           : updatedOrder;
         res.json({
           ok: true,
@@ -1265,7 +1265,7 @@ export function makeOpsController(env: Env) {
         const body = rejectOrderProofSchema.parse(req.body);
         const { roles, user: requester } = getRequester(req);
 
-        const order = await db().order.findFirst({ where: { ...idWhere(body.orderId), deletedAt: null }, include: { items: { where: { deletedAt: null } } } });
+        const order = await db().order.findFirst({ where: { ...idWhere(body.orderId), isDeleted: false }, include: { items: { where: { isDeleted: false } } } });
         if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
 
         const agencyCode = await assertOrderAccess(order, roles, requester);
@@ -1394,7 +1394,7 @@ export function makeOpsController(env: Env) {
         const body = requestMissingProofSchema.parse(req.body);
         const { roles, user: requester } = getRequester(req);
 
-        const order = await db().order.findFirst({ where: { ...idWhere(body.orderId), deletedAt: null }, include: { items: { where: { deletedAt: null } } } });
+        const order = await db().order.findFirst({ where: { ...idWhere(body.orderId), isDeleted: false }, include: { items: { where: { isDeleted: false } } } });
         if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
 
         const agencyCode = await assertOrderAccess(order, roles, requester);
@@ -1483,20 +1483,20 @@ export function makeOpsController(env: Env) {
           throw new AppError(403, 'FORBIDDEN', 'Insufficient role');
         }
 
-        const order = await db().order.findFirst({ where: { ...idWhere(body.orderId), deletedAt: null }, include: { items: { where: { deletedAt: null } } } });
+        const order = await db().order.findFirst({ where: { ...idWhere(body.orderId), isDeleted: false }, include: { items: { where: { isDeleted: false } } } });
         if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
 
         const agencyCode = await assertOrderAccess(order, roles, user);
 
         // Buyer must also be active — order.userId is PG UUID
-        const buyer = await db().user.findUnique({ where: { id: order.userId }, select: { id: true, status: true, deletedAt: true } });
-        if (!buyer || buyer.deletedAt || buyer.status !== 'active') {
+        const buyer = await db().user.findUnique({ where: { id: order.userId }, select: { id: true, status: true, isDeleted: true } });
+        if (!buyer || buyer.isDeleted || buyer.status !== 'active') {
           throw new AppError(409, 'FROZEN_SUSPENSION', 'Buyer is not active; settlement is blocked');
         }
 
         const orderDisplayId = order.mongoId ?? order.id;
         const hasOpenDispute = await db().ticket.findFirst({
-          where: { orderId: orderDisplayId, status: 'Open', deletedAt: null },
+          where: { orderId: orderDisplayId, status: 'Open', isDeleted: false },
           select: { id: true },
         });
         if (hasOpenDispute) {
@@ -1529,7 +1529,7 @@ export function makeOpsController(env: Env) {
         const productId = String(order.items?.[0]?.productId || '').trim();
         const mediatorCode = String(order.managerName || '').trim();
 
-        const campaign = campaignId ? await db().campaign.findFirst({ where: { id: campaignId, deletedAt: null } }) : null;
+        const campaign = campaignId ? await db().campaign.findFirst({ where: { id: campaignId, isDeleted: false } }) : null;
 
         let isOverLimit = false;
         if (campaignId && mediatorCode) {
@@ -1548,7 +1548,7 @@ export function makeOpsController(env: Env) {
                   items: { some: { campaignId } },
                   OR: [{ affiliateStatus: 'Approved_Settled' }, { paymentStatus: 'Paid' }],
                   id: { not: order.id },
-                  deletedAt: null,
+                  isDeleted: false,
                 },
               });
               if (settledCount >= assignedLimit) isOverLimit = true;
@@ -1562,7 +1562,7 @@ export function makeOpsController(env: Env) {
             throw new AppError(409, 'MISSING_DEAL_ID', 'Order is missing deal reference');
           }
 
-          const deal = await db().deal.findFirst({ where: { ...idWhere(productId), deletedAt: null } });
+          const deal = await db().deal.findFirst({ where: { ...idWhere(productId), isDeleted: false } });
           if (!deal) {
             throw new AppError(409, 'DEAL_NOT_FOUND', 'Cannot settle: deal not found');
           }
@@ -1595,7 +1595,7 @@ export function makeOpsController(env: Env) {
           const mediatorMarginPaise = payoutPaise - buyerCommissionPaise;
           let mediatorUserId: string | null = null;
           if (mediatorMarginPaise > 0 && mediatorCode) {
-            const mediator = await db().user.findFirst({ where: { mediatorCode, deletedAt: null }, select: { id: true } });
+            const mediator = await db().user.findFirst({ where: { mediatorCode, isDeleted: false }, select: { id: true } });
             if (mediator) {
               mediatorUserId = mediator.id;
               await ensureWallet(mediatorUserId);
@@ -1735,7 +1735,7 @@ export function makeOpsController(env: Env) {
         const canScoped = roles.includes('mediator') || roles.includes('agency');
         if (!canAny && !canScoped) throw new AppError(403, 'FORBIDDEN', 'Insufficient role');
 
-        const order = await db().order.findFirst({ where: { ...idWhere(body.orderId), deletedAt: null }, include: { items: { where: { deletedAt: null } } } });
+        const order = await db().order.findFirst({ where: { ...idWhere(body.orderId), isDeleted: false }, include: { items: { where: { isDeleted: false } } } });
         if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
 
         if ((order as any).frozen) {
@@ -1776,7 +1776,7 @@ export function makeOpsController(env: Env) {
         const campaignId = order.items?.[0]?.campaignId;
         const mediatorCode = String(order.managerName || '').trim();
 
-        const campaign = campaignId ? await db().campaign.findFirst({ where: { id: campaignId, deletedAt: null } }) : null;
+        const campaign = campaignId ? await db().campaign.findFirst({ where: { id: campaignId, isDeleted: false } }) : null;
         const brandId = String(order.brandUserId || campaign?.brandUserId || '').trim();
 
         const isCapExceeded = String(order.affiliateStatus) === 'Cap_Exceeded';
@@ -1813,7 +1813,7 @@ export function makeOpsController(env: Env) {
 
         if (!isCapExceeded && settlementMode !== 'external') {
           if (!productId) throw new AppError(409, 'MISSING_DEAL_ID', 'Order is missing deal reference');
-          const deal = await db().deal.findFirst({ where: { ...idWhere(productId), deletedAt: null } });
+          const deal = await db().deal.findFirst({ where: { ...idWhere(productId), isDeleted: false } });
           if (!deal) throw new AppError(409, 'DEAL_NOT_FOUND', 'Cannot revert: deal not found');
 
           const payoutPaise = Number(deal.payoutPaise ?? 0);
@@ -1830,7 +1830,7 @@ export function makeOpsController(env: Env) {
 
           let unsettleMediatorUserId: string | null = null;
           if (mediatorMarginPaise > 0 && mediatorCode) {
-            const mediator = await db().user.findFirst({ where: { mediatorCode, deletedAt: null }, select: { id: true } });
+            const mediator = await db().user.findFirst({ where: { mediatorCode, isDeleted: false }, select: { id: true } });
             if (mediator) {
               unsettleMediatorUserId = mediator.id;
             }
@@ -1926,7 +1926,7 @@ export function makeOpsController(env: Env) {
           const brandUserId = String(body.brandUserId || '').trim();
           if (!brandUserId) throw new AppError(400, 'MISSING_BRAND_USER_ID', 'brandUserId is required');
 
-          const brand = await db().user.findFirst({ where: { ...idWhere(brandUserId), deletedAt: null } });
+          const brand = await db().user.findFirst({ where: { ...idWhere(brandUserId), isDeleted: false } });
           if (!brand) throw new AppError(404, 'BRAND_NOT_FOUND', 'Brand not found');
           if (!(Array.isArray(brand.roles) ? brand.roles : []).includes('brand')) throw new AppError(400, 'INVALID_BRAND', 'Invalid brand');
           if (brand.status !== 'active') throw new AppError(409, 'BRAND_SUSPENDED', 'Brand is not active');
@@ -2045,7 +2045,7 @@ export function makeOpsController(env: Env) {
         }
 
         const { roles, pgUserId, user: requester } = getRequester(req);
-        const campaign = await db().campaign.findFirst({ where: { ...idWhere(campaignId), deletedAt: null } });
+        const campaign = await db().campaign.findFirst({ where: { ...idWhere(campaignId), isDeleted: false } });
         if (!campaign) {
           throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
         }
@@ -2074,7 +2074,7 @@ export function makeOpsController(env: Env) {
 
         if (previousStatus !== nextStatus) {
           await db().deal.updateMany({
-            where: { campaignId: campaign.id, deletedAt: null },
+            where: { campaignId: campaign.id, isDeleted: false },
             data: { active: nextStatus === 'active' },
           });
         }
@@ -2131,7 +2131,7 @@ export function makeOpsController(env: Env) {
 
         const { roles, pgUserId } = getRequester(req);
 
-        const campaign = await db().campaign.findFirst({ where: { ...idWhere(campaignId), deletedAt: null } });
+        const campaign = await db().campaign.findFirst({ where: { ...idWhere(campaignId), isDeleted: false } });
         if (!campaign) {
           throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
         }
@@ -2143,24 +2143,23 @@ export function makeOpsController(env: Env) {
         }
 
         const hasOrders = await db().orderItem.findFirst({
-          where: { campaignId: campaign.id, order: { deletedAt: null } },
+          where: { campaignId: campaign.id, order: { isDeleted: false } },
           select: { id: true },
         });
         if (hasOrders) throw new AppError(409, 'CAMPAIGN_HAS_ORDERS', 'Cannot delete a campaign with orders');
 
-        const now = new Date();
         try {
           await db().campaign.update({
-            where: { id: campaign.id, deletedAt: null },
-            data: { deletedAt: now, deletedBy: pgUserId || undefined, updatedBy: pgUserId || undefined },
+            where: { id: campaign.id, isDeleted: false },
+            data: { isDeleted: true, updatedBy: pgUserId || undefined},
           });
         } catch {
           throw new AppError(409, 'CAMPAIGN_ALREADY_DELETED', 'Campaign already deleted');
         }
 
         await db().deal.updateMany({
-          where: { campaignId: campaign.id, deletedAt: null },
-          data: { deletedAt: now, deletedBy: pgUserId || undefined, active: false },
+          where: { campaignId: campaign.id, isDeleted: false },
+          data: { isDeleted: true, updatedBy: pgUserId || undefined, active: false },
         });
 
         await writeAuditLog({
@@ -2170,7 +2169,7 @@ export function makeOpsController(env: Env) {
           entityId: campaign.mongoId ?? campaign.id,
         });
         businessLog.info('Campaign deleted', { campaignId: campaign.mongoId ?? campaign.id, title: campaign.title });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Campaign', entityId: campaign.mongoId ?? campaign.id, action: 'CAMPAIGN_DELETED', changedFields: ['deletedAt'], before: { deletedAt: null }, after: { deletedAt: now.toISOString() } });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Campaign', entityId: campaign.mongoId ?? campaign.id, action: 'CAMPAIGN_DELETED', changedFields: ['isDeleted'], before: { isDeleted: false }, after: { isDeleted: new Date().toISOString() } });
         logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_DELETED', campaignId: campaign.mongoId ?? campaign.id, title: campaign.title } });
 
         const allowed = Array.isArray(campaign.allowedAgencyCodes)
@@ -2220,7 +2219,7 @@ export function makeOpsController(env: Env) {
       try {
         const body = assignSlotsSchema.parse(req.body);
         const { roles, user: requester } = getRequester(req);
-        const campaign = await db().campaign.findFirst({ where: { ...idWhere(body.id), deletedAt: null } });
+        const campaign = await db().campaign.findFirst({ where: { ...idWhere(body.id), isDeleted: false } });
         if (!campaign) throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
 
         // Campaign must be active to accept new assignments.
@@ -2228,21 +2227,22 @@ export function makeOpsController(env: Env) {
           throw new AppError(409, 'CAMPAIGN_NOT_ACTIVE', 'Campaign must be active to assign slots');
         }
 
-        if (campaign.locked) {
-          const attemptingTermChange =
-            typeof (body as any).dealType !== 'undefined' ||
-            typeof (body as any).price !== 'undefined';
-          if (attemptingTermChange) {
-            throw new AppError(409, 'CAMPAIGN_LOCKED', 'Campaign is locked after slot assignment; create a new campaign to change terms');
-          }
-        }
-
+        // Check if orders exist – if so, only block term changes (price, dealType),
+        // but still allow adding/modifying mediator assignments.
         const hasOrders = await db().orderItem.findFirst({
-          where: { campaignId: campaign.id, order: { deletedAt: null } },
+          where: { campaignId: campaign.id, order: { isDeleted: false } },
           select: { id: true },
         });
-        if (hasOrders) {
-          throw new AppError(409, 'CAMPAIGN_LOCKED', 'Campaign is locked after first order; create a new campaign to change terms');
+
+        const attemptingTermChange =
+          typeof (body as any).dealType !== 'undefined' ||
+          typeof (body as any).price !== 'undefined';
+
+        if (campaign.locked && attemptingTermChange) {
+          throw new AppError(409, 'CAMPAIGN_LOCKED', 'Campaign terms are locked after slot assignment. You can still add new mediators.');
+        }
+        if (hasOrders && attemptingTermChange) {
+          throw new AppError(409, 'CAMPAIGN_LOCKED', 'Campaign terms are locked after first order. You can still add new mediators.');
         }
 
         const agencyCode = roles.includes('agency') && !isPrivileged(roles)
@@ -2274,7 +2274,7 @@ export function makeOpsController(env: Env) {
               mediatorCode: { in: assignmentCodes },
               parentCode: agencyCode,
               status: 'active',
-              deletedAt: null,
+              isDeleted: false,
             },
             select: { mediatorCode: true },
           });
@@ -2400,7 +2400,7 @@ export function makeOpsController(env: Env) {
       try {
         const body = publishDealSchema.parse(req.body);
         const { roles, pgUserId, user: requester } = getRequester(req);
-        const campaign = await db().campaign.findFirst({ where: { ...idWhere(body.id), deletedAt: null } });
+        const campaign = await db().campaign.findFirst({ where: { ...idWhere(body.id), isDeleted: false } });
         if (!campaign) throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
 
         const normalizeCode = (v: unknown) => normalizeMediatorCode(v);
@@ -2465,7 +2465,7 @@ export function makeOpsController(env: Env) {
           where: {
             campaignId: campaign.id,
             mediatorCode: { equals: requestedCode, mode: 'insensitive' },
-            deletedAt: null,
+            isDeleted: false,
           },
         });
 
@@ -2548,7 +2548,7 @@ export function makeOpsController(env: Env) {
             throw new AppError(409, 'FROZEN_SUSPENSION', 'Agency is not active; payouts are blocked');
           }
         }
-        const user = await db().user.findFirst({ where: { ...idWhere(body.mediatorId), deletedAt: null }, select: { id: true, mongoId: true, roles: true, parentCode: true, status: true, mediatorCode: true } });
+        const user = await db().user.findFirst({ where: { ...idWhere(body.mediatorId), isDeleted: false }, select: { id: true, mongoId: true, roles: true, parentCode: true, status: true, mediatorCode: true } });
         if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
         if (canAgency) {
@@ -2640,11 +2640,11 @@ export function makeOpsController(env: Env) {
           throw new AppError(403, 'FORBIDDEN', 'Insufficient role');
         }
 
-        const payout = await db().payout.findFirst({ where: { ...idWhere(payoutId), deletedAt: null } });
+        const payout = await db().payout.findFirst({ where: { ...idWhere(payoutId), isDeleted: false } });
         if (!payout) throw new AppError(404, 'PAYOUT_NOT_FOUND', 'Payout not found');
 
-        const beneficiary = await db().user.findUnique({ where: { id: payout.beneficiaryUserId }, select: { id: true, mongoId: true, deletedAt: true, parentCode: true } });
-        if (!beneficiary || beneficiary.deletedAt) throw new AppError(404, 'BENEFICIARY_NOT_FOUND', 'Beneficiary not found');
+        const beneficiary = await db().user.findUnique({ where: { id: payout.beneficiaryUserId }, select: { id: true, mongoId: true, isDeleted: true, parentCode: true } });
+        if (!beneficiary || beneficiary.isDeleted) throw new AppError(404, 'BENEFICIARY_NOT_FOUND', 'Beneficiary not found');
 
         if (!isPriv) {
           const agencyCode = String((user as any)?.mediatorCode || '').trim();
@@ -2655,15 +2655,14 @@ export function makeOpsController(env: Env) {
           }
         }
 
-        const hasWalletTx = await db().transaction.findFirst({ where: { payoutId: payout.id, deletedAt: null }, select: { id: true } });
+        const hasWalletTx = await db().transaction.findFirst({ where: { payoutId: payout.id, isDeleted: false }, select: { id: true } });
         if (hasWalletTx) {
           throw new AppError(409, 'PAYOUT_HAS_LEDGER', 'Cannot delete a payout with wallet ledger entries');
         }
 
-        const now = new Date();
         const result = await db().payout.updateMany({
-          where: { id: payout.id, deletedAt: null },
-          data: { deletedAt: now, deletedBy: pgUserId || undefined, updatedBy: pgUserId || undefined },
+          where: { id: payout.id, isDeleted: false },
+          data: { isDeleted: true, updatedBy: pgUserId || undefined},
         });
         if (!result.count) {
           throw new AppError(409, 'PAYOUT_ALREADY_DELETED', 'Payout already deleted');
@@ -2679,7 +2678,7 @@ export function makeOpsController(env: Env) {
           metadata: { beneficiaryUserId: beneficiaryDisplayId },
         });
         businessLog.info('Payout deleted', { payoutId: payoutDisplayId, beneficiaryId: beneficiaryDisplayId, amountPaise: payout.amountPaise });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Payout', entityId: payoutDisplayId, action: 'PAYOUT_DELETED', changedFields: ['deletedAt'], before: { deletedAt: null }, after: { deletedAt: now.toISOString() } });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Payout', entityId: payoutDisplayId, action: 'PAYOUT_DELETED', changedFields: ['isDeleted'], before: { isDeleted: false }, after: { isDeleted: new Date().toISOString() } });
         logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Payout', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'PAYOUT_DELETED', payoutId: payoutDisplayId, beneficiaryId: beneficiaryDisplayId, amountPaise: payout.amountPaise } });
 
         const agencyCode = String(beneficiary.parentCode || '').trim();
@@ -2706,7 +2705,7 @@ export function makeOpsController(env: Env) {
     getTransactions: async (req: Request, res: Response, next: NextFunction) => {
       try {
         const { roles, pgUserId } = getRequester(req);
-        const where: any = { deletedAt: null };
+        const where: any = { isDeleted: false };
 
         // Non-privileged roles only see their own transactions
         if (!isPrivileged(roles)) {
@@ -2747,7 +2746,7 @@ export function makeOpsController(env: Env) {
       try {
         const { id } = copyCampaignSchema.parse(req.body);
         const { roles, pgUserId, user: requester } = getRequester(req);
-        const campaign = await db().campaign.findFirst({ where: { ...idWhere(id), deletedAt: null } });
+        const campaign = await db().campaign.findFirst({ where: { ...idWhere(id), isDeleted: false } });
         if (!campaign) {
           throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
         }
@@ -2818,8 +2817,8 @@ export function makeOpsController(env: Env) {
         }
 
         const campaign = await db().campaign.findFirst({
-          where: { ...idWhere(id), deletedAt: null },
-          select: { id: true, mongoId: true, allowedAgencyCodes: true, brandUserId: true, title: true, deletedAt: true },
+          where: { ...idWhere(id), isDeleted: false },
+          select: { id: true, mongoId: true, allowedAgencyCodes: true, brandUserId: true, title: true, isDeleted: true },
         });
         if (!campaign) {
           throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');

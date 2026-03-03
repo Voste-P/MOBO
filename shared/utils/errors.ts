@@ -91,12 +91,8 @@ export function formatErrorMessage(err: unknown, fallback: string): string {
     if (statusMatch) {
       return httpStatusToFriendlyMessage(Number(statusMatch[1]));
     }
-    const requestId = (err as any).requestId;
-    if (requestId) return `${err.message} (Ref: ${String(requestId)})`;
     return err.message;
   }
 
-  const requestId = (err as any)?.requestId;
-  if (requestId) return `${fallback} (Ref: ${String(requestId)})`;
   return fallback;
 }

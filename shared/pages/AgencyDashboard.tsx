@@ -398,6 +398,11 @@ const AgencyProfile = ({ user }: any) => {
           </div>
         </div>
       </div>
+
+      {/* Feedback Section */}
+      <div className="mt-8">
+        <FeedbackCard role="agency" />
+      </div>
     </div>
   );
 };
@@ -3812,7 +3817,7 @@ export const AgencyDashboard: React.FC = () => {
       onSidebarOpenChange={setIsSidebarOpen}
       containerClassName="flex h-[100dvh] min-h-0 bg-[#F8F9FA] overflow-hidden relative"
       asideClassName="bg-white border-r border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col"
-      mainClassName="flex-1 min-w-0 min-h-0 overflow-y-auto bg-[#FAFAFA] relative scrollbar-hide p-4 md:p-8"
+      mainClassName="flex-1 min-w-0 min-h-0 overflow-y-auto bg-[#FAFAFA] relative scrollbar-styled p-4 md:p-8"
       mobileHeader={<h2 className="text-xl font-black text-slate-900">Agency Portal</h2>}
       mobileMenuButton={
         <button
@@ -3932,7 +3937,6 @@ export const AgencyDashboard: React.FC = () => {
             >
               <LogOut size={16} /> Sign Out
             </button>
-            <FeedbackCard role="agency" />
           </div>
         </>
       }

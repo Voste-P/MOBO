@@ -283,7 +283,7 @@ export function aiRoutes(env: Env): Router {
                 where: {
                   mediatorCode: { equals: mediatorCode, mode: 'insensitive' },
                   active: true,
-                  deletedAt: null,
+                  isDeleted: false,
                 },
                 orderBy: { createdAt: 'desc' },
                 take: 50,

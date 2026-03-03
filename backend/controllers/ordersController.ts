@@ -48,11 +48,11 @@ export function makeOrdersController(env: Env) {
     const isUuid = UUID_RE.test(orderId);
     // Single query with OR to cover id, mongoId, AND externalOrderId
     const where = isUuid
-      ? { OR: [{ id: orderId }, { mongoId: orderId }, { externalOrderId: orderId }] as any, deletedAt: null }
-      : { OR: [{ mongoId: orderId }, { externalOrderId: orderId }] as any, deletedAt: null };
+      ? { OR: [{ id: orderId }, { mongoId: orderId }, { externalOrderId: orderId }] as any, isDeleted: false }
+      : { OR: [{ mongoId: orderId }, { externalOrderId: orderId }] as any, isDeleted: false };
     const found = await db().order.findFirst({
       where: where as any,
-      include: { items: { where: { deletedAt: null } } },
+      include: { items: { where: { isDeleted: false } } },
     });
     return found ? pgOrder(found) : null;
   };
@@ -134,7 +134,7 @@ export function makeOrdersController(env: Env) {
     const updated = await db().order.update({
       where: { id: freshOrder.id },
       data: { verification: v, events: evts as any },
-      include: { items: { where: { deletedAt: null } } },
+      include: { items: { where: { isDeleted: false } } },
     });
 
     const finalize = await finalizeApprovalIfReady(updated!, 'SYSTEM_AI', envRef);
@@ -149,7 +149,7 @@ export function makeOrdersController(env: Env) {
     if ((finalize as any).approved) {
       return await db().order.findFirst({
         where: { id: freshOrder.id },
-        include: { items: { where: { deletedAt: null } } },
+        include: { items: { where: { isDeleted: false } } },
       });
     }
     return updated;
@@ -192,7 +192,7 @@ export function makeOrdersController(env: Env) {
                   roles: { has: 'mediator' as any },
                   mediatorCode: String(order.managerName || '').trim(),
                   parentCode: agencyCode,
-                  deletedAt: null,
+                  isDeleted: false,
                 },
                 select: { id: true },
               });
@@ -297,13 +297,13 @@ export function makeOrdersController(env: Env) {
 
         // Resolve mongoId/UUID → PG UUID for FK query
         const userWhere = UUID_RE.test(userId)
-          ? { OR: [{ id: userId }, { mongoId: userId }] as any, deletedAt: null }
-          : { mongoId: userId, deletedAt: null };
+          ? { OR: [{ id: userId }, { mongoId: userId }] as any, isDeleted: false }
+          : { mongoId: userId, isDeleted: false };
         const targetUser = await db().user.findFirst({ where: userWhere as any, select: { id: true } });
         if (!targetUser) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
         const { page, limit, skip, isPaginated } = parsePagination(req.query as Record<string, unknown>, { limit: 50 });
-        const where = { userId: targetUser.id, deletedAt: null };
+        const where = { userId: targetUser.id, isDeleted: false };
 
         const [orders, total] = await Promise.all([
           db().order.findMany({
@@ -378,8 +378,8 @@ export function makeOrdersController(env: Env) {
         }
 
         const userLookupWhere = UUID_RE.test(body.userId)
-          ? { OR: [{ id: body.userId }, { mongoId: body.userId }] as any, deletedAt: null }
-          : { mongoId: body.userId, deletedAt: null };
+          ? { OR: [{ id: body.userId }, { mongoId: body.userId }] as any, isDeleted: false }
+          : { mongoId: body.userId, isDeleted: false };
         const user = await db().user.findFirst({ where: userLookupWhere as any, select: { id: true, mongoId: true, name: true, mobile: true, status: true, parentCode: true } });
         if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
         if (user.status !== 'active') {
@@ -393,8 +393,8 @@ export function makeOrdersController(env: Env) {
         const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
         const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
         const [hourly, daily] = await Promise.all([
-          db().order.count({ where: { userId: userPgId, createdAt: { gte: oneHourAgo }, deletedAt: null } }),
-          db().order.count({ where: { userId: userPgId, createdAt: { gte: oneDayAgo }, deletedAt: null } }),
+          db().order.count({ where: { userId: userPgId, createdAt: { gte: oneHourAgo }, isDeleted: false } }),
+          db().order.count({ where: { userId: userPgId, createdAt: { gte: oneDayAgo }, isDeleted: false } }),
         ]);
         if (hourly >= 10 || daily >= 30) {
           throw new AppError(429, 'VELOCITY_LIMIT', 'Too many orders created. Please try later.');
@@ -404,7 +404,7 @@ export function makeOrdersController(env: Env) {
         const resolvedExternalOrderId = body.externalOrderId || (allowE2eBypass ? `E2E-${Date.now()}` : undefined);
 
         if (resolvedExternalOrderId) {
-          const dup = await db().order.findFirst({ where: { externalOrderId: resolvedExternalOrderId, deletedAt: null }, select: { id: true } });
+          const dup = await db().order.findFirst({ where: { externalOrderId: resolvedExternalOrderId, isDeleted: false }, select: { id: true } });
           if (dup) {
             throw new AppError(
               409,
@@ -419,7 +419,7 @@ export function makeOrdersController(env: Env) {
         const firstItem = body.items[0];
         const duplicateWhere: any = {
           userId: userPgId,
-          deletedAt: null,
+          isDeleted: false,
           workflowStatus: { notIn: ['FAILED', 'REJECTED'] },
           items: { some: { productId: firstItem.productId } },
         };
@@ -495,14 +495,14 @@ export function makeOrdersController(env: Env) {
           throw new AppError(503, 'AI_NOT_CONFIGURED', 'Proof validation is not configured.');
         }
         const campaignWhere = UUID_RE.test(item.campaignId)
-          ? { OR: [{ id: item.campaignId }, { mongoId: item.campaignId }], deletedAt: null }
-          : { mongoId: item.campaignId, deletedAt: null };
+          ? { OR: [{ id: item.campaignId }, { mongoId: item.campaignId }], isDeleted: false }
+          : { mongoId: item.campaignId, isDeleted: false };
 
         // [PERF] Parallel fetch: campaign + mediatorUser are independent
         const [campaign, mediatorUser] = await Promise.all([
           db().campaign.findFirst({ where: campaignWhere as any }),
           db().user.findFirst({
-            where: { roles: { has: 'mediator' as any }, mediatorCode: upstreamMediatorCode, deletedAt: null },
+            where: { roles: { has: 'mediator' as any }, mediatorCode: upstreamMediatorCode, isDeleted: false },
             select: { parentCode: true },
           }),
         ]);
@@ -518,7 +518,7 @@ export function makeOrdersController(env: Env) {
         let resolvedAgencyName = 'Partner Agency';
         if (upstreamAgencyCode) {
           const agencyUser = await db().user.findFirst({
-            where: { roles: { has: 'agency' as any }, mediatorCode: upstreamAgencyCode, deletedAt: null },
+            where: { roles: { has: 'agency' as any }, mediatorCode: upstreamAgencyCode, isDeleted: false },
             select: { name: true },
           });
           if (agencyUser?.name) resolvedAgencyName = String(agencyUser.name);
@@ -553,8 +553,8 @@ export function makeOrdersController(env: Env) {
         // Commission snapshot: prefer published Deal record if productId is a Deal id.
         let commissionPaise = rupeesToPaise(item.commission);
         const dealWhere = UUID_RE.test(item.productId)
-          ? { OR: [{ id: item.productId }, { mongoId: item.productId }] as any, deletedAt: null }
-          : { mongoId: item.productId, deletedAt: null };
+          ? { OR: [{ id: item.productId }, { mongoId: item.productId }] as any, isDeleted: false }
+          : { mongoId: item.productId, isDeleted: false };
 
         // [PERF] Parallel fetch: mediatorSales + maybeDeal are independent
         const [mediatorSales, maybeDeal] = await Promise.all([
@@ -564,7 +564,7 @@ export function makeOrdersController(env: Env) {
                   managerName: upstreamMediatorCode,
                   items: { some: { campaignId: campaign.id } },
                   status: { not: 'Cancelled' as any },
-                  deletedAt: null,
+                  isDeleted: false,
                 },
               })
             : Promise.resolve(0),
@@ -599,11 +599,11 @@ export function makeOrdersController(env: Env) {
           // If this is an upgrade from a redirect-tracked pre-order, update that order instead of creating a new one.
           if (body.preOrderId) {
             const preOrderWhere = UUID_RE.test(body.preOrderId)
-              ? { OR: [{ id: body.preOrderId }, { mongoId: body.preOrderId }] as any, userId: userPgId, deletedAt: null }
-              : { mongoId: body.preOrderId, userId: userPgId, deletedAt: null };
+              ? { OR: [{ id: body.preOrderId }, { mongoId: body.preOrderId }] as any, userId: userPgId, isDeleted: false }
+              : { mongoId: body.preOrderId, userId: userPgId, isDeleted: false };
             const existing = await tx.order.findFirst({
               where: preOrderWhere as any,
-              include: { items: { where: { deletedAt: null } } },
+              include: { items: { where: { isDeleted: false } } },
             });
             if (!existing) throw new AppError(404, 'ORDER_NOT_FOUND', 'Pre-order not found');
             if (existing.frozen) throw new AppError(409, 'ORDER_FROZEN', 'Order is frozen and requires explicit reactivation');
@@ -615,7 +615,7 @@ export function makeOrdersController(env: Env) {
             await claimSlot(tx);
 
             // Soft-delete old items, then recreate with new data
-            await tx.orderItem.updateMany({ where: { orderId: existing.id }, data: { deletedAt: new Date() } });
+            await tx.orderItem.updateMany({ where: { orderId: existing.id }, data: { isDeleted: true } });
 
             const existingEvents = Array.isArray(existing.events) ? (existing.events as any[]) : [];
             const _updated = await tx.order.update({
@@ -668,7 +668,7 @@ export function makeOrdersController(env: Env) {
                 }) as any,
                 updatedBy: userPgId,
               },
-              include: { items: { where: { deletedAt: null } } },
+              include: { items: { where: { isDeleted: false } } },
             });
 
             // State machine: REDIRECTED -> ORDERED
@@ -738,7 +738,7 @@ export function makeOrdersController(env: Env) {
               }) as any,
               createdBy: userPgId,
             },
-            include: { items: { where: { deletedAt: null } } },
+            include: { items: { where: { isDeleted: false } } },
           });
 
           return order;
@@ -791,8 +791,8 @@ export function makeOrdersController(env: Env) {
           const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
           if (aiOrderConfidence >= autoThreshold) {
             const freshOrder = await db().order.findFirst({
-              where: { mongoId: orderMongoId, deletedAt: null },
-              include: { items: { where: { deletedAt: null } } },
+              where: { mongoId: orderMongoId, isDeleted: false },
+              include: { items: { where: { isDeleted: false } } },
             });
             if (freshOrder && String(freshOrder.workflowStatus) === 'UNDER_REVIEW') {
               const v = (freshOrder.verification && typeof freshOrder.verification === 'object')
@@ -810,7 +810,7 @@ export function makeOrdersController(env: Env) {
                 const updated = await db().order.update({
                   where: { id: freshOrder.id },
                   data: { verification: v, events: evts as any },
-                  include: { items: { where: { deletedAt: null } } },
+                  include: { items: { where: { isDeleted: false } } },
                 });
                 const finalize = await finalizeApprovalIfReady(updated!, 'SYSTEM_AI', env);
                 orderLog.info('Auto-verified purchase by AI confidence', {
@@ -822,7 +822,7 @@ export function makeOrdersController(env: Env) {
                 if ((finalize as any).approved) {
                   finalOrder = await db().order.findFirst({
                     where: { id: freshOrder.id },
-                    include: { items: { where: { deletedAt: null } } },
+                    include: { items: { where: { isDeleted: false } } },
                   });
                 } else {
                   finalOrder = updated;
@@ -911,11 +911,11 @@ export function makeOrdersController(env: Env) {
       try {
         const body = submitClaimSchema.parse(req.body);
         const claimOrderWhere = UUID_RE.test(body.orderId)
-          ? { OR: [{ id: body.orderId }, { mongoId: body.orderId }] as any, deletedAt: null }
-          : { mongoId: body.orderId, deletedAt: null };
+          ? { OR: [{ id: body.orderId }, { mongoId: body.orderId }] as any, isDeleted: false }
+          : { mongoId: body.orderId, isDeleted: false };
         const order = await db().order.findFirst({
           where: claimOrderWhere as any,
-          include: { items: { where: { deletedAt: null } } },
+          include: { items: { where: { isDeleted: false } } },
         });
         if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
 
@@ -1222,7 +1222,7 @@ export function makeOrdersController(env: Env) {
         // ORDERED -> PROOF_SUBMITTED -> UNDER_REVIEW
         // If already UNDER_REVIEW, we just persist the new proof without rewinding workflow.
         if (wf === 'UNDER_REVIEW') {
-          let refreshed = await db().order.findUnique({ where: { id: order.id }, include: { items: { where: { deletedAt: null } } } });
+          let refreshed = await db().order.findUnique({ where: { id: order.id }, include: { items: { where: { isDeleted: false } } } });
 
           // ── Auto-verify by AI confidence (submitClaim, already UNDER_REVIEW) ──
           const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
@@ -1257,8 +1257,8 @@ export function makeOrdersController(env: Env) {
         const autoThreshold2 = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
         if (claimAiConfidence >= autoThreshold2 && afterReview) {
           const freshOrder = await db().order.findFirst({
-            where: { id: order.id, deletedAt: null },
-            include: { items: { where: { deletedAt: null } } },
+            where: { id: order.id, isDeleted: false },
+            include: { items: { where: { isDeleted: false } } },
           });
           if (freshOrder) {
             claimFinalOrder = await autoVerifyStep(freshOrder, body.type, claimAiConfidence, autoThreshold2, env);
@@ -1271,7 +1271,7 @@ export function makeOrdersController(env: Env) {
         const managerCode = String(order.managerName || '').trim();
         const mediatorUser = managerCode
           ? await db().user.findFirst({
-            where: { roles: { has: 'mediator' as any }, mediatorCode: managerCode, deletedAt: null },
+            where: { roles: { has: 'mediator' as any }, mediatorCode: managerCode, isDeleted: false },
             select: { parentCode: true },
           })
           : null;

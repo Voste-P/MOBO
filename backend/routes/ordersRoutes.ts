@@ -93,7 +93,7 @@ export function ordersRoutes(env: Env): Router {
                 roles: { has: 'mediator' },
                 mediatorCode: String(order.managerName).trim(),
                 parentCode: agencyCode,
-                deletedAt: null,
+                isDeleted: false,
               },
               select: { id: true },
             });

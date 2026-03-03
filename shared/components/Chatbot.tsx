@@ -361,7 +361,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
   }, [clearChat]);
 
   return (
-    <div className="flex flex-col h-full min-h-0 w-full bg-[#F4F4F5]">
+    <div className="flex flex-col h-full min-h-0 w-full bg-[#F4F4F5] relative">
       {/* Header */}
       <div className="shrink-0 w-full bg-white border-b border-gray-100 shadow-sm px-5 py-4 safe-top flex justify-between items-center">
         <div className="flex items-center gap-3">
@@ -398,8 +398,8 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
       </div>
 
       {showNotifications && (
-        <div className="shrink-0 px-5 pt-2">
-          <div className="flex justify-end">
+        <div className="absolute inset-x-0 top-[72px] bottom-0 z-30 bg-black/20 backdrop-blur-[2px]" onClick={() => setShowNotifications(false)}>
+          <div className="flex justify-end px-5 pt-2" onClick={(e) => e.stopPropagation()}>
             <div className="w-[78vw] max-w-[340px] bg-white rounded-[2rem] shadow-2xl border border-gray-100 p-2 animate-enter">
               <div className="px-4 py-3 flex justify-between items-center border-b border-gray-50 mb-1">
                 <h3 className="font-extrabold text-sm text-slate-900">Notifications</h3>
@@ -504,7 +504,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
           const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
           setIsAtBottom(distanceFromBottom < 80);
         }}
-        className="flex-1 min-h-0 overflow-y-auto px-4 py-6 scrollbar-hide"
+        className="flex-1 min-h-0 overflow-y-auto px-4 py-6 scrollbar-styled"
       >
         <div className="flex flex-col gap-6">
           {messages.length === 0 && (
@@ -648,7 +648,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
         </div>
       </div>
 
-      <div className="shrink-0 w-full px-4 pb-28 safe-bottom">
+      <div className="shrink-0 w-full px-4 pb-20 safe-bottom">
         <div className="flex flex-nowrap gap-2 justify-center pb-3 overflow-x-auto scrollbar-hide">
           {quickActions.map((action) => (
             <button
@@ -662,7 +662,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
           ))}
         </div>
 
-        <div className="bg-white p-2 rounded-[2rem] shadow-xl border border-slate-100 flex items-center gap-2 relative">
+        <div className="bg-white p-2 pl-4 rounded-[2rem] shadow-xl border border-slate-100 flex items-center gap-2 relative">
           <form onSubmit={(e) => handleSendMessage(e)} className="flex-1 min-w-0">
             <input
               ref={inputRef}

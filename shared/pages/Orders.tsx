@@ -802,7 +802,7 @@ export const Orders: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-28 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-28 scrollbar-styled">
         {/* Search & Filter */}
         <div className="flex gap-2 items-center">
           <div className="flex-1 relative">
@@ -1318,7 +1318,7 @@ export const Orders: React.FC = () => {
               ))}
             </div>
 
-            <div className="flex-1 overflow-y-auto scrollbar-hide space-y-4">
+            <div className="flex-1 overflow-y-auto scrollbar-styled space-y-4">
               {!selectedProduct ? (
                 <>
                   <div className="relative">

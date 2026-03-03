@@ -49,7 +49,7 @@ export function getVapidPublicKey(env: Env): string {
 async function removeInvalidSubscription(endpoint: string) {
   try {
     if (isPrismaAvailable()) {
-      await prisma().pushSubscription.updateMany({ where: { endpoint, deletedAt: null }, data: { deletedAt: new Date() } }).catch(() => {});
+      await prisma().pushSubscription.updateMany({ where: { endpoint, isDeleted: false }, data: { isDeleted: true } }).catch(() => {});
     }
   } catch {
     // ignore cleanup errors
@@ -77,7 +77,7 @@ export async function sendPushToUser(params: {
     });
     if (pgUser) {
       subscriptions = await db.pushSubscription.findMany({
-        where: { userId: pgUser.id, app: params.app, deletedAt: null },
+        where: { userId: pgUser.id, app: params.app, isDeleted: false },
         select: { endpoint: true, keysP256dh: true, keysAuth: true, expirationTime: true },
       });
     }
@@ -176,7 +176,7 @@ export async function notifyOrderWorkflowPush(params: {
         if (isPrismaAvailable()) {
           const db = prisma();
           const pgMediators = await db.user.findMany({
-            where: { mediatorCode, roles: { has: 'mediator' }, deletedAt: null },
+            where: { mediatorCode, roles: { has: 'mediator' }, isDeleted: false },
             select: { id: true, mongoId: true },
           });
           mediatorIds = pgMediators.map(m => m.mongoId || m.id);

@@ -264,6 +264,10 @@ export interface Ticket {
   issueType: string;
   description: string;
   status: TicketStatus;
+  targetRole?: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  resolvedAt?: string;
+  resolutionNote?: string;
   createdAt: string;
 }
 

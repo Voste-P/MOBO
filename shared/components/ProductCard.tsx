@@ -255,7 +255,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
           onClick={() => setFormOpen(true)}
           className="w-full mt-2 py-3 bg-lime-500 text-white font-extrabold rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-lime-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 hover:bg-lime-600"
         >
-          <ShoppingBag size={14} className="stroke-[3]" /> PLACE ORDER
+          <ShoppingBag size={14} className="stroke-[3]" /> ORDER FORM
         </button>
       )}
 
@@ -363,7 +363,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
           onClick={() => onPlaceOrder(product)}
           className="w-full mt-2 py-3 bg-lime-500 text-white font-extrabold rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-lime-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 hover:bg-lime-600"
         >
-          <ShoppingBag size={14} className="stroke-[3]" /> PLACE ORDER
+          <ShoppingBag size={14} className="stroke-[3]" /> ORDER FORM
         </button>
       )}
     </div>

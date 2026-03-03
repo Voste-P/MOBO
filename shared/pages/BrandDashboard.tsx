@@ -357,6 +357,11 @@ const BrandProfileView = () => {
           </div>
         </div>
       </div>
+
+      {/* Feedback Section */}
+      <div className="mt-8">
+        <FeedbackCard role="brand" />
+      </div>
     </div>
   );
 };
@@ -2304,7 +2309,7 @@ export const BrandDashboard: React.FC = () => {
       overlayClassName="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm"
       sidebarWidthClassName="w-80"
       asideClassName="bg-white flex flex-col border-r border-zinc-100 shadow-[4px_0_24px_rgba(0,0,0,0.02)]"
-      mainClassName="flex-1 min-w-0 min-h-0 overflow-y-auto bg-[#FAFAFA] relative scrollbar-hide p-4 md:p-8"
+      mainClassName="flex-1 min-w-0 min-h-0 overflow-y-auto bg-[#FAFAFA] relative scrollbar-styled p-4 md:p-8"
       mobileHeader={
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-black text-lime-400 rounded-lg flex items-center justify-center">
@@ -2440,7 +2445,6 @@ export const BrandDashboard: React.FC = () => {
             >
               <LogOut size={16} /> Sign Out
             </button>
-            <FeedbackCard role="brand" />
           </div>
         </>
       }

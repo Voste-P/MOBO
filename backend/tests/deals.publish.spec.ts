@@ -63,7 +63,7 @@ describe('ops deals: publish', () => {
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('ok', true);
 
-    const deal = await db.deal.findFirst({ where: { campaignId: pgCampaign.id, mediatorCode, deletedAt: null } });
+    const deal = await db.deal.findFirst({ where: { campaignId: pgCampaign.id, mediatorCode, isDeleted: false } });
     expect(deal).toBeTruthy();
     expect(deal?.active).toBe(true);
   });
@@ -114,7 +114,7 @@ describe('ops deals: publish', () => {
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('ok', true);
 
-    const deal = await db.deal.findFirst({ where: { campaignId: pgCampaign.id, mediatorCode, deletedAt: null } });
+    const deal = await db.deal.findFirst({ where: { campaignId: pgCampaign.id, mediatorCode, isDeleted: false } });
     expect(deal).toBeTruthy();
     expect(deal?.commissionPaise).toBe(0);
     expect(deal?.active).toBe(true);
@@ -168,7 +168,7 @@ describe('ops deals: publish', () => {
     expect(res.status).toBe(400);
     expect(res.body?.error?.code).toBe('INVALID_ECONOMICS');
 
-    const deal = await db.deal.findFirst({ where: { campaignId: pgCampaign.id, mediatorCode, deletedAt: null } });
+    const deal = await db.deal.findFirst({ where: { campaignId: pgCampaign.id, mediatorCode, isDeleted: false } });
     expect(deal).toBeFalsy();
   });
 });

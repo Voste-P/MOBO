@@ -47,14 +47,14 @@ export async function transitionOrderWorkflow(params: {
 
   // Read current order (need events array for append)
   const orderWhere = UUID_RE.test(params.orderId)
-    ? { OR: [{ id: params.orderId }, { mongoId: params.orderId }], deletedAt: null }
-    : { mongoId: params.orderId, deletedAt: null };
+    ? { OR: [{ id: params.orderId }, { mongoId: params.orderId }], isDeleted: false }
+    : { mongoId: params.orderId, isDeleted: false };
   const current = await client.order.findFirst({
     where: orderWhere as any,
     select: { id: true, mongoId: true, events: true, frozen: true, workflowStatus: true },
   });
 
-  if (!current || current.deletedAt) {
+  if (!current || current.isDeleted) {
     throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
   }
   if (current.frozen) {
@@ -83,7 +83,7 @@ export async function transitionOrderWorkflow(params: {
       id: current.id,
       workflowStatus: params.from as any,
       frozen: false,
-      deletedAt: null,
+      isDeleted: false,
     },
     data: {
       workflowStatus: params.to as any,
@@ -98,7 +98,7 @@ export async function transitionOrderWorkflow(params: {
   }
 
   // Re-read full order to return
-  const order = await client.order.findUnique({ where: { id: current.id }, include: { items: { where: { deletedAt: null } } } });
+  const order = await client.order.findUnique({ where: { id: current.id }, include: { items: { where: { isDeleted: false } } } });
 
   orderLog.info(`Order workflow: ${params.from} → ${params.to}`, { orderId: current.id, mongoId: current.mongoId, from: params.from, to: params.to, actorUserId: params.actorUserId });
   logChangeEvent({ actorUserId: params.actorUserId, entityType: 'Order', entityId: current.id, action: 'STATUS_CHANGE', changedFields: ['workflowStatus'], before: { workflowStatus: params.from }, after: { workflowStatus: params.to }, metadata: { orderId: params.orderId, mongoId: current.mongoId } });
@@ -134,7 +134,7 @@ export async function freezeOrders(params: {
   const res = await client.order.updateMany({
     where: {
       ...params.query,
-      deletedAt: null,
+      isDeleted: false,
       frozen: false,
       workflowStatus: { notIn: Array.from(TERMINAL) as any },
     },
@@ -166,7 +166,7 @@ export async function reactivateOrder(params: { orderId: string; actorUserId: st
   const current = await client.order.findFirst({
     where: {
       mongoId: params.orderId,
-      deletedAt: null,
+      isDeleted: false,
       frozen: true,
       workflowStatus: { notIn: Array.from(TERMINAL) as any },
     },

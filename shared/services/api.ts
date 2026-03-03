@@ -966,6 +966,10 @@ export const api = {
       fetchJson('/tickets', {
         headers: { ...authHeaders() },
       }),
+    getIssueTypes: async () =>
+      fetchJson('/tickets/issue-types', {
+        headers: { ...authHeaders() },
+      }),
     create: async (data: any) => {
       await fetchOk('/tickets', {
         method: 'POST',
@@ -973,11 +977,11 @@ export const api = {
         body: JSON.stringify(data),
       });
     },
-    update: async (id: string, status: string) => {
+    update: async (id: string, status: string, resolutionNote?: string) => {
       await fetchOk(`/tickets/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, ...(resolutionNote ? { resolutionNote } : {}) }),
       });
     },
     delete: async (id: string) => {

@@ -25,8 +25,8 @@ describe('brand payouts + ledger', () => {
 
     const brandToken = await login(app, E2E_ACCOUNTS.brand.mobile, E2E_ACCOUNTS.brand.password);
 
-    const brand = await db.user.findFirst({ where: { mobile: E2E_ACCOUNTS.brand.mobile, deletedAt: null } });
-    const agency = await db.user.findFirst({ where: { mobile: E2E_ACCOUNTS.agency.mobile, deletedAt: null } });
+    const brand = await db.user.findFirst({ where: { mobile: E2E_ACCOUNTS.brand.mobile, isDeleted: false } });
+    const agency = await db.user.findFirst({ where: { mobile: E2E_ACCOUNTS.agency.mobile, isDeleted: false } });
     expect(brand).toBeTruthy();
     expect(agency).toBeTruthy();
 

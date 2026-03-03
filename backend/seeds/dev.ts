@@ -60,7 +60,7 @@ async function upsertUserByMobile(params: {
   const db = prisma();
   const forcePassword = String(process.env.SEED_DEV_FORCE_PASSWORD || '').toLowerCase() === 'true';
 
-  let user = await db.user.findFirst({ where: { mobile: params.mobile, deletedAt: null } });
+  let user = await db.user.findFirst({ where: { mobile: params.mobile, isDeleted: false } });
   if (!user) {
     const passwordHash = await hashPassword(params.password);
     user = await db.user.create({
@@ -82,7 +82,7 @@ async function upsertUserByMobile(params: {
       role: params.role,
       roles: Array.from(new Set([...(user.roles as string[] ?? []), ...params.roles])),
       status: 'active',
-      deletedAt: null,
+      isDeleted: false,
       ...params.extra,
     };
     if (forcePassword) {

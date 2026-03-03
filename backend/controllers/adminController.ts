@@ -99,7 +99,7 @@ export function makeAdminController() {
           throw new AppError(400, 'INVALID_ROLE', 'Invalid role filter');
         }
 
-        const where: any = { deletedAt: null };
+        const where: any = { isDeleted: false };
         if (dbRole) where.roles = { has: dbRole as any };
         if (queryParams.status && queryParams.status !== 'all') {
           where.status = queryParams.status;
@@ -120,7 +120,7 @@ export function makeAdminController() {
             orderBy: { createdAt: 'desc' },
             skip,
             take: limit,
-            select: { ...userAdminListSelect, wallets: { where: { deletedAt: null }, take: 1, select: { id: true, availablePaise: true, pendingPaise: true } } },
+            select: { ...userAdminListSelect, wallets: { where: { isDeleted: false }, take: 1, select: { id: true, availablePaise: true, pendingPaise: true } } },
           }),
           db().user.count({ where }),
         ]);
@@ -147,7 +147,7 @@ export function makeAdminController() {
     getFinancials: async (req: Request, res: Response, next: NextFunction) => {
       try {
         const queryParams = adminFinancialsQuerySchema.parse(req.query);
-        const where: any = { deletedAt: null };
+        const where: any = { isDeleted: false };
         if (queryParams.status && queryParams.status !== 'all') {
           where.affiliateStatus = queryParams.status;
         }
@@ -288,7 +288,7 @@ export function makeAdminController() {
     getProducts: async (req: Request, res: Response, next: NextFunction) => {
       try {
         const queryParams = adminProductsQuerySchema.parse(req.query);
-        const where: any = { deletedAt: null };
+        const where: any = { isDeleted: false };
         if (queryParams.active && queryParams.active !== 'all') {
           where.active = queryParams.active === 'true';
         }
@@ -326,12 +326,12 @@ export function makeAdminController() {
         const dealId = String(req.params.dealId || '').trim();
         if (!dealId) throw new AppError(400, 'INVALID_DEAL_ID', 'dealId required');
 
-        const deal = await db().deal.findFirst({ where: { ...idWhere(dealId), deletedAt: null } });
+        const deal = await db().deal.findFirst({ where: { ...idWhere(dealId), isDeleted: false } });
         if (!deal) throw new AppError(404, 'DEAL_NOT_FOUND', 'Deal not found');
 
         // Check for orders referencing this deal via order items
         const hasOrders = await db().orderItem.findFirst({
-          where: { productId: dealId, order: { deletedAt: null } },
+          where: { productId: dealId, order: { isDeleted: false } },
           select: { id: true },
         });
         if (hasOrders) throw new AppError(409, 'DEAL_HAS_ORDERS', 'Cannot delete a deal with orders');
@@ -339,7 +339,7 @@ export function makeAdminController() {
         const pgUserId = (req.auth as any)?.pgUserId as string | undefined;
         await db().deal.update({
           where: { id: deal.id },
-          data: { deletedAt: new Date(), deletedBy: pgUserId, updatedBy: pgUserId, active: false },
+          data: { isDeleted: true, updatedBy: pgUserId, active: false },
         });
 
         await writeAuditLog({
@@ -350,7 +350,7 @@ export function makeAdminController() {
           metadata: { mediatorCode: deal.mediatorCode },
         });
         businessLog.info('Deal deleted by admin', { dealId: deal.mongoId, mediatorCode: deal.mediatorCode, title: deal.title });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Deal', entityId: deal.mongoId!, action: 'DEAL_DELETED', changedFields: ['deletedAt', 'active'], before: { active: true }, after: { active: false, deletedAt: new Date().toISOString() } });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Deal', entityId: deal.mongoId!, action: 'DEAL_DELETED', changedFields: ['isDeleted', 'active'], before: { active: true }, after: { active: false, isDeleted: new Date().toISOString() } });
         logAccessEvent('ADMIN_ACTION', {
           userId: req.auth?.userId,
           roles: req.auth?.roles as string[],
@@ -385,7 +385,7 @@ export function makeAdminController() {
         const userId = String(req.params.userId || '').trim();
         if (!userId) throw new AppError(400, 'INVALID_USER_ID', 'userId required');
 
-        const user = await db().user.findFirst({ where: { ...idWhere(userId), deletedAt: null } });
+        const user = await db().user.findFirst({ where: { ...idWhere(userId), isDeleted: false } });
         if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
         const roles = Array.isArray(user.roles) ? (user.roles as string[]) : [];
@@ -395,11 +395,11 @@ export function makeAdminController() {
 
         const mediatorCode = String(user.mediatorCode || '').trim();
 
-        const hasCampaigns = await db().campaign.findFirst({ where: { brandUserId: user.id, deletedAt: null }, select: { id: true } });
+        const hasCampaigns = await db().campaign.findFirst({ where: { brandUserId: user.id, isDeleted: false }, select: { id: true } });
         if (hasCampaigns) throw new AppError(409, 'USER_HAS_CAMPAIGNS', 'User has campaigns');
 
         if (mediatorCode) {
-          const hasDeals = await db().deal.findFirst({ where: { mediatorCode, deletedAt: null }, select: { id: true } });
+          const hasDeals = await db().deal.findFirst({ where: { mediatorCode, isDeleted: false }, select: { id: true } });
           if (hasDeals) throw new AppError(409, 'USER_HAS_DEALS', 'User has deals');
         }
 
@@ -412,16 +412,16 @@ export function makeAdminController() {
           if (mediatorCodes.length) orderOr.push({ managerName: { in: mediatorCodes } });
         }
 
-        const hasOrders = await db().order.findFirst({ where: { deletedAt: null, OR: orderOr }, select: { id: true } });
+        const hasOrders = await db().order.findFirst({ where: { isDeleted: false, OR: orderOr }, select: { id: true } });
         if (hasOrders) throw new AppError(409, 'USER_HAS_ORDERS', 'User has orders');
 
         const hasPendingPayout = await db().payout.findFirst({
-          where: { beneficiaryUserId: user.id, status: { in: ['requested', 'processing'] as any }, deletedAt: null },
+          where: { beneficiaryUserId: user.id, status: { in: ['requested', 'processing'] as any }, isDeleted: false },
           select: { id: true },
         });
         if (hasPendingPayout) throw new AppError(409, 'USER_HAS_PAYOUTS', 'User has pending payouts');
 
-        const wallet = await db().wallet.findFirst({ where: { ownerUserId: user.id, deletedAt: null } });
+        const wallet = await db().wallet.findFirst({ where: { ownerUserId: user.id, isDeleted: false } });
         const available = Number(wallet?.availablePaise ?? 0);
         const pending = Number(wallet?.pendingPaise ?? 0);
         const locked = Number(wallet?.lockedPaise ?? 0);
@@ -433,13 +433,13 @@ export function makeAdminController() {
         if (wallet) {
           await db().wallet.update({
             where: { id: wallet.id },
-            data: { deletedAt: new Date(), deletedBy: pgUserId, updatedBy: pgUserId },
+            data: { isDeleted: true, updatedBy: pgUserId},
           });
         }
 
         await db().user.update({
           where: { id: user.id },
-          data: { deletedAt: new Date(), deletedBy: pgUserId, updatedBy: pgUserId },
+          data: { isDeleted: true, updatedBy: pgUserId},
         });
 
         await writeAuditLog({
@@ -450,8 +450,8 @@ export function makeAdminController() {
           metadata: { role: roles.join(','), mediatorCode },
         });
         securityLog.info('User deleted by admin', { userId: user.mongoId, roles: roles.join(','), mediatorCode });
-        businessLog.info('User deleted by admin', { userId: user.mongoId, targetRole: roles.join(','), mediatorCode, deletedBy: req.auth?.userId, ip: req.ip });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'User', entityId: user.mongoId!, action: 'USER_DELETED', changedFields: ['deletedAt'], before: { status: user.status }, after: { deletedAt: new Date().toISOString() } });
+        businessLog.info('User deleted by admin', { userId: user.mongoId, targetRole: roles.join(','), mediatorCode, updatedBy: req.auth?.userId, ip: req.ip });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'User', entityId: user.mongoId!, action: 'USER_DELETED', changedFields: ['isDeleted'], before: { status: user.status }, after: { isDeleted: new Date().toISOString() } });
         logAccessEvent('ADMIN_ACTION', {
           userId: req.auth?.userId,
           roles: req.auth?.roles as string[],
@@ -497,10 +497,10 @@ export function makeAdminController() {
         if (!userId) throw new AppError(400, 'INVALID_USER_ID', 'userId required');
 
         // Resolve PG UUID for the user
-        const user = await db().user.findFirst({ where: { ...idWhere(userId), deletedAt: null }, select: { id: true, mongoId: true } });
+        const user = await db().user.findFirst({ where: { ...idWhere(userId), isDeleted: false }, select: { id: true, mongoId: true } });
         if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
-        const wallet = await db().wallet.findFirst({ where: { ownerUserId: user.id, deletedAt: null } });
+        const wallet = await db().wallet.findFirst({ where: { ownerUserId: user.id, isDeleted: false } });
         if (!wallet) throw new AppError(404, 'WALLET_NOT_FOUND', 'Wallet not found');
 
         const available = Number(wallet.availablePaise ?? 0);
@@ -511,7 +511,7 @@ export function makeAdminController() {
         }
 
         const hasPendingPayout = await db().payout.findFirst({
-          where: { beneficiaryUserId: user.id, status: { in: ['requested', 'processing'] as any }, deletedAt: null },
+          where: { beneficiaryUserId: user.id, status: { in: ['requested', 'processing'] as any }, isDeleted: false },
           select: { id: true },
         });
         if (hasPendingPayout) {
@@ -521,7 +521,7 @@ export function makeAdminController() {
         const pgUserId = (req.auth as any)?.pgUserId as string | undefined;
         await db().wallet.update({
           where: { id: wallet.id },
-          data: { deletedAt: new Date(), deletedBy: pgUserId, updatedBy: pgUserId },
+          data: { isDeleted: true, updatedBy: pgUserId},
         });
 
         await writeAuditLog({
@@ -532,7 +532,7 @@ export function makeAdminController() {
           metadata: { ownerUserId: userId },
         });
         businessLog.info('Wallet deleted by admin', { walletId: wallet.mongoId || wallet.id, ownerUserId: userId });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Wallet', entityId: wallet.mongoId || wallet.id, action: 'WALLET_DELETED', changedFields: ['deletedAt'], before: { deletedAt: null }, after: { deletedAt: new Date().toISOString() } });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Wallet', entityId: wallet.mongoId || wallet.id, action: 'WALLET_DELETED', changedFields: ['isDeleted'], before: { isDeleted: false }, after: { isDeleted: new Date().toISOString() } });
         logAccessEvent('ADMIN_ACTION', {
           userId: req.auth?.userId,
           roles: req.auth?.roles as string[],
@@ -566,9 +566,9 @@ export function makeAdminController() {
           throw new AppError(400, 'CANNOT_SELF_SUSPEND', 'Cannot suspend your own account');
         }
 
-        const before = await db().user.findFirst({ where: { ...idWhere(body.userId), deletedAt: null } });
+        const before = await db().user.findFirst({ where: { ...idWhere(body.userId), isDeleted: false } });
         if (!before) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
-        if (before.deletedAt) throw new AppError(409, 'USER_DELETED', 'Cannot update status of a deleted user');
+        if (before.isDeleted) throw new AppError(409, 'USER_DELETED', 'Cannot update status of a deleted user');
 
         const user = await db().user.update({
           where: { id: before.id },
@@ -602,21 +602,21 @@ export function makeAdminController() {
               }
 
               if (roles.includes('mediator') && mediatorCode) {
-                await tx.deal.updateMany({ where: { mediatorCode, deletedAt: null }, data: { active: false } });
+                await tx.deal.updateMany({ where: { mediatorCode, isDeleted: false }, data: { active: false } });
                 await freezeOrders({ query: { managerName: mediatorCode }, reason: 'MEDIATOR_SUSPENDED', actorUserId: adminPgId, tx });
               }
 
               if (roles.includes('agency') && mediatorCode) {
                 const mediatorCodes = await listMediatorCodesForAgency(mediatorCode);
                 if (mediatorCodes.length) {
-                  await tx.deal.updateMany({ where: { mediatorCode: { in: mediatorCodes }, deletedAt: null }, data: { active: false } });
+                  await tx.deal.updateMany({ where: { mediatorCode: { in: mediatorCodes }, isDeleted: false }, data: { active: false } });
                   await freezeOrders({ query: { managerName: { in: mediatorCodes } }, reason: 'AGENCY_SUSPENDED', actorUserId: adminPgId, tx });
                 }
               }
 
               if (roles.includes('brand')) {
                 await tx.campaign.updateMany({
-                  where: { brandUserId: user.id, deletedAt: null, status: { in: ['active', 'draft'] as any } },
+                  where: { brandUserId: user.id, isDeleted: false, status: { in: ['active', 'draft'] as any } },
                   data: { status: 'paused' as any },
                 });
                 await freezeOrders({ query: { brandUserId: user.id }, reason: 'BRAND_SUSPENDED', actorUserId: adminPgId, tx });

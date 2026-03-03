@@ -53,7 +53,7 @@ describe('core flows: products -> redirect -> order -> claim -> ops verify/settl
     // Find the E2E Deal: query DB directly because stale deals from prior runs
     // may push it off the first page of the paginated products API.
     const deal = await db.deal.findFirst({
-      where: { title: 'E2E Deal', active: true, deletedAt: null },
+      where: { title: 'E2E Deal', active: true, isDeleted: false },
       include: { campaign: true },
     });
     expect(deal).toBeTruthy();
@@ -85,8 +85,8 @@ describe('core flows: products -> redirect -> order -> claim -> ops verify/settl
     // Reset velocity counter: soft-delete ALL orders for this user so the
     // per-buyer velocity limit (10/hour, 30/day) does not fire on repeated runs.
     await db.order.updateMany({
-      where: { userId: shopper.userId, deletedAt: null },
-      data: { deletedAt: new Date() },
+      where: { userId: shopper.userId, isDeleted: false },
+      data: { isDeleted: true },
     });
 
     // Also identify old orders for this specific deal (for transaction cleanup below)
@@ -187,7 +187,7 @@ describe('core flows: products -> redirect -> order -> claim -> ops verify/settl
     expect(verifyRes.body).toHaveProperty('ok', true);
 
     // Snapshot wallet balance immediately BEFORE settling
-    const walletSnap = await db.wallet.findFirst({ where: { ownerUserId: campaignBrandUserId, deletedAt: null } });
+    const walletSnap = await db.wallet.findFirst({ where: { ownerUserId: campaignBrandUserId, isDeleted: false } });
     expect(walletSnap).toBeTruthy();
     const brandAvailableBefore = Number(walletSnap?.availablePaise ?? 0);
 
@@ -200,7 +200,7 @@ describe('core flows: products -> redirect -> order -> claim -> ops verify/settl
     expect(settleRes.status).toBe(200);
     expect(settleRes.body).toHaveProperty('ok', true);
 
-    const brandWalletAfter = await db.wallet.findFirst({ where: { ownerUserId: campaignBrandUserId, deletedAt: null } });
+    const brandWalletAfter = await db.wallet.findFirst({ where: { ownerUserId: campaignBrandUserId, isDeleted: false } });
     expect(brandWalletAfter).toBeTruthy();
     const brandAvailableAfter = Number(brandWalletAfter?.availablePaise ?? 0);
 
@@ -215,7 +215,7 @@ describe('core flows: products -> redirect -> order -> claim -> ops verify/settl
     expect(myOrdersRes.body.some((o: any) => o.id === orderId)).toBe(true);
 
     // Clean up any existing connection between agency and brand so we can test fresh
-    const brandUser = await db.user.findFirst({ where: { brandCode: E2E_ACCOUNTS.brand.brandCode, deletedAt: null } });
+    const brandUser = await db.user.findFirst({ where: { brandCode: E2E_ACCOUNTS.brand.brandCode, isDeleted: false } });
     if (brandUser) {
       const currentConnected = Array.isArray(brandUser.connectedAgencies) ? brandUser.connectedAgencies as string[] : [];
       const stripped = currentConnected.filter((c: string) => c !== E2E_ACCOUNTS.agency.agencyCode);

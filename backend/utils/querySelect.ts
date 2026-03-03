@@ -27,7 +27,7 @@ export const userStatusSelect = {
   roles: true,
   mediatorCode: true,
   parentCode: true,
-  deletedAt: true,
+  isDeleted: true,
 } as const;
 
 /**
@@ -77,7 +77,7 @@ export const userAdminListSelect = {
   // avatar included — typically 5-20KB compressed JPEG; needed for profile photos in lists
   avatar: true,
   createdAt: true,
-  // EXCLUDED: passwordHash, googleRefreshToken, fcmTokens, deletedAt
+  // EXCLUDED: passwordHash, googleRefreshToken, fcmTokens, isDeleted
 } as const;
 
 /**

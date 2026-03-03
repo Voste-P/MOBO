@@ -9,8 +9,8 @@ async function ensureActiveUserByMongoId(idOrUuid: string) {
   const db = prisma();
   // If the value looks like a UUID, look up by PG id; otherwise by mongoId.
   const where = UUID_RE.test(idOrUuid)
-    ? { id: idOrUuid, deletedAt: null }
-    : { mongoId: idOrUuid, deletedAt: null };
+    ? { id: idOrUuid, isDeleted: false }
+    : { mongoId: idOrUuid, isDeleted: false };
   const user = await db.user.findFirst({ where: where as any });
   if (!user) throw new AppError(400, 'INVITE_ISSUER_NOT_FOUND', 'Invite issuer not found');
   if (user.status !== 'active') {
@@ -26,7 +26,7 @@ async function ensureActiveUserByCode(params: { code: string; role: string }) {
       mediatorCode: params.code,
       roles: { has: params.role as any },
       status: 'active',
-      deletedAt: null,
+      isDeleted: false,
     },
   });
   if (!user) throw new AppError(400, 'INVITE_UPSTREAM_NOT_ACTIVE', 'Invite upstream is not active');
