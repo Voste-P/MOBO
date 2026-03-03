@@ -41,4 +41,4 @@ EXPOSE 3000
 WORKDIR /app/backend
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["node", "dist/index.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]

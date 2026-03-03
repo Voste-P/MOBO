@@ -110,6 +110,27 @@ async function main() {
   });
   startupLog.info('PostgreSQL connected — primary database ready');
 
+  // ── Schema sanity check ─────────────────────────────────────────────
+  // Catch migration drift at startup instead of failing on first request.
+  try {
+    const { prisma: getPrisma } = await import('./database/prisma.js');
+    const db = getPrisma();
+    await db.user.findFirst({ where: { isDeleted: false }, select: { id: true }, take: 1 });
+    startupLog.info('Schema sanity check passed (isDeleted column accessible)');
+  } catch (schemaErr: any) {
+    const code = (schemaErr as any)?.code;
+    if (code === 'P2022' || code === 'P2010' || code === 'P2023') {
+      startupLog.error(
+        'SCHEMA MISMATCH: Database columns do not match Prisma schema. ' +
+        'Run "npx prisma migrate deploy" to apply pending migrations.',
+        { prismaCode: code, message: schemaErr?.message },
+      );
+      process.exit(1);
+    }
+    // Non-schema errors (e.g. empty table) are fine — just log and continue
+    startupLog.warn('Schema sanity check query failed (non-fatal)', { error: schemaErr?.message });
+  }
+
   const app = createApp(env);
 
   server = app.listen(env.PORT, () => {
