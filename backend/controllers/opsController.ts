@@ -1663,7 +1663,7 @@ export function makeOpsController(env: Env) {
                 events: newEvents1 as any,
               },
             });
-          });
+          }, { timeout: 15000 });
         } else {
           // Cap-exceeded or external: no wallet movement, just update order status
           const newEvents1 = pushOrderEvent(order.events as any, {
@@ -1882,7 +1882,7 @@ export function makeOpsController(env: Env) {
             }
 
             await tx.order.update({ where: { id: order.id }, data: buildUnsettleData() });
-          });
+          }, { timeout: 15000 });
         } else {
           // Non-wallet path (cap exceeded or external settlement): no transaction needed.
           await db().order.update({ where: { id: order.id }, data: buildUnsettleData() });
@@ -2620,7 +2620,7 @@ export function makeOpsController(env: Env) {
           if (canAny) {
             walletLog.info('Payout debit applied', { payoutId: payoutDisplayId, beneficiaryId: userDisplayId, amountPaise });
           }
-        });
+        }, { timeout: 15000 });
 
         res.json({ ok: true });
       } catch (err) {

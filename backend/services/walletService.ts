@@ -156,7 +156,7 @@ export async function applyWalletCredit(input: WalletMutationInput) {
   }
 
   const db = prisma();
-  const result = await db.$transaction(async (tx) => execute(tx));
+  const result = await db.$transaction(async (tx) => execute(tx), { timeout: 15000 });
   logChangeEvent({ actorUserId: input.fromUserId, entityType: 'Wallet', entityId: input.ownerUserId, action: 'UPDATE', changedFields: ['availablePaise'], metadata: { operation: 'CREDIT', amountPaise: input.amountPaise, type: input.type, idempotencyKey: input.idempotencyKey, orderId: input.orderId } });
   writeAuditLog({ action: 'WALLET_CREDIT', entityType: 'Wallet', entityId: input.ownerUserId, metadata: { amountPaise: input.amountPaise, type: input.type, idempotencyKey: input.idempotencyKey } });
   return result;
@@ -238,7 +238,7 @@ export async function applyWalletDebit(input: WalletMutationInput) {
   }
 
   const db = prisma();
-  const result = await db.$transaction(async (tx) => execute(tx));
+  const result = await db.$transaction(async (tx) => execute(tx), { timeout: 15000 });
   walletLog.info('Wallet debit completed', { userId: input.ownerUserId, type: input.type, amountPaise: input.amountPaise, txnId: result.id });
   logChangeEvent({ actorUserId: input.toUserId, entityType: 'Wallet', entityId: input.ownerUserId, action: 'UPDATE', changedFields: ['availablePaise'], metadata: { operation: 'DEBIT', amountPaise: input.amountPaise, type: input.type, idempotencyKey: input.idempotencyKey, orderId: input.orderId } });
   writeAuditLog({ action: 'WALLET_DEBIT', entityType: 'Wallet', entityId: input.ownerUserId, metadata: { amountPaise: input.amountPaise, type: input.type, idempotencyKey: input.idempotencyKey } });

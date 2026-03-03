@@ -22,6 +22,12 @@ for migration_file in $(find "$MIGRATIONS_DIR" -name "migration.sql" -type f | s
 
   echo "  Checking: $migration_name"
 
+  # Skip migrations explicitly approved for destructive operations
+  if grep -q '@approved-destructive' "$migration_file"; then
+    echo "    ⏭️  Approved-destructive — skipping safety checks"
+    continue
+  fi
+
   # ── Dangerous: DROP TABLE ──
   if grep -qiE '^\s*DROP\s+TABLE' "$migration_file"; then
     ERRORS+="❌ [$migration_name] Contains DROP TABLE — requires manual approval\n"

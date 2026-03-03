@@ -85,7 +85,7 @@ export function makeAuthController(env: Env) {
 
         // Atomic: validate + create user + (optional) consume invite.
         const { user, consumed } = await db().$transaction(async (tx) => {
-          // Preferred: invite-based registration.
+          // Preferred: invite-based registration (shopper).
           const invite = await tx.invite.findFirst({ where: { code: body.mediatorCode, status: 'active' } });
 
           let upstreamMediatorCode = '';
@@ -156,7 +156,7 @@ export function makeAuthController(env: Env) {
             : null;
 
           return { user: newUser, consumed: consumedInvite };
-        });
+        }, { timeout: 15000 });
 
         if (consumed) {
           await writeAuditLog({
@@ -634,7 +634,7 @@ export function makeAuthController(env: Env) {
             : null;
 
           return { user: newUser, consumed: consumedInvite, pendingApproval };
-        });
+        }, { timeout: 15000 });
 
         if (consumed) {
           await writeAuditLog({
@@ -784,7 +784,7 @@ export function makeAuthController(env: Env) {
           });
 
           return { user: newUser, consumed: consumedInvite };
-        });
+        }, { timeout: 15000 });
 
         await writeAuditLog({
           req,
