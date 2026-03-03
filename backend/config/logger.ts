@@ -389,10 +389,24 @@ if (isProd) {
       datePattern: 'YYYY-MM-DD',
       maxSize: '20m',
       maxFiles: '30d',
-      format: prodJsonFormat,
+      format: combine(
+        winston.format((info) => {
+          const domain = info.domain || (info.metadata as any)?.domain;
+          const category = info.eventCategory || (info.metadata as any)?.eventCategory;
+          if (
+            domain === 'http' ||
+            domain === 'auth' ||
+            category === 'access' ||
+            category === 'authentication' ||
+            category === 'authorization'
+          ) {
+            return info;
+          }
+          return false;
+        })(),
+        prodJsonFormat
+      ),
       zippedArchive: true,
-      // Filter: only log entries with authentication/authorization category
-      // Winston uses the log transform to apply this filter.
     }),
     // Security events — for SIEM ingestion and incident investigation.
     new DailyRotateFile({

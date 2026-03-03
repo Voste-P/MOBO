@@ -194,10 +194,13 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     setLocal((prev) => [newNotification, ...prev].slice(0, 30));
   }, []);
 
+  const value = useMemo(
+    () => ({ notifications, unreadCount, markAllRead, refresh, showNotification, removeNotification }),
+    [notifications, unreadCount, markAllRead, refresh, showNotification, removeNotification],
+  );
+
   return (
-    <NotificationContext.Provider
-      value={{ notifications, unreadCount, markAllRead, refresh, showNotification, removeNotification }}
-    >
+    <NotificationContext.Provider value={value}>
       {children}
     </NotificationContext.Provider>
   );

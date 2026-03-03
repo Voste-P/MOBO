@@ -95,12 +95,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser(me);
         localStorage.setItem('mobo_session', JSON.stringify(me));
         emitAuthChange();
-      } catch {
-        // Any failure => clear local auth state and show splash.
-        localStorage.removeItem('mobo_session');
-        localStorage.removeItem('mobo_tokens_v1');
-        setUser(null);
-        emitAuthChange();
+      } catch (err: unknown) {
+        // Only clear auth state on definitive auth failures (401/403),
+        // not on transient network errors that would cause unnecessary logout.
+        const isAuthErr =
+          (err instanceof Error && /401|403|unauthorized|forbidden/i.test(err.message)) ||
+          (typeof err === 'object' && err !== null && 'status' in err && ((err as any).status === 401 || (err as any).status === 403));
+        if (isAuthErr) {
+          localStorage.removeItem('mobo_session');
+          localStorage.removeItem('mobo_tokens_v1');
+          setUser(null);
+          emitAuthChange();
+        }
+        // On network errors, keep stale session so user isn't force-logged-out
       }
     };
 

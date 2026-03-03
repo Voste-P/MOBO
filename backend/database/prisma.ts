@@ -153,8 +153,14 @@ export async function connectPrisma(maxRetries = 3): Promise<void> {
 
         // Standard PostgreSQL with connection pooling + SSL
         const { PrismaPg } = await import('@prisma/adapter-pg');
+        const pg = await import('pg');
         const { poolConfig, pgSchema, sslmode } = buildPoolConfig(url);
-        const adapter = new PrismaPg(poolConfig as any, pgSchema ? { schema: pgSchema } : undefined);
+        const pool = new pg.default.Pool(poolConfig as any);
+        _pool = pool; // Expose for metrics
+        pool.on('error', (err: Error) => {
+          dbLog.error('PG pool background error', { error: err.message });
+        });
+        const adapter = new PrismaPg(pool, pgSchema ? { schema: pgSchema } : undefined);
         const client = new PrismaClient({ adapter, log: logConfig });
 
         // Log slow queries (>200ms) in development for performance debugging
@@ -260,6 +266,17 @@ export async function pingPg(): Promise<boolean> {
     } catch { /* reconnection failed — fall through */ }
     return false;
   }
+}
+
+/* ── Pool metrics (active, idle, waiting) for observability ───────── */
+let _pool: any = null;
+export function getPoolMetrics() {
+  if (!_pool) return { totalCount: 0, idleCount: 0, waitingCount: 0 };
+  return {
+    totalCount: _pool.totalCount ?? 0,
+    idleCount: _pool.idleCount ?? 0,
+    waitingCount: _pool.waitingCount ?? 0,
+  };
 }
 
 /**
