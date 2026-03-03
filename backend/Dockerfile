@@ -75,4 +75,4 @@ EXPOSE 8080
 # Start the server with tini for proper signal forwarding
 ENV NODE_ENV=production
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "cd backend && npx prisma migrate deploy && node dist/index.js"]
+CMD ["sh", "-c", "cd backend && node scripts/deploy-migrate.cjs && node dist/index.js"]
