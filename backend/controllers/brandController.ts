@@ -134,7 +134,7 @@ export function makeBrandController() {
 
         let brandPgId: string;
         if (isPrivileged(roles) && requested) {
-          const brandUser = await db().user.findFirst({ where: { ...idWhere(requested) }, select: { id: true } });
+          const brandUser = await db().user.findFirst({ where: { ...idWhere(requested), isDeleted: false }, select: { id: true } });
           if (!brandUser) throw new AppError(404, 'BRAND_NOT_FOUND', 'Brand not found');
           brandPgId = brandUser.id;
         } else {
@@ -271,7 +271,7 @@ export function makeBrandController() {
 
         let brandPgId: string;
         if (isPrivileged(roles) && requested) {
-          const brandUser = await db().user.findFirst({ where: { ...idWhere(requested) }, select: { id: true } });
+          const brandUser = await db().user.findFirst({ where: { ...idWhere(requested), isDeleted: false }, select: { id: true } });
           if (!brandUser) throw new AppError(404, 'BRAND_NOT_FOUND', 'Brand not found');
           brandPgId = brandUser.id;
         } else {
@@ -605,7 +605,7 @@ export function makeBrandController() {
           const affectedCount = await db().$executeRaw`
             UPDATE "campaigns"
             SET "allowed_agency_codes" = array_remove("allowed_agency_codes", ${agencyCode})
-            WHERE "brand_user_id" = ${brand.id}::uuid AND "deleted_at" IS NULL
+            WHERE "brand_user_id" = ${brand.id}::uuid AND "is_deleted" = false
             AND ${agencyCode} = ANY("allowed_agency_codes")
           `;
           if (affectedCount > 0) {
@@ -656,7 +656,7 @@ export function makeBrandController() {
         let brandPgId: string;
         let brandMongoId: string;
         if (isPrivileged(roles) && body?.brandId) {
-          const brandUser = await db().user.findFirst({ where: { ...idWhere(String(body.brandId)) }, select: { id: true, mongoId: true } });
+          const brandUser = await db().user.findFirst({ where: { ...idWhere(String(body.brandId)), isDeleted: false }, select: { id: true, mongoId: true } });
           if (!brandUser) throw new AppError(404, 'BRAND_NOT_FOUND', 'Brand not found');
           brandPgId = brandUser.id;
           brandMongoId = brandUser.mongoId || brandUser.id;
@@ -686,7 +686,7 @@ export function makeBrandController() {
 
         if (!isPrivileged(roles)) {
           // Auto-connect allowed agencies to the brand (addToSet logic)
-          const brandUser = await db().user.findFirst({ where: { id: pgUserId }, select: { id: true, connectedAgencies: true } });
+          const brandUser = await db().user.findFirst({ where: { id: pgUserId, isDeleted: false }, select: { id: true, connectedAgencies: true } });
           if (brandUser) {
             const connected = Array.isArray(brandUser.connectedAgencies) ? [...brandUser.connectedAgencies] : [];
             const merged = Array.from(new Set([...connected, ...normalizedAllowed]));
@@ -780,7 +780,7 @@ export function makeBrandController() {
 
         if (!isPrivileged(roles)) {
           // Resolve brand user mongoId from PG UUID for ownership check
-          const brandOwner = await db().user.findFirst({ where: { id: existing.brandUserId }, select: { mongoId: true } });
+          const brandOwner = await db().user.findFirst({ where: { id: existing.brandUserId, isDeleted: false }, select: { mongoId: true } });
           const ownerMongoId = brandOwner?.mongoId || existing.brandUserId;
           if (ownerMongoId !== userId) throw new AppError(403, 'FORBIDDEN', 'Cannot modify campaigns outside your brand');
 
@@ -803,7 +803,7 @@ export function makeBrandController() {
             }
 
             // Auto-connect newly assigned agencies.
-            const brandUser = await db().user.findFirst({ where: { id: pgUserId }, select: { id: true, connectedAgencies: true } });
+            const brandUser = await db().user.findFirst({ where: { id: pgUserId, isDeleted: false }, select: { id: true, connectedAgencies: true } });
             if (brandUser) {
               const connected = Array.isArray(brandUser.connectedAgencies) ? [...brandUser.connectedAgencies] : [];
               const merged = Array.from(new Set([...connected, ...normalizedAllowed]));
@@ -816,7 +816,7 @@ export function makeBrandController() {
 
         // Non-negotiable: lock campaign mutability after the first order is created.
         const hasOrders = await db().orderItem.findFirst({
-          where: { campaignId: existing.id, order: { isDeleted: false } },
+          where: { campaignId: existing.id, isDeleted: false, order: { isDeleted: false } },
           select: { id: true },
         });
         const requestedKeys = Object.keys(body || {});
@@ -882,7 +882,7 @@ export function makeBrandController() {
 
         const allowedUnion = Array.from(new Set([...(previousAllowed || []), ...(nextAllowed || [])])).filter(Boolean);
         // Resolve brand user mongoId for realtime audience
-        const brandOwner = await db().user.findFirst({ where: { id: campaign.brandUserId }, select: { mongoId: true } });
+        const brandOwner = await db().user.findFirst({ where: { id: campaign.brandUserId, isDeleted: false }, select: { mongoId: true } });
         const brandUserIdForAudience = brandOwner?.mongoId || campaign.brandUserId || userId;
 
         const campaignMongoId = campaign.mongoId || campaign.id;
@@ -938,7 +938,7 @@ export function makeBrandController() {
         }
 
         // Only brand owner or privileged can copy
-        const brandOwner = await db().user.findFirst({ where: { id: campaign.brandUserId }, select: { mongoId: true } });
+        const brandOwner = await db().user.findFirst({ where: { id: campaign.brandUserId, isDeleted: false }, select: { mongoId: true } });
         const ownerMongoId = brandOwner?.mongoId || campaign.brandUserId;
         if (!isPrivileged(roles) && ownerMongoId !== userId) {
           throw new AppError(403, 'FORBIDDEN', 'Not authorized to copy this campaign');
@@ -1015,14 +1015,14 @@ export function makeBrandController() {
         });
         if (!campaign) throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
 
-        const brandOwner = await db().user.findFirst({ where: { id: campaign.brandUserId }, select: { mongoId: true } });
+        const brandOwner = await db().user.findFirst({ where: { id: campaign.brandUserId, isDeleted: false }, select: { mongoId: true } });
         const ownerMongoId = brandOwner?.mongoId || campaign.brandUserId;
         if (!isPrivileged(roles) && ownerMongoId !== userId) {
           throw new AppError(403, 'FORBIDDEN', 'Cannot delete campaigns outside your ownership');
         }
 
         const hasOrders = await db().orderItem.findFirst({
-          where: { campaignId: campaign.id, order: { isDeleted: false } },
+          where: { campaignId: campaign.id, isDeleted: false, order: { isDeleted: false } },
           select: { id: true },
         });
         if (hasOrders) throw new AppError(409, 'CAMPAIGN_HAS_ORDERS', 'Cannot delete a campaign with orders');

@@ -205,7 +205,7 @@ export function makeAdminController() {
           db().$queryRaw<Array<{ role: string; count: number }>>`
             SELECT r AS role, COUNT(*)::int AS count
             FROM "users", UNNEST(roles) AS r
-            WHERE "deleted_at" IS NULL
+            WHERE "is_deleted" = false
             GROUP BY r`,
           db().$queryRaw<Array<{ total_orders: number; total_revenue_paise: number; pending_revenue_paise: number; risk_orders: number }>>`
             SELECT
@@ -214,7 +214,7 @@ export function makeAdminController() {
               COALESCE(SUM(CASE WHEN "affiliate_status"::text = 'Pending_Cooling' THEN "total_paise" ELSE 0 END), 0)::int AS pending_revenue_paise,
               COALESCE(SUM(CASE WHEN "affiliate_status"::text IN ('Fraud_Alert', 'Unchecked') THEN 1 ELSE 0 END), 0)::int AS risk_orders
             FROM "orders"
-            WHERE "deleted_at" IS NULL`,
+            WHERE "is_deleted" = false`,
         ]);
 
         const counts: any = { total: 0, user: 0, mediator: 0, agency: 0, brand: 0 };
@@ -257,7 +257,7 @@ export function makeAdminController() {
           SELECT TO_CHAR("created_at", 'YYYY-MM-DD') AS date,
                  COALESCE(SUM("total_paise"), 0)::int AS revenue
           FROM "orders"
-          WHERE "created_at" >= ${since} AND "deleted_at" IS NULL
+          WHERE "created_at" >= ${since} AND "is_deleted" = false
           GROUP BY TO_CHAR("created_at", 'YYYY-MM-DD')`;
 
         const revenueByDate = new Map(pipeline.map(b => [b.date, Math.round(Number(b.revenue) / 100)]));
@@ -331,7 +331,7 @@ export function makeAdminController() {
 
         // Check for orders referencing this deal via order items
         const hasOrders = await db().orderItem.findFirst({
-          where: { productId: dealId, order: { isDeleted: false } },
+          where: { productId: dealId, isDeleted: false, order: { isDeleted: false } },
           select: { id: true },
         });
         if (hasOrders) throw new AppError(409, 'DEAL_HAS_ORDERS', 'Cannot delete a deal with orders');
