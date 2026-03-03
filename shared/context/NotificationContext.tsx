@@ -76,7 +76,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
       // Preserve stale inbox data on transient network errors instead of clearing.
       console.error('Failed to load notifications', e);
     }
-  }, [user]);
+  }, [user?.id]);
 
   // Refresh on login; poll only as a fallback when realtime is disconnected.
   useEffect(() => {

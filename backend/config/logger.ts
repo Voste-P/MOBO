@@ -110,6 +110,11 @@ function sanitize(obj: unknown, depth = 0, seen = new WeakSet()): unknown {
 
   if (typeof obj !== 'object') return obj;
 
+  // Handle common non-plain objects that shouldn't be iterated as key-value pairs
+  if (obj instanceof Date) return obj.toISOString();
+  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(obj)) return `[Buffer ${obj.length} bytes]`;
+  if (obj instanceof RegExp) return obj.toString();
+
   // Circular reference protection
   if (seen.has(obj as object)) return '[CIRCULAR]';
   seen.add(obj as object);

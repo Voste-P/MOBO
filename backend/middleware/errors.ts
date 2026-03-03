@@ -59,6 +59,8 @@ export function errorHandler(
     return;
   }
 
+  const userId = (req as any).auth?.userId ?? (req as any).auth?.pgUserId;
+
   if (err instanceof AppError) {
     // Operational errors deserve structured logging at appropriate severity
     const severity = err.statusCode >= 500 ? 'high' : err.statusCode === 403 ? 'medium' : 'low';
@@ -70,7 +72,7 @@ export function errorHandler(
       errorCode: err.code,
       operation: `${req.method} ${req.originalUrl}`,
       requestId,
-      userId: (req as any).user?.id,
+      userId,
       ip: req.ip,
       method: req.method,
       route: req.originalUrl,
@@ -97,7 +99,7 @@ export function errorHandler(
       errorCode: 'ZOD_VALIDATION',
       operation: `${req.method} ${req.originalUrl}`,
       requestId,
-      userId: (req as any).user?.id,
+      userId,
       ip: req.ip,
       method: req.method,
       route: req.originalUrl,
@@ -186,7 +188,7 @@ export function errorHandler(
           errorCode: 'P2002',
           operation: `${req.method} ${req.originalUrl}`,
           requestId,
-          userId: (req as any).user?.id,
+          userId,
           ip: req.ip,
           method: req.method,
           route: req.originalUrl,
@@ -209,7 +211,7 @@ export function errorHandler(
           errorCode: 'P2025',
           operation: `${req.method} ${req.originalUrl}`,
           requestId,
-          userId: (req as any).user?.id,
+          userId,
           ip: req.ip,
           method: req.method,
           route: req.originalUrl,
@@ -232,7 +234,7 @@ export function errorHandler(
           errorCode: 'P2003',
           operation: `${req.method} ${req.originalUrl}`,
           requestId,
-          userId: (req as any).user?.id,
+          userId,
           ip: req.ip,
           method: req.method,
           route: req.originalUrl,
@@ -322,7 +324,7 @@ export function errorHandler(
       errorCode: 'PRISMA_VALIDATION',
       operation: `${req.method} ${req.originalUrl}`,
       requestId,
-      userId: (req as any).user?.id,
+      userId,
       ip: req.ip,
       method: req.method,
       route: req.originalUrl,
@@ -415,7 +417,7 @@ export function errorHandler(
     errorCode: (err as any)?.code || 'UNHANDLED',
     operation: `${req.method} ${req.originalUrl}`,
     requestId,
-    userId: (req as any).user?.id,
+    userId,
     ip: req.ip,
     method: req.method,
     route: req.originalUrl,

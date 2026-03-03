@@ -209,4 +209,7 @@ main().catch((err) => {
     metadata: { ...getSystemMetrics() },
   });
   process.exitCode = 1;
+  // Force exit — without this, Winston transports and intervals keep the event loop alive
+  // and the process hangs indefinitely with no server listening.
+  setTimeout(() => process.exit(1), 2000).unref();
 });

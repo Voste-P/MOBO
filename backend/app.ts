@@ -268,6 +268,7 @@ export function createApp(env: Env) {
     }, REQUEST_TIMEOUT_MS);
     // Don't prevent process exit.
     timer.unref();
+    res.on('finish', () => clearTimeout(timer));
     res.on('close', () => clearTimeout(timer));
     next();
   });

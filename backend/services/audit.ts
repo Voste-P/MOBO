@@ -22,7 +22,7 @@ export async function writeAuditLog(params: AuditParams): Promise<void> {
       const db = prisma();
       await db.auditLog.create({
         data: {
-          actorUserId: pgActorUserId || undefined,
+          actorUserId: pgActorUserId || params.actorUserId || undefined,
           actorRoles: Array.isArray(actorRoles) ? (actorRoles as string[]) : [],
           action: params.action,
           entityType: params.entityType,

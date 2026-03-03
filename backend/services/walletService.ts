@@ -74,6 +74,9 @@ export async function applyWalletCredit(input: WalletMutationInput) {
       where: { idempotencyKey: input.idempotencyKey },
     });
     if (existingTx) {
+      if (existingTx.type !== input.type) {
+        throw new AppError(409, 'IDEMPOTENCY_CONFLICT', `Idempotency key already used for a different transaction type (${existingTx.type})`);
+      }
       walletLog.info('Wallet credit idempotency hit (duplicate key)', { userId: input.ownerUserId, type: input.type, key: input.idempotencyKey });
       return existingTx;
     }
@@ -124,6 +127,7 @@ export async function applyWalletCredit(input: WalletMutationInput) {
 
     // Re-read wallet to get walletId for the transaction record
     const wallet = await tx.wallet.findUnique({ where: { ownerUserId: input.ownerUserId } });
+    if (!wallet) throw new AppError(404, 'WALLET_NOT_FOUND', 'Wallet disappeared during credit');
 
     const txn = await tx.transaction.create({
       data: {
@@ -174,6 +178,11 @@ export async function applyWalletDebit(input: WalletMutationInput) {
       where: { idempotencyKey: input.idempotencyKey },
     });
     if (existingTx) {
+      // Verify the existing transaction matches the expected type to prevent
+      // cross-type collisions (e.g., a credit key being reused as a debit).
+      if (existingTx.type !== input.type) {
+        throw new AppError(409, 'IDEMPOTENCY_CONFLICT', `Idempotency key already used for a different transaction type (${existingTx.type})`);
+      }
       walletLog.info('Wallet debit idempotency hit (duplicate key)', { userId: input.ownerUserId, type: input.type, key: input.idempotencyKey });
       return existingTx;
     }
