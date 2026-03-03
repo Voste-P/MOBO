@@ -52,14 +52,14 @@ export async function seedAdminOnly(args: SeedAdminArgs = {}) {
   const db = prisma();
 
   // Try to find existing admin by username first, then by mobile.
-  let user = await db.user.findFirst({ where: { username, deletedAt: null } });
+  let user = await db.user.findFirst({ where: { username, isDeleted: false } });
   if (!user) {
-    user = await db.user.findFirst({ where: { mobile, deletedAt: null } });
+    user = await db.user.findFirst({ where: { mobile, isDeleted: false } });
   }
 
   // Avoid clobbering an existing different user with the same username.
   if (user && user.username && user.username !== username) {
-    const existingByUsername = await db.user.findFirst({ where: { username, deletedAt: null } });
+    const existingByUsername = await db.user.findFirst({ where: { username, isDeleted: false } });
     if (existingByUsername && existingByUsername.id !== user.id) {
       throw new Error(`seedAdminOnly: username '${username}' is already taken`);
     }
@@ -86,7 +86,7 @@ export async function seedAdminOnly(args: SeedAdminArgs = {}) {
       role: 'admin',
       roles: Array.from(new Set(['admin', ...(user.roles as string[] ?? [])])),
       status: 'active',
-      deletedAt: null,
+      isDeleted: false,
     };
     if (!user.username || shouldForceUsername) updateData.username = username;
     if (shouldForcePassword) {

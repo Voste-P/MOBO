@@ -28,7 +28,7 @@ async function hasE2EUsers(): Promise<boolean> {
   if (isPrismaAvailable()) {
     try {
       const count = await prisma().user.count({
-        where: { mobile: { in: requiredMobiles }, deletedAt: null },
+        where: { mobile: { in: requiredMobiles }, isDeleted: false },
       });
       if (count >= requiredMobiles.length) return true;
     } catch {

@@ -17,7 +17,7 @@ export type AuthUser = {
   parentCode?: string | null;
   mediatorCode?: string | null;
   brandCode?: string | null;
-  deletedAt?: Date | null;
+  isDeleted?: boolean;
   mobile: string;
   name: string;
 };
@@ -66,15 +66,15 @@ async function resolveAuthFromToken(token: string, env: Env): Promise<AuthContex
   // Zero-trust: do not trust roles/status embedded in the JWT.
   // Fetch from DB so suspensions and role changes take effect immediately.
   const user = await db.user.findFirst({
-    where: { ...idWhere(userId), deletedAt: null },
+    where: { ...idWhere(userId), isDeleted: false },
     select: {
       id: true, mongoId: true, status: true, roles: true, role: true,
       parentCode: true, mediatorCode: true, brandCode: true,
-      deletedAt: true, mobile: true, name: true,
+      isDeleted: true, mobile: true, name: true,
     },
   });
 
-  if (!user || user.deletedAt) {
+  if (!user || user.isDeleted) {
     logAuthEvent('SESSION_EXPIRED', {
       userId,
       reason: 'User not found or deleted',
@@ -103,7 +103,7 @@ async function resolveAuthFromToken(token: string, env: Env): Promise<AuthContex
         where: {
           mediatorCode: parentCode,
           roles: { has: 'agency' as any },
-          deletedAt: null,
+          isDeleted: false,
         },
         select: { status: true },
       });
@@ -125,7 +125,7 @@ async function resolveAuthFromToken(token: string, env: Env): Promise<AuthContex
         where: {
           mediatorCode: parentCode,
           roles: { has: 'mediator' as any },
-          deletedAt: null,
+          isDeleted: false,
         },
         select: { status: true, parentCode: true },
       });
@@ -145,7 +145,7 @@ async function resolveAuthFromToken(token: string, env: Env): Promise<AuthContex
           where: {
             mediatorCode: agencyCode,
             roles: { has: 'agency' as any },
-            deletedAt: null,
+            isDeleted: false,
           },
           select: { status: true },
         });
@@ -170,7 +170,7 @@ async function resolveAuthFromToken(token: string, env: Env): Promise<AuthContex
     parentCode: user.parentCode,
     mediatorCode: user.mediatorCode,
     brandCode: user.brandCode,
-    deletedAt: user.deletedAt,
+    isDeleted: user.isDeleted,
     mobile: user.mobile,
     name: user.name,
   };

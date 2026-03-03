@@ -101,7 +101,7 @@ describe('auth registration + invites', () => {
     expect(((invite?.uses as any[]) ?? []).length).toBe(1);
 
     // Verify user was created (PG)
-    const created = await db.user.findFirst({ where: { mobile, deletedAt: null } });
+    const created = await db.user.findFirst({ where: { mobile, isDeleted: false } });
     expect(created).toBeTruthy();
     const shopperProfile = await db.shopperProfile.findFirst({ where: { userId: created!.id } });
     expect(shopperProfile).toBeTruthy();
@@ -149,7 +149,7 @@ describe('auth registration + invites', () => {
     expect(invite?.useCount).toBe(1);
 
     // Verify user + profile created (PG)
-    const created = await db.user.findFirst({ where: { mobile, deletedAt: null } });
+    const created = await db.user.findFirst({ where: { mobile, isDeleted: false } });
     expect(created).toBeTruthy();
     const profile = await db.mediatorProfile.findFirst({ where: { mediatorCode: created!.mediatorCode! } });
     expect(profile).toBeTruthy();
@@ -177,7 +177,7 @@ describe('auth registration + invites', () => {
     expect(res.body.tokens).toBeUndefined(); // No tokens until approved
 
     // Verify user created as pending (PG)
-    const created = await db.user.findFirst({ where: { mobile, deletedAt: null } });
+    const created = await db.user.findFirst({ where: { mobile, isDeleted: false } });
     expect(created).toBeTruthy();
     expect(created?.status).toBe('pending');
     const profile = await db.mediatorProfile.findFirst({ where: { mediatorCode: created!.mediatorCode! } });
@@ -252,7 +252,7 @@ describe('auth registration + invites', () => {
     expect(typeof res.body.tokens?.accessToken).toBe('string');
 
     // Verify user + profile (PG)
-    const created = await db.user.findFirst({ where: { mobile, deletedAt: null } });
+    const created = await db.user.findFirst({ where: { mobile, isDeleted: false } });
     expect(created).toBeTruthy();
     const shopperProfile = await db.shopperProfile.findFirst({ where: { userId: created!.id } });
     expect(shopperProfile).toBeTruthy();
@@ -286,7 +286,7 @@ describe('auth registration + invites', () => {
     expect(res.status).toBe(201);
 
     // Verify user (PG)
-    const created = await db.user.findFirst({ where: { mobile, deletedAt: null } });
+    const created = await db.user.findFirst({ where: { mobile, isDeleted: false } });
     expect(created).toBeTruthy();
     expect((created?.roles as string[]) ?? []).toContain('agency');
 

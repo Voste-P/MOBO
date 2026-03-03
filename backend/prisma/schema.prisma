@@ -290,8 +290,7 @@ model User {
   // Audit / soft delete
   createdBy String?   @map("created_by") @db.Uuid
   updatedBy String?   @map("updated_by") @db.Uuid
-  deletedAt DateTime? @map("deleted_at")
-  deletedBy String?   @map("deleted_by") @db.Uuid
+  isDeleted Boolean @default(false) @map("is_deleted")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -319,9 +318,9 @@ model User {
   @@index([mediatorCode, roles])
   @@index([roles, status])
   // 100k-scale indexes for login + listing queries
-  @@index([mobile, deletedAt])               // fast login lookup
-  @@index([username, deletedAt])             // fast username login lookup
-  @@index([deletedAt, createdAt(sort: Desc)]) // admin user listing
+  @@index([mobile, isDeleted])               // fast login lookup
+  @@index([username, isDeleted])             // fast username login lookup
+  @@index([isDeleted, createdAt(sort: Desc)]) // admin user listing
   @@map("users")
 }
 
@@ -333,7 +332,7 @@ model PendingConnection {
   agencyName String?   @map("agency_name")
   agencyCode String?   @map("agency_code")
   timestamp  DateTime  @default(now())
-  deletedAt  DateTime? @map("deleted_at")
+  isDeleted Boolean @default(false) @map("is_deleted")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -353,13 +352,12 @@ model Brand {
 
   createdBy String?   @map("created_by") @db.Uuid
   updatedBy String?   @map("updated_by") @db.Uuid
-  deletedAt DateTime? @map("deleted_at")
-  deletedBy String?   @map("deleted_by") @db.Uuid
+  isDeleted Boolean @default(false) @map("is_deleted")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
   @@index([status, createdAt(sort: Desc)])
-  @@index([deletedAt, status])
+  @@index([isDeleted, status])
   @@index([ownerUserId])
   @@map("brands")
 }
@@ -375,13 +373,12 @@ model Agency {
 
   createdBy String?   @map("created_by") @db.Uuid
   updatedBy String?   @map("updated_by") @db.Uuid
-  deletedAt DateTime? @map("deleted_at")
-  deletedBy String?   @map("deleted_by") @db.Uuid
+  isDeleted Boolean @default(false) @map("is_deleted")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
   @@index([status, createdAt(sort: Desc)])
-  @@index([deletedAt, status])
+  @@index([isDeleted, status])
   @@index([ownerUserId])
   @@map("agencies")
 }
@@ -397,8 +394,7 @@ model MediatorProfile {
 
   createdBy String?   @map("created_by") @db.Uuid
   updatedBy String?   @map("updated_by") @db.Uuid
-  deletedAt DateTime? @map("deleted_at")
-  deletedBy String?   @map("deleted_by") @db.Uuid
+  isDeleted Boolean @default(false) @map("is_deleted")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
@@ -417,8 +413,7 @@ model ShopperProfile {
 
   createdBy String?   @map("created_by") @db.Uuid
   updatedBy String?   @map("updated_by") @db.Uuid
-  deletedAt DateTime? @map("deleted_at")
-  deletedBy String?   @map("deleted_by") @db.Uuid
+  isDeleted Boolean @default(false) @map("is_deleted")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
@@ -460,8 +455,7 @@ model Campaign {
 
   createdBy String?   @map("created_by") @db.Uuid
   updatedBy String?   @map("updated_by") @db.Uuid
-  deletedAt DateTime? @map("deleted_at")
-  deletedBy String?   @map("deleted_by") @db.Uuid
+  isDeleted Boolean @default(false) @map("is_deleted")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
@@ -470,7 +464,7 @@ model Campaign {
 
   @@index([status, brandUserId, createdAt(sort: Desc)])
   @@index([brandUserId])
-  @@index([deletedAt, createdAt(sort: Desc)])
+  @@index([isDeleted, createdAt(sort: Desc)])
   @@index([status])
   @@index([allowedAgencyCodes], type: Gin)
   @@index([assignments], type: Gin)
@@ -505,8 +499,7 @@ model Deal {
 
   createdBy String?   @map("created_by") @db.Uuid
   updatedBy String?   @map("updated_by") @db.Uuid
-  deletedAt DateTime? @map("deleted_at")
-  deletedBy String?   @map("deleted_by") @db.Uuid
+  isDeleted Boolean @default(false) @map("is_deleted")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
@@ -514,9 +507,9 @@ model Deal {
 
   @@unique([campaignId, mediatorCode])
   @@index([mediatorCode, createdAt(sort: Desc)])
-  @@index([mediatorCode, deletedAt, active])
+  @@index([mediatorCode, isDeleted, active])
   @@index([active])
-  @@index([deletedAt, active])
+  @@index([isDeleted, active])
   @@map("deals")
 }
 
@@ -593,8 +586,7 @@ model Order {
 
   createdBy String?   @map("created_by") @db.Uuid
   updatedBy String?   @map("updated_by") @db.Uuid
-  deletedAt DateTime? @map("deleted_at")
-  deletedBy String?   @map("deleted_by") @db.Uuid
+  isDeleted Boolean @default(false) @map("is_deleted")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
@@ -613,13 +605,13 @@ model Order {
   @@index([affiliateStatus])
   @@index([settlementMode])
   // 100k-scale composite indexes for common query/filter patterns
-  @@index([deletedAt, createdAt(sort: Desc)])     // soft-delete + recent-first listing
-  @@index([deletedAt, affiliateStatus, createdAt(sort: Desc)]) // admin financials with status filter
+  @@index([isDeleted, createdAt(sort: Desc)])     // soft-delete + recent-first listing
+  @@index([isDeleted, affiliateStatus, createdAt(sort: Desc)]) // admin financials with status filter
   @@index([externalOrderId])                       // duplicate-check during order creation
-  @@index([userId, workflowStatus, deletedAt])     // buyer dashboard filtered listing
-  @@index([brandUserId, workflowStatus, deletedAt]) // brand dashboard filtered listing
-  @@index([managerName, deletedAt, createdAt(sort: Desc)]) // ops dashboard filtered listing
-  @@index([buyerMobile, deletedAt])                  // velocity check lookups
+  @@index([userId, workflowStatus, isDeleted])     // buyer dashboard filtered listing
+  @@index([brandUserId, workflowStatus, isDeleted]) // brand dashboard filtered listing
+  @@index([managerName, isDeleted, createdAt(sort: Desc)]) // ops dashboard filtered listing
+  @@index([buyerMobile, isDeleted])                  // velocity check lookups
   @@map("orders")
 }
 
@@ -637,7 +629,7 @@ model OrderItem {
   quantity             Int       @default(1)
   platform             String?
   brandName            String?   @map("brand_name")
-  deletedAt            DateTime? @map("deleted_at")
+  isDeleted Boolean @default(false) @map("is_deleted")
 
   order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
@@ -661,8 +653,7 @@ model Wallet {
 
   createdBy String?   @map("created_by") @db.Uuid
   updatedBy String?   @map("updated_by") @db.Uuid
-  deletedAt DateTime? @map("deleted_at")
-  deletedBy String?   @map("deleted_by") @db.Uuid
+  isDeleted Boolean @default(false) @map("is_deleted")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
@@ -694,15 +685,14 @@ model Transaction {
 
   createdBy String?   @map("created_by") @db.Uuid
   updatedBy String?   @map("updated_by") @db.Uuid
-  deletedAt DateTime? @map("deleted_at")
-  deletedBy String?   @map("deleted_by") @db.Uuid
+  isDeleted Boolean @default(false) @map("is_deleted")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
   wallet Wallet? @relation(fields: [walletId], references: [id])
 
   @@index([status, type, createdAt(sort: Desc)])
-  @@index([deletedAt, createdAt(sort: Desc)])
+  @@index([isDeleted, createdAt(sort: Desc)])
   @@index([walletId, createdAt(sort: Desc)])
   @@index([orderId])
   @@index([campaignId])
@@ -733,8 +723,7 @@ model Payout {
 
   createdBy String?   @map("created_by") @db.Uuid
   updatedBy String?   @map("updated_by") @db.Uuid
-  deletedAt DateTime? @map("deleted_at")
-  deletedBy String?   @map("deleted_by") @db.Uuid
+  isDeleted Boolean @default(false) @map("is_deleted")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
@@ -745,7 +734,7 @@ model Payout {
   @@index([status, requestedAt(sort: Desc)])
   @@index([beneficiaryUserId, requestedAt(sort: Desc)])
   @@index([walletId])
-  @@index([deletedAt, requestedAt(sort: Desc)])
+  @@index([isDeleted, requestedAt(sort: Desc)])
   @@map("payouts")
 }
 
@@ -801,23 +790,29 @@ model Ticket {
   description String
   status      TicketStatus @default(Open)
 
+  /// Which role should handle this ticket (cascade routing)
+  targetRole  String?      @map("target_role")
+
+  /// Priority level: low, medium, high, urgent
+  priority    String       @default("medium")
+
   resolvedBy     String?   @map("resolved_by") @db.Uuid
   resolvedAt     DateTime? @map("resolved_at")
   resolutionNote String?   @map("resolution_note") @db.VarChar(1000)
 
   createdBy String?   @map("created_by") @db.Uuid
   updatedBy String?   @map("updated_by") @db.Uuid
-  deletedAt DateTime? @map("deleted_at")
-  deletedBy String?   @map("deleted_by") @db.Uuid
+  isDeleted Boolean @default(false) @map("is_deleted")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@index([status, createdAt(sort: Desc)])
-  @@index([userId, deletedAt, createdAt(sort: Desc)]) // user-specific ticket listing
-  @@index([deletedAt, createdAt(sort: Desc)])          // admin ticket listing
+  @@index([userId, isDeleted, createdAt(sort: Desc)]) // user-specific ticket listing
+  @@index([isDeleted, createdAt(sort: Desc)])          // admin ticket listing
   @@index([orderId])                                   // settlement dispute lookups
+  @@index([targetRole, isDeleted, createdAt(sort: Desc)]) // cascade routing lookups
   @@map("tickets")
 }
 
@@ -832,7 +827,7 @@ model PushSubscription {
   keysP256dh     String    @map("keys_p256dh")
   keysAuth       String    @map("keys_auth")
   userAgent      String?   @map("user_agent")
-  deletedAt      DateTime? @map("deleted_at")
+  isDeleted Boolean @default(false) @map("is_deleted")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

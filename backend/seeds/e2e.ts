@@ -1,4 +1,4 @@
-﻿// E2E seeding — PG-only via Prisma.
+// E2E seeding — PG-only via Prisma.
 // NO deleteMany, NO truncate, NO wipe — safe upserts only.
 import { randomUUID } from 'node:crypto';
 
@@ -234,7 +234,7 @@ export async function seedE2E(): Promise<SeededE2E> {
   // Campaign: find existing or create — never duplicate, never delete
   // Search by title only (not brandUserId) to avoid creating duplicates when the brand user PG id changes
   let campaign = await db.campaign.findFirst({
-    where: { title: 'E2E Campaign', deletedAt: null },
+    where: { title: 'E2E Campaign', isDeleted: false },
   });
   if (!campaign) {
     campaign = await db.campaign.create({
@@ -270,7 +270,7 @@ export async function seedE2E(): Promise<SeededE2E> {
   // Deal: find existing or create — never duplicate, never delete
   // Search broadly by mediatorCode + title so we always find and fix stale deals
   const existingDeal = await db.deal.findFirst({
-    where: { mediatorCode: E2E_ACCOUNTS.mediator.mediatorCode, title: 'E2E Deal', deletedAt: null },
+    where: { mediatorCode: E2E_ACCOUNTS.mediator.mediatorCode, title: 'E2E Deal', isDeleted: false },
   });
   const dealDefaults = {
     title: 'E2E Deal',

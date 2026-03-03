@@ -39,6 +39,9 @@ const nextConfig = {
   },
   async rewrites() {
     const backendBase = process.env.NEXT_PUBLIC_API_PROXY_TARGET || 'http://localhost:8080';
+    if (!process.env.NEXT_PUBLIC_API_PROXY_TARGET && process.env.VERCEL) {
+      console.warn('[admin-web] ⚠️  NEXT_PUBLIC_API_PROXY_TARGET is not set — API calls will fail. Set it to your backend URL in Vercel project settings (all environments).');
+    }
     return [
       {
         source: '/api/:path*',

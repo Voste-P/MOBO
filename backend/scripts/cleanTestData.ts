@@ -34,7 +34,7 @@ async function main() {
 
   // ─── Step 1: Find test users ──────────────────────────────────────────────
   const allUsers = await db.user.findMany({
-    where: { deletedAt: null },
+    where: { isDeleted: false },
     select: { id: true, mongoId: true, name: true, mobile: true, username: true, role: true, roles: true, mediatorCode: true, brandCode: true, parentCode: true },
   });
 
@@ -247,7 +247,7 @@ async function main() {
   await safeDelete('test users', () => db.user.deleteMany({ where: { id: { in: testUserIds } } }), testUserIds.length);
 
   // ─── Step 4: Summary ──────────────────────────────────────────────────────
-  const remainingUsers = await db.user.count({ where: { deletedAt: null } });
+  const remainingUsers = await db.user.count({ where: { isDeleted: false } });
   console.log(`\n═══════════════════════════════════════════════════`);
   console.log(`  ✅ Test data cleanup complete`);
   console.log(`  Remaining active users: ${remainingUsers}`);

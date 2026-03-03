@@ -40,7 +40,7 @@ export function makeAuthController(env: Env) {
         }
 
         const user = await db().user.findFirst({
-          where: { ...idWhere(userId), deletedAt: null },
+          where: { ...idWhere(userId), isDeleted: false },
           include: { pendingConnections: true },
         });
         if (!user) {
@@ -76,7 +76,7 @@ export function makeAuthController(env: Env) {
       try {
         const body = registerSchema.parse(req.body);
 
-        const existing = await db().user.findFirst({ where: { mobile: body.mobile, deletedAt: null }, select: { id: true } });
+        const existing = await db().user.findFirst({ where: { mobile: body.mobile, isDeleted: false }, select: { id: true } });
         if (existing) {
           throw new AppError(409, 'MOBILE_ALREADY_EXISTS', 'Mobile already registered');
         }
@@ -120,7 +120,7 @@ export function makeAuthController(env: Env) {
               mediatorCode: upstreamMediatorCode,
               roles: { has: 'mediator' as any },
               status: 'active',
-              deletedAt: null,
+              isDeleted: false,
             },
             select: { id: true },
           });
@@ -260,7 +260,7 @@ export function makeAuthController(env: Env) {
         const username = usernameRaw ? usernameRaw.toLowerCase() : '';
 
         // Phase 1: Fast auth-only query — minimal columns for password check + lockout.
-        // Uses the @@index([mobile, deletedAt]) / @@index([username, deletedAt]) index.
+        // Uses the @@index([mobile, isDeleted]) / @@index([username, isDeleted]) index.
         const authSelect = {
           id: true,
           role: true,
@@ -272,8 +272,8 @@ export function makeAuthController(env: Env) {
         } as const;
 
         const authUser = mobile
-          ? await db().user.findFirst({ where: { mobile, deletedAt: null }, select: authSelect })
-          : await db().user.findFirst({ where: { username, roles: { hasSome: ['admin', 'ops'] as any }, deletedAt: null }, select: authSelect });
+          ? await db().user.findFirst({ where: { mobile, isDeleted: false }, select: authSelect })
+          : await db().user.findFirst({ where: { username, roles: { hasSome: ['admin', 'ops'] as any }, isDeleted: false }, select: authSelect });
 
         if (!authUser) {
           businessLog.warn('Login failed — user not found', { identifier: mobile || username, ip: req.ip });
@@ -468,7 +468,7 @@ export function makeAuthController(env: Env) {
         const userId = String(decoded.sub || '').trim();
         if (!userId) throw new AppError(401, 'UNAUTHENTICATED', 'Invalid refresh token');
 
-        const user = await db().user.findFirst({ where: { ...idWhere(userId), deletedAt: null } });
+        const user = await db().user.findFirst({ where: { ...idWhere(userId), isDeleted: false } });
         if (!user) {
           throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
         }
@@ -509,7 +509,7 @@ export function makeAuthController(env: Env) {
       try {
         const body = registerOpsSchema.parse(req.body);
 
-        const existing = await db().user.findFirst({ where: { mobile: body.mobile, deletedAt: null }, select: { id: true } });
+        const existing = await db().user.findFirst({ where: { mobile: body.mobile, isDeleted: false }, select: { id: true } });
         if (existing) {
           throw new AppError(409, 'MOBILE_ALREADY_EXISTS', 'Mobile already registered');
         }
@@ -558,7 +558,7 @@ export function makeAuthController(env: Env) {
                 mediatorCode: agencyCode,
                 roles: { has: 'agency' as any },
                 status: 'active',
-                deletedAt: null,
+                isDeleted: false,
               },
             });
             if (!agency) {
@@ -583,7 +583,7 @@ export function makeAuthController(env: Env) {
                 mediatorCode: agencyCode,
                 roles: { has: 'agency' as any },
                 status: 'active',
-                deletedAt: null,
+                isDeleted: false,
               },
             });
             if (!agency) {
@@ -727,7 +727,7 @@ export function makeAuthController(env: Env) {
       try {
         const body = registerBrandSchema.parse(req.body);
 
-        const existing = await db().user.findFirst({ where: { mobile: body.mobile, deletedAt: null }, select: { id: true } });
+        const existing = await db().user.findFirst({ where: { mobile: body.mobile, isDeleted: false }, select: { id: true } });
         if (existing) {
           throw new AppError(409, 'MOBILE_ALREADY_EXISTS', 'Mobile already registered');
         }
@@ -858,7 +858,7 @@ export function makeAuthController(env: Env) {
         }
 
         const targetMongoId = body.userId ?? requesterId;
-        const requester = await db().user.findFirst({ where: { ...idWhere(requesterId), deletedAt: null } });
+        const requester = await db().user.findFirst({ where: { ...idWhere(requesterId), isDeleted: false } });
         if (!requester) throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
 
         const isSelf = String(targetMongoId) === String(requesterId);
@@ -869,7 +869,7 @@ export function makeAuthController(env: Env) {
 
         const targetUser = isSelf
           ? requester
-          : await db().user.findFirst({ where: { ...idWhere(targetMongoId), deletedAt: null } });
+          : await db().user.findFirst({ where: { ...idWhere(targetMongoId), isDeleted: false } });
         if (!targetUser) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
         const update: any = {};

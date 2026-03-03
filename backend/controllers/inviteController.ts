@@ -40,7 +40,7 @@ export function makeInviteController() {
         // Resolve createdBy: need PG UUID, not mongoId
         let createdByUuid: string | undefined;
         if (req.auth?.userId) {
-          const actor = await db().user.findFirst({ where: { ...idWhere(req.auth.userId), deletedAt: null }, select: { id: true } });
+          const actor = await db().user.findFirst({ where: { ...idWhere(req.auth.userId), isDeleted: false }, select: { id: true } });
           createdByUuid = actor?.id;
         }
 
@@ -92,7 +92,7 @@ export function makeInviteController() {
         if (req.auth?.pgUserId) {
           revokedByUuid = req.auth.pgUserId;
         } else if (req.auth?.userId) {
-          const actor = await db().user.findFirst({ where: { ...idWhere(req.auth.userId), deletedAt: null }, select: { id: true } });
+          const actor = await db().user.findFirst({ where: { ...idWhere(req.auth.userId), isDeleted: false }, select: { id: true } });
           revokedByUuid = actor?.id;
         }
         if (!revokedByUuid) throw new AppError(401, 'UNAUTHENTICATED', 'Missing auth context');
@@ -194,7 +194,7 @@ export function makeInviteController() {
         const requesterId = req.auth?.userId;
         if (!requesterId) throw new AppError(401, 'UNAUTHENTICATED', 'Missing auth context');
 
-        const requester = await db().user.findFirst({ where: { ...idWhere(requesterId), deletedAt: null } });
+        const requester = await db().user.findFirst({ where: { ...idWhere(requesterId), isDeleted: false } });
         if (!requester) throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
 
         // Allow agencies to generate mediator invites for themselves. Admin/Ops can generate for any agency.
@@ -205,7 +205,7 @@ export function makeInviteController() {
           throw new AppError(403, 'FORBIDDEN', 'Cannot generate invites for this agency');
         }
 
-        const agency = await db().user.findFirst({ where: { ...idWhere(body.agencyId), deletedAt: null } });
+        const agency = await db().user.findFirst({ where: { ...idWhere(body.agencyId), isDeleted: false } });
         if (!agency || !(agency.roles as string[])?.includes('agency')) {
           throw new AppError(404, 'AGENCY_NOT_FOUND', 'Agency not found');
         }
@@ -269,7 +269,7 @@ export function makeInviteController() {
         const requesterId = req.auth?.userId;
         if (!requesterId) throw new AppError(401, 'UNAUTHENTICATED', 'Missing auth context');
 
-        const requester = await db().user.findFirst({ where: { ...idWhere(requesterId), deletedAt: null } });
+        const requester = await db().user.findFirst({ where: { ...idWhere(requesterId), isDeleted: false } });
         if (!requester) throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
 
         const isMediatorSelf = (requester.roles as string[])?.includes('mediator') && requester.mongoId === mediatorId;
@@ -278,7 +278,7 @@ export function makeInviteController() {
           throw new AppError(403, 'FORBIDDEN', 'Cannot generate buyer invites for this mediator');
         }
 
-        const mediator = await db().user.findFirst({ where: { ...idWhere(mediatorId), deletedAt: null } });
+        const mediator = await db().user.findFirst({ where: { ...idWhere(mediatorId), isDeleted: false } });
         if (!mediator || !(mediator.roles as string[])?.includes('mediator')) {
           throw new AppError(404, 'MEDIATOR_NOT_FOUND', 'Mediator not found');
         }

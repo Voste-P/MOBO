@@ -89,11 +89,11 @@ export const m20260108_indexes_softdelete_unique: Migration = {
     const { db, log } = ctx;
 
     // Preflight duplicate checks so unique index creation fails with actionable info.
-    // Note: these checks only look at "active" docs (deletedAt is null or missing), matching our partial indexes.
+    // Note: these checks only look at "active" docs (isDeleted is null or missing), matching our partial indexes.
     const dupUserMobile = await findDuplicateKeys({
       db,
       collection: 'users',
-      match: { deletedAt: null, mobile: { $type: 'string' } },
+      match: { isDeleted: false, mobile: { $type: 'string' } },
       groupId: { mobile: '$mobile' },
     });
     if (dupUserMobile.length) {
@@ -105,7 +105,7 @@ export const m20260108_indexes_softdelete_unique: Migration = {
     const dupUserEmail = await findDuplicateKeys({
       db,
       collection: 'users',
-      match: { deletedAt: null, email: { $type: 'string' } },
+      match: { isDeleted: false, email: { $type: 'string' } },
       groupId: { email: '$email' },
     });
     if (dupUserEmail.length) {
@@ -117,7 +117,7 @@ export const m20260108_indexes_softdelete_unique: Migration = {
     const dupMediatorCode = await findDuplicateKeys({
       db,
       collection: 'users',
-      match: { deletedAt: null, mediatorCode: { $type: 'string' } },
+      match: { isDeleted: false, mediatorCode: { $type: 'string' } },
       groupId: { mediatorCode: '$mediatorCode' },
     });
     if (dupMediatorCode.length) {
@@ -129,7 +129,7 @@ export const m20260108_indexes_softdelete_unique: Migration = {
     const dupWalletOwner = await findDuplicateKeys({
       db,
       collection: 'wallets',
-      match: { deletedAt: null, ownerUserId: { $exists: true } },
+      match: { isDeleted: false, ownerUserId: { $exists: true } },
       groupId: { ownerUserId: '$ownerUserId' },
     });
     if (dupWalletOwner.length) {
@@ -141,7 +141,7 @@ export const m20260108_indexes_softdelete_unique: Migration = {
     const dupTxIdempotency = await findDuplicateKeys({
       db,
       collection: 'transactions',
-      match: { deletedAt: null, idempotencyKey: { $type: 'string' } },
+      match: { isDeleted: false, idempotencyKey: { $type: 'string' } },
       groupId: { idempotencyKey: '$idempotencyKey' },
     });
     if (dupTxIdempotency.length) {
@@ -156,7 +156,7 @@ export const m20260108_indexes_softdelete_unique: Migration = {
       db,
       collection: 'payouts',
       match: {
-        deletedAt: null,
+        isDeleted: false,
         provider: { $type: 'string' },
         providerRef: { $type: 'string' },
       },
@@ -177,7 +177,7 @@ export const m20260108_indexes_softdelete_unique: Migration = {
       keys: { mobile: 1 },
       options: {
         unique: true,
-        partialFilterExpression: { deletedAt: null },
+        partialFilterExpression: { isDeleted: false },
       },
       dropIfOptionsConflict: true,
     });
@@ -188,7 +188,7 @@ export const m20260108_indexes_softdelete_unique: Migration = {
       keys: { email: 1 },
       options: {
         unique: true,
-        partialFilterExpression: { deletedAt: null, email: { $type: 'string' } },
+        partialFilterExpression: { isDeleted: false, email: { $type: 'string' } },
       },
       dropIfOptionsConflict: true,
     });
@@ -199,7 +199,7 @@ export const m20260108_indexes_softdelete_unique: Migration = {
       keys: { mediatorCode: 1 },
       options: {
         unique: true,
-        partialFilterExpression: { deletedAt: null, mediatorCode: { $type: 'string' } },
+        partialFilterExpression: { isDeleted: false, mediatorCode: { $type: 'string' } },
       },
       dropIfOptionsConflict: true,
     });
@@ -209,7 +209,7 @@ export const m20260108_indexes_softdelete_unique: Migration = {
       collection: 'users',
       keys: { brandCode: 1 },
       options: {
-        partialFilterExpression: { deletedAt: null, brandCode: { $type: 'string' } },
+        partialFilterExpression: { isDeleted: false, brandCode: { $type: 'string' } },
       },
       dropIfOptionsConflict: true,
     });
@@ -217,21 +217,21 @@ export const m20260108_indexes_softdelete_unique: Migration = {
     await ensureIndex({
       db,
       collection: 'users',
-      keys: { brandCode: 1, roles: 1, deletedAt: 1 },
+      keys: { brandCode: 1, roles: 1, isDeleted: 1 },
       dropIfOptionsConflict: false,
     });
 
     await ensureIndex({
       db,
       collection: 'users',
-      keys: { mediatorCode: 1, roles: 1, deletedAt: 1 },
+      keys: { mediatorCode: 1, roles: 1, isDeleted: 1 },
       dropIfOptionsConflict: false,
     });
 
     await ensureIndex({
       db,
       collection: 'users',
-      keys: { roles: 1, status: 1, deletedAt: 1 },
+      keys: { roles: 1, status: 1, isDeleted: 1 },
       dropIfOptionsConflict: false,
     });
 
@@ -239,7 +239,7 @@ export const m20260108_indexes_softdelete_unique: Migration = {
     await ensureIndex({
       db,
       collection: 'wallets',
-      keys: { deletedAt: 1, createdAt: -1 },
+      keys: { isDeleted: 1, createdAt: -1 },
       dropIfOptionsConflict: false,
     });
 
@@ -249,7 +249,7 @@ export const m20260108_indexes_softdelete_unique: Migration = {
       keys: { ownerUserId: 1 },
       options: {
         unique: true,
-        partialFilterExpression: { deletedAt: null },
+        partialFilterExpression: { isDeleted: false },
       },
       dropIfOptionsConflict: true,
     });
@@ -265,7 +265,7 @@ export const m20260108_indexes_softdelete_unique: Migration = {
     await ensureIndex({
       db,
       collection: 'transactions',
-      keys: { deletedAt: 1, createdAt: -1 },
+      keys: { isDeleted: 1, createdAt: -1 },
       dropIfOptionsConflict: false,
     });
 
@@ -282,7 +282,7 @@ export const m20260108_indexes_softdelete_unique: Migration = {
       keys: { idempotencyKey: 1 },
       options: {
         unique: true,
-        partialFilterExpression: { deletedAt: null },
+        partialFilterExpression: { isDeleted: false },
       },
       dropIfOptionsConflict: true,
     });
@@ -317,7 +317,7 @@ export const m20260108_indexes_softdelete_unique: Migration = {
       options: {
         unique: true,
         partialFilterExpression: {
-          deletedAt: null,
+          isDeleted: false,
           provider: { $type: 'string' },
           providerRef: { $type: 'string' },
         },

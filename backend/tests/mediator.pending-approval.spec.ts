@@ -44,14 +44,14 @@ describe('mediator pending approval flow', () => {
     expect(registerRes.body.tokens).toBeUndefined();
 
     // 2. Verify mediator is created with pending status (PG)
-    const pendingMediator = await db.user.findFirst({ where: { mobile: mediatorMobile, deletedAt: null } });
+    const pendingMediator = await db.user.findFirst({ where: { mobile: mediatorMobile, isDeleted: false } });
     expect(pendingMediator).toBeTruthy();
     expect(pendingMediator?.status).toBe('pending');
     expect(pendingMediator?.kycStatus).toBe('pending');
     const mediatorCode = pendingMediator?.mediatorCode;
     expect(typeof mediatorCode).toBe('string');
 
-    const profile = await db.mediatorProfile.findFirst({ where: { mediatorCode: mediatorCode!, deletedAt: null } });
+    const profile = await db.mediatorProfile.findFirst({ where: { mediatorCode: mediatorCode!, isDeleted: false } });
     expect(profile).toBeTruthy();
     expect(profile?.parentAgencyCode).toBe(E2E_ACCOUNTS.agency.agencyCode);
 
@@ -119,7 +119,7 @@ describe('mediator pending approval flow', () => {
     expect(registerRes.status).toBe(202);
 
     // Look up pending mediator in PG (controller uses { mongoId: body.id })
-    const pendingMediator = await db.user.findFirst({ where: { mobile: mediatorMobile, deletedAt: null } });
+    const pendingMediator = await db.user.findFirst({ where: { mobile: mediatorMobile, isDeleted: false } });
     const mediatorId = pendingMediator?.id;
 
     // Create a second agency (via admin invite) to ensure its code differs.

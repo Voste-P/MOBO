@@ -94,10 +94,10 @@ export function makeBrandController() {
         const { roles, userId: _userId, user: _user } = getRequester(req);
         const pgUserId = (req.auth as any)?.pgUserId as string;
 
-        const where: any = { roles: { has: 'agency' as any }, deletedAt: null };
+        const where: any = { roles: { has: 'agency' as any }, isDeleted: false };
         if (!isPrivileged(roles)) {
           // Re-fetch brand user from DB to get connectedAgencies (not in auth user)
-          const brandUser = await db().user.findFirst({ where: { id: pgUserId, deletedAt: null }, select: { connectedAgencies: true } });
+          const brandUser = await db().user.findFirst({ where: { id: pgUserId, isDeleted: false }, select: { connectedAgencies: true } });
           const connected = Array.isArray((brandUser as any)?.connectedAgencies)
             ? (brandUser as any).connectedAgencies as string[]
             : [];
@@ -144,12 +144,12 @@ export function makeBrandController() {
         const { page, limit, skip, isPaginated } = parsePagination(q);
         const [campaigns, total] = await Promise.all([
           db().campaign.findMany({
-            where: { brandUserId: brandPgId, deletedAt: null },
+            where: { brandUserId: brandPgId, isDeleted: false },
             orderBy: { createdAt: 'desc' },
             skip,
             take: limit,
           }),
-          db().campaign.count({ where: { brandUserId: brandPgId, deletedAt: null } }),
+          db().campaign.count({ where: { brandUserId: brandPgId, isDeleted: false } }),
         ]);
         res.json(paginatedResponse(campaigns.map((c: any) => toUiCampaign(pgCampaign(c))), total, page, limit, isPaginated));
 
@@ -174,7 +174,7 @@ export function makeBrandController() {
         const { roles, userId: _userId, user } = getRequester(req);
         const pgUserId = (req.auth as any)?.pgUserId as string;
 
-        const where: any = { deletedAt: null };
+        const where: any = { isDeleted: false };
         if (isPrivileged(roles)) {
           const brandName = typeof q.brandName === 'string' ? q.brandName : '';
           if (brandName) where.brandName = brandName;
@@ -279,7 +279,7 @@ export function makeBrandController() {
         }
 
         // Brand ledger = outbound agency payouts from this brand.
-        const txWhere = { deletedAt: null, fromUserId: brandPgId, type: 'agency_payout' as any };
+        const txWhere = { isDeleted: false, fromUserId: brandPgId, type: 'agency_payout' as any };
         const { page, limit, skip, isPaginated } = parsePagination(q);
         const [txns, txTotal] = await Promise.all([
           db().transaction.findMany({
@@ -297,7 +297,7 @@ export function makeBrandController() {
 
         const agencies = agencyPgIds.length
           ? await db().user.findMany({
-            where: { id: { in: agencyPgIds }, deletedAt: null },
+            where: { id: { in: agencyPgIds }, isDeleted: false },
             select: { id: true, mongoId: true, name: true, mediatorCode: true },
           })
           : [];
@@ -344,15 +344,15 @@ export function makeBrandController() {
         let brandUser: any;
         if (isPrivileged(roles) && body.brandId) {
           const brandWhere = UUID_RE.test(body.brandId)
-            ? { OR: [{ id: body.brandId }, { mongoId: body.brandId }], deletedAt: null }
-            : { mongoId: String(body.brandId), deletedAt: null };
+            ? { OR: [{ id: body.brandId }, { mongoId: body.brandId }], isDeleted: false }
+            : { mongoId: String(body.brandId), isDeleted: false };
           brandUser = await db().user.findFirst({ where: brandWhere as any, select: { id: true, mongoId: true, roles: true, status: true, connectedAgencies: true } });
           if (!brandUser) throw new AppError(404, 'NOT_FOUND', 'Brand not found');
           brandPgId = brandUser.id;
           brandMongoId = brandUser.mongoId || brandUser.id;
         } else {
           // Re-fetch full brand user from DB (auth middleware doesn't include connectedAgencies)
-          brandUser = await db().user.findFirst({ where: { id: pgUserId, deletedAt: null }, select: { id: true, mongoId: true, roles: true, status: true, connectedAgencies: true } });
+          brandUser = await db().user.findFirst({ where: { id: pgUserId, isDeleted: false }, select: { id: true, mongoId: true, roles: true, status: true, connectedAgencies: true } });
           if (!brandUser) throw new AppError(404, 'NOT_FOUND', 'Brand user not found');
           brandPgId = brandUser.id;
           brandMongoId = brandUser.mongoId || brandUser.id;
@@ -367,8 +367,8 @@ export function makeBrandController() {
 
         // Resolve agency
         const agencyWhere = UUID_RE.test(body.agencyId)
-          ? { OR: [{ id: body.agencyId }, { mongoId: body.agencyId }], deletedAt: null }
-          : { mongoId: body.agencyId, deletedAt: null };
+          ? { OR: [{ id: body.agencyId }, { mongoId: body.agencyId }], isDeleted: false }
+          : { mongoId: body.agencyId, isDeleted: false };
         const agency = await db().user.findFirst({
           where: agencyWhere as any,
           select: { id: true, mongoId: true, roles: true, mediatorCode: true, name: true, status: true },
@@ -482,12 +482,12 @@ export function makeBrandController() {
         let agency: any = null;
         if (body.agencyId) {
           agency = await db().user.findFirst({
-            where: { ...idWhere(body.agencyId), roles: { has: 'agency' as any }, deletedAt: null },
+            where: { ...idWhere(body.agencyId), roles: { has: 'agency' as any }, isDeleted: false },
             select: { id: true, mongoId: true, mediatorCode: true },
           });
         } else if (body.agencyCode) {
           agency = await db().user.findFirst({
-            where: { roles: { has: 'agency' as any }, mediatorCode: body.agencyCode, deletedAt: null },
+            where: { roles: { has: 'agency' as any }, mediatorCode: body.agencyCode, isDeleted: false },
             select: { id: true, mongoId: true, mediatorCode: true },
           });
         }
@@ -499,7 +499,7 @@ export function makeBrandController() {
         const agencyMongoId = agency.mongoId || agency.id;
 
         const brand = await db().user.findFirst({
-          where: { id: pgUserId, deletedAt: null },
+          where: { id: pgUserId, isDeleted: false },
           select: { id: true, mongoId: true, roles: true, connectedAgencies: true },
         });
         if (!brand) throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
@@ -511,10 +511,10 @@ export function makeBrandController() {
         await db().pendingConnection.updateMany({
           where: {
             userId: brand.id,
-            deletedAt: null,
+            isDeleted: false,
             OR: [{ agencyCode }, { agencyId: agencyMongoId }],
           },
-          data: { deletedAt: new Date() },
+          data: { isDeleted: true },
         });
 
         if (body.action === 'approve') {
@@ -571,7 +571,7 @@ export function makeBrandController() {
         const { roles } = getRequester(req);
         const pgUserId = (req.auth as any)?.pgUserId as string;
 
-        const brand = await db().user.findFirst({ where: { id: pgUserId, deletedAt: null }, select: { id: true, mongoId: true, roles: true, connectedAgencies: true } });
+        const brand = await db().user.findFirst({ where: { id: pgUserId, isDeleted: false }, select: { id: true, mongoId: true, roles: true, connectedAgencies: true } });
         if (!brand) throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
         if (!isPrivileged(roles) && !(brand.roles as string[])?.includes('brand')) {
           throw new AppError(403, 'FORBIDDEN', 'Only brands can remove agencies');
@@ -584,8 +584,8 @@ export function makeBrandController() {
 
         // Soft-delete pending connections for this agency
         await db().pendingConnection.updateMany({
-          where: { userId: brand.id, agencyCode: body.agencyCode, deletedAt: null },
-          data: { deletedAt: new Date() },
+          where: { userId: brand.id, agencyCode: body.agencyCode, isDeleted: false },
+          data: { isDeleted: true },
         });
 
         await writeAuditLog({
@@ -674,7 +674,7 @@ export function makeBrandController() {
             mediatorCode: { in: normalizedAllowed },
             roles: { has: 'agency' as any },
             status: 'active' as any,
-            deletedAt: null,
+            isDeleted: false,
           },
           select: { mediatorCode: true },
         });
@@ -767,7 +767,7 @@ export function makeBrandController() {
         const pgUserId = (req.auth as any)?.pgUserId as string;
 
         const existing = await db().campaign.findFirst({
-          where: { ...idWhere(id), deletedAt: null },
+          where: { ...idWhere(id), isDeleted: false },
         });
         if (!existing) throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
 
@@ -792,7 +792,7 @@ export function makeBrandController() {
                 mediatorCode: { in: normalizedAllowed },
                 roles: { has: 'agency' as any },
                 status: 'active' as any,
-                deletedAt: null,
+                isDeleted: false,
               },
               select: { mediatorCode: true },
             });
@@ -816,7 +816,7 @@ export function makeBrandController() {
 
         // Non-negotiable: lock campaign mutability after the first order is created.
         const hasOrders = await db().orderItem.findFirst({
-          where: { campaignId: existing.id, order: { deletedAt: null } },
+          where: { campaignId: existing.id, order: { isDeleted: false } },
           select: { id: true },
         });
         const requestedKeys = Object.keys(body || {});
@@ -830,11 +830,11 @@ export function makeBrandController() {
           typeof body.dealType !== 'undefined';
 
         if (existing.locked && attemptingLockedTerms && !onlyStatus) {
-          throw new AppError(409, 'CAMPAIGN_LOCKED', 'Campaign is locked after slot assignment; create a new campaign to change terms');
+          throw new AppError(409, 'CAMPAIGN_LOCKED', 'Campaign terms are locked after slot assignment. Non-financial fields (title, image, status) can still be updated.');
         }
 
-        if (hasOrders && !onlyStatus) {
-          throw new AppError(409, 'CAMPAIGN_LOCKED', 'Campaign is locked after first order; create a new campaign to change terms');
+        if (hasOrders && attemptingLockedTerms && !onlyStatus) {
+          throw new AppError(409, 'CAMPAIGN_LOCKED', 'Campaign terms are locked after first order. Non-financial fields (title, image, status) can still be updated.');
         }
 
         const update: any = {};
@@ -871,7 +871,7 @@ export function makeBrandController() {
         if (statusRequested) {
           const isActive = String(campaign.status || '').toLowerCase() === 'active';
           await db().deal.updateMany({
-            where: { campaignId: campaign.id, deletedAt: null },
+            where: { campaignId: campaign.id, isDeleted: false },
             data: { active: isActive },
           });
         }
@@ -932,7 +932,7 @@ export function makeBrandController() {
         const { roles, userId } = getRequester(req);
         const pgUserId = (req.auth as any)?.pgUserId as string;
 
-        const campaign = await db().campaign.findFirst({ where: { ...idWhere(id), deletedAt: null } });
+        const campaign = await db().campaign.findFirst({ where: { ...idWhere(id), isDeleted: false } });
         if (!campaign) {
           throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
         }
@@ -1011,7 +1011,7 @@ export function makeBrandController() {
         const pgUserId = (req.auth as any)?.pgUserId as string;
 
         const campaign = await db().campaign.findFirst({
-          where: { ...idWhere(id), deletedAt: null },
+          where: { ...idWhere(id), isDeleted: false },
         });
         if (!campaign) throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
 
@@ -1022,20 +1022,19 @@ export function makeBrandController() {
         }
 
         const hasOrders = await db().orderItem.findFirst({
-          where: { campaignId: campaign.id, order: { deletedAt: null } },
+          where: { campaignId: campaign.id, order: { isDeleted: false } },
           select: { id: true },
         });
         if (hasOrders) throw new AppError(409, 'CAMPAIGN_HAS_ORDERS', 'Cannot delete a campaign with orders');
 
-        const now = new Date();
         await db().campaign.update({
           where: { id: campaign.id },
-          data: { deletedAt: now, deletedBy: pgUserId, updatedBy: pgUserId },
+          data: { isDeleted: true, updatedBy: pgUserId},
         });
 
         await db().deal.updateMany({
-          where: { campaignId: campaign.id, deletedAt: null },
-          data: { deletedAt: now, deletedBy: pgUserId, active: false },
+          where: { campaignId: campaign.id, isDeleted: false },
+          data: { isDeleted: true, updatedBy: pgUserId, active: false },
         });
 
         const campaignMongoId = campaign.mongoId || campaign.id;
@@ -1046,7 +1045,7 @@ export function makeBrandController() {
           entityId: campaignMongoId,
         });
         businessLog.info('Brand campaign deleted', { campaignId: campaignMongoId, title: campaign.title });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Campaign', entityId: campaignMongoId, action: 'CAMPAIGN_DELETED', changedFields: ['deletedAt'], before: { deletedAt: null }, after: { deletedAt: now.toISOString() } });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Campaign', entityId: campaignMongoId, action: 'CAMPAIGN_DELETED', changedFields: ['isDeleted'], before: { isDeleted: false }, after: { isDeleted: new Date().toISOString() } });
         logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_DELETED', campaignId: campaignMongoId, title: campaign.title } });
 
         const allowed = Array.isArray(campaign.allowedAgencyCodes)

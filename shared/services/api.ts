@@ -946,12 +946,14 @@ export const api = {
         headers: { ...authHeaders(), 'X-Confirm-Delete': 'true' },
       });
     },
-    getAuditLogs: async (filters?: { action?: string; entityType?: string; limit?: number; page?: number }) => {
+    getAuditLogs: async (filters?: { action?: string; entityType?: string; limit?: number; page?: number; from?: string; to?: string }) => {
       const params = new URLSearchParams();
       if (filters?.action) params.append('action', filters.action);
       if (filters?.entityType) params.append('entityType', filters.entityType);
       if (filters?.limit) params.append('limit', String(filters.limit));
       if (filters?.page) params.append('page', String(filters.page));
+      if (filters?.from) params.append('from', filters.from);
+      if (filters?.to) params.append('to', filters.to);
       const qs = params.toString();
       return fetchJson(`/admin/audit-logs${qs ? '?' + qs : ''}`, {
         headers: { ...authHeaders() },
@@ -964,6 +966,10 @@ export const api = {
       fetchJson('/tickets', {
         headers: { ...authHeaders() },
       }),
+    getIssueTypes: async () =>
+      fetchJson('/tickets/issue-types', {
+        headers: { ...authHeaders() },
+      }),
     create: async (data: any) => {
       await fetchOk('/tickets', {
         method: 'POST',
@@ -971,11 +977,11 @@ export const api = {
         body: JSON.stringify(data),
       });
     },
-    update: async (id: string, status: string) => {
+    update: async (id: string, status: string, resolutionNote?: string) => {
       await fetchOk(`/tickets/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, ...(resolutionNote ? { resolutionNote } : {}) }),
       });
     },
     delete: async (id: string) => {

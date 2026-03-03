@@ -135,7 +135,10 @@ export const Explore: React.FC = () => {
       {/* Header */}
       <div className="px-6 pt-16 pb-4 bg-white shadow-sm z-10 border-b border-gray-100 sticky top-0">
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-extrabold text-slate-900">Explore Deals</h1>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black tracking-widest text-lime-600 bg-lime-50 px-2 py-0.5 rounded-md border border-lime-200">BUZZMA</span>
+            <h1 className="text-2xl font-extrabold text-slate-900">Explore Deals</h1>
+          </div>
           <button
             onClick={() => setTicketOpen(true)}
             className="w-9 h-9 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-500 hover:bg-red-100 transition-all active:scale-95"
@@ -199,7 +202,7 @@ export const Explore: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6 pb-32 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto p-6 pb-32 scrollbar-styled">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-500 font-bold text-sm gap-3">
             <Spinner className="w-7 h-7 text-lime-500" />

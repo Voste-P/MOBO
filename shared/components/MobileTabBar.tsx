@@ -36,17 +36,18 @@ export const MobileTabBar = React.memo(function MobileTabBar({
   const ringOffsetClass = variant === 'glass' ? 'focus-visible:ring-offset-[#F2F2F7]' : 'focus-visible:ring-offset-[#18181B]';
 
   return (
-    <div className={cn(containerClass, className)}>
+    <div role="tablist" className={cn(containerClass, className)}>
       {items.map((item) => {
         const active = item.id === activeId;
 
         if (showLabels) {
           return (
             <button
+              role="tab"
               key={item.id}
               onClick={() => onChange(item.id)}
               aria-label={item.ariaLabel || item.label}
-              aria-pressed={active}
+              aria-selected={active}
               className={cn(
                 'flex flex-col items-center gap-1 min-w-[50px] transition-all duration-300 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#18181B] rounded-xl motion-reduce:transition-none motion-reduce:transform-none',
                 active ? '-translate-y-1' : 'hover:-translate-y-0.5'
@@ -85,9 +86,10 @@ export const MobileTabBar = React.memo(function MobileTabBar({
         return (
           <div key={item.id} className="flex-1 flex justify-center">
             <button
+              role="tab"
               onClick={() => onChange(item.id)}
               aria-label={item.ariaLabel || item.label}
-              aria-pressed={active}
+              aria-selected={active}
               className={cn(
                 'relative p-3 rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:transform-none',
                 ringOffsetClass,

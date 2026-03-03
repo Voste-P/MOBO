@@ -150,7 +150,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
         <div className="sticky top-0 bg-white rounded-t-3xl px-5 pt-5 pb-3 border-b border-gray-100 flex items-center justify-between z-10">
           <div className="flex items-center gap-2">
             <ShoppingBag size={18} className="text-lime-600" />
-            <h2 className="text-lg font-extrabold text-slate-900">Place Order</h2>
+            <h2 className="text-lg font-extrabold text-slate-900">Order Form</h2>
           </div>
           <button type="button" onClick={handleClose} className="p-1.5 rounded-full hover:bg-gray-100 transition">
             <X size={18} className="text-gray-500" />

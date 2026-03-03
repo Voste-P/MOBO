@@ -36,7 +36,7 @@ export function makeProductsController() {
         const where = {
           mediatorCode: { equals: mediatorCode, mode: 'insensitive' as const },
           active: true,
-          deletedAt: null,
+          isDeleted: false,
         };
 
         const [deals, total, mediatorUser] = await Promise.all([
@@ -48,7 +48,7 @@ export function makeProductsController() {
           }),
           db().deal.count({ where }),
           db().user.findFirst({
-            where: { mediatorCode: { equals: mediatorCode, mode: 'insensitive' }, deletedAt: null },
+            where: { mediatorCode: { equals: mediatorCode, mode: 'insensitive' }, isDeleted: false },
             select: { name: true },
           }),
         ]);
@@ -92,16 +92,16 @@ export function makeProductsController() {
             ...idWhere(dealId),
             mediatorCode: { equals: mediatorCode, mode: 'insensitive' },
             active: true,
-            deletedAt: null,
+            isDeleted: false,
           },
         });
         if (!deal) throw new AppError(404, 'DEAL_NOT_FOUND', 'Deal not found');
 
         const campaign = await db().campaign.findFirst({
           where: { id: deal.campaignId },
-          select: { id: true, brandUserId: true, brandName: true, deletedAt: true },
+          select: { id: true, brandUserId: true, brandName: true, isDeleted: true },
         });
-        if (!campaign || campaign.deletedAt) throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
+        if (!campaign || campaign.isDeleted) throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
 
         // Look up brand user's mongoId for realtime audience
         let brandUserMongoId: string | undefined;

@@ -264,7 +264,21 @@ export interface Ticket {
   issueType: string;
   description: string;
   status: TicketStatus;
+  targetRole?: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  resolvedAt?: string;
+  resolutionNote?: string;
   createdAt: string;
+}
+
+export interface ExtractedValues {
+  orderId?: string;
+  amount?: string;
+  orderDate?: string;
+  seller?: string;
+  productName?: string;
+  paymentMethod?: string;
+  platform?: string;
 }
 
 export interface ChatMessage {
@@ -276,6 +290,7 @@ export interface ChatMessage {
   isError?: boolean;
   relatedProducts?: Product[];
   relatedOrders?: Order[];
+  extractedValues?: ExtractedValues;
 }
 
 // ─── AI Response Types ───────────────────────────────────
@@ -295,6 +310,7 @@ export interface ChatResponse {
   navigateTo?: AiNavigateTo;
   uiType?: 'product_card' | 'order_card';
   data?: Product[] | Order[];
+  extractedValues?: ExtractedValues;
 }
 
 export interface AiProofVerificationResult {

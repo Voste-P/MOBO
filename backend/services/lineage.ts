@@ -34,7 +34,7 @@ export async function listMediatorCodesForAgency(agencyCode: string): Promise<st
   if (cached !== undefined) return cached;
   const db = prisma();
   const mediators = await db.user.findMany({
-    where: { roles: { has: 'mediator' as any }, parentCode: agencyCode, deletedAt: null },
+    where: { roles: { has: 'mediator' as any }, parentCode: agencyCode, isDeleted: false },
     select: { mediatorCode: true },
   });
   const codes = mediators.map((m) => String(m.mediatorCode || '')).filter(Boolean);
@@ -48,7 +48,7 @@ export async function getAgencyCodeForMediatorCode(mediatorCode: string): Promis
   if (cached !== undefined) return cached;
   const db = prisma();
   const mediator = await db.user.findFirst({
-    where: { roles: { has: 'mediator' as any }, mediatorCode, deletedAt: null },
+    where: { roles: { has: 'mediator' as any }, mediatorCode, isDeleted: false },
     select: { parentCode: true },
   });
   const agencyCode = mediator ? String(mediator.parentCode || '').trim() : '';
@@ -69,7 +69,7 @@ export async function getAgencyCodesForMediatorCodes(mediatorCodes: string[]): P
   if (uncached.length > 0) {
     const db = prisma();
     const mediators = await db.user.findMany({
-      where: { roles: { has: 'mediator' as any }, mediatorCode: { in: uncached }, deletedAt: null },
+      where: { roles: { has: 'mediator' as any }, mediatorCode: { in: uncached }, isDeleted: false },
       select: { mediatorCode: true, parentCode: true },
     });
     const byCode = new Map(mediators.map((m) => [String(m.mediatorCode), String(m.parentCode || '').trim() || null]));
@@ -88,7 +88,7 @@ export async function isAgencyActive(agencyCode: string): Promise<boolean> {
   if (cached !== undefined) return cached;
   const db = prisma();
   const agency = await db.user.findFirst({
-    where: { roles: { has: 'agency' as any }, mediatorCode: agencyCode, deletedAt: null },
+    where: { roles: { has: 'agency' as any }, mediatorCode: agencyCode, isDeleted: false },
     select: { status: true },
   });
   const result = !!agency && agency.status === 'active';
@@ -102,7 +102,7 @@ export async function isMediatorActive(mediatorCode: string): Promise<boolean> {
   if (cached !== undefined) return cached;
   const db = prisma();
   const mediator = await db.user.findFirst({
-    where: { roles: { has: 'mediator' as any }, mediatorCode, deletedAt: null },
+    where: { roles: { has: 'mediator' as any }, mediatorCode, isDeleted: false },
     select: { status: true },
   });
   const result = !!mediator && mediator.status === 'active';

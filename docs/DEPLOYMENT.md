@@ -71,8 +71,8 @@ Required env vars:
 
 - `NODE_ENV=production`
 - `DATABASE_URL=postgresql://user:pass@host:5432/db?currentSchema=buzzma_production&sslmode=require`
-- `JWT_ACCESS_SECRET=...` (>= 20 chars)
-- `JWT_REFRESH_SECRET=...` (>= 20 chars)
+- `JWT_ACCESS_SECRET=...` (>= 32 chars)
+- `JWT_REFRESH_SECRET=...` (>= 32 chars)
 - `CORS_ORIGINS=https://www.buzzma.in,https://www.mediatorbuzzma.in,https://www.agencybuzzma.in,https://www.brandbuzzma.in,https://moboadmin.vercel.app`
 
 Health check:

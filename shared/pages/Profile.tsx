@@ -162,7 +162,7 @@ export const Profile: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#F4F4F5] relative overflow-y-auto scrollbar-hide">
+    <div className="flex flex-col h-full min-h-0 bg-[#F4F4F5] relative overflow-y-auto scrollbar-styled">
       <div className="max-w-xl mx-auto w-full p-6 pb-32 space-y-6">
         {/* Identity Card */}
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-zinc-100 relative overflow-hidden animate-enter">

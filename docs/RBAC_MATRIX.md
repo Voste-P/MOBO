@@ -36,7 +36,13 @@ Legend:
 | Products (`/products`, `/deals/*/redirect`) |      ✅ |       ❌ |     ❌ |    ❌ |   ❌ |    ❌ |
 | Orders (`/orders/*`)                        |      ⚠️ |       ✅ |     ✅ |    ✅ |   ✅ |    ✅ |
 | Tickets (`/tickets/*`)                      |      ⚠️ |       ⚠️ |     ⚠️ |    ⚠️ |   ✅ |    ✅ |
+| Notifications (`/notifications/*`)          |      ✅ |       ✅ |     ✅ |    ✅ |   ✅ |    ✅ |
+| Push (`/notifications/push/*`)              |      ✅ |       ✅ |     ❌ |    ❌ |   ❌ |    ❌ |
+| Realtime (`/realtime/*`)                    |      ✅ |       ✅ |     ✅ |    ✅ |   ✅ |    ✅ |
+| Media (`/media/*`)                          |      ✅ |       ✅ |     ✅ |    ✅ |   ✅ |    ✅ |
 | AI (`/ai/*`)                                |    ✅\* |     ✅\* |   ✅\* |  ✅\* | ✅\* |  ✅\* |
+| Sheets (`/sheets/*`)                        |      ❌ |       ❌ |     ⚠️ |    ⚠️ |   ✅ |    ✅ |
+| Google OAuth (`/google/*`)                  |      ❌ |       ❌ |     ⚠️ |    ⚠️ |   ✅ |    ✅ |
 
 \* AI routes are generally `optionalAuth` (some endpoints are `admin|ops` only).
 
@@ -45,17 +51,14 @@ Legend:
 ### Orders
 
 - `GET /orders/user/:userId`
-
   - shopper: only self
   - admin/ops: any user
 
 - `POST /orders`
-
   - shopper only; cannot create orders for another user
   - campaign must be accessible to buyer lineage (agency allow-list OR mediator assignment)
 
 - `POST /ops/verify`
-
   - admin/ops always allowed
   - mediator/agency allowed but scoped to their network
   - mediator self-verification for their own buyers is blocked

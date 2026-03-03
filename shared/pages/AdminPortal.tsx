@@ -1016,7 +1016,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-8 scrollbar-hide bg-[#F8FAFC]">
+        <div className="flex-1 overflow-y-auto p-8 scrollbar-styled bg-[#F8FAFC]">
           <div className="max-w-[1600px] mx-auto space-y-8 animate-enter">
             {/* DASHBOARD VIEW */}
             {view === 'dashboard' && stats && (

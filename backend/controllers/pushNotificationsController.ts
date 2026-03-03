@@ -117,8 +117,8 @@ export function makePushNotificationsController(env: Env) {
         const db = prisma();
 
         await db.pushSubscription.updateMany({
-          where: { endpoint: body.endpoint, userId: pgUserId, deletedAt: null },
-          data: { deletedAt: new Date() },
+          where: { endpoint: body.endpoint, userId: pgUserId, isDeleted: false },
+          data: { isDeleted: true },
         });
 
         writeAuditLog({

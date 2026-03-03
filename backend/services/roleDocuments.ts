@@ -25,7 +25,7 @@ export async function ensureRoleDocumentsForUser(args: { user: AnyUser; session?
   if (pgUserId && !UUID_RE.test(pgUserId)) {
     // user.id looks like a legacy hex ID — resolve to PG UUID via mongoId lookup.
     const mongoId = user?._id ? String(user._id) : pgUserId;
-    const pgUser = await db.user.findFirst({ where: { mongoId, deletedAt: null }, select: { id: true } });
+    const pgUser = await db.user.findFirst({ where: { mongoId, isDeleted: false }, select: { id: true } });
     if (!pgUser) {
       // No PG user found for this legacy ID — skip silently (test/migration scenarios).
       return;
@@ -38,7 +38,7 @@ export async function ensureRoleDocumentsForUser(args: { user: AnyUser; session?
   // Also resolve createdBy if it's a legacy hex ID.
   let resolvedCreatedBy = createdBy;
   if (resolvedCreatedBy && !UUID_RE.test(resolvedCreatedBy)) {
-    const pgCreator = await db.user.findFirst({ where: { mongoId: resolvedCreatedBy, deletedAt: null }, select: { id: true } });
+    const pgCreator = await db.user.findFirst({ where: { mongoId: resolvedCreatedBy, isDeleted: false }, select: { id: true } });
     resolvedCreatedBy = pgCreator?.id ?? undefined;
   }
 

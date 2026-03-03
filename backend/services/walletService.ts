@@ -102,7 +102,7 @@ export async function applyWalletCredit(input: WalletMutationInput) {
     const updated = await tx.wallet.updateMany({
       where: {
         ownerUserId: input.ownerUserId,
-        deletedAt: null,
+        isDeleted: false,
         availablePaise: { lte: MAX_BALANCE_PAISE - input.amountPaise },
       },
       data: {
@@ -114,7 +114,7 @@ export async function applyWalletCredit(input: WalletMutationInput) {
     if (updated.count === 0) {
       // Distinguish wallet-not-found from limit exceeded
       const existing = await tx.wallet.findUnique({ where: { ownerUserId: input.ownerUserId } });
-      if (!existing || existing.deletedAt) {
+      if (!existing || existing.isDeleted) {
         logErrorEvent({ category: 'BUSINESS_LOGIC', severity: 'high', message: 'Wallet credit failed — wallet not found', operation: 'applyWalletCredit', userId: input.ownerUserId, metadata: { type: input.type, amountPaise: input.amountPaise } });
         throw new AppError(404, 'WALLET_NOT_FOUND', 'Wallet not found');
       }
@@ -182,7 +182,7 @@ export async function applyWalletDebit(input: WalletMutationInput) {
     const updated = await tx.wallet.updateMany({
       where: {
         ownerUserId: input.ownerUserId,
-        deletedAt: null,
+        isDeleted: false,
         availablePaise: { gte: input.amountPaise },
       },
       data: {
@@ -196,7 +196,7 @@ export async function applyWalletDebit(input: WalletMutationInput) {
       const existing = await tx.wallet.findUnique({
         where: { ownerUserId: input.ownerUserId },
       });
-      if (!existing || existing.deletedAt) {
+      if (!existing || existing.isDeleted) {
         logErrorEvent({ category: 'BUSINESS_LOGIC', severity: 'high', message: 'Wallet debit failed — wallet not found', operation: 'applyWalletDebit', userId: input.ownerUserId, metadata: { type: input.type, amountPaise: input.amountPaise } });
         throw new AppError(404, 'WALLET_NOT_FOUND', 'Wallet not found');
       }

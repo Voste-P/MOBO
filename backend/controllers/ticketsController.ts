@@ -6,7 +6,7 @@ import type { Role } from '../middleware/auth.js';
 import { orderLog, businessLog } from '../config/logger.js';
 import { logChangeEvent, logAccessEvent, logErrorEvent } from '../config/appLogs.js';
 import { prisma } from '../database/prisma.js';
-import { createTicketSchema, updateTicketSchema } from '../validations/tickets.js';
+import { createTicketSchema, updateTicketSchema, TICKET_TARGET_ROLE } from '../validations/tickets.js';
 import { toUiTicket, toUiTicketForBrand } from '../utils/uiMappers.js';
 import { pgTicket } from '../utils/pgMappers.js';
 import { getRequester, isPrivileged } from '../services/authz.js';
@@ -27,7 +27,7 @@ async function buildTicketAudience(ticket: any) {
   if (orderId) {
     const db = prisma();
     const order = await db.order.findFirst({
-      where: { ...idWhere(orderId), deletedAt: null },
+      where: { ...idWhere(orderId), isDeleted: false },
       select: {
         managerName: true,
         user: { select: { mongoId: true } },
@@ -64,7 +64,7 @@ async function getScopedOrderMongoIds(params: {
 
   if (roles.includes('brand')) {
     const orders = await db.order.findMany({
-      where: { brandUserId: pgUserId, deletedAt: null },
+      where: { brandUserId: pgUserId, isDeleted: false },
       select: { mongoId: true },
       orderBy: { createdAt: 'desc' },
       take: 500,
@@ -76,7 +76,7 @@ async function getScopedOrderMongoIds(params: {
     const mediatorCode = String(requesterUser?.mediatorCode || '').trim();
     if (!mediatorCode) return [];
     const orders = await db.order.findMany({
-      where: { managerName: mediatorCode, deletedAt: null },
+      where: { managerName: mediatorCode, isDeleted: false },
       select: { mongoId: true },
       orderBy: { createdAt: 'desc' },
       take: 500,
@@ -90,7 +90,7 @@ async function getScopedOrderMongoIds(params: {
     const mediatorCodes = await listMediatorCodesForAgency(agencyCode);
     if (!mediatorCodes.length) return [];
     const orders = await db.order.findMany({
-      where: { managerName: { in: mediatorCodes }, deletedAt: null },
+      where: { managerName: { in: mediatorCodes }, isDeleted: false },
       select: { mongoId: true },
       orderBy: { createdAt: 'desc' },
       take: 500,
@@ -106,7 +106,7 @@ async function assertCanReferenceOrder(params: { orderId: string; pgUserId: stri
   const db = prisma();
 
   const order = await db.order.findFirst({
-    where: { ...idWhere(orderId), deletedAt: null },
+    where: { ...idWhere(orderId), isDeleted: false },
     select: { userId: true, managerName: true, brandUserId: true },
   });
   if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
@@ -155,7 +155,7 @@ export function makeTicketsController() {
         };
 
         if (isPrivileged(roles)) {
-          const ticketWhere = { deletedAt: null };
+          const ticketWhere = { isDeleted: false };
           const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 200, maxLimit: 500 });
           const [tickets, total] = await Promise.all([
             db.ticket.findMany({ where: ticketWhere, orderBy: { createdAt: 'desc' }, skip, take: limit }),
@@ -167,7 +167,7 @@ export function makeTicketsController() {
         }
 
         if (roles.includes('shopper')) {
-          const shopperWhere = { userId: pgUserId, deletedAt: null };
+          const shopperWhere = { userId: pgUserId, isDeleted: false };
           const { page, limit, skip, isPaginated } = parsePagination(req.query as any);
           const [tickets, total] = await Promise.all([
             db.ticket.findMany({ where: shopperWhere, orderBy: { createdAt: 'desc' }, skip, take: limit }),
@@ -178,10 +178,50 @@ export function makeTicketsController() {
           return;
         }
 
+        // Cascade routing: each role sees tickets created by them + tickets targeted TO their role
+        const mediatorCode = String((user as any)?.mediatorCode || '').trim();
+        const agencyCode = roles.includes('agency') ? mediatorCode : '';
+        const cascadeTargets: any[] = [{ userId: pgUserId }];
+
+        if (roles.includes('mediator') && mediatorCode) {
+          // Mediator sees buyer tickets targeted to 'mediator' from their buyers
+          const mediatorOrders = await db.order.findMany({
+            where: { managerName: mediatorCode, isDeleted: false },
+            select: { userId: true },
+          });
+          const buyerUserIds = [...new Set(mediatorOrders.map(o => o.userId).filter(Boolean))];
+          if (buyerUserIds.length) {
+            cascadeTargets.push({ targetRole: 'mediator', userId: { in: buyerUserIds } });
+          }
+        }
+
+        if (roles.includes('agency') && agencyCode) {
+          // Agency sees mediator tickets targeted to 'agency'
+          const mediatorCodes = await listMediatorCodesForAgency(agencyCode);
+          if (mediatorCodes.length) {
+            const mediatorUsers = await db.user.findMany({
+              where: { mediatorCode: { in: mediatorCodes }, isDeleted: false },
+              select: { id: true },
+            });
+            const mediatorUserIds = mediatorUsers.map(u => u.id);
+            if (mediatorUserIds.length) {
+              cascadeTargets.push({ targetRole: 'agency', userId: { in: mediatorUserIds } });
+            }
+          }
+        }
+
+        if (roles.includes('brand')) {
+          // Brand sees agency tickets targeted to 'brand'
+          cascadeTargets.push({ targetRole: 'brand' });
+        }
+
         const orderMongoIds = await getScopedOrderMongoIds({ roles, pgUserId, requesterUser: user });
+        if (orderMongoIds.length) {
+          cascadeTargets.push({ orderId: { in: orderMongoIds } });
+        }
         const ticketWhere = {
-            deletedAt: null,
-            OR: [{ userId: pgUserId }, ...(orderMongoIds.length ? [{ orderId: { in: orderMongoIds } }] : [])],
+            isDeleted: false,
+            OR: cascadeTargets,
         };
         const { page, limit, skip, isPaginated } = parsePagination(req.query as any);
         const [tickets, total] = await Promise.all([
@@ -220,6 +260,7 @@ export function makeTicketsController() {
         }
 
         const mongoId = randomUUID();
+        const targetRole = TICKET_TARGET_ROLE[role] || 'admin';
         const ticket = await db.ticket.create({
           data: {
             mongoId,
@@ -230,6 +271,8 @@ export function makeTicketsController() {
             issueType: body.issueType,
             description: body.description,
             status: 'Open' as any,
+            targetRole,
+            priority: body.priority || 'medium',
             createdBy: pgUserId,
           },
         });
@@ -260,7 +303,7 @@ export function makeTicketsController() {
         const { roles, pgUserId, user } = getRequester(req);
         const db = prisma();
 
-        const existing = await db.ticket.findFirst({ where: { ...idWhere(id), deletedAt: null } });
+        const existing = await db.ticket.findFirst({ where: { ...idWhere(id), isDeleted: false } });
         if (!existing) throw new AppError(404, 'TICKET_NOT_FOUND', 'Ticket not found');
 
         if (!isPrivileged(roles) && existing.userId !== pgUserId) {
@@ -310,7 +353,7 @@ export function makeTicketsController() {
         const { roles, pgUserId, user } = getRequester(req);
         const db = prisma();
 
-        const existing = await db.ticket.findFirst({ where: { ...idWhere(id), deletedAt: null } });
+        const existing = await db.ticket.findFirst({ where: { ...idWhere(id), isDeleted: false } });
         if (!existing) throw new AppError(404, 'TICKET_NOT_FOUND', 'Ticket not found');
 
         if (String(existing.status || '').trim() === 'Open') {
@@ -325,7 +368,7 @@ export function makeTicketsController() {
           }
         }
 
-        await db.ticket.update({ where: { id: existing.id }, data: { deletedAt: new Date(), deletedBy: pgUserId } });
+        await db.ticket.update({ where: { id: existing.id }, data: { isDeleted: true, updatedBy: pgUserId } });
 
         const mapped = pgTicket(existing);
         const audience = await buildTicketAudience(mapped);
@@ -334,7 +377,7 @@ export function makeTicketsController() {
 
         await writeAuditLog({ req, action: 'TICKET_DELETED', entityType: 'Ticket', entityId: id, metadata: { status: String(existing.status) } });
         businessLog.info(`[${String(user?.role || roles[0] || 'User').charAt(0).toUpperCase() + String(user?.role || roles[0] || 'User').slice(1)}] User ${req.auth?.userId} deleted ticket ${id} — was ${String(existing.status)}`, { actorUserId: req.auth?.userId, ticketId: id, previousStatus: String(existing.status), ip: req.ip });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Ticket', entityId: id, action: 'TICKET_DELETED', changedFields: ['deletedAt'], before: { status: String(existing.status) }, after: { deleted: true } });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Ticket', entityId: id, action: 'TICKET_DELETED', changedFields: ['isDeleted'], before: { status: String(existing.status) }, after: { deleted: true } });
         logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Ticket', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'TICKET_DELETED', ticketId: id, status: String(existing.status) } });
 
         res.json({ ok: true });

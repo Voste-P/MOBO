@@ -2052,7 +2052,7 @@ export const MediatorDashboard: React.FC = () => {
 
               {/* AI-Extracted Metadata */}
               {(proofModal.soldBy || proofModal.orderDate || proofModal.extractedProductName || proofModal.reviewerName) && (
-                <div className="grid grid-cols-3 gap-3 mt-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
                   {proofModal.reviewerName && (
                     <div className="bg-black/40 p-2.5 rounded-xl border border-indigo-500/20">
                       <p className="text-[9px] text-indigo-400 font-bold uppercase mb-1">Reviewer Name</p>

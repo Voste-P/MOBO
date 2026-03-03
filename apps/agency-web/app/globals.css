@@ -42,6 +42,26 @@ input[type='number']::-webkit-inner-spin-button {
   scrollbar-width: none;
 }
 
+/* Thin styled scrollbar — use on scrollable areas that need visible scrolling */
+.scrollbar-styled::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.scrollbar-styled::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-styled::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 999px;
+}
+.scrollbar-styled::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+.scrollbar-styled {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
 /* ── Animations ── */
 .animate-enter {
   animation: enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;

@@ -1,4 +1,6 @@
-﻿# API surface (UI contract)
+﻿# API Surface (UI Contract)
+
+> **83 endpoints** across 14 route files. Last updated: June 2025.
 
 All endpoints are rooted at `/api`.
 
@@ -7,201 +9,241 @@ All endpoints are rooted at `/api`.
 - **Auth**: send `Authorization: Bearer <accessToken>`.
 - **Content type**: JSON requests should use `Content-Type: application/json`.
 - **Money**: all wallet balances and ledger amounts are stored in **paise** (integer).
-- **Roles**:
-  - Backend uses `shopper` for buyers; UI may display this as `user`.
-  - Most authorization checks are a combination of **role gates** + **ownership scoping**.
+- **Roles**: `shopper` (buyer), `mediator`, `agency`, `brand`, `ops`, `admin`.
+  - Backend uses `shopper` for buyers; UI may display as `user`.
+  - Most authorization checks combine **role gates** + **ownership scoping**.
+- **Soft-delete rule**: every destructive operation sets `deletedAt` — no hard deletes in production.
 
-## Portal integration (Next.js)
+## Portal Integration (Next.js)
 
-All portals proxy `/api/:path*` to the backend using `next.config.js` rewrites.
+All 5 portals proxy `/api/:path*` → backend via `next.config.js` rewrites.
 
-- Recommended local setup:
-  - Create `apps/<portal>/.env.local` with:
+| Env var                        | Where                   | Purpose                        |
+| ------------------------------ | ----------------------- | ------------------------------ |
+| `NEXT_PUBLIC_API_PROXY_TARGET` | Vercel project settings | Backend URL for proxy rewrites |
+| `NEXT_PUBLIC_API_URL`          | Optional override       | Direct API base URL            |
 
-    `NEXT_PUBLIC_API_PROXY_TARGET=http://localhost:8080`
+**⚠️ Critical**: if `NEXT_PUBLIC_API_PROXY_TARGET` is not set on Vercel, API calls will fail. Build logs will warn you.
 
-- Client base URL selection (shared client in `@mobo/shared`):
-  - `NEXT_PUBLIC_API_URL` (if set) overrides the default.
-  - Otherwise it uses relative `/api` (works with Next rewrites in dev + prod).
+Client base URL resolution (`shared/utils/apiBaseUrl.ts`):
 
-## Error format
+1. `globalThis.__MOBO_API_URL__` 2. `VITE_API_URL` 3. `NEXT_PUBLIC_API_URL` 4. Same-origin `/api` 5. `localhost:8080` 6. `/api`
 
-Most non-2xx responses are JSON:
-
-```json
-{
-  "error": {
-    "code": "SOME_CODE",
-    "message": "Human readable message",
-    "details": []
-  }
-}
-```
-
-- Typical statuses: `400` (validation), `401` (unauthenticated), `403` (forbidden), `404` (not found), `409` (conflict), `429` (rate limit), `500` (server).
-- The shared UI client attaches `error.code` onto the thrown `Error` as `err.code`.
-
-## Health
-
-- `GET /api/health` 200 only if PostgreSQL is connected, else 503.
-
-## Realtime (`/api/realtime`)
-
-- `GET /api/realtime/health` (no auth)
-  - Lightweight health check for the realtime subsystem
-
-- `GET /api/realtime/stream` (auth)
-  - SSE stream used by portals for live refresh
-  - Events: `ready`, `ping`, plus domain events like `deals.changed`, `users.changed`, `orders.changed`, `wallets.changed`, `tickets.changed`, `notifications.changed`
-  - See `docs/REALTIME.md` for the contract
-
-## Auth (`/api/auth`)
-
-### Response shapes
-
-- `AuthResponse`:
+## Error Format
 
 ```json
-{
-  "user": { "id": "...", "role": "shopper|mediator|agency|brand|ops|admin", "name": "..." },
-  "tokens": { "accessToken": "...", "refreshToken": "..." }
-}
+{ "error": { "code": "SOME_CODE", "message": "Human readable", "details": [] } }
 ```
 
-- `POST /api/auth/register` (buyer) invite-based via `mediatorCode` (invite code)
-  - Body: `{ name, mobile, password, mediatorCode, email? }`
-  - 201: `AuthResponse`
-- `POST /api/auth/login`
-  - Body: `{ mobile, password }`
-  - 200: `AuthResponse`
-- `GET /api/auth/me` (auth)
-  - 200: `{ user }`
-- `POST /api/auth/register-ops` (agency/mediator) invite-based
-  - Body: `{ name, mobile, password, role: 'agency'|'mediator', code }`
-  - 201: `AuthResponse`
-- `POST /api/auth/register-brand` (brand) invite-based
-  - Body: `{ name, mobile, password, brandCode }`
-  - 201: `AuthResponse`
-- `PATCH /api/auth/profile` (auth)
-  - Body: `{ userId, ...updates }` (server applies RBAC/ownership)
-  - 200: `{ user }`
+Statuses: `400` validation, `401` unauthenticated, `403` forbidden, `404` not found, `409` conflict, `429` rate limit, `500` server.
 
-## Admin (`/api/admin`) role: `admin`
+---
 
-- `GET /api/admin/invites`
-- `POST /api/admin/invites`
-  - Body: `{ role, label }`
-  - 201: `{ code, role, label, ... }`
-- `POST /api/admin/invites/revoke`
-- `GET /api/admin/users` (query `role=all|user|mediator|agency|brand|admin`)
-- `PATCH /api/admin/users/status`
-  - Body: `{ userId, status: 'active'|'suspended' }`
-- `GET /api/admin/financials`
-- `GET /api/admin/stats`
-- `GET /api/admin/growth`
-- `GET /api/admin/products`
-- `POST /api/admin/orders/reactivate`
+## Health (4 endpoints)
 
-## Ops (`/api/ops`) roles: `agency|mediator|ops|admin`
+| Method | Path                | Auth | Description                                       |
+| ------ | ------------------- | ---- | ------------------------------------------------- |
+| GET    | `/api/health/live`  | No   | Liveness probe (always 200)                       |
+| GET    | `/api/health/ready` | No   | Readiness probe (DB connected)                    |
+| GET    | `/api/health`       | No   | Full health check — 200 if PG connected, else 503 |
+| GET    | `/api/health/e2e`   | No   | E2E test readiness check                          |
 
-- Invites:
-  - `POST /api/ops/invites/generate` (mediator invites; agency self or privileged)
-    - Body: `{ agencyId }`
-    - 201: `{ code }`
-  - `POST /api/ops/invites/generate-buyer` (buyer invites; mediator self or privileged)
-    - Body: `{ mediatorId }`
-    - 201: `{ code }`
+## Realtime (2 endpoints)
 
-- Brand connection:
-  - `POST /api/ops/brands/connect` (agency-only) requests a connection to a brand by `brandCode`
-    - Body: `{ brandCode }`
-    - 200: `{ ok: true, ... }` (shape may include connection/request metadata)
-    - Errors: `ALREADY_REQUESTED` is treated as idempotent by the agency portal.
+| Method | Path                   | Auth | Description          |
+| ------ | ---------------------- | ---- | -------------------- |
+| GET    | `/api/realtime/health` | No   | SSE subsystem health |
+| GET    | `/api/realtime/stream` | Yes  | SSE event stream     |
 
-- Network + operations:
-  - `GET /api/ops/mediators` (scope depends on role; privileged can query arbitrary)
-  - `GET /api/ops/campaigns`
-  - `GET /api/ops/orders`
-  - `GET /api/ops/users/pending`
-  - `GET /api/ops/users/verified`
-  - `GET /api/ops/ledger`
+Events: `ready`, `ping`, `deals.changed`, `users.changed`, `orders.changed`, `wallets.changed`, `tickets.changed`, `notifications.changed`. See `docs/REALTIME.md`.
 
-- Approvals + workflow:
-  - `POST /api/ops/mediators/approve` (privileged)
-  - `POST /api/ops/users/approve`
-  - `POST /api/ops/users/reject`
-  - `POST /api/ops/verify` (verifies order claim; anti-collusion checks)
-  - `POST /api/ops/orders/settle`
-    - Roles: `admin|ops`
-    - Body: `{ orderId, settlementRef? }`
-    - 200: `{ ok: true, ... }`
-    - Money invariants: settlement creates an idempotent **brand debit** and then credits buyer+mediator.
+## Auth — `/api/auth` (7 endpoints)
 
-- Campaign + deals:
-  - `POST /api/ops/campaigns` (creates campaigns)
-    - Body: campaign details; scoping enforced (non-privileged can only create for self/network)
-  - `POST /api/ops/campaigns/assign` (assign slots; locks campaign terms)
-    - Body: `{ id, assignments, dealType?, price?, payout? }`
-  - `POST /api/ops/deals/publish`
-    - Body: `{ id, commission, mediatorCode }`
+| Method | Path                       | Auth | Description                                          |
+| ------ | -------------------------- | ---- | ---------------------------------------------------- |
+| POST   | `/api/auth/register`       | No   | Buyer registration (invite-based via `mediatorCode`) |
+| POST   | `/api/auth/login`          | No   | Login → `{ user, tokens }`                           |
+| POST   | `/api/auth/refresh`        | No   | Refresh access token                                 |
+| GET    | `/api/auth/me`             | Yes  | Current user profile                                 |
+| POST   | `/api/auth/register-ops`   | No   | Agency/mediator registration (invite-based)          |
+| POST   | `/api/auth/register-brand` | No   | Brand registration (invite-based)                    |
+| PATCH  | `/api/auth/profile`        | Yes  | Update profile (RBAC/ownership enforced)             |
 
-- Payouts:
-  - `POST /api/ops/payouts` (payout mediator)
+**AuthResponse**: `{ user: { id, role, name, ... }, tokens: { accessToken, refreshToken } }`
 
-## Brand (`/api/brand`) roles: `brand|admin|ops`
+## Admin — `/api/admin` (17 endpoints) — role: `admin`
 
-- `GET /api/brand/agencies`
-- `GET /api/brand/campaigns`
-- `GET /api/brand/orders`
-- `GET /api/brand/transactions`
-- `POST /api/brand/payout` (brand agency wallet transfer)
-  - Body: `{ brandId, agencyId, amount, ref }`
-  - 200: payout/transfer confirmation payload
-- `POST /api/brand/requests/resolve` (approve/reject pending agency connection)
-  - Accepts either `agencyId` (UI) or `agencyCode` (legacy/internal) + `action`
-- `POST /api/brand/agencies/remove`
-- `POST /api/brand/campaigns`
-- `PATCH /api/brand/campaigns/:campaignId` (campaign terms locked after first order or slot assignment)
+| Method | Path                           | Description                                                                 |
+| ------ | ------------------------------ | --------------------------------------------------------------------------- |
+| GET    | `/api/admin/invites`           | List all invites                                                            |
+| POST   | `/api/admin/invites`           | Create invite                                                               |
+| POST   | `/api/admin/invites/revoke`    | Revoke invite                                                               |
+| DELETE | `/api/admin/invites/:code`     | Delete invite (soft)                                                        |
+| GET    | `/api/admin/config`            | System config                                                               |
+| PATCH  | `/api/admin/config`            | Update system config                                                        |
+| GET    | `/api/admin/users`             | List users (filter: `role`)                                                 |
+| GET    | `/api/admin/financials`        | Platform financials                                                         |
+| GET    | `/api/admin/stats`             | Dashboard stats                                                             |
+| GET    | `/api/admin/growth`            | Growth metrics                                                              |
+| GET    | `/api/admin/products`          | All products/deals                                                          |
+| PATCH  | `/api/admin/users/status`      | Suspend/activate user                                                       |
+| DELETE | `/api/admin/products/:dealId`  | Soft-delete deal                                                            |
+| DELETE | `/api/admin/users/:userId`     | Soft-delete user                                                            |
+| DELETE | `/api/admin/wallets/:userId`   | Soft-delete wallet                                                          |
+| POST   | `/api/admin/orders/reactivate` | Reactivate order                                                            |
+| GET    | `/api/admin/audit-logs`        | Audit logs (filters: `action`, `entityType`, `limit`, `page`, `from`, `to`) |
 
-## Products
+## Ops — `/api/ops` (29 endpoints) — roles: `agency|mediator|ops|admin`
 
-- `GET /api/products` (role: buyer/shopper)
-  - 200: `Product[]`
-- `POST /api/deals/:dealId/redirect` (role: buyer/shopper) creates a REDIRECTED pre-order and returns `{ preOrderId, url }`
+### Invites
 
-## Orders
+| Method | Path                              | Description              |
+| ------ | --------------------------------- | ------------------------ |
+| POST   | `/api/ops/invites/generate`       | Generate mediator invite |
+| POST   | `/api/ops/invites/generate-buyer` | Generate buyer invite    |
 
-- `GET /api/orders/user/:userId` (auth; self or privileged)
-  - 200: `Order[]`
-- `POST /api/orders` (buyer creates/updates order)
-  - Body: `{ userId, items, ...metadata }`
-  - 200/201: `Order`
-- `POST /api/orders/claim` (submit proof)
-  - Body: `{ orderId, type, data }`
-  - 200: updated `Order`
+### Brand Connection
 
-## Tickets
+| Method | Path                      | Description                            |
+| ------ | ------------------------- | -------------------------------------- |
+| POST   | `/api/ops/brands/connect` | Request brand connection (agency-only) |
 
-- `GET /api/tickets` (auth; scoped by role/network)
-  - 200: `Ticket[]`
-- `POST /api/tickets`
-  - Body: `{ title, message, ... }`
-- `PATCH /api/tickets/:id`
-  - Body: `{ status }`
+### Network & Operations
 
-## AI (`/api/ai`)
+| Method | Path                      | Description             |
+| ------ | ------------------------- | ----------------------- |
+| GET    | `/api/ops/mediators`      | List mediators (scoped) |
+| GET    | `/api/ops/campaigns`      | List campaigns (scoped) |
+| GET    | `/api/ops/deals`          | List deals (scoped)     |
+| GET    | `/api/ops/orders`         | List orders (scoped)    |
+| GET    | `/api/ops/users/pending`  | Pending users           |
+| GET    | `/api/ops/users/verified` | Verified users          |
+| GET    | `/api/ops/ledger`         | Transaction ledger      |
 
-- `POST /api/ai/chat` (optional auth; rate-limited)
-  - Body: `{ message, userName?, products?, orders?, tickets?, image? }`
-  - 200: chat UI response payload
-- `GET /api/ai/status`
-- `POST /api/ai/check-key` (auth; roles: admin/ops)
-- `POST /api/ai/verify-proof` (optional auth; rate-limited)
-  - Body: `{ imageBase64, expectedOrderId, expectedAmount }`
-  - 200: `{ orderIdMatch, amountMatch, confidenceScore, ... }`
+### Approvals & Workflow
 
-Notes:
+| Method | Path                                 | Description               |
+| ------ | ------------------------------------ | ------------------------- |
+| POST   | `/api/ops/mediators/approve`         | Approve mediator          |
+| POST   | `/api/ops/mediators/reject`          | Reject mediator           |
+| POST   | `/api/ops/users/approve`             | Approve user              |
+| POST   | `/api/ops/users/reject`              | Reject user               |
+| POST   | `/api/ops/verify`                    | Verify order claim        |
+| POST   | `/api/ops/orders/verify-requirement` | Verify single requirement |
+| POST   | `/api/ops/orders/verify-all`         | Verify all proof steps    |
+| POST   | `/api/ops/orders/reject-proof`       | Reject proof              |
+| POST   | `/api/ops/orders/request-proof`      | Request missing proof     |
+| POST   | `/api/ops/orders/settle`             | Settle order payment      |
+| POST   | `/api/ops/orders/unsettle`           | Reverse settlement        |
 
-- Requests are limited by global rate limit plus stricter AI limits.
-- JSON body size is capped at 10mb.
-- For enforceable RBAC expectations, see `docs/RBAC_MATRIX.md` and the backend tests in `backend/tests/rbac.policy.spec.ts`.
+### Campaigns & Deals
+
+| Method | Path                                    | Description                |
+| ------ | --------------------------------------- | -------------------------- |
+| POST   | `/api/ops/campaigns`                    | Create campaign            |
+| POST   | `/api/ops/campaigns/copy`               | Copy campaign              |
+| POST   | `/api/ops/campaigns/decline`            | Decline offer              |
+| PATCH  | `/api/ops/campaigns/:campaignId/status` | Update campaign status     |
+| DELETE | `/api/ops/campaigns/:campaignId`        | Soft-delete campaign       |
+| POST   | `/api/ops/campaigns/assign`             | Assign slots (locks terms) |
+| POST   | `/api/ops/deals/publish`                | Publish deal               |
+
+### Payouts
+
+| Method | Path                         | Description     |
+| ------ | ---------------------------- | --------------- |
+| POST   | `/api/ops/payouts`           | Payout mediator |
+| DELETE | `/api/ops/payouts/:payoutId` | Cancel payout   |
+
+## Brand — `/api/brand` (11 endpoints) — roles: `brand|admin|ops`
+
+| Method | Path                               | Description                                |
+| ------ | ---------------------------------- | ------------------------------------------ |
+| GET    | `/api/brand/agencies`              | Connected agencies                         |
+| GET    | `/api/brand/campaigns`             | Brand campaigns                            |
+| GET    | `/api/brand/orders`                | Brand orders                               |
+| GET    | `/api/brand/transactions`          | Brand transactions                         |
+| POST   | `/api/brand/payout`                | Pay out to agency                          |
+| POST   | `/api/brand/requests/resolve`      | Approve/reject agency connection           |
+| POST   | `/api/brand/agencies/remove`       | Remove agency connection                   |
+| POST   | `/api/brand/campaigns`             | Create campaign                            |
+| POST   | `/api/brand/campaigns/copy`        | Copy campaign                              |
+| PATCH  | `/api/brand/campaigns/:campaignId` | Update campaign (locked after first order) |
+| DELETE | `/api/brand/campaigns/:campaignId` | Soft-delete campaign                       |
+
+## Products (2 endpoints)
+
+| Method | Path                          | Auth        | Description                            |
+| ------ | ----------------------------- | ----------- | -------------------------------------- |
+| GET    | `/api/products`               | Yes (buyer) | List available products/deals          |
+| POST   | `/api/deals/:dealId/redirect` | Yes (buyer) | Track redirect → `{ preOrderId, url }` |
+
+## Orders (5 endpoints)
+
+| Method | Path                               | Auth        | Description                                  |
+| ------ | ---------------------------------- | ----------- | -------------------------------------------- |
+| GET    | `/api/orders/user/:userId`         | Yes         | User orders (self or privileged)             |
+| POST   | `/api/orders`                      | Yes (buyer) | Create/update order                          |
+| POST   | `/api/orders/claim`                | Yes (buyer) | Submit proof                                 |
+| GET    | `/api/orders/:orderId/proof/:type` | Yes         | Get order proof (review/rating/returnWindow) |
+| GET    | `/api/orders/:orderId/audit`       | Yes         | Order audit trail                            |
+
+## Tickets (4 endpoints)
+
+| Method | Path               | Auth | Description                   |
+| ------ | ------------------ | ---- | ----------------------------- |
+| GET    | `/api/tickets`     | Yes  | List tickets (scoped by role) |
+| POST   | `/api/tickets`     | Yes  | Create ticket                 |
+| PATCH  | `/api/tickets/:id` | Yes  | Update ticket status          |
+| DELETE | `/api/tickets/:id` | Yes  | Soft-delete ticket            |
+
+## Notifications — `/api/notifications` (4 endpoints)
+
+| Method | Path                                 | Auth | Description                  |
+| ------ | ------------------------------------ | ---- | ---------------------------- |
+| GET    | `/api/notifications`                 | Yes  | List notifications           |
+| GET    | `/api/notifications/push/public-key` | No   | VAPID public key             |
+| POST   | `/api/notifications/push/subscribe`  | Yes  | Register push subscription   |
+| DELETE | `/api/notifications/push/subscribe`  | Yes  | Unregister push subscription |
+
+## Media (1 endpoint)
+
+| Method | Path               | Auth | Description                |
+| ------ | ------------------ | ---- | -------------------------- |
+| GET    | `/api/media/image` | No   | Image proxy (query: `url`) |
+
+## AI — `/api/ai` (6 endpoints)
+
+| Method | Path                    | Auth            | Description                           |
+| ------ | ----------------------- | --------------- | ------------------------------------- |
+| POST   | `/api/ai/chat`          | Optional        | AI chat (rate-limited, 10MB body cap) |
+| GET    | `/api/ai/status`        | No              | AI service status                     |
+| POST   | `/api/ai/check-key`     | Yes (admin/ops) | Validate Gemini API key               |
+| POST   | `/api/ai/verify-proof`  | Optional        | Verify order proof screenshot         |
+| POST   | `/api/ai/verify-rating` | Optional        | Verify rating screenshot              |
+| POST   | `/api/ai/extract-order` | Optional        | Extract order details from screenshot |
+
+## Google Sheets — `/api/sheets` (1 endpoint)
+
+| Method | Path                 | Auth | Description                 |
+| ------ | -------------------- | ---- | --------------------------- |
+| POST   | `/api/sheets/export` | Yes  | Export data to Google Sheet |
+
+## Google OAuth — `/api/google` (4 endpoints)
+
+| Method | Path                     | Auth | Description              |
+| ------ | ------------------------ | ---- | ------------------------ |
+| GET    | `/api/google/auth`       | Yes  | Get OAuth consent URL    |
+| GET    | `/api/google/callback`   | No   | OAuth callback handler   |
+| GET    | `/api/google/status`     | Yes  | Google connection status |
+| POST   | `/api/google/disconnect` | Yes  | Revoke Google tokens     |
+
+---
+
+## Notes
+
+- Global rate limit applies to all routes; auth routes have stricter limits (30 req / 5 min in production).
+- JSON body size capped at 10MB.
+- SSE realtime connects directly to backend (cross-origin) — CORS must be configured.
+- For RBAC matrix: `docs/RBAC_MATRIX.md`
+- For backend tests: `backend/tests/rbac.policy.spec.ts`

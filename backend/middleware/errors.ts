@@ -75,7 +75,6 @@ export function errorHandler(
         code: err.code,
         message: err.message,
         details: err.details,
-        ...(requestId ? { requestId } : {}),
       },
     });
     return;

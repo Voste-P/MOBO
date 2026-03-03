@@ -15,7 +15,7 @@ describe('api smoke', () => {
     await seedE2E();
 
     const campaign = await prisma().campaign.findFirst({
-      where: { title: 'E2E Campaign', deletedAt: null },
+      where: { title: 'E2E Campaign', isDeleted: false },
     });
     expect(campaign).toBeTruthy();
 
@@ -24,7 +24,7 @@ describe('api smoke', () => {
       where: {
         campaignId: campaign!.id,
         mediatorCode: 'MED_TEST',
-        deletedAt: null,
+        isDeleted: false,
       },
     });
 

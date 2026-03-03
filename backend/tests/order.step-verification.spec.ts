@@ -50,8 +50,8 @@ describe('order step verification (purchase vs review/rating)', () => {
     // Reset velocity counter: soft-delete ALL orders for this user so the
     // per-buyer velocity limit (10/hour, 30/day) does not fire on repeated runs.
     await prisma().order.updateMany({
-      where: { userId: shopper.userId, deletedAt: null },
-      data: { deletedAt: new Date() },
+      where: { userId: shopper.userId, isDeleted: false },
+      data: { isDeleted: true },
     });
 
     const createOrderRes = await request(app)
@@ -165,8 +165,8 @@ describe('order step verification (purchase vs review/rating)', () => {
     // Reset velocity counter: soft-delete ALL orders for this user so the
     // per-buyer velocity limit (10/hour, 30/day) does not fire on repeated runs.
     await prisma().order.updateMany({
-      where: { userId: shopper.userId, deletedAt: null },
-      data: { deletedAt: new Date() },
+      where: { userId: shopper.userId, isDeleted: false },
+      data: { isDeleted: true },
     });
 
     const createOrderRes = await request(app)

@@ -43,7 +43,7 @@ export function makeNotificationsController() {
 
         if (isShopper) {
           const orders = await db().order.findMany({
-            where: { userId: pgUserId, deletedAt: null },
+            where: { userId: pgUserId, isDeleted: false },
             select: orderNotificationSelect,
             orderBy: { updatedAt: 'desc' },
             take: 100,
@@ -178,8 +178,8 @@ export function makeNotificationsController() {
           const mediatorCode = String((user as any)?.mediatorCode || '').trim();
           if (mediatorCode) {
             const [pendingUsers, pendingOrders] = await Promise.all([
-              db().user.count({ where: { parentCode: mediatorCode, roles: { has: 'shopper' as any }, isVerifiedByMediator: false, deletedAt: null } }),
-              db().order.count({ where: { managerName: mediatorCode, workflowStatus: 'UNDER_REVIEW' as any, deletedAt: null } }),
+              db().user.count({ where: { parentCode: mediatorCode, roles: { has: 'shopper' as any }, isVerifiedByMediator: false, isDeleted: false } }),
+              db().order.count({ where: { managerName: mediatorCode, workflowStatus: 'UNDER_REVIEW' as any, isDeleted: false } }),
             ]);
 
             if (pendingUsers > 0) {
@@ -205,7 +205,7 @@ export function makeNotificationsController() {
 
           // Recent payouts recorded to this mediator.
           const payouts = await db().payout.findMany({
-            where: { beneficiaryUserId: pgUserId, deletedAt: null },
+            where: { beneficiaryUserId: pgUserId, isDeleted: false },
             select: { id: true, mongoId: true, amountPaise: true, status: true, processedAt: true, createdAt: true },
             orderBy: { createdAt: 'desc' },
             take: 10,
