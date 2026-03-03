@@ -284,6 +284,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
         timestamp: Date.now(),
         relatedProducts: response.uiType === 'product_card' ? response.data : undefined,
         relatedOrders: response.uiType === 'order_card' ? response.data : undefined,
+        extractedValues: response.extractedValues,
       });
     } catch (err: any) {
       // If the request was aborted (user sent a new message), silently bail
@@ -572,6 +573,59 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                   {msg.relatedProducts.map((product) => (
                     <ProductCard key={product.id} product={product} />
                   ))}
+                </div>
+              </div>
+            )}
+            {msg.extractedValues && Object.keys(msg.extractedValues).length > 0 && (
+              <div className="ml-11 mt-3 w-full max-w-[320px]">
+                <div className="bg-gradient-to-br from-emerald-50 to-cyan-50 rounded-2xl p-4 shadow-sm border border-emerald-100">
+                  <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <CheckCircle2 size={12} /> Extracted Details
+                  </p>
+                  <div className="space-y-2">
+                    {msg.extractedValues.orderId && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-[11px] text-slate-500">Order ID</span>
+                        <span className="text-[11px] font-bold text-slate-800 font-mono">{msg.extractedValues.orderId}</span>
+                      </div>
+                    )}
+                    {msg.extractedValues.amount && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-[11px] text-slate-500">Amount</span>
+                        <span className="text-[11px] font-bold text-emerald-700">{msg.extractedValues.amount}</span>
+                      </div>
+                    )}
+                    {msg.extractedValues.productName && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-[11px] text-slate-500">Product</span>
+                        <span className="text-[11px] font-semibold text-slate-700 truncate max-w-[180px]">{msg.extractedValues.productName}</span>
+                      </div>
+                    )}
+                    {msg.extractedValues.platform && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-[11px] text-slate-500">Platform</span>
+                        <span className="text-[11px] font-semibold text-slate-700">{msg.extractedValues.platform}</span>
+                      </div>
+                    )}
+                    {msg.extractedValues.seller && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-[11px] text-slate-500">Seller</span>
+                        <span className="text-[11px] font-semibold text-slate-700 truncate max-w-[180px]">{msg.extractedValues.seller}</span>
+                      </div>
+                    )}
+                    {msg.extractedValues.orderDate && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-[11px] text-slate-500">Date</span>
+                        <span className="text-[11px] font-semibold text-slate-700">{msg.extractedValues.orderDate}</span>
+                      </div>
+                    )}
+                    {msg.extractedValues.paymentMethod && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-[11px] text-slate-500">Payment</span>
+                        <span className="text-[11px] font-semibold text-slate-700">{msg.extractedValues.paymentMethod}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

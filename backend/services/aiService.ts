@@ -215,6 +215,15 @@ type ChatModelResponse = {
     | 'unknown';
   navigateTo?: 'home' | 'explore' | 'orders' | 'profile';
   recommendedProductIds?: string[];
+  extractedValues?: {
+    orderId?: string;
+    amount?: string;
+    orderDate?: string;
+    seller?: string;
+    productName?: string;
+    paymentMethod?: string;
+    platform?: string;
+  };
 };
 
 export type ChatUiResponse = {
@@ -223,6 +232,16 @@ export type ChatUiResponse = {
   navigateTo?: ChatModelResponse['navigateTo'];
   uiType?: 'product_card';
   data?: unknown;
+  /** Structured values extracted from an uploaded image */
+  extractedValues?: {
+    orderId?: string;
+    amount?: string;
+    orderDate?: string;
+    seller?: string;
+    productName?: string;
+    paymentMethod?: string;
+    platform?: string;
+  };
 };
 
 const GEMINI_MODEL_FALLBACKS = [
@@ -524,11 +543,18 @@ ${
   hasImage
     ? `7. IMAGE ANALYSIS (HIGHEST PRIORITY):
    - The user has uploaded an image. IGNORE the 'RECENT ORDERS' list for identification purposes.
-   - EXTRACT the Order ID exactly as appearing in the image (e.g., Amazon '404-1234567...', Flipkart 'OD123...', Myntra, etc.).
-   - EXTRACT the Final Order Amount/Total.
-   - STRICTLY IGNORE any "system" IDs (e.g., random UUIDs, IDs starting with SYS/MOBO, or single/double digit numbers).
-   - If you see an Order ID in the image, your response text MUST begin with: "Found Order ID: <ID>".
-   - If you cannot clearly read an Order ID, say "Could not read Order ID from image".`
+   - EXTRACT ALL of the following values from the image and put them in the 'extractedValues' JSON object:
+     * orderId: The Order ID exactly as appearing in the image (e.g., Amazon '404-1234567...', Flipkart 'OD123...', Myntra 'MYN...', Meesho, etc.). STRICTLY IGNORE system UUIDs or IDs starting with SYS/MOBO.
+     * amount: The Final Order Amount/Total paid (e.g., "₹599", "₹1,299"). Look for "Total", "Grand Total", "Amount Paid", "Order Total". Use the FINAL amount after discounts.
+     * orderDate: The order date (e.g., "15 Jan 2025", "2025-01-15"). Look for "Ordered on", "Order Date", "Placed on".
+     * seller: The seller/vendor name. Look for "Sold by", "Seller", "Fulfilled by".
+     * productName: The main product name or title visible in the image.
+     * paymentMethod: Payment method used (e.g., "UPI", "Credit Card", "COD", "Wallet"). Look for "Paid via", "Payment Method", "Payment".
+     * platform: The e-commerce platform (e.g., "Amazon", "Flipkart", "Myntra", "Meesho", "Ajio").
+   - For EACH value: if clearly visible, extract it exactly. If not visible or unreadable, omit that field.
+   - Your responseText should summarize ALL extracted values in a readable format using **bold** for values.
+   - If you see an Order ID, your response text MUST begin with: "Found Order ID: **<ID>**".
+   - If you cannot read ANY values clearly, say "Could not extract details from this image. Please upload a clearer screenshot."`
     : ''
 }
 `;
@@ -646,6 +672,18 @@ ${
                 },
                 navigateTo: { type: Type.STRING, enum: ['home', 'explore', 'orders', 'profile'] },
                 recommendedProductIds: { type: Type.ARRAY, items: { type: Type.STRING } },
+                extractedValues: {
+                  type: Type.OBJECT,
+                  properties: {
+                    orderId: { type: Type.STRING },
+                    amount: { type: Type.STRING },
+                    orderDate: { type: Type.STRING },
+                    seller: { type: Type.STRING },
+                    productName: { type: Type.STRING },
+                    paymentMethod: { type: Type.STRING },
+                    platform: { type: Type.STRING },
+                  },
+                },
               },
               required: ['responseText', 'intent'],
             },
@@ -676,6 +714,23 @@ ${
         });
 
         recordGeminiSuccess();
+
+        // Build extractedValues from the AI response (only include non-empty fields)
+        let extractedValues: ChatUiResponse['extractedValues'] | undefined;
+        if (parsed.extractedValues && typeof parsed.extractedValues === 'object') {
+          const ev = parsed.extractedValues as Record<string, unknown>;
+          const cleaned: Record<string, string> = {};
+          for (const key of ['orderId', 'amount', 'orderDate', 'seller', 'productName', 'paymentMethod', 'platform'] as const) {
+            const val = ev[key];
+            if (typeof val === 'string' && val.trim()) {
+              cleaned[key] = val.trim();
+            }
+          }
+          if (Object.keys(cleaned).length > 0) {
+            extractedValues = cleaned as ChatUiResponse['extractedValues'];
+          }
+        }
+
         return {
           text: parsed.responseText,
           intent: parsed.intent ?? 'unknown',
@@ -683,6 +738,7 @@ ${
           ...(recommendedProducts.length
             ? { uiType: 'product_card' as const, data: recommendedProducts }
             : {}),
+          ...(extractedValues ? { extractedValues } : {}),
         };
       } catch (innerError) {
         aiLog.warn('[Chatbot] Model fallback error', { error: innerError instanceof Error ? innerError.message : innerError });
