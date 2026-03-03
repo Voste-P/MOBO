@@ -338,12 +338,12 @@ export function makeOpsController(env: Env) {
             const allCodes = [code, ...mediatorCodes].filter(Boolean);
             const rows = statusFilter
               ? await db().$queryRaw<{ id: string }[]>`
-                  SELECT id FROM "campaigns" WHERE "deleted_at" IS NULL AND status = ${statusFilter}
+                  SELECT id FROM "campaigns" WHERE "is_deleted" = false AND status = ${statusFilter}
                   AND (${code} = ANY("allowed_agency_codes")
                        OR EXISTS (SELECT 1 FROM unnest(${allCodes}::text[]) AS mc WHERE jsonb_exists(assignments, mc)))
                 `
               : await db().$queryRaw<{ id: string }[]>`
-                  SELECT id FROM "campaigns" WHERE "deleted_at" IS NULL
+                  SELECT id FROM "campaigns" WHERE "is_deleted" = false
                   AND (${code} = ANY("allowed_agency_codes")
                        OR EXISTS (SELECT 1 FROM unnest(${allCodes}::text[]) AS mc WHERE jsonb_exists(assignments, mc)))
                 `;
@@ -351,11 +351,11 @@ export function makeOpsController(env: Env) {
           } else {
             const rows = statusFilter
               ? await db().$queryRaw<{ id: string }[]>`
-                  SELECT id FROM "campaigns" WHERE "deleted_at" IS NULL AND status = ${statusFilter}
+                  SELECT id FROM "campaigns" WHERE "is_deleted" = false AND status = ${statusFilter}
                   AND (${code} = ANY("allowed_agency_codes") OR jsonb_exists(assignments, ${code}))
                 `
               : await db().$queryRaw<{ id: string }[]>`
-                  SELECT id FROM "campaigns" WHERE "deleted_at" IS NULL
+                  SELECT id FROM "campaigns" WHERE "is_deleted" = false
                   AND (${code} = ANY("allowed_agency_codes") OR jsonb_exists(assignments, ${code}))
                 `;
             matchingIds = rows.map((r) => r.id);
@@ -722,7 +722,7 @@ export function makeOpsController(env: Env) {
 
         const beneficiaryIds = payouts.map((p: any) => p.beneficiaryUserId).filter(Boolean);
         const users = await db().user.findMany({
-          where: { id: { in: beneficiaryIds } },
+          where: { id: { in: beneficiaryIds }, isDeleted: false },
           select: { id: true, mongoId: true, name: true, mediatorCode: true },
         });
         const byId = new Map(users.map((u: any) => [String(u.id), u]));
@@ -1064,7 +1064,7 @@ export function makeOpsController(env: Env) {
 
         // Only re-fetch if finalize modified the order; otherwise use the update result
         const finalOrder = (finalize as any).approved
-          ? await db().order.findFirst({ where: { id: order.id }, include: { items: { where: { isDeleted: false } } } })
+          ? await db().order.findFirst({ where: { id: order.id, isDeleted: false }, include: { items: { where: { isDeleted: false } } } })
           : updatedOrder;
         res.json({
           ok: true,
@@ -1155,7 +1155,7 @@ export function makeOpsController(env: Env) {
 
         // Only re-fetch if finalize modified the order; otherwise use the update result
         const finalOrder = (finalize as any).approved
-          ? await db().order.findFirst({ where: { id: order.id }, include: { items: { where: { isDeleted: false } } } })
+          ? await db().order.findFirst({ where: { id: order.id, isDeleted: false }, include: { items: { where: { isDeleted: false } } } })
           : updatedOrder;
         res.json({
           ok: true,
@@ -1246,7 +1246,7 @@ export function makeOpsController(env: Env) {
 
         // Only re-fetch if finalize modified the order; otherwise use the update result
         const finalOrder = (finalize as any).approved
-          ? await db().order.findFirst({ where: { id: order.id }, include: { items: { where: { isDeleted: false } } } })
+          ? await db().order.findFirst({ where: { id: order.id, isDeleted: false }, include: { items: { where: { isDeleted: false } } } })
           : updatedOrder;
         res.json({
           ok: true,
@@ -1326,7 +1326,7 @@ export function makeOpsController(env: Env) {
         if (body.type === 'order') {
           const campaignId = order.items?.[0]?.campaignId;
           if (campaignId) {
-            await db().$executeRaw`UPDATE "campaigns" SET "used_slots" = GREATEST("used_slots" - 1, 0) WHERE id = ${campaignId}::uuid AND "deleted_at" IS NULL`;
+            await db().$executeRaw`UPDATE "campaigns" SET "used_slots" = GREATEST("used_slots" - 1, 0) WHERE id = ${campaignId}::uuid AND "is_deleted" = false`;
           }
         }
 
@@ -2143,7 +2143,7 @@ export function makeOpsController(env: Env) {
         }
 
         const hasOrders = await db().orderItem.findFirst({
-          where: { campaignId: campaign.id, order: { isDeleted: false } },
+          where: { campaignId: campaign.id, isDeleted: false, order: { isDeleted: false } },
           select: { id: true },
         });
         if (hasOrders) throw new AppError(409, 'CAMPAIGN_HAS_ORDERS', 'Cannot delete a campaign with orders');
@@ -2230,7 +2230,7 @@ export function makeOpsController(env: Env) {
         // Check if orders exist – if so, only block term changes (price, dealType),
         // but still allow adding/modifying mediator assignments.
         const hasOrders = await db().orderItem.findFirst({
-          where: { campaignId: campaign.id, order: { isDeleted: false } },
+          where: { campaignId: campaign.id, isDeleted: false, order: { isDeleted: false } },
           select: { id: true },
         });
 

@@ -148,7 +148,7 @@ export function makeOrdersController(env: Env) {
 
     if ((finalize as any).approved) {
       return await db().order.findFirst({
-        where: { id: freshOrder.id },
+        where: { id: freshOrder.id, isDeleted: false },
         include: { items: { where: { isDeleted: false } } },
       });
     }
@@ -587,7 +587,7 @@ export function makeOrdersController(env: Env) {
         const claimSlot = async (tx: any) => {
           const claimed: any[] = await tx.$queryRaw`
             UPDATE "campaigns" SET "used_slots" = "used_slots" + 1
-            WHERE id = ${campaign.id}::uuid AND "used_slots" < "total_slots" AND "deleted_at" IS NULL
+            WHERE id = ${campaign.id}::uuid AND "used_slots" < "total_slots" AND "is_deleted" = false
             RETURNING id
           `;
           if (!claimed.length) {
@@ -821,7 +821,7 @@ export function makeOrdersController(env: Env) {
                 });
                 if ((finalize as any).approved) {
                   finalOrder = await db().order.findFirst({
-                    where: { id: freshOrder.id },
+                    where: { id: freshOrder.id, isDeleted: false },
                     include: { items: { where: { isDeleted: false } } },
                   });
                 } else {
@@ -1222,7 +1222,7 @@ export function makeOrdersController(env: Env) {
         // ORDERED -> PROOF_SUBMITTED -> UNDER_REVIEW
         // If already UNDER_REVIEW, we just persist the new proof without rewinding workflow.
         if (wf === 'UNDER_REVIEW') {
-          let refreshed = await db().order.findUnique({ where: { id: order.id }, include: { items: { where: { isDeleted: false } } } });
+          let refreshed = await db().order.findFirst({ where: { id: order.id, isDeleted: false }, include: { items: { where: { isDeleted: false } } } });
 
           // ── Auto-verify by AI confidence (submitClaim, already UNDER_REVIEW) ──
           const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
