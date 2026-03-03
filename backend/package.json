@@ -9,7 +9,7 @@
     "dev:e2e": "tsx watch index.e2e.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
-    "start:prod": "npx prisma migrate deploy && node dist/index.js",
+    "start:prod": "node scripts/deploy-migrate.cjs && node dist/index.js",
     "test": "vitest run -c vitest.config.ts",
     "test:watch": "vitest",
     "lint": "eslint \"**/*.ts\"",
