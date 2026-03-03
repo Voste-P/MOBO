@@ -742,7 +742,7 @@ export function makeOrdersController(env: Env) {
           });
 
           return order;
-        });
+        }, { timeout: 15000 });
 
         // UI often submits the initial order screenshot at creation time.
         // If proof is already present, progress the strict workflow so Ops can verify.

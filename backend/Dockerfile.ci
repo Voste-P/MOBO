@@ -20,6 +20,9 @@ RUN npm ci --workspace=@mobo/backend --omit=dev
 # Copy pre-built dist from CI
 COPY backend/dist ./backend/dist
 
+# Copy prisma config (needed for Prisma 7 CLI commands)
+COPY backend/prisma.config.ts ./backend/prisma.config.ts
+
 # Copy deploy-migrate script
 COPY backend/scripts/deploy-migrate.cjs ./backend/scripts/deploy-migrate.cjs
 
@@ -41,4 +44,4 @@ EXPOSE 3000
 WORKDIR /app/backend
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+CMD ["sh", "-c", "node scripts/deploy-migrate.cjs && node dist/index.js"]

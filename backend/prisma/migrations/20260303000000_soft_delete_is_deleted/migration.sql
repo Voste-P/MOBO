@@ -1,5 +1,7 @@
 -- Migration: Replace deletedAt/deletedBy with isDeleted Boolean flag
 -- Audit trail uses updatedAt/updatedBy (already existing columns)
+-- @approved-destructive: Intentional column removal — old deleted_at/deleted_by columns
+-- replaced by is_deleted Boolean. All code already migrated to use isDeleted.
 
 -- Step 1: Add is_deleted column to all tables
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_deleted" BOOLEAN NOT NULL DEFAULT false;

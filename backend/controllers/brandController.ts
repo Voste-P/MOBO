@@ -429,7 +429,7 @@ export function makeBrandController() {
               metadata: { ref, brandId: brandMongoId, brandName },
               tx,
             });
-          });
+          }, { timeout: 15000 });
         } catch (e: any) {
           const code = String(e?.code || e?.error?.code || '');
           if (code !== 'INSUFFICIENT_FUNDS' && code !== 'WALLET_NOT_FOUND') throw e;

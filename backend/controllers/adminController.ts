@@ -621,7 +621,7 @@ export function makeAdminController() {
                 });
                 await freezeOrders({ query: { brandUserId: user.id }, reason: 'BRAND_SUSPENDED', actorUserId: adminPgId, tx });
               }
-            });
+            }, { timeout: 15000 });
 
             // Audit logs + realtime events (non-transactional, fire-and-forget)
             const roles = Array.isArray(user.roles) ? (user.roles as string[]) : [];
