@@ -302,7 +302,7 @@ export type AiIntent =
   | 'navigation'
   | 'unknown';
 
-export type AiNavigateTo = 'home' | 'explore' | 'orders' | 'profile';
+export type AiNavigateTo = 'home' | 'explore' | 'orders' | 'profile' | 'tickets';
 
 export interface ChatResponse {
   text: string;

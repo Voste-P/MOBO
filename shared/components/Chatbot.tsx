@@ -19,7 +19,7 @@ import { ProxiedImage } from './ProxiedImage';
 
 interface ChatbotProps {
   isVisible?: boolean;
-  onNavigate?: (tab: 'home' | 'explore' | 'orders' | 'profile') => void;
+  onNavigate?: (tab: 'home' | 'explore' | 'orders' | 'profile' | 'tickets') => void;
 }
 
 const MoboAvatar: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'md' }) => {
@@ -263,7 +263,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
       );
 
       // Recommendation 1: Dynamic Navigation Handling with validation
-      const VALID_NAV_TARGETS: AiNavigateTo[] = ['home', 'explore', 'orders', 'profile'];
+      const VALID_NAV_TARGETS: AiNavigateTo[] = ['home', 'explore', 'orders', 'profile', 'tickets'];
       if (
         response.navigateTo &&
         response.intent === 'navigation' &&
