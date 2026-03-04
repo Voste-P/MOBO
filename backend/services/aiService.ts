@@ -3819,7 +3819,7 @@ export async function extractOrderDetailsWithAi(
             })();
             if (directResult.productName && !directProductIsUrl && !directProductIsNavCrap) {
               // Strip known navigation chrome fragments from the product name before evaluating
-              let cleanedProductName = directResult.productName
+              const cleanedProductName = directResult.productName
                 .replace(/\b(Deliver\s*to\s+\w+[^.]*)/gi, '')
                 .replace(/\b(Hello[,\s]+\w+[^.]*)/gi, '')
                 .replace(/\b(Returns?\s*(&\s*Orders?|\b\d))/gi, '')
