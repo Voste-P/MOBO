@@ -529,7 +529,7 @@ export const api = {
       // Compress before sending — phone screenshots can be 5-15 MB raw,
       // exceeding the Vercel proxy 4.5 MB body limit.
       // Use higher quality for extraction accuracy — OCR needs sharp text.
-      const compressed = await compressImage(rawBase64, { maxDimension: 2400, quality: 0.88 });
+      const compressed = await compressImage(rawBase64, { maxDimension: 2400, quality: 0.92 });
       return fetchJson('/ai/extract-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },

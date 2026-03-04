@@ -699,7 +699,8 @@ export function aiRoutes(env: Env): Router {
 
   router.post('/extract-order', requireAuth(env), limiterExtractOrder, async (req, res, next) => {
     try {
-      if (!ensureAiEnabled(res)) return;
+      // NOTE: Do NOT check ensureAiEnabled here — Tesseract.js works locally
+      // without Gemini API key, so extraction should always be available.
       const payload = extractOrderSchema.parse(req.body);
 
       if (!enforceDailyLimit(req, res)) return;

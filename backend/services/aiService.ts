@@ -1776,15 +1776,19 @@ export async function extractOrderDetailsWithAi(
     const GENERIC_ID_PATTERN       = '\\b[A-Z][A-Z0-9\\-]{7,}\\b';
 
     // ── Amount patterns (₹, Rs, INR, bare) ──
-    const AMOUNT_LABEL_RE = /(grand\s*total|amount\s*paid|paid\s*amount|you\s*paid|order\s*total|final\s*total|total\s*amount|net\s*amount|payable|item\s*total|subtotal|sub\s*total|bag\s*total|cart\s*value|deal\s*price|offer\s*price|sale\s*price|final\s*price|price|your\s*price|estimated\s*total|total|amount\s*to\s*pay|pay\s*amount|bill\s*total|order\s*value|net\s*pay|final\s*pay|total\s*refund|refund\s*total|refund\s*amount)/i;
+    // NOTE: Includes OCR-garbled variants: Tesseract commonly misreads l→1/!/i/|, o→0, a→@, t→+
+    // e.g. "Total" → "Tota!", "Totai", "T0tal", "Tota1"; "Price" → "Pr1ce", "Prlce"; "Paid" → "Pa1d"
+    const AMOUNT_LABEL_RE = /(grand\s*t[o0]t[a@][l1!i|]|am[o0]un[t+]\s*pa[i1!|][d0]|pa[i1!|][d0]\s*am[o0]un[t+]|you\s*pa[i1!|][d0]|[o0]rder\s*t[o0]t[a@][l1!i|]|f[i1!|]na[l1!|]\s*t[o0]t[a@][l1!i|]|t[o0]t[a@][l1!i|]\s*am[o0]un[t+]|net\s*am[o0]un[t+]|payab[l1!|]e|[i1!|]tem\s*t[o0]t[a@][l1!i|]|subt[o0]t[a@][l1!i|]|sub\s*t[o0]t[a@][l1!i|]|bag\s*t[o0]t[a@][l1!i|]|cart\s*va[l1!|]ue|dea[l1!|]\s*pr[i1!|]ce|[o0]ffer\s*pr[i1!|]ce|sa[l1!|]e\s*pr[i1!|]ce|f[i1!|]na[l1!|]\s*pr[i1!|]ce|pr[i1!|]ce|y[o0]ur\s*pr[i1!|]ce|est[i1!|]mated\s*t[o0]t[a@][l1!i|]|t[o0]t[a@][l1!i|]|am[o0]un[t+]\s*t[o0]\s*pay|pay\s*am[o0]un[t+]|b[i1!|][l1!|][l1!|]\s*t[o0]t[a@][l1!i|]|[o0]rder\s*va[l1!|]ue|net\s*pay|f[i1!|]na[l1!|]\s*pay|t[o0]t[a@][l1!i|]\s*refund|refund\s*t[o0]t[a@][l1!i|]|refund\s*am[o0]un[t+])/i;
     // Priority labels that indicate the FINAL price paid (not MRP)
-    const FINAL_AMOUNT_LABEL_RE = /(grand\s*total|amount\s*paid|paid\s*amount|you\s*paid|order\s*total|final\s*total|total\s*amount|net\s*amount|payable|estimated\s*total|amount\s*payable|total\s*payable|bill\s*amount|invoice\s*total|checkout\s*total|payment\s*total|you\s*pay|to\s*pay|your\s*total|final\s*amount|due\s*amount|total\s*due|total\s*paid|amount\s*due|total\s*price|final\s*price|order\s*amount|purchase\s*total|amount\s*to\s*pay|pay\s*amount|bill\s*total|order\s*value|net\s*pay|final\s*pay|paid\s*via|paid\s*using|paid\s*by|payment\s*of|deducted|charged|debited|total\s*refund|refund\s*total|refund\s*amount)/i;
+    const FINAL_AMOUNT_LABEL_RE = /(grand\s*t[o0]t[a@][l1!i|]|am[o0]un[t+]\s*pa[i1!|][d0]|pa[i1!|][d0]\s*am[o0]un[t+]|you\s*pa[i1!|][d0]|[o0]rder\s*t[o0]t[a@][l1!i|]|f[i1!|]na[l1!|]\s*t[o0]t[a@][l1!i|]|t[o0]t[a@][l1!i|]\s*am[o0]un[t+]|net\s*am[o0]un[t+]|payab[l1!|]e|est[i1!|]mated\s*t[o0]t[a@][l1!i|]|am[o0]un[t+]\s*payab[l1!|]e|t[o0]t[a@][l1!i|]\s*payab[l1!|]e|b[i1!|][l1!|][l1!|]\s*am[o0]un[t+]|[i1!|]nv[o0][i1!|]ce\s*t[o0]t[a@][l1!i|]|check[o0]ut\s*t[o0]t[a@][l1!i|]|payment\s*t[o0]t[a@][l1!i|]|you\s*pay|t[o0]\s*pay|y[o0]ur\s*t[o0]t[a@][l1!i|]|f[i1!|]na[l1!|]\s*am[o0]un[t+]|due\s*am[o0]un[t+]|t[o0]t[a@][l1!i|]\s*due|t[o0]t[a@][l1!i|]\s*pa[i1!|][d0]|am[o0]un[t+]\s*due|t[o0]t[a@][l1!i|]\s*pr[i1!|]ce|f[i1!|]na[l1!|]\s*pr[i1!|]ce|[o0]rder\s*am[o0]un[t+]|purchase\s*t[o0]t[a@][l1!i|]|am[o0]un[t+]\s*t[o0]\s*pay|pay\s*am[o0]un[t+]|b[i1!|][l1!|][l1!|]\s*t[o0]t[a@][l1!i|]|[o0]rder\s*va[l1!|]ue|net\s*pay|f[i1!|]na[l1!|]\s*pay|pa[i1!|][d0]\s*v[i1!|]a|pa[i1!|][d0]\s*us[i1!|]ng|pa[i1!|][d0]\s*by|payment\s*[o0]f|deducted|charged|deb[i1!|]ted|t[o0]t[a@][l1!i|]\s*refund|refund\s*t[o0]t[a@][l1!i|]|refund\s*am[o0]un[t+])/i;
     // Labels to EXCLUDE — MRP/savings/discount/fee lines should NOT be treated as amounts
     const EXCLUDED_AMOUNT_LABEL_RE = /(m\.?r\.?p|mrp|maximum\s*retail|retail\s*price|original\s*price|was\s*₹|was\s*rs|savings?|discount|you\s*sav|coupon|cashback|refund|promo|crossed\s*out|list\s*price|listing\s*price|selling\s*price|special\s*price|compare\s*at|earlier\s*price|regular\s*price|marked?\s*price|cut\s*price|item\s*price|unit\s*price|per\s*unit|per\s*item|reward\s*points?|loyalty\s*points?|coins?\s*earned|super\s*coins?|delivery\s*charge|delivery\s*fee|shipping\s*fee|shipping\s*charge|convenience\s*fee|handling\s*fee|packaging\s*fee|packing\s*fee|gst|tax\s*amount|total\s*tax|cgst|sgst|igst|platform\s*fee|marketplace\s*fee|packing\s*charge|total\s*fees|total\s*charges|total\s*savings|eco\s*fee|tip|donation|round\s*off|protection\s*fee|insurance\s*fee|cash.*delivery\s*fee|cod\s*fee|pay\s*on\s*delivery\s*fee)/i;
     // Amount with optional ₹ prefix — captures "₹ 599", "₹599", "599.00" etc.
-    const AMOUNT_VALUE_PATTERN = '(?:₹|(?:rs|r[5s$])\\.?|inr)?\\s*\\.?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)';
-    // Indian currency explicit prefix: ₹, Rs, Rs., INR, plus Tesseract variants (R5, R$, Ri, RI)
-    const INR_VALUE_PATTERN = '(?:₹|(?:rs|r[5s$iI])\\.?|inr|(?:rupees?))\\s*\\.?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)(?:\\s*\\/-)?';
+    // Extended with Tesseract OCR confusions for ₹: commonly read as { < ¥ ¢ # 7 t z etc.
+    const AMOUNT_VALUE_PATTERN = '(?:₹|(?:rs|r[5s$iIzZ])\\.?|inr|[{<¥¢])?\\s*\\.?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)';
+    // Indian currency explicit prefix: ₹, Rs, Rs., INR, plus Tesseract misread variants
+    // (R5, R$, Ri, RI, Rz, RZ, r5) and other common ₹ OCR confusions ({, <, ¥, ¢, #, t, z)
+    const INR_VALUE_PATTERN = '(?:₹|(?:rs|r[5s$iIzZ])\\.?|inr|(?:rupees?)|[{<¥¢#])\\s*\\.?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)(?:\\s*\\/-)?';
     const BARE_AMOUNT_PATTERN = '\\b([0-9]{2,8}(?:\\.[0-9]{1,2})?)\\b';
 
     // ── Compiled regexes ──
@@ -1821,7 +1825,7 @@ export async function extractOrderDetailsWithAi(
 
     const sanitizeOrderId = (value: unknown) => {
       if (typeof value !== 'string') return null;
-      const raw = value.trim().replace(/[\s]+/g, '');
+      let raw = value.trim().replace(/[\s]+/g, '');
       if (!raw) return null;
       const upper = raw.toUpperCase();
       if (upper.startsWith('E2E-') || upper.startsWith('SYS') || upper.includes('MOBO') || upper.includes('BUZZMA')) {
@@ -1829,6 +1833,9 @@ export async function extractOrderDetailsWithAi(
       }
       if (/^[a-f0-9]{24}$/i.test(raw)) return null; // legacy hex ID
       if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) return null; // UUID
+      // Normalize Flipkart OD prefix: OCR often produces "0OD..." or "00D..." instead of "OD..."
+      if (/^[0o][Oo0][Dd]\d{10,}$/i.test(raw)) raw = 'OD' + raw.slice(3);
+      else if (/^[0o][Dd]\d{10,}$/i.test(raw)) raw = 'OD' + raw.slice(2);
       if (raw.length < 4 || raw.length > 64) return null;
       // Must contain at least one digit to be a valid order ID
       if (!/\d/.test(raw)) return null;
@@ -2195,6 +2202,39 @@ export async function extractOrderDetailsWithAi(
       }
       // For bare numbers: prefer the last value (nearest to bottom of receipt)
       if (bareValues.length) return bareValues[bareValues.length - 1];
+
+      // ── STRUCTURAL BOTTOM-OF-TEXT FALLBACK ──
+      // When ALL previous methods fail, scan only the bottom 30% of lines
+      // for any INR-prefixed or bare number that could be a total.
+      // E-commerce receipts almost always show totals near the bottom.
+      const bottomStartLine = Math.max(0, lines.length - Math.ceil(lines.length * 0.35));
+      const bottomLines = lines.slice(bottomStartLine);
+      const bottomText = bottomLines.join('\n');
+      const bottomInrMatches = bottomText.matchAll(INR_VALUE_GLOBAL_RE);
+      const bottomValues: number[] = [];
+      for (const match of bottomInrMatches) {
+        const value = parseAmountString(match[1]);
+        if (!value || value < 10) continue;
+        if (isOrderIdFragment(match[1])) continue;
+        if (isLikelyPhoneNumber(match[1], value)) continue;
+        bottomValues.push(value);
+      }
+      if (bottomValues.length) return bottomValues[bottomValues.length - 1];
+      // Bare number scan on bottom lines
+      const bottomBareMatches = bottomText.matchAll(BARE_AMOUNT_GLOBAL_RE);
+      for (const match of bottomBareMatches) {
+        const value = parseAmountString(match[1]);
+        if (!value || value < 10 || value > 999999) continue;
+        if (isOrderIdFragment(match[1])) continue;
+        if (/^\d{10}$/.test(match[1])) continue;
+        if (/^\d{1}$/.test(match[1])) continue;
+        const bLine = bottomText.slice(
+          Math.max(0, bottomText.lastIndexOf('\n', match.index ?? 0)),
+          (bottomText.indexOf('\n', (match.index ?? 0) + match[0].length) + 1) || undefined,
+        );
+        if (isLikelyPincode(match[1], value, bLine)) continue;
+        return value;
+      }
 
       return null;
     };
@@ -2838,7 +2878,9 @@ export async function extractOrderDetailsWithAi(
           if (m?.[0]) {
             // Normalize Flipkart prefix to uppercase OD
             let val = m[0];
-            if (/^[0o][Dd]/i.test(val)) val = 'OD' + val.slice(2);
+            // OCR sometimes prepends garbage chars before OD: "0OD..." → "OD..."
+            if (/^[0o][Oo0][Dd]/i.test(val)) val = 'OD' + val.slice(3);
+            else if (/^[0o][Dd]/i.test(val)) val = 'OD' + val.slice(2);
             pushCandidate(val, hasKeyword);
           }
         }
@@ -3080,7 +3122,7 @@ export async function extractOrderDetailsWithAi(
 
     /** Tesseract.js fallback: local OCR that works without any external API. */
     const TESSERACT_TIMEOUT_MS = 45_000; // 45 seconds max for all Tesseract attempts
-    const runTesseractOcr = async (imageBase64: string): Promise<string> => {
+    const runTesseractOcr = async (imageBase64: string, preProcessed = false): Promise<string> => {
       let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
       const deadline = Date.now() + TESSERACT_TIMEOUT_MS;
       try {
@@ -3088,15 +3130,20 @@ export async function extractOrderDetailsWithAi(
         if (!isRecognizedImageBuffer(buf)) {
           return ''; // Not a valid image — skip Tesseract entirely
         }
-        // Enhance the image for better Tesseract accuracy
-        const enhanced = await sharp(buf)
-          .resize({ width: 2400, withoutEnlargement: false })
-          .grayscale()
-          .normalize()
-          .sharpen({ sigma: 1.5 })
-          .linear(1.2, -20) // Increase contrast
-          .jpeg({ quality: 95 })
-          .toBuffer();
+
+        // When input is already preprocessed by preprocessForOcr (grayscale,
+        // normalized, sharpened), skip re-enhancement to avoid double-processing
+        // artifacts that degrade OCR quality.
+        const enhanced = preProcessed
+          ? await sharp(buf).resize({ width: 2400, withoutEnlargement: true }).jpeg({ quality: 95 }).toBuffer()
+          : await sharp(buf)
+              .resize({ width: 2400, withoutEnlargement: false })
+              .grayscale()
+              .normalize()
+              .sharpen({ sigma: 1.5 })
+              .linear(1.2, -20) // Increase contrast
+              .jpeg({ quality: 95 })
+              .toBuffer();
 
         worker = await acquireOcrWorker();
         // Try default PSM first (automatic), then PSM 6 (uniform block of text)
@@ -3109,6 +3156,22 @@ export async function extractOrderDetailsWithAi(
           const { data: data6 } = await worker.recognize(enhanced);
           const text6 = normalizeOcrText(data6.text || '');
           if (text6.length > text.length) text = text6;
+        }
+
+        // Binary threshold: convert to pure black & white — dramatically helps
+        // with colored backgrounds, gradients, shadows in real screenshots.
+        // This is the #1 Tesseract improvement for e-commerce screenshot OCR.
+        if (Date.now() < deadline) {
+          const binaryImg = await sharp(buf)
+            .resize({ width: 2400, withoutEnlargement: false })
+            .grayscale()
+            .threshold(140) // Otsu-like binarization: anything < 140 → black, rest → white
+            .jpeg({ quality: 95 })
+            .toBuffer();
+          await worker.setParameters({ tessedit_pageseg_mode: '3' as any });
+          const { data: dataBin } = await worker.recognize(binaryImg);
+          const textBin = normalizeOcrText(dataBin.text || '');
+          if (textBin.length > text.length) text = textBin;
         }
 
         // If still poor and within budget, try a high-contrast version
@@ -3141,6 +3204,29 @@ export async function extractOrderDetailsWithAi(
           const { data: data4 } = await worker.recognize(columnEnhanced);
           const text4 = normalizeOcrText(data4.text || '');
           if (text4.length > text.length) text = text4;
+        }
+
+        // Binary threshold with inverted colors — helps dark-mode screenshots
+        if (Date.now() < deadline && (!text || text.length < 40)) {
+          const invertedBin = await sharp(buf)
+            .resize({ width: 2400, withoutEnlargement: false })
+            .negate({ alpha: false })
+            .grayscale()
+            .threshold(140)
+            .jpeg({ quality: 95 })
+            .toBuffer();
+          await worker.setParameters({ tessedit_pageseg_mode: '3' as any });
+          const { data: dataInvBin } = await worker.recognize(invertedBin);
+          const textInvBin = normalizeOcrText(dataInvBin.text || '');
+          if (textInvBin.length > text.length) text = textInvBin;
+        }
+
+        // PSM 11 (sparse text) — good for screenshots with text scattered across the page
+        if (Date.now() < deadline && (!text || text.length < 30)) {
+          await worker.setParameters({ tessedit_pageseg_mode: '11' as any });
+          const { data: data11 } = await worker.recognize(enhanced);
+          const text11 = normalizeOcrText(data11.text || '');
+          if (text11.length > text.length) text = text11;
         }
 
         if (Date.now() >= deadline) {
@@ -3403,9 +3489,14 @@ export async function extractOrderDetailsWithAi(
             continue;
           }
         }
+        // All Gemini models failed for this OCR pass — record failure for circuit breaker
+        recordGeminiFailure();
       }
       // Fallback: Tesseract.js local OCR (works without Gemini API key)
-      const tesseractText = await runTesseractOcr(imageBase64);
+      // Pass preProcessed=true for variants that already went through preprocessForOcr
+      // (everything except 'original') to avoid double-enhancement artifacts.
+      const isPreProcessed = label !== 'original';
+      const tesseractText = await runTesseractOcr(imageBase64, isPreProcessed);
       if (tesseractText) {
         aiLog.info('Order extract OCR pass (Tesseract)', { label, length: tesseractText.length });
       }
@@ -3523,7 +3614,8 @@ export async function extractOrderDetailsWithAi(
     }
 
     // When using Tesseract (no Gemini), use more variants for better coverage
-    const ocrVariants = ai ? allOcrVariants : allOcrVariants.slice(0, 8);
+    // Include all device-specific crops (phone: 7, base: 4 = 11 total; desktop/tablet: up to 12+)
+    const ocrVariants = ai ? allOcrVariants : allOcrVariants.slice(0, 12);
 
     let ocrText = '';
     let ocrLabel = 'none';
@@ -4002,11 +4094,11 @@ export async function extractOrderDetailsWithAi(
       const amountStr = String(Math.round(finalAmount));
       // Check: full amount string is a contiguous substring of order ID digits
       if (orderDigits.length >= 8 && amountStr.length >= 3 && orderDigits.includes(amountStr)) {
-        // For short amounts (3 digits), only reject if they appear at the very START
-        // of the order ID digits (e.g. "408" from "408-0258263-..."), not in the middle.
-        // Middle occurrences of short sequences are usually coincidental.
+        // Only reject if amount is 5+ digits matching inside order ID (very suspicious)
+        // For 3-4 digit amounts, only reject if they appear at the START of order ID (e.g. "408" from "408-xxx")
+        // This prevents valid amounts like ₹2409 from being dropped when order ID contains those digits
         const isStartMatch = orderDigits.startsWith(amountStr);
-        if (amountStr.length >= 4 || isStartMatch) {
+        if (amountStr.length >= 5 || (amountStr.length === 3 && isStartMatch)) {
           notes.push(`Amount ₹${finalAmount} appears to be digits from Order ID — rejected.`);
           finalAmount = null;
           confidenceScore = Math.max(30, confidenceScore - 20);

@@ -1660,11 +1660,28 @@ export const Orders: React.FC = () => {
                           <p className="text-[10px] text-amber-700 font-bold flex items-center gap-1.5 mb-1">
                             <AlertTriangle size={12} /> Could not auto-detect details from this screenshot.
                           </p>
-                          <p className="text-[9px] text-amber-600 leading-relaxed">
-                            Please type your <strong>Order ID</strong> and <strong>Paid Amount</strong> manually in the fields above. 
-                            Tip: Use a clear, full-screen screenshot of the order details page.
+                          <p className="text-[9px] text-amber-600 leading-relaxed mb-1.5">
+                            Please type your <strong>Order ID</strong> and <strong>Paid Amount</strong> manually in the fields above.
                           </p>
+                          <details className="text-[9px] text-amber-600">
+                            <summary className="font-bold cursor-pointer hover:text-amber-700">Tips for better detection</summary>
+                            <ul className="list-disc pl-3 mt-1 space-y-0.5 leading-relaxed">
+                              <li>Take a <strong>clear, full-screen screenshot</strong> of the order details page</li>
+                              <li>Ensure <strong>Order ID</strong> and <strong>Total Amount</strong> are both visible</li>
+                              <li><strong>Amazon:</strong> Go to Your Orders → View Order Details</li>
+                              <li><strong>Flipkart:</strong> Go to My Orders → tap the order</li>
+                              <li><strong>Myntra/Ajio:</strong> Go to Orders → Order Details</li>
+                              <li>Avoid screenshots of delivery tracking or payment pages</li>
+                              <li>Use good lighting and avoid dark mode if possible</li>
+                            </ul>
+                          </details>
                         </div>
+                      )}
+                      {/* Guidance when only one field is extracted */}
+                      {!isAnalyzing && (!!extractedDetails.orderId !== !!extractedDetails.amount) && (
+                        <p className="text-[9px] text-blue-600 font-medium bg-blue-50 p-2 rounded-lg flex items-center gap-1.5">
+                          <AlertTriangle size={10} /> {extractedDetails.orderId ? 'Amount not detected — please enter the Paid Amount manually.' : 'Order ID not detected — please enter the Order ID manually.'}
+                        </p>
                       )}
                     </div>
                   )}
