@@ -526,19 +526,24 @@ export const api = {
     /** [FIX] Added missing extractDetails for Orders.tsx */
     extractDetails: async (file: File) => {
       const rawBase64 = await readFileAsDataUrl(file);
+      // Compress before sending — phone screenshots can be 5-15 MB raw,
+      // exceeding the Vercel proxy 4.5 MB body limit.
+      const compressed = await compressImage(rawBase64, { maxDimension: 1600, quality: 0.8 });
       return fetchJson('/ai/extract-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ imageBase64: rawBase64 }),
+        body: JSON.stringify({ imageBase64: compressed }),
       });
     },
     /** Pre-validate rating screenshot: checks account name + product name match */
     verifyRating: async (file: File, expectedBuyerName: string, expectedProductName: string, expectedReviewerName?: string) => {
       const rawBase64 = await readFileAsDataUrl(file);
+      // Compress before sending to stay under Vercel proxy body limit.
+      const compressed = await compressImage(rawBase64, { maxDimension: 1600, quality: 0.8 });
       return fetchJson('/ai/verify-rating', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ imageBase64: rawBase64, expectedBuyerName, expectedProductName, ...(expectedReviewerName ? { expectedReviewerName } : {}) }),
+        body: JSON.stringify({ imageBase64: compressed, expectedBuyerName, expectedProductName, ...(expectedReviewerName ? { expectedReviewerName } : {}) }),
       });
     },
   },

@@ -495,13 +495,18 @@ export const Orders: React.FC = () => {
           toast.info('Screenshot uploaded. You can enter the Order ID and Amount below if needed.');
         }
       }
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error('[extraction error]', e);
       // Still allow manual entry by showing empty extraction fields
       setExtractedDetails({ orderId: '', amount: '' });
       setMatchStatus({ id: 'none', amount: 'none', productName: 'none' });
       setOrderIdLocked(false);
-      toast.info('Screenshot uploaded. Enter Order ID and Amount below.');
+      // Surface meaningful error so users know what went wrong
+      const msg =
+        typeof e?.message === 'string' && e.message.length > 0
+          ? e.message
+          : 'Could not extract details from screenshot';
+      toast.error(`${msg}. Please enter Order ID and Amount manually.`);
     } finally {
       setIsAnalyzing(false);
     }

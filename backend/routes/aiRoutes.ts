@@ -740,5 +740,27 @@ export function aiRoutes(env: Env): Router {
       if (!sendKnownError(err, res)) next(err);
     }
   });
+
+  // ── AI Health Check ──
+  // GET /api/ai/status — returns current AI subsystem status without requiring auth.
+  // Useful for diagnosing production issues (is Gemini key set? circuit breaker state? Tesseract ready?).
+  router.get('/status', async (_req, res) => {
+    try {
+      const geminiConfigured = isGeminiConfigured(env);
+      const geminiKeyCheck = geminiConfigured ? await checkGeminiApiKey(env).catch(() => ({ ok: false, model: '', error: 'check failed' })) : { ok: false, model: '', error: 'not configured' };
+      res.json({
+        aiEnabled: env.AI_ENABLED,
+        geminiConfigured,
+        geminiKeyValid: geminiKeyCheck.ok,
+        geminiModel: geminiKeyCheck.model || null,
+        geminiError: geminiKeyCheck.error || null,
+        tesseractAvailable: true,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'Health check failed', message: String(err) });
+    }
+  });
+
   return router;
 }
