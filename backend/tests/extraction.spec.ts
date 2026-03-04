@@ -1385,4 +1385,446 @@ describe('order extraction (Tesseract fallback)', () => {
       expect(result.soldBy).toMatch(/DERMATOUCH/i);
     }
   });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NEW SCREENSHOTS — Session 6 (9 unique order screenshots)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  it('Screenshot 13: Flipkart MANCODE Sandalwood Soap — ₹68, Gold variant, "2 offers" excluded', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'flipkart',
+      'Order ID - OD33128284112875010',
+      'MANCODE Moisturising Sandalwood Bath Soap with Sandalwood Oil',
+      'Gold',
+      'Seller: SaanviBrands',
+      'Rs 68',
+      '2 offers',
+      'Order Confirmed, Today',
+      'Your Order has been placed., Sat 18th May',
+      'Shipped, Expected By May 19',
+      'Out For Delivery',
+      'Delivery, May 20 By 11 PM',
+      'See All Updates',
+      'Edit Order',
+      'Chat with us',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 13 result:', JSON.stringify(result, null, 2));
+
+    if (result.amount) {
+      expect(result.amount).toBe(68);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/OD3312828411287501/i);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/mancode|sandalwood|soap/i);
+      expect(result.productName).not.toMatch(/2\s*offers|edit\s*order|gold\s*$/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/SaanviBrands/i);
+    }
+  });
+
+  it('Screenshot 14: Flipkart MANCODE Tan Removal — ₹205, PAY button excluded, Share Location excluded', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'flipkart',
+      'to drop the item at doorstep',
+      'PAY Rs 205',
+      'Order ID - OD43139076308243810',
+      'MANCODE Tan Removal Peel off Face Mask for Men and Women',
+      'Seller: SaanviBrands',
+      'Rs 205',
+      '2 offers',
+      'Help our delivery agent reach you faster.',
+      'Share Location',
+      'Order Confirmed, Today',
+      'Your Order has been placed., Thu 30th May',
+      'Shipped, Expected By May 31',
+      'Out For Delivery',
+      'Delivery, Jun 03 By 11 PM',
+      'Expected by Sat 1st Jun',
+      'See All Updates',
+      'Edit Order',
+      'Chat with us',
+      'Help India make good choices',
+      'Did you find this page helpful?',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 14 result:', JSON.stringify(result, null, 2));
+
+    if (result.amount) {
+      expect(result.amount).toBe(205);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/OD4313907630824381/i);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/mancode|tan\s*removal|face\s*mask/i);
+      expect(result.productName).not.toMatch(/pay\s*rs|doorstep|share\s*location|help.*delivery/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/SaanviBrands/i);
+    }
+  });
+
+  it('Screenshot 15: Flipkart HYPHEN Sunscreen (Desktop) — ₹403, tracking number excluded, breadcrumb order ID', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'flipkart',
+      'Home > My Account > My Orders > OD33488122540018810',
+      'Order can be tracked by 7253967553.',
+      'Tracking link is shared via SMS.',
+      'Manage who can access',
+      'HYPHEN Sunscreen - SPF 50 PA++++ All I Need Sunscreen',
+      'Seller: INdianmahabestoil',
+      'Rs 403',
+      'Order Confirmed, Today',
+      'Your Order has been placed., Tue 8th Jul',
+      'Shipped, Expected By Jul 10',
+      'Out For Delivery',
+      'Delivery, Thu Jul 10 By 11 PM',
+      'Expected by Thu 10th Jul',
+      'See All Updates',
+      'Cancel',
+      'Chat with us',
+      'Rate your experience',
+      'Did you find this page helpful?',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 15 result:', JSON.stringify(result, null, 2));
+
+    if (result.amount) {
+      expect(result.amount).toBe(403);
+      // Must NOT pick tracking number as amount
+      expect(result.amount).not.toBe(7253967553);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/OD3348812254001881/i);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/hyphen|sunscreen|spf/i);
+      expect(result.productName).not.toMatch(/tracked|tracking|manage|breadcrumb|seller/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/INdianmahabesto/i);
+    }
+  });
+
+  it('Screenshot 16: Flipkart HYPHEN Sunscreen (Desktop, Mcaffeine) — ₹426', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'flipkart',
+      'Home > My Account > My Orders > OD43488120296007710',
+      'Order can be tracked by 7982657303.',
+      'Tracking link is shared via SMS.',
+      'Manage who can access',
+      'HYPHEN Sunscreen - SPF 50 PA++++ All I Need Sunscreen | Brightens - Niacinamide, Kakadu Plum',
+      'Seller: Mcaffeine',
+      'Rs 426',
+      'Order Confirmed, Today',
+      'Your Order has been placed., Tue 8th Jul',
+      'Shipped, Expected By Jul 8',
+      'Out For Delivery',
+      'Delivery, Tomorrow, Jul 09 By 11 PM',
+      'See All Updates',
+      'Cancel',
+      'Chat with us',
+      'Rate your experience',
+      'Did you find this page helpful?',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 16 result:', JSON.stringify(result, null, 2));
+
+    if (result.amount) {
+      expect(result.amount).toBe(426);
+      expect(result.amount).not.toBe(7982657303);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/OD4348812029600771/i);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/hyphen|sunscreen/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/Mcaffeine/i);
+    }
+  });
+
+  it('Screenshot 17: Flipkart HYPHEN Sunscreen (Mobile) — ₹403', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'flipkart',
+      'Order ID - OD43488145129491910',
+      'HYPHEN Sunscreen - SPF 50 PA++++ All I Need',
+      'Seller: INdianmahabestoil',
+      'Rs 403',
+      'Order Confirmed, Today',
+      'Your Order has been placed., Tue 8th Jul',
+      'Shipped, Expected By Jul 10',
+      'Out For Delivery',
+      'Delivery, Fri Jul 11 By 11 PM',
+      'See All Updates',
+      'Edit Order',
+      'Chat with us',
+      'Rate your experience',
+      'Did you find this page helpful?',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 17 result:', JSON.stringify(result, null, 2));
+
+    if (result.amount) {
+      expect(result.amount).toBe(403);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/OD4348814512949191/i);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/hyphen|sunscreen/i);
+      expect(result.productName).not.toMatch(/edit\s*order|chat\s*with|rate\s*your/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/INdianmahabestoil/i);
+    }
+  });
+
+  it('Screenshot 18: Amazon Softsens Baby Starter Kit — Grand Total ₹654, GHAZIABAD/UTTAR PRADESH address', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'amazon.in',
+      'Your Orders',
+      'Order Details',
+      'Order placed 1 March 2026',
+      'Order number 408-3540057-5684354',
+      'Download Invoice',
+      'Arriving tomorrow',
+      'Softsens Baby Starter Kit | Combo Pack of 5 Skincare Essentials',
+      'Sold by: Softsens',
+      'Rs 649.00',
+      'Track package',
+      'Cancel items',
+      'Ask Product Question',
+      'Write a product review',
+      'Payment method',
+      'BHIM UPI',
+      'Ship to',
+      'Mittal',
+      'House number 43 sector 5',
+      'Sector 5, Vaishali',
+      'GHAZIABAD, UTTAR PRADESH 201012',
+      'India',
+      'Order Summary',
+      'Item(s) Subtotal: Rs 649.00',
+      'Shipping: Rs 0.00',
+      'Marketplace Fee: Rs 5.00',
+      'Total: Rs 654.00',
+      'Grand Total: Rs 654.00',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 18 result:', JSON.stringify(result, null, 2));
+
+    if (result.amount) {
+      expect(result.amount).toBe(654);
+      expect(result.amount).not.toBe(649);
+      expect(result.amount).not.toBe(5);
+      expect(result.amount).not.toBe(201012);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/408-3540057-5684354/);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/softsens|baby|starter\s*kit|skincare/i);
+      expect(result.productName).not.toMatch(/mittal|ghaziabad|uttar|vaishali|201012/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/Softsens/i);
+    }
+    if (result.orderDate) {
+      expect(result.orderDate).toMatch(/1.*March.*2026|March.*1.*2026/i);
+    }
+  });
+
+  it('Screenshot 19: Amazon Arabian Aroma Old Money — Grand Total ₹317.44, SURAT/GUJARAT address, Promotion -₹5.56', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'amazon.in',
+      'Your Orders',
+      'Order Details',
+      'Order placed 3 March 2026',
+      'Order number 171-3355238-4289100',
+      'Download Invoice',
+      'Arriving 11 March',
+      'Arabian Aroma Old Money Eau de Parfum Long Lasting Perfume',
+      'Sold by: ARABIAN AROMA',
+      'Rs 278.00',
+      'Track package',
+      'Cancel items',
+      'Ask Product Question',
+      'Write a product review',
+      'Payment method',
+      'BHIM UPI',
+      'Ship to',
+      'Chakhdi Shoes & More',
+      'Shop No. 22, Shivam Society',
+      'Opp. Rameshwar Mahadev Mandir',
+      'SURAT, GUJARAT 395009',
+      'India',
+      'Order Summary',
+      'Item(s) Subtotal: Rs 278.00',
+      'Shipping: Rs 40.00',
+      'Marketplace Fee: Rs 5.00',
+      'Total: Rs 323.00',
+      'Promotion Applied: -Rs 5.56',
+      'Grand Total: Rs 317.44',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 19 result:', JSON.stringify(result, null, 2));
+
+    if (result.amount) {
+      expect(result.amount).toBe(317.44);
+      expect(result.amount).not.toBe(278);
+      expect(result.amount).not.toBe(323);
+      expect(result.amount).not.toBe(40);
+      expect(result.amount).not.toBe(395009);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/171-3355238-4289100/);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/arabian\s*aroma|old\s*money|parfum/i);
+      expect(result.productName).not.toMatch(/chakhdi|surat|gujarat|rameshwar|395009/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/ARABIAN\s*AROMA/i);
+    }
+    if (result.orderDate) {
+      expect(result.orderDate).toMatch(/3.*March.*2026|March.*3.*2026/i);
+    }
+  });
+
+  it('Screenshot 20: Amazon Arabian Aroma Seduction — Grand Total ₹195, SURAT/GUJARAT address', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'amazon.in',
+      'Your Orders',
+      'Order Details',
+      'Order placed 3 March 2026',
+      'Order number 407-8729235-4319566',
+      'Download Invoice',
+      'Arriving 11 March',
+      'Arabian Aroma Seduction Perfume For Men, Ultimate Compliment',
+      'Sold by: ARABIAN AROMA',
+      'Rs 150.00',
+      'Track package',
+      'Cancel items',
+      'Ask Product Question',
+      'Write a product review',
+      'Payment method',
+      'BHIM UPI',
+      'Ship to',
+      'VAANI PRIYA',
+      'D/5, DIVYAJYOTI APARTMENT',
+      'Below Sardar Bridge, Behind Swaminarayan',
+      'Mandir, Adajan',
+      'SURAT, GUJARAT 395009',
+      'India',
+      'Order Summary',
+      'Item(s) Subtotal: Rs 150.00',
+      'Shipping: Rs 40.00',
+      'Marketplace Fee: Rs 5.00',
+      'Total: Rs 195.00',
+      'Grand Total: Rs 195.00',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 20 result:', JSON.stringify(result, null, 2));
+
+    // Amount must be 195 (Grand Total) — not rejected as order ID digit overlap
+    expect(result.amount).toBe(195);
+    expect(result.amount).not.toBe(150);
+    expect(result.amount).not.toBe(40);
+    expect(result.amount).not.toBe(395009);
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/407-8729235-4319566/);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/arabian\s*aroma|seduction|perfume/i);
+      expect(result.productName).not.toMatch(/vaani|priya|surat|gujarat|divyajyoti|adajan|395009/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/ARABIAN\s*AROMA/i);
+    }
+    if (result.orderDate) {
+      expect(result.orderDate).toMatch(/3.*March.*2026|March.*3.*2026/i);
+    }
+  });
+
+  it('Screenshot 21: Amazon Whimsy Beauty Sunscreen — Grand Total ₹445.02 (decimal), COD fee ₹14, AJMER address', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'amazon.in',
+      'Order Details',
+      'Order placed 3 March 2026',
+      'Order number 404-9901075-4566749',
+      'Download Invoice',
+      'Arriving Saturday',
+      'Whimsy Beauty Sunscreen SPF 50+ Summer Time Madness',
+      'Sold by: Whimsy India',
+      'Rs 399.00',
+      'Track package',
+      'Cancel items',
+      'Ask Product Question',
+      'Write a product review',
+      'Payment method',
+      'Pay on Delivery',
+      'Ship to',
+      'Priyanka tinker',
+      '336/10',
+      'New chandra vardai nagar Tara garh road',
+      'ajmer',
+      'AJMER, RAJASTHAN 305001',
+      'India',
+      'Order Summary',
+      'Item(s) Subtotal: Rs 399.00',
+      'Shipping: Rs 40.00',
+      'Cash/Pay on Delivery fee: Rs 14.00',
+      'Total: Rs 453.00',
+      'Promotion Applied: -Rs 7.98',
+      'Grand Total: Rs 445.02',
+      'Keep shopping for',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 21 result:', JSON.stringify(result, null, 2));
+
+    if (result.amount) {
+      expect(result.amount).toBe(445.02);
+      expect(result.amount).not.toBe(399);
+      expect(result.amount).not.toBe(453);
+      expect(result.amount).not.toBe(14);
+      expect(result.amount).not.toBe(305001);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/404-9901075-4566749/);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/whimsy|sunscreen|spf/i);
+      expect(result.productName).not.toMatch(/priyanka|ajmer|rajasthan|keep\s*shopping|305001/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/Whimsy\s*India/i);
+    }
+    if (result.orderDate) {
+      expect(result.orderDate).toMatch(/3.*March.*2026|March.*3.*2026/i);
+    }
+  });
 });

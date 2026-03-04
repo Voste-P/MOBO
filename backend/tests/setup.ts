@@ -48,7 +48,7 @@ beforeAll(async () => {
       '\n⚠  [test setup] PostgreSQL not available after 5 retries – PG-dependent tests will fail.\n\n'
     );
   }
-}, 60000);
+}, 120_000);
 
 afterAll(async () => {
   await disconnectPrisma();

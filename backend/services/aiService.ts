@@ -2333,8 +2333,29 @@ export async function extractOrderDetailsWithAi(
         /^(add\s*to\s*cart|buy\s*now|add\s*to\s*bag|go\s*to\s*cart|checkout|proceed|continue)/i,
         /^(similar\s*products?|you\s*may\s*also|frequently\s*bought|customers?\s*(also|who))/i,
         /^(bargain\s*recommend|recommended\s*for\s*you|people\s*also\s*(bought|viewed)|inspired\s*by\s*your)/i,
-        // ── Flipkart/Amazon action buttons ──
-        /^(edit\s*(order|item|address)|change\s*(date|address|slot)|cancel\s*(order|item)|track\s*(order|package|shipment))/i,
+        // ── Flipkart/Amazon action buttons & UI chrome ──
+        /^(edit\s*(order|item|address)|change\s*(date|address|slot)|cancel\s*(order|item|$)|track\s*(order|package|shipment)|cancel\s*items?)/i,
+        /^(pay\s*(rs|\u20b9|inr)\s*\d|pay\s+\d)/i,
+        /\border\s*can\s*be\s*tracked|tracking\s*link\b/i,
+        /\bmanage\s*who\s*can\s*access/i,
+        /\b(help|assist)\s*(our\s*)?delivery\s*agent/i,
+        /\bshare\s*location/i,
+        /\bdrop.*(item|package).*doorstep|to\s*drop\s*the\s*item/i,
+        /\bhelp\s*india\s*make\s*good/i,
+        /\bdid\s*you\s*find.*helpful/i,
+        /^keep\s*shopping/i,
+        /^(ask\s*product\s*question|write\s*a\s*product\s*review|ask\s*a\s*product)/i,
+        /^(track\s*package|cancel\s*items?|write\s*a\s*product)/i,
+        // ── Flipkart delivery timeline lines ──
+        /^(delivery|shipped)\s*,?\s*(expected|tomorrow|today|mon|tue|wed|thu|fri|sat|sun|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i,
+        /^expected\s*by\s/i,
+        /^you\s*can\s*cancel/i,
+        // ── Flipkart breadcrumb navigation ──
+        /^home\s*>\s*(my\s*account|my\s*orders)/i,
+        // ── Platform domain names (standalone lines) ──
+        /^(amazon|flipkart|meesho|myntra|nykaa|ajio|blinkit|jiomart|snapdeal|shopsy|croma|tatacliq|lenskart|pharmeasy|purplle|swiggy|zepto|bigbasket)\s*\.?\s*(in|com)?\s*$/i,
+        // ── Seller prefix lines (should never be product name) ──
+        /^seller\s*[:\-]/i,
         // ── Standalone offer count lines (Flipkart) ──
         /^\d+\s*offers?\s*$/i,
         // ── Rating / review noise ──
@@ -3887,9 +3908,15 @@ export async function extractOrderDetailsWithAi(
       const amountStr = String(Math.round(finalAmount));
       // Check: full amount string is a contiguous substring of order ID digits
       if (orderDigits.length >= 8 && amountStr.length >= 3 && orderDigits.includes(amountStr)) {
-        notes.push(`Amount ₹${finalAmount} appears to be digits from Order ID — rejected.`);
-        finalAmount = null;
-        confidenceScore = Math.max(30, confidenceScore - 20);
+        // For short amounts (3 digits), only reject if they appear at the very START
+        // of the order ID digits (e.g. "408" from "408-0258263-..."), not in the middle.
+        // Middle occurrences of short sequences are usually coincidental.
+        const isStartMatch = orderDigits.startsWith(amountStr);
+        if (amountStr.length >= 4 || isStartMatch) {
+          notes.push(`Amount ₹${finalAmount} appears to be digits from Order ID — rejected.`);
+          finalAmount = null;
+          confidenceScore = Math.max(30, confidenceScore - 20);
+        }
       }
     }
 
