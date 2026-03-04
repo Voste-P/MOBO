@@ -480,4 +480,623 @@ describe('order extraction (Tesseract fallback)', () => {
       expect(result.productName).not.toMatch(/koramangala|bangalore|karnataka|560034/i);
     }
   });
+
+  it('rejects Amazon navigation chrome as product name (". Deliver to Sumit")', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      '. Deliver to Sumit ) i . Hello, Ashok Retuns 0',
+      'Orders  Account & Lists  Returns 0',
+      '',
+      'Order #171-3561275-3245136',
+      'NICONI Tan Vanish Gluta-Kojic Skin Polish',
+      'Sold by: ARABIAN AROMA',
+      'Grand Total: Rs 3,297.00',
+      'Order placed: 15 Jan 2025',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Nav chrome rejection result:', JSON.stringify(result, null, 2));
+
+    // Product name must NOT be the navigation chrome
+    if (result.productName) {
+      expect(result.productName).not.toMatch(/Deliver\s*to\s*Sumit/i);
+      expect(result.productName).not.toMatch(/Hello.*Ashok/i);
+      expect(result.productName).not.toMatch(/Retuns?\s*0/i);
+    }
+    // Amount should be correct
+    if (result.amount) {
+      expect(result.amount).toBe(3297);
+    }
+  });
+
+  it('rejects concatenated nav: "5 Deliver to ABHILASH N Hello, ROOT Returns 0"', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      '5 Deliver to ABHILASH N Hello, ROOT Returns 0',
+      '',
+      'Order #408-0052132-6347578',
+      'Avimee Herbal Keshpallav Hair Oil with Rosemary',
+      'Sold by: RetailEZ Pvt Ltd',
+      'Grand Total: Rs 3,246.00',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Concatenated nav rejection result:', JSON.stringify(result, null, 2));
+
+    if (result.productName) {
+      expect(result.productName).not.toMatch(/Deliver\s*to\s*ABHILASH/i);
+      expect(result.productName).not.toMatch(/Hello.*ROOT/i);
+    }
+    if (result.amount) {
+      expect(result.amount).toBe(3246);
+    }
+  });
+
+  it('strips button text from soldBy: "ARABIAN AROMA ( Ask Product Question )"', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'Order #171-3561275-3245136',
+      'NICONI Tan Vanish Gluta-Kojic Skin Polish',
+      'Sold by: ARABIAN AROMA ( Ask Product Question )',
+      'Grand Total: Rs 3,297.00',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('SoldBy button strip result:', JSON.stringify(result, null, 2));
+
+    if (result.soldBy) {
+      expect(result.soldBy).not.toMatch(/Ask\s*Product\s*Question/i);
+      expect(result.soldBy.trim()).toMatch(/ARABIAN\s*AROMA/i);
+    }
+    if (result.amount) {
+      expect(result.amount).toBe(3297);
+    }
+  });
+
+  it('extracts Flipkart "Order Confirmed" date format', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'flipkart',
+      'Order ID: OD436768365753640100',
+      '',
+      'Order Confirmed, Sep 30, 2022',
+      'boAt Airdopes 141 True Wireless Earbuds',
+      'Seller: Appario Retail Private Ltd',
+      'Total Amount: Rs 1,299.00',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Flipkart date result:', JSON.stringify(result, null, 2));
+
+    if (result.orderDate) {
+      expect(result.orderDate).toMatch(/Sep.*30.*2022|30.*Sep.*2022/i);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/OD\d{10,}/);
+    }
+  });
+
+  // =========================================================
+  //  NEW: Flipkart price breakdown — must pick Total amount,
+  //        NOT Listing price / Selling price / Special price
+  // =========================================================
+  it('Flipkart: picks Total amount ₹1,408, ignores Listing price ₹2,299', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'flipkart',
+      'Order ID: OD432100012345678900',
+      '',
+      'OnePlus Bullets Z2 Bluetooth Wireless in Ear Earphones',
+      'Seller: SuperComNet LLP',
+      '',
+      'Price details',
+      'Listing price        Rs 2,299',
+      'Selling price        Rs 1,399',
+      'Special price        Rs 1,399',
+      'Total fees (1 item)  Rs 9',
+      'Total amount         Rs 1,408',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Flipkart price breakdown result:', JSON.stringify(result, null, 2));
+
+    // Amount MUST be 1408, not 2299 or 1399 or 9
+    if (result.amount) {
+      expect(result.amount).toBe(1408);
+    }
+  });
+
+  // =========================================================
+  //  NEW: Flipkart refund page — must pick Refund Total
+  // =========================================================
+  it('Flipkart: picks Refund Total ₹41,990 from refund page', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'flipkart',
+      'Order ID: OD432100098765432100',
+      '',
+      'HP 15s 12th Gen Intel Core i5',
+      'Seller: TBL Online',
+      '',
+      'Refund Details',
+      'Selling price        Rs 41990',
+      'Cashback discount    Rs 0',
+      'Refund Total         Rs 41990',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Flipkart refund result:', JSON.stringify(result, null, 2));
+
+    if (result.amount) {
+      expect(result.amount).toBe(41990);
+    }
+  });
+
+  // =========================================================
+  //  NEW: Amazon Grand Total with Promotion
+  // =========================================================
+  it('Amazon: picks Grand Total ₹1,390, ignores promotion/subtotal', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'amazon.in',
+      'Order number 171-3561275-3245136',
+      '',
+      'NICONI Tan Vanish Gluta-Kojic Skin Polish',
+      'Sold by: ARABIAN AROMA',
+      '',
+      'Order Summary',
+      'Item(s) Subtotal:    Rs 1,385.00',
+      'Shipping:            Rs 45.00',
+      'Promotion Applied:   -Rs 40.00',
+      'Grand Total:         Rs 1,390.00',
+      '',
+      'Order placed: 15 January 2025',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Amazon Grand Total result:', JSON.stringify(result, null, 2));
+
+    // Must be Grand Total, not subtotal or shipping
+    if (result.amount) {
+      expect(result.amount).toBe(1390);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/171-3561275-3245136/);
+    }
+  });
+
+  // =========================================================
+  //  NEW: Amazon desktop with address/pincode — must NOT confuse
+  // =========================================================
+  it('Amazon: ignores address pincode 560034, picks amount ₹6,003', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'amazon.in',
+      'Deliver to Sumit - Bangalore 560034',
+      '',
+      'Order number 408-1234567-8901234',
+      'Lorazzo Kitchen Sink 304 Grade Stainless Steel',
+      'Sold by: LorazzO Store',
+      '',
+      'Grand Total: Rs 6,003.00',
+      'Order placed: 3 February 2025',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Amazon pincode vs amount result:', JSON.stringify(result, null, 2));
+
+    // Must NOT pick 560034 as amount
+    if (result.amount) {
+      expect(result.amount).toBe(6003);
+      expect(result.amount).not.toBe(560034);
+    }
+    // Product name should NOT contain pincode or address
+    if (result.productName) {
+      expect(result.productName).not.toMatch(/560034|bangalore|deliver\s*to/i);
+    }
+  });
+
+  // =========================================================
+  //  NEW: dd-MMM-yyyy date format
+  // =========================================================
+  it('extracts dd-MMM-yyyy date (18-Mar-2022)', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'flipkart',
+      'Order ID: OD436768365753640100',
+      '',
+      'Order Confirmed, 18-Mar-2022',
+      'Infinix Hot 11 (Silver Wave, 64 GB)',
+      'Seller: Flashstar Commerce',
+      'Total Amount: Rs 8,499.00',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('dd-MMM-yyyy date result:', JSON.stringify(result, null, 2));
+
+    if (result.orderDate) {
+      expect(result.orderDate).toMatch(/18.*Mar.*2022|Mar.*18.*2022/i);
+    }
+    if (result.amount) {
+      expect(result.amount).toBe(8499);
+    }
+  });
+
+  // =========================================================
+  //  NEW: Brand: label for seller extraction
+  // =========================================================
+  it('extracts seller from "Brand: Samsung Electronics"', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'nykaa.com',
+      'Order ID: NYK20250215001',
+      '',
+      'Samsung Galaxy Watch 5 (40mm)',
+      'Brand: Samsung Electronics',
+      '',
+      'Amount Paid: Rs 24,999.00',
+      'Ordered on 15 Feb 2025',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Brand seller extraction result:', JSON.stringify(result, null, 2));
+
+    if (result.soldBy) {
+      expect(result.soldBy.toLowerCase()).toMatch(/samsung/i);
+    }
+    if (result.amount) {
+      expect(result.amount).toBe(24999);
+    }
+  });
+
+  // =========================================================
+  //  NEW: Delivered date keyword extraction
+  // =========================================================
+  it('extracts date from "Delivered, Oct 19, 2025"', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'amazon.in',
+      'Order number 408-9999999-1234567',
+      '',
+      'Delivered, Oct 19, 2025',
+      'Lymio Cargo for Men Cotton Cargo Pant',
+      'Sold by: RetailEZ Pvt Ltd',
+      'Grand Total: Rs 599.00',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Delivered date result:', JSON.stringify(result, null, 2));
+
+    if (result.orderDate) {
+      expect(result.orderDate).toMatch(/Oct.*19.*2025|19.*Oct.*2025/i);
+    }
+    if (result.amount) {
+      expect(result.amount).toBe(599);
+    }
+  });
+
+  // =========================================================
+  //  NEW: Multiple amounts — Total amount must win over item prices
+  // =========================================================
+  it('picks Total ₹10,048 over individual item price ₹9,999', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'flipkart',
+      'Order ID: OD432100055555555500',
+      '',
+      'Samsung Galaxy M34 5G (Midnight Blue, 128 GB)',
+      'Selling price        Rs 9,999',
+      'Delivery charges     Rs 49',
+      'Total amount         Rs 10,048',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Total vs selling price result:', JSON.stringify(result, null, 2));
+
+    if (result.amount) {
+      expect(result.amount).toBe(10048);
+    }
+  });
+
+  // =====================================================================
+  //  REAL SCREENSHOT TESTS — Exact OCR simulations from 6 user screenshots
+  // =====================================================================
+
+  it('Screenshot 1: Flipkart truke Buds F1 — ₹704, ignores Listing ₹2,499 & phone 7768014471', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'flipkart',
+      'Home  My Account  My Orders  OD226133561137984000',
+      'Sagar Chaudhari shared this order with you.',
+      'truke Buds F1 with 38H Playtime, Dual Mic ENC, Instant Pairing',
+      'Exceptional Sound Bluetooth Headset',
+      'Black',
+      'Seller: BUZZINDIA',
+      'Rs 704',
+      'Order Confirmed, Sep 30, 2022',
+      'Delivered, Oct 01, 2022',
+      'See All Updates',
+      'Order #OD226133561137984000',
+      'Delivery details',
+      'Sagar Chaudhari  7768014471',
+      'Price details',
+      'Listing price   Rs 2,499',
+      'Selling price   Rs 799',
+      'Total fees      Rs 5',
+      'Other discount  -Rs 100',
+      'Total amount    Rs 704',
+      'Payment method  Cash On Delivery',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 1 result:', JSON.stringify(result, null, 2));
+
+    // Amount must be 704 (Total amount), NOT 2499 (Listing), 799 (Selling), or 7768014471 (phone)
+    if (result.amount) {
+      expect(result.amount).toBe(704);
+      expect(result.amount).not.toBe(2499);
+      expect(result.amount).not.toBe(799);
+    }
+    // Order ID must be the Flipkart OD number
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/OD226133561137984000/i);
+    }
+    // Product name must NOT be "shared this order" or phone number
+    if (result.productName) {
+      expect(result.productName).not.toMatch(/shared\s*this\s*order/i);
+      expect(result.productName).not.toMatch(/7768014471/);
+    }
+    // Seller
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/BUZZINDIA/i);
+    }
+  });
+
+  it('Screenshot 2: Flipkart Portronics Cable — ₹183, ignores Listing ₹599', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'flipkart',
+      'OD426901489159379100',
+      'Portronics Micro USB Cable 3 A 2 m Konnect Spydr',
+      'White',
+      'Seller: Portronics Digital',
+      'Rs 183',
+      'Order Confirmed, Dec 27, 2022',
+      'Delivered, Dec 30, 2022',
+      'Chat with us',
+      'Order #OD426901489159379100',
+      'Delivery details',
+      'Chetan Dnyaneshwar Chaudhari  7768014471',
+      'Price details',
+      'Listing price   Rs 599',
+      'Selling price   Rs 199',
+      'Other discount  -Rs 16',
+      'Total amount    Rs 183',
+      'Payment method  PAYTM Wallet',
+      'Download Invoice',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 2 result:', JSON.stringify(result, null, 2));
+
+    if (result.amount) {
+      expect(result.amount).toBe(183);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/OD426901489159379100/i);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/portronics|konnect|spydr|cable/i);
+      expect(result.productName).not.toMatch(/chat\s*with\s*us/i);
+      expect(result.productName).not.toMatch(/download\s*invoice/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/Portronics\s*Digital/i);
+    }
+  });
+
+  it('Screenshot 3: Flipkart OnePlus multiline — ₹1,408, ignores Listing ₹2,299 & Special ₹1,399', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'flipkart',
+      'OD435763547340894100',
+      'OnePlus Nord Buds 2r in Ear Earbuds with Dual Mic & AI Crystal',
+      'Clear Call Bluetooth',
+      'Black',
+      'Seller: SVPeripherals',
+      'Rs 1,408',
+      'Order Confirmed, Oct 18, 2025',
+      'Delivered, Oct 19, 2025',
+      'See All Updates',
+      'Chat with us',
+      'Rate your experience',
+      'Rate the product',
+      'Order #OD435763547340894100',
+      'Chetan Dnyaneshwar Chaudhari  7768014471',
+      'Price details',
+      'Listing price   Rs 2,299',
+      'Special price   Rs 1,399',
+      'Total fees      Rs 9',
+      'Total amount    Rs 1,408',
+      'Payment method  UPI',
+      'Download Invoice',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 3 result:', JSON.stringify(result, null, 2));
+
+    if (result.amount) {
+      expect(result.amount).toBe(1408);
+      expect(result.amount).not.toBe(2299);
+      expect(result.amount).not.toBe(1399);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/OD435763547340894100/i);
+    }
+    // Product name should concatenate multiline: "OnePlus Nord Buds 2r ... Crystal Clear Call Bluetooth"
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/oneplus|nord\s*buds/i);
+      expect(result.productName).not.toMatch(/rate\s*(your|the)/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/SVPeripherals/i);
+    }
+  });
+
+  it('Screenshot 4: Flipkart HP refund — ₹41,990, Total refund label, ignores Listing ₹49,590', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'flipkart',
+      'OD223955246546161000',
+      'Total refund - Rs 41990',
+      'Completed',
+      'refund reference number 204313421848',
+      'HP Core i3 11th Gen - (8 GB/512 GB SSD/Windows 11 Home) 15s-du3563TU Thin and Light Laptop',
+      'Jet Black',
+      'Seller: ElectronicsBazaarEB',
+      'Rs 41990',
+      'Return, Feb 11, 2022',
+      'Refund, Feb 15, 2022',
+      'See All Updates',
+      'Chat with us',
+      'Price details',
+      'Listing price   Rs 49590',
+      'Selling price   Rs 41990',
+      'Total amount    Rs 41990',
+      'Payment method  Cash On Delivery',
+      'Download Invoice',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 4 result:', JSON.stringify(result, null, 2));
+
+    if (result.amount) {
+      expect(result.amount).toBe(41990);
+      expect(result.amount).not.toBe(49590);
+      // Must NOT pick refund reference number as amount
+      expect(result.amount).not.toBe(204313421848);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/OD223955246546161000/i);
+      // Must NOT pick refund reference as order ID
+      expect(result.orderId).not.toMatch(/204313421848/);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/hp|core\s*i3|laptop/i);
+      expect(result.productName).not.toMatch(/completed/i);
+      expect(result.productName).not.toMatch(/refund\s*reference/i);
+    }
+  });
+
+  it('Screenshot 5: Amazon NICONI — Grand Total ₹1,390, ignores Subtotal/Shipping/Marketplace/pincode 411027', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'amazon.in',
+      'Deliver to Chetan Pimpri Ch... 411027',
+      'Order Details',
+      'Order placed 21 February 2026',
+      'Order number 404-6108608-0153914',
+      'Ship to',
+      'Chetan Chaudhari',
+      '163',
+      'Vishal nagar, vakad',
+      'PIMPRI CHINCHWAD, MAHARASHTRA',
+      '411027',
+      'India',
+      'Order Summary',
+      'Item(s) Subtotal: Rs 1,385.00',
+      'Shipping: Rs 40.00',
+      'Marketplace Fee: Rs 5.00',
+      'Total: Rs 1,430.00',
+      'Promotion Applied: -Rs 40.00',
+      'Grand Total: Rs 1,390.00',
+      'Delivered 23 February',
+      'Package was handed to resident',
+      'NICONI Tan Vanish Gluta-Kojic Skin Polish',
+      'Sold by: FORMULATE BRAND PRIVATE LIMITED',
+      'Rs 1,385.00',
+      'Buy it again  View your item',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 5 result:', JSON.stringify(result, null, 2));
+
+    // Grand Total must be 1390, NOT subtotal 1385, shipping 40, total 1430, or pincode 411027
+    if (result.amount) {
+      expect(result.amount).toBe(1390);
+      expect(result.amount).not.toBe(1385);
+      expect(result.amount).not.toBe(1430);
+      expect(result.amount).not.toBe(411027);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/404-6108608-0153914/);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/niconi|skin\s*polish/i);
+      expect(result.productName).not.toMatch(/411027|pimpri|maharashtra/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/FORMULATE/i);
+    }
+    if (result.orderDate) {
+      expect(result.orderDate).toMatch(/21.*February.*2026|February.*21.*2026/i);
+    }
+  });
+
+  it('Screenshot 6: Amazon Lorazzo — Grand Total ₹6,003, return window date NOT as order date', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'amazon.in',
+      'Deliver to Gaurav Pimpri Ch... 411027',
+      'Order Details',
+      'Order placed 17 February 2026',
+      'Order number 408-2723032-2917965',
+      'Ship to',
+      'Gaurav Chafle',
+      '163',
+      'Vishal Nagar, Wakad Road',
+      'PIMPRI CHINCHWAD, MAHARASHTRA',
+      '411027',
+      'India',
+      'Order Summary',
+      'Item(s) Subtotal: Rs 5,998.00',
+      'Shipping: Rs 40.00',
+      'Marketplace Fee: Rs 5.00',
+      'Total: Rs 6,043.00',
+      'Promotion Applied: -Rs 40.00',
+      'Grand Total: Rs 6,003.00',
+      'Delivered 19 February',
+      'Package was handed to resident',
+      'Lorazzo Lustr Kitchen Sink (SILVER) 24X18 inches',
+      'CERTIFIED 304 Stainless Steel Sink for Kitchen',
+      'Sold by: Lorazzo',
+      'Rs 5,998.00',
+      'Return window closed on 1 March 2026',
+      'Buy it again  View your item',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 6 result:', JSON.stringify(result, null, 2));
+
+    if (result.amount) {
+      expect(result.amount).toBe(6003);
+      expect(result.amount).not.toBe(5998);
+      expect(result.amount).not.toBe(6043);
+      expect(result.amount).not.toBe(411027);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/408-2723032-2917965/);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/lorazzo|kitchen\s*sink|stainless/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/Lorazzo/i);
+    }
+    // Order date should be "17 February 2026", NOT "1 March 2026" (return window)
+    if (result.orderDate) {
+      expect(result.orderDate).toMatch(/17.*February.*2026|February.*17.*2026/i);
+      expect(result.orderDate).not.toMatch(/March/i);
+    }
+  });
 });

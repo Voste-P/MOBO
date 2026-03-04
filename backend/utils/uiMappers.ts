@@ -579,6 +579,10 @@ export function toUiTicketForBrand(t: any) {
     issueType: t.issueType,
     description: t.description,
     status: t.status,
+    priority: t.priority || 'medium',
+    targetRole: t.targetRole || null,
+    resolutionNote: t.resolutionNote || null,
+    resolvedAt: safeIso(t.resolvedAt) ?? null,
     createdAt: safeIso(t.createdAt) ?? new Date().toISOString(),
   };
 }
@@ -592,6 +596,11 @@ export function toUiTicket(t: any) {
     issueType: t.issueType,
     description: t.description,
     status: t.status,
+    priority: t.priority || 'medium',
+    targetRole: t.targetRole || null,
+    resolutionNote: t.resolutionNote || null,
+    resolvedBy: t.resolvedBy || null,
+    resolvedAt: safeIso(t.resolvedAt) ?? null,
     createdAt: safeIso(t.createdAt) ?? new Date().toISOString(),
   };
 }

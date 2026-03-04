@@ -3296,7 +3296,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
 
               {/* Payout Action Side */}
               <div className="w-full md:w-[28rem] bg-white p-6 flex flex-col shadow-[inset_10px_0_20px_-15px_rgba(0,0,0,0.05)] min-h-0">
-                <div className="flex-1 min-h-0 overflow-y-auto">
+                <div className="flex-1 min-h-0 overflow-y-auto scrollbar-styled">
                   <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
                     <Wallet size={18} /> Quick Payout
                   </h3>

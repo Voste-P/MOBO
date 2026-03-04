@@ -153,7 +153,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
 
   // 2. Login / Register Form
   return (
-    <div className="flex-1 flex flex-col bg-white h-full relative px-8 pt-12 pb-[env(safe-area-inset-bottom)] overflow-y-auto scrollbar-hide">
+    <div className="flex-1 flex flex-col bg-white h-full relative px-8 pt-12 pb-[env(safe-area-inset-bottom)] overflow-y-auto scrollbar-styled">
       <div className="mb-8">
         <Button
           type="button"

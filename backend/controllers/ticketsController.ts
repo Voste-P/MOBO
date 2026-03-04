@@ -155,7 +155,16 @@ export function makeTicketsController() {
         };
 
         if (isPrivileged(roles)) {
-          const ticketWhere = { isDeleted: false };
+          // Admin/ops can filter by role, status, targetRole, and priority query params
+          const roleFilter = String(req.query.role || '').trim().toLowerCase();
+          const statusFilter = String(req.query.status || '').trim();
+          const targetRoleFilter = String(req.query.targetRole || '').trim().toLowerCase();
+          const priorityFilter = String(req.query.priority || '').trim().toLowerCase();
+          const ticketWhere: any = { isDeleted: false };
+          if (roleFilter && roleFilter !== 'all') ticketWhere.role = roleFilter;
+          if (statusFilter && statusFilter !== 'All' && statusFilter !== 'all') ticketWhere.status = statusFilter;
+          if (targetRoleFilter && targetRoleFilter !== 'all') ticketWhere.targetRole = targetRoleFilter;
+          if (priorityFilter && priorityFilter !== 'all') ticketWhere.priority = priorityFilter;
           const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 200, maxLimit: 500 });
           const [tickets, total] = await Promise.all([
             db.ticket.findMany({ where: ticketWhere, orderBy: { createdAt: 'desc' }, skip, take: limit }),

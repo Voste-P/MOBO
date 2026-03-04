@@ -205,6 +205,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   // Filters
   const [userRoleFilter, setUserRoleFilter] = useState<string>('All');
   const [userSearch, setUserSearch] = useState('');
+  const [ticketRoleFilter, setTicketRoleFilter] = useState<string>('All');
+  const [ticketStatusFilter, setTicketStatusFilter] = useState<string>('All');
   const [inviteRole, setInviteRole] = useState<'agency' | 'brand'>('agency');
   const [inviteLabel, setInviteLabel] = useState('');
 
@@ -532,8 +534,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
 
   const resolveTicket = async (id: string, status: 'Resolved' | 'Rejected') => {
     try {
-      await api.tickets.update(id, status);
-      setTickets(tickets.map((t) => (t.id === id ? { ...t, status } : t)));
+      const note = window.prompt(`Add a resolution note (optional):`);
+      await api.tickets.update(id, status, note || undefined);
+      setTickets(tickets.map((t) => (t.id === id ? { ...t, status, resolutionNote: note || undefined } : t)));
       toast.success(`Ticket ${status.toLowerCase()} successfully`);
     } catch (e: any) {
       toast.error(formatErrorMessage(e, `Failed to ${status.toLowerCase()} ticket`));
@@ -1165,6 +1168,18 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
             {/* SUPPORT VIEW */}
             {view === 'support' && (() => {
               const supportTickets = tickets.filter((t) => t.issueType !== 'Feedback');
+              const filteredTickets = supportTickets.filter((t) => {
+                if (ticketRoleFilter !== 'All' && (t.role || '').toLowerCase() !== ticketRoleFilter.toLowerCase()) return false;
+                if (ticketStatusFilter !== 'All' && t.status !== ticketStatusFilter) return false;
+                return true;
+              });
+              const roleCounts = {
+                All: supportTickets.length,
+                Shopper: supportTickets.filter((t) => (t.role || '').toLowerCase() === 'shopper').length,
+                Mediator: supportTickets.filter((t) => (t.role || '').toLowerCase() === 'mediator').length,
+                Agency: supportTickets.filter((t) => (t.role || '').toLowerCase() === 'agency').length,
+                Brand: supportTickets.filter((t) => (t.role || '').toLowerCase() === 'brand').length,
+              };
               return (
               <div className="space-y-6 animate-enter">
                 <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between">
@@ -1180,7 +1195,44 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     </div>
                   </div>
                   <div className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-xl text-xs font-bold">
-                    {supportTickets.filter((t) => t.status === 'Open').length} Pending
+                    {filteredTickets.filter((t) => t.status === 'Open').length} Pending
+                  </div>
+                </div>
+
+                {/* Role Filter Tabs */}
+                <div className="flex flex-wrap gap-2">
+                  {(['All', 'Shopper', 'Mediator', 'Agency', 'Brand'] as const).map((role) => (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => setTicketRoleFilter(role)}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                        ticketRoleFilter === role
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'bg-white text-slate-500 border border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+                      }`}
+                    >
+                      {role} {roleCounts[role] > 0 ? `(${roleCounts[role]})` : ''}
+                    </button>
+                  ))}
+                  <div className="ml-auto flex gap-2">
+                    {(['All', 'Open', 'Resolved', 'Rejected'] as const).map((status) => (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() => setTicketStatusFilter(status)}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
+                          ticketStatusFilter === status
+                            ? status === 'Open' ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                              : status === 'Resolved' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                              : status === 'Rejected' ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                              : 'bg-slate-800 text-white'
+                            : 'bg-white text-slate-400 border border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        {status}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -1194,16 +1246,16 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         className="border-slate-200"
                       />
                     </div>
-                  ) : supportTickets.length === 0 ? (
+                  ) : filteredTickets.length === 0 ? (
                     <div className="col-span-full">
                       <EmptyState
                         title="No tickets"
-                        description="When users raise disputes or issues, they'll appear here."
+                        description={ticketRoleFilter !== 'All' || ticketStatusFilter !== 'All' ? 'No tickets match the current filters.' : 'When users raise disputes or issues, they\'ll appear here.'}
                         className="border-slate-200"
                       />
                     </div>
                   ) : (
-                    supportTickets.map((t) => (
+                    filteredTickets.map((t) => (
                       <div
                         key={t.id}
                         className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col hover:shadow-md transition-all"
@@ -1215,6 +1267,15 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                                 #{t.id.slice(-6)}
                               </span>
                               <StatusBadge status={t.status} />
+                              {(t as any).priority && (t as any).priority !== 'medium' && (
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                  (t as any).priority === 'urgent' ? 'bg-red-100 text-red-600'
+                                  : (t as any).priority === 'high' ? 'bg-orange-100 text-orange-600'
+                                  : 'bg-slate-100 text-slate-500'
+                                }`}>
+                                  {(t as any).priority}
+                                </span>
+                              )}
                             </div>
                             <h4 className="font-bold text-slate-900 text-sm">{t.issueType}</h4>
                           </div>
@@ -1229,6 +1290,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                           </p>
                         </div>
 
+                        {/* Resolution Note */}
+                        {t.status !== 'Open' && (t as any).resolutionNote && (
+                          <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-xl mb-4">
+                            <p className="text-[10px] font-bold text-emerald-700 uppercase mb-1">Resolution Note</p>
+                            <p className="text-xs text-emerald-600 font-medium">{(t as any).resolutionNote}</p>
+                          </div>
+                        )}
+
                         <div className="flex items-center justify-between mt-auto">
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center font-bold text-xs text-slate-500">
@@ -1236,7 +1305,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                             </div>
                             <div className="text-[10px]">
                               <p className="font-bold text-slate-900">{t.userName}</p>
-                              <p className="text-slate-400 font-mono capitalize">{t.role || 'User'}</p>
+                              <p className="text-slate-400 font-mono capitalize">{t.role || 'User'} → {(t as any).targetRole || 'admin'}</p>
                             </div>
                           </div>
 
@@ -1699,7 +1768,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   </select>
                   <span className="text-xs text-slate-400 font-bold">{filteredOrders.length} orders</span>
                 </div>
-                <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                <div className="overflow-x-auto max-h-[600px] overflow-y-auto scrollbar-styled">
                   <table className="w-full text-left">
                     <thead className="bg-slate-50/80 text-xs font-extrabold uppercase text-slate-400 tracking-wider sticky top-0 z-10">
                       <tr>
@@ -2004,7 +2073,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       {/* Proof Viewer Modal */}
       {proofModal && (
         <div className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => { setProofModal(null); }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto scrollbar-styled" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
               <div>
                 <h3 className="font-extrabold text-lg text-slate-900">Order Proofs</h3>
