@@ -19,7 +19,7 @@ import { ProxiedImage } from './ProxiedImage';
 
 interface ChatbotProps {
   isVisible?: boolean;
-  onNavigate?: (tab: 'home' | 'explore' | 'orders' | 'profile' | 'tickets') => void;
+  onNavigate?: (tab: 'home' | 'explore' | 'orders' | 'profile') => void;
 }
 
 const MoboAvatar: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'md' }) => {
@@ -271,7 +271,9 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
       ) {
         // Use ref-tracked timeout so it's cancelled if component unmounts
         const navTimer = setTimeout(() => {
-          onNavigate?.(response.navigateTo as AiNavigateTo);
+          // Map 'tickets' → 'orders' since tickets live on the Orders tab
+          const mappedTab = response.navigateTo === 'tickets' ? 'orders' : response.navigateTo;
+          onNavigate?.(mappedTab as 'home' | 'explore' | 'orders' | 'profile');
         }, 1500);
         // Store for cleanup (will be cleared if component unmounts via effect)
         navTimerRef.current = navTimer;
@@ -316,7 +318,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
         return;
       }
       if (lowerText.includes('support') || lowerText.includes('tickets')) {
-        onNavigate?.('tickets');
+        onNavigate?.('orders');
         addMessage({
           id: makeMessageId(),
           role: 'model',
