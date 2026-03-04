@@ -1780,7 +1780,7 @@ export async function extractOrderDetailsWithAi(
     // Priority labels that indicate the FINAL price paid (not MRP)
     const FINAL_AMOUNT_LABEL_RE = /(grand\s*total|amount\s*paid|paid\s*amount|you\s*paid|order\s*total|final\s*total|total\s*amount|net\s*amount|payable|estimated\s*total|amount\s*payable|total\s*payable|bill\s*amount|invoice\s*total|checkout\s*total|payment\s*total|you\s*pay|to\s*pay|your\s*total|final\s*amount|due\s*amount|total\s*due|total\s*paid|amount\s*due|total\s*price|final\s*price|order\s*amount|purchase\s*total|amount\s*to\s*pay|pay\s*amount|bill\s*total|order\s*value|net\s*pay|final\s*pay|paid\s*via|paid\s*using|paid\s*by|payment\s*of|deducted|charged|debited|total\s*refund|refund\s*total|refund\s*amount)/i;
     // Labels to EXCLUDE — MRP/savings/discount/fee lines should NOT be treated as amounts
-    const EXCLUDED_AMOUNT_LABEL_RE = /(m\.?r\.?p|mrp|maximum\s*retail|retail\s*price|original\s*price|was\s*₹|was\s*rs|savings?|discount|you\s*sav|coupon|cashback|refund|promo|crossed\s*out|list\s*price|listing\s*price|selling\s*price|special\s*price|compare\s*at|earlier\s*price|regular\s*price|marked?\s*price|cut\s*price|item\s*price|unit\s*price|per\s*unit|per\s*item|reward\s*points?|loyalty\s*points?|coins?\s*earned|super\s*coins?|delivery\s*charge|delivery\s*fee|shipping\s*fee|shipping\s*charge|convenience\s*fee|handling\s*fee|packaging\s*fee|packing\s*fee|gst|tax\s*amount|total\s*tax|cgst|sgst|igst|platform\s*fee|marketplace\s*fee|packing\s*charge|total\s*fees|total\s*charges|total\s*savings|eco\s*fee|tip|donation|round\s*off|protection\s*fee|insurance\s*fee)/i;
+    const EXCLUDED_AMOUNT_LABEL_RE = /(m\.?r\.?p|mrp|maximum\s*retail|retail\s*price|original\s*price|was\s*₹|was\s*rs|savings?|discount|you\s*sav|coupon|cashback|refund|promo|crossed\s*out|list\s*price|listing\s*price|selling\s*price|special\s*price|compare\s*at|earlier\s*price|regular\s*price|marked?\s*price|cut\s*price|item\s*price|unit\s*price|per\s*unit|per\s*item|reward\s*points?|loyalty\s*points?|coins?\s*earned|super\s*coins?|delivery\s*charge|delivery\s*fee|shipping\s*fee|shipping\s*charge|convenience\s*fee|handling\s*fee|packaging\s*fee|packing\s*fee|gst|tax\s*amount|total\s*tax|cgst|sgst|igst|platform\s*fee|marketplace\s*fee|packing\s*charge|total\s*fees|total\s*charges|total\s*savings|eco\s*fee|tip|donation|round\s*off|protection\s*fee|insurance\s*fee|cash.*delivery\s*fee|cod\s*fee|pay\s*on\s*delivery\s*fee)/i;
     // Amount with optional ₹ prefix — captures "₹ 599", "₹599", "599.00" etc.
     const AMOUNT_VALUE_PATTERN = '(?:₹|(?:rs|r[5s$])\\.?|inr)?\\s*\\.?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)';
     // Indian currency explicit prefix: ₹, Rs, Rs., INR, plus Tesseract variants (R5, R$, Ri, RI)
@@ -2006,7 +2006,7 @@ export async function extractOrderDetailsWithAi(
       /** Check if the line context suggests this is an address/contact, not a price */
       const isAddressOrContactLine = (line: string): boolean => {
         return /\b(pincode|pin\s*code|zip|postal|address|deliver\s*to|ship\s*to|phone|mobile|contact|tel|fax)\b/i.test(line)
-          || /\b(maharashtra|karnataka|tamil\s*nadu|delhi|mumbai|bangalore|chennai|hyderabad|kolkata|pune|jaipur|lucknow|ahmedabad|india|mhasas|jalgaon|pachora|vakad|pimpri|chinchwad|hingne|budrukh|karve\s*nagar)\b/i.test(line)
+          || /\b(maharashtra|karnataka|tamil\s*nadu|delhi|mumbai|bangalore|chennai|hyderabad|kolkata|pune|jaipur|lucknow|ahmedabad|india|mhasas|jalgaon|pachora|vakad|pimpri|chinchwad|hingne|budrukh|karve\s*nagar|ajmer|rajasthan|uttar\s*pradesh|madhya\s*pradesh|andhra\s*pradesh|telangana|kerala|gujarat|bihar|odisha|assam|west\s*bengal|chhattisgarh|jharkhand|uttarakhand|himachal|goa|chandigarh|noida|gurgaon|gurugram|faridabad|ghaziabad|indore|bhopal|nagpur|surat|vadodara|coimbatore|visakhapatnam|patna|ranchi|bhubaneswar|dehradun|thiruvananthapuram|kochi|mangalore|mysore|jodhpur|udaipur|agra|varanasi|allahabad|kanpur|meerut|ludhiana|amritsar|jammu|srinagar)\b/i.test(line)
           || /\b\d{6}\b.*\b(india|in)\b/i.test(line)
           || /\bchetan\b.*\b(chaudhari|dnyaneshwar)\b/i.test(line);
       };
@@ -2301,16 +2301,21 @@ export async function extractOrderDetailsWithAi(
         /^(marketplace\s*fee|promotion\s*applied|item.?\s*subtotal|shipping|delivery\s*charge|convenience\s*fee|handling\s*fee|packaging|platform\s*fee|gst|cgst|sgst|igst|tax\b|total\s*fee|eco\s*fee|protection\s*fee|insurance\s*fee|tip\b|round\s*off)/i,
         /^(order\s*summary|price\s*details?|price\s*breakdown|billing\s*details?|payment\s*summary|invoice\s*details?)/i,
         /^(listing\s*price|selling\s*price|special\s*price|other\s*discount|total\s*fees|total\s*amount|grand\s*total|amount\s*paid|net\s*amount)/i,
+        // ── COD / delivery fee lines (unanchored — catches OCR variants like "Cash/Pay on Delivery fee") ──
+        /\b(delivery\s*fee|cod\s*(fee|charge)|pay\s*on\s*delivery\s*(fee|charge))\b/i,
+        /\bcash.*delivery\s*fee/i,
+        // ── OCR-mangled billing lines (Tesseract may garble first char: "[tem(s) subtotal") ──
+        /\bsubtotal\s*[:\-]?\s*(rs|\u20b9|inr)/i,
         // ── Comma-separated category lists (not product names) ──
         /^[A-Z][a-z]+(\s*,\s*[A-Z][a-z]+){3,}/,  // "Tablets, Earbuds, Watch, Blue" pattern
         // ── Indian address patterns ──
-        /\b(maharashtra|karnataka|tamil\s*nadu|delhi|mumbai|bangalore|chennai|hyderabad|kolkata|pune|jaipur|lucknow|ahmedabad|india)\b/i,
+        /\b(maharashtra|karnataka|tamil\s*nadu|delhi|mumbai|bangalore|chennai|hyderabad|kolkata|pune|jaipur|lucknow|ahmedabad|india|ajmer|rajasthan|uttar\s*pradesh|madhya\s*pradesh|andhra\s*pradesh|telangana|kerala|gujarat|bihar|odisha|assam|noida|gurgaon|gurugram|faridabad|ghaziabad|indore|bhopal|nagpur|surat|vadodara|coimbatore|patna|ranchi|dehradun|jodhpur|udaipur|agra|varanasi|kanpur|ludhiana|amritsar)\b/i,
         /\b\d{6}\b.*\b(india|in)\b/i,   // pincode followed by "India"
         // ── Order confirmation noise / UI chrome ──
         /^(thank\s*you|order\s*id|your\s*order|congratulations|order\s*confirmed|successfully)/i,
         /^(free\s*delivery|standard\s*delivery|express\s*delivery|same\s*day|next\s*day)/i,
         // ── Standalone status words ──
-        /^(completed|pending|cancelled|processing|successful|approved|rejected|failed|accepted|verified)\s*$/i,
+        /^(completed|pending|cancelled|processing|successful|approved|rejected|failed|accepted|verified|shipped|dispatched|confirmed|received)\s*$/i,
         // ── Flipkart/Amazon UI chrome ──
         /^(chat\s*with\s*us|see\s*all\s*updates?|download\s*invoice|rate\s*(your|the)\s*(experience|product)|how\s*do\s*i|return\s*window|payment\s*method|cash\s*on\s*delivery|paytm|upi\b|share\s*this)/i,
         /shared\s*this\s*order/i,
@@ -2327,6 +2332,11 @@ export async function extractOrderDetailsWithAi(
         /^(shop\s*(now|by|all)|view\s*(all|more|details)|see\s*(all|more)|browse|explore|discover)/i,
         /^(add\s*to\s*cart|buy\s*now|add\s*to\s*bag|go\s*to\s*cart|checkout|proceed|continue)/i,
         /^(similar\s*products?|you\s*may\s*also|frequently\s*bought|customers?\s*(also|who))/i,
+        /^(bargain\s*recommend|recommended\s*for\s*you|people\s*also\s*(bought|viewed)|inspired\s*by\s*your)/i,
+        // ── Flipkart/Amazon action buttons ──
+        /^(edit\s*(order|item|address)|change\s*(date|address|slot)|cancel\s*(order|item)|track\s*(order|package|shipment))/i,
+        // ── Standalone offer count lines (Flipkart) ──
+        /^\d+\s*offers?\s*$/i,
         // ── Rating / review noise ──
         /^(\d+\s*(star|rating|review)|★|☆|\d+(\.\d)?\s*\/\s*5)/i,
         // ── Quantity / item count lines ──

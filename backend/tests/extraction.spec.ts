@@ -1099,4 +1099,290 @@ describe('order extraction (Tesseract fallback)', () => {
       expect(result.orderDate).not.toMatch(/March/i);
     }
   });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NEW SCREENSHOTS — Session 5 (7 screenshots, 6 unique, 1 duplicate)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  it('Screenshot 7: Amazon Whimsy Beauty — Grand Total ₹340.02 (decimal), COD fee excluded, AJMER address skipped', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'amazon.in',
+      'Order Details',
+      'Order placed 3 March 2026',
+      'Order number 404-5959012-1034718',
+      'Ship to',
+      'Priyanka tinker',
+      'AJMER, RAJASTHAN',
+      '305001',
+      'India',
+      'Order Summary',
+      'Item(s) Subtotal: Rs 339.00',
+      'Shipping: Rs 0.00',
+      'Cash/Pay on Delivery fee: Rs 7.00',
+      'Total: Rs 346.00',
+      'Promotion Applied: -Rs 5.98',
+      'Grand Total: Rs 340.02',
+      'Arriving Sunday, 9 March',
+      'Whimsy Beauty Foaming Body Wash for Girls & Kids | Gentl...',
+      'Sold by: Whimsy India',
+      'Rs 339.00',
+      'Buy it again  View your item',
+      'Ask a product question  Write a product review',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 7 result:', JSON.stringify(result, null, 2));
+
+    // Grand Total ₹340.02 — NOT subtotal 339, COD fee 7, total 346, promotion 5.98, or pincode 305001
+    if (result.amount) {
+      expect(result.amount).toBe(340.02);
+      expect(result.amount).not.toBe(339);
+      expect(result.amount).not.toBe(346);
+      expect(result.amount).not.toBe(7);
+      expect(result.amount).not.toBe(305001);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/404-5959012-1034718/);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/whimsy|body\s*wash/i);
+      // Must NOT pick address, person name, or UI chrome
+      expect(result.productName).not.toMatch(/priyanka|ajmer|rajasthan|305001/i);
+      expect(result.productName).not.toMatch(/arriving|sunday/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/Whimsy\s*India/i);
+    }
+    if (result.orderDate) {
+      expect(result.orderDate).toMatch(/3.*March.*2026|March.*3.*2026/i);
+    }
+  });
+
+  it('Screenshot 8: Amazon Arabian Aroma — Grand Total ₹678, BHIM UPI excluded, Marketplace Fee excluded', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'amazon.in',
+      'Order Details',
+      'Order placed 3 March 2026',
+      'Order number 171-6031047-3374730',
+      'Ship to',
+      'Mayank Ojha',
+      'AJMER, RAJASTHAN',
+      '305001',
+      'India',
+      'Order Summary',
+      'Item(s) Subtotal: Rs 713.00',
+      'Shipping: Rs 0.00',
+      'Marketplace Fee: Rs 5.00',
+      'Total: Rs 718.00',
+      'Promotion Applied: -Rs 40.00',
+      'Grand Total: Rs 678.00',
+      'Payment Method: BHIM UPI',
+      'Arriving Monday, 10 March',
+      'Arabian Aroma Sovage Perfume for Men Long Lasting',
+      'Sold by: ARABIAN AROMA',
+      'Rs 713.00',
+      'Buy it again  View your item',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 8 result:', JSON.stringify(result, null, 2));
+
+    // Grand Total ₹678 — NOT subtotal 713, marketplace fee 5, total 718, promotion 40, or pincode 305001
+    if (result.amount) {
+      expect(result.amount).toBe(678);
+      expect(result.amount).not.toBe(713);
+      expect(result.amount).not.toBe(718);
+      expect(result.amount).not.toBe(5);
+      expect(result.amount).not.toBe(305001);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/171-6031047-3374730/);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/arabian\s*aroma|perfume/i);
+      expect(result.productName).not.toMatch(/mayank|ajmer|rajasthan|bhim|upi/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/ARABIAN\s*AROMA/i);
+    }
+    if (result.orderDate) {
+      expect(result.orderDate).toMatch(/3.*March.*2026|March.*3.*2026/i);
+    }
+  });
+
+  it('Screenshot 9: Amazon NUTROVA Omega 3 — Grand Total ₹1,030, COD fee ₹17 excluded, dark mode', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'amazon.in',
+      'Order Details',
+      'Order placed 4 March 2026',
+      'Order number 408-8278277-3924353',
+      'Ship to',
+      'Mandheer mishra',
+      'AJMER, RAJASTHAN',
+      '305001',
+      'India',
+      'Order Summary',
+      'Item(s) Subtotal: Rs 1,013.00',
+      'Shipping: Rs 0.00',
+      'Cash/Pay on Delivery fee: Rs 17.00',
+      'Total: Rs 1,030.00',
+      'Grand Total: Rs 1,030.00',
+      'Arriving Friday, 14 March',
+      'NUTROVA Complete Omega 3 Vegan and Gelatin-Free 60 Capsules',
+      'Sold by: Nutrova',
+      'Rs 1,013.00',
+      'Buy it again  View your item',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 9 result:', JSON.stringify(result, null, 2));
+
+    if (result.amount) {
+      expect(result.amount).toBe(1030);
+      expect(result.amount).not.toBe(1013);
+      expect(result.amount).not.toBe(17);
+      expect(result.amount).not.toBe(305001);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/408-8278277-3924353/);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/nutrova|omega\s*3/i);
+      expect(result.productName).not.toMatch(/mandheer|ajmer|rajasthan|arriving/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/Nutrova/i);
+    }
+    if (result.orderDate) {
+      expect(result.orderDate).toMatch(/4.*March.*2026|March.*4.*2026/i);
+    }
+  });
+
+  it('Screenshot 10: Amazon NUTROVA Kerastrength — Grand Total ₹1,044.20 (decimal), Promotion -₹82.80 excluded', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'amazon.in',
+      'Order Details',
+      'Order placed 4 March 2026',
+      'Order number 403-5861220-2183552',
+      'Ship to',
+      'Bhavika',
+      'AJMER, RAJASTHAN',
+      '305001',
+      'India',
+      'Order Summary',
+      'Item(s) Subtotal: Rs 1,110.00',
+      'Shipping: Rs 0.00',
+      'Cash/Pay on Delivery fee: Rs 17.00',
+      'Total: Rs 1,127.00',
+      'Promotion Applied: -Rs 82.80',
+      'Grand Total: Rs 1,044.20',
+      'Arriving Friday, 14 March',
+      'NUTROVA Kerastrength For Men & Women 30 Capsules',
+      'Sold by: Nutrova',
+      'Rs 1,110.00',
+      'Buy it again  View your item',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 10 result:', JSON.stringify(result, null, 2));
+
+    // Grand Total ₹1,044.20 (decimal) — NOT subtotal 1110, COD 17, total 1127, promotion 82.80
+    if (result.amount) {
+      expect(result.amount).toBe(1044.2);
+      expect(result.amount).not.toBe(1110);
+      expect(result.amount).not.toBe(1127);
+      expect(result.amount).not.toBe(17);
+      expect(result.amount).not.toBe(82.8);
+      expect(result.amount).not.toBe(305001);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/403-5861220-2183552/);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/nutrova|kerastrength/i);
+      expect(result.productName).not.toMatch(/bhavika|ajmer|rajasthan|arriving/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/Nutrova/i);
+    }
+    if (result.orderDate) {
+      expect(result.orderDate).toMatch(/4.*March.*2026|March.*4.*2026/i);
+    }
+  });
+
+  it('Screenshot 11: Flipkart Dermatouch Bye Bye Pigmentation — ₹429, "1 offer" excluded, Edit Order excluded', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'flipkart',
+      'Order ID: OD431938214243263100',
+      'Order Confirmed, Today',
+      'Your Order has been placed., Thu 1st Aug 2024',
+      'Dermatouch Bye Bye Pigmentation Niacinamide Kojic Acid & Alpha Arbutin',
+      'Serum Night Cream for Pigmentation & Dark Spots',
+      'Rs 429',
+      '1 offer',
+      'Seller: DERMATOUCH',
+      'Edit Order',
+      'Chat with us',
+      'Rate your experience',
+      'Recommended for you based on your shopping trends',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 11 result:', JSON.stringify(result, null, 2));
+
+    if (result.amount) {
+      expect(result.amount).toBe(429);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/OD431938214243263100/i);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/dermatouch|pigmentation/i);
+      // Must NOT pick UI chrome, offer count, or recommendations
+      expect(result.productName).not.toMatch(/1\s*offer|edit\s*order|chat\s*with|rate\s*your|recommended/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/DERMATOUCH/i);
+    }
+  });
+
+  it('Screenshot 12: Flipkart Dermatouch Bright & Even Tone — ₹354, "2 offers" excluded, Shipped status excluded', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'flipkart',
+      'Order ID: OD431913265903508100',
+      'Shipped',
+      'Order Received, Mon Jul 29 2024',
+      'Dermatouch Bright & Even Tone with Niacinamide Vitamin C & Kojic',
+      'Acid Gel Cream for Oily Skin',
+      'Rs 354',
+      '2 offers',
+      'Seller: DERMATOUCH',
+      'Change Date',
+      'See all updates',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 12 result:', JSON.stringify(result, null, 2));
+
+    if (result.amount) {
+      expect(result.amount).toBe(354);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/OD431913265903508100/i);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/dermatouch|even\s*tone/i);
+      // Must NOT pick "2 offers", "Change Date", "See all updates", or "Shipped"
+      expect(result.productName).not.toMatch(/2\s*offers|change\s*date|see\s*all|shipped/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/DERMATOUCH/i);
+    }
+  });
 });
