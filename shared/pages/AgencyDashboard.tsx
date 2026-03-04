@@ -4010,6 +4010,9 @@ export const AgencyDashboard: React.FC = () => {
           ) : (
             <div className="space-y-3 max-h-[65vh] overflow-y-auto scrollbar-styled">
               {tickets.map((t: Ticket) => (
+                <div key={t.id} className="rounded-xl border border-slate-100 bg-white px-3 py-3 shadow-sm space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-slate-900 truncate">{String(t.issueType || 'Ticket')}</span>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${

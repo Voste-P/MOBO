@@ -1371,7 +1371,7 @@ export const Orders: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                ))
+                ))}
                 </div>
               )}
             </div>
