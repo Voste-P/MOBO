@@ -2520,7 +2520,8 @@ export const BrandDashboard: React.FC = () => {
                             type="button"
                             onClick={async () => {
                               try {
-                                await api.tickets.update(t.id, 'Resolved');
+                                const note = window.prompt('Resolution note (optional):');
+                                await api.tickets.update(t.id, 'Resolved', note || undefined);
                                 toast.success('Ticket resolved.');
                                 fetchData();
                               } catch (err: any) {
@@ -2535,7 +2536,8 @@ export const BrandDashboard: React.FC = () => {
                             type="button"
                             onClick={async () => {
                               try {
-                                await api.tickets.update(t.id, 'Rejected');
+                                const note = window.prompt('Rejection reason (optional):');
+                                await api.tickets.update(t.id, 'Rejected', note || undefined);
                                 toast.success('Ticket rejected.');
                                 fetchData();
                               } catch (err: any) {

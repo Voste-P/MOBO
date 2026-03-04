@@ -1981,12 +1981,23 @@ export async function extractOrderDetailsWithAi(
       };
 
       /** Check if a raw numeric string is likely a pincode (6-digit Indian pincode) */
-      const isLikelyPincode = (raw: string, value: number): boolean => {
+      const isLikelyPincode = (raw: string, value: number, lineCtx?: string): boolean => {
         const cleaned = raw.replace(/,/g, '').replace(/\.\d{1,2}$/, '');
         // Indian pincodes: 6 digits, first digit 1-9, value 100000-999999
         if (/^\d{6}$/.test(cleaned) && value >= 100000 && value <= 999999) {
-          // Check if the line has address/pincode context
-          return true;
+          // Only flag as pincode if surrounding text has address/pincode context
+          // OR if the number falls in a known Indian pincode range (1xxxxx-8xxxxx)
+          if (lineCtx && isAddressOrContactLine(lineCtx)) return true;
+          // Known Indian pincode first-digit: 1-8 (9xxxxx is very rare)
+          const firstDigit = parseInt(cleaned[0], 10);
+          if (firstDigit >= 1 && firstDigit <= 8 && lineCtx && /\b(pin|zip|code|city|state|district|area|sector|colony|nagar|road|street|lane|near|opp|behind|floor|flat|apartment|house|bldg|block|plot|ward|village|taluk|mandal|tehsil)\b/i.test(lineCtx)) return true;
+          // If line contains a final label like "Total", "Amount", "Price" — NOT a pincode
+          if (lineCtx && FINAL_AMOUNT_LABEL_RE.test(lineCtx)) return false;
+          if (lineCtx && AMOUNT_LABEL_RE.test(lineCtx)) return false;
+          // If the line has an INR prefix (₹, Rs) before this number — NOT a pincode
+          if (lineCtx && /[₹]|\brs\.?\s/i.test(lineCtx)) return false;
+          // Default: treat standalone 6-digit numbers as possible pincodes only without any price context
+          return !lineCtx;
         }
         return false;
       };
@@ -2018,7 +2029,7 @@ export async function extractOrderDetailsWithAi(
         // Reject amounts that are clearly too small to be an order total (< ₹1)
         if (value < 1) return false;
         // Reject values that look like 6-digit pincodes (unless line explicitly says "total"/"amount")
-        if (isLikelyPincode(match[1], value) && !isFinalLabel) return false;
+        if (isLikelyPincode(match[1], value, line) && !isFinalLabel) return false;
         // Reject values that look like phone numbers
         if (isLikelyPhoneNumber(match[1], value)) return false;
         // Reject if the line is clearly about addresses/contacts (not prices)
@@ -2066,6 +2077,7 @@ export async function extractOrderDetailsWithAi(
 
         // If no amount on this line, check the next 3 lines (label on one line, value below)
         if (!foundOnLine) {
+          const lookaheadSeen = new Set<number>();
           for (let offset = 1; offset <= 3 && i + offset < lines.length; offset++) {
             const nextLine = lines[i + offset];
             // Stop if the next line has its own label
@@ -2073,8 +2085,11 @@ export async function extractOrderDetailsWithAi(
             const nextMatches = nextLine.matchAll(AMOUNT_VALUE_GLOBAL_RE);
             for (const match of nextMatches) {
               const value = parseAmountString(match[1]);
-              if (!value) continue;
+              if (!value || lookaheadSeen.has(value)) continue;
+              lookaheadSeen.add(value);
               if (isOrderIdFragment(match[1])) continue;
+              if (isLikelyPincode(match[1], value, nextLine) && !isFinalLabel) continue;
+              if (isLikelyPhoneNumber(match[1], value)) continue;
               const w = isFinalLabel ? getFinalLabelWeight(lines[i]) : getGenericLabelWeight(lines[i]);
               if (isFinalLabel) finalAmounts.push({ value, weight: w });
               else labeledAmounts.push({ value, weight: w, index: i });
@@ -2083,8 +2098,11 @@ export async function extractOrderDetailsWithAi(
             const nextInr = nextLine.matchAll(INR_VALUE_GLOBAL_RE);
             for (const match of nextInr) {
               const value = parseAmountString(match[1]);
-              if (!value) continue;
+              if (!value || lookaheadSeen.has(value)) continue;
+              lookaheadSeen.add(value);
               if (isOrderIdFragment(match[1])) continue;
+              if (isLikelyPincode(match[1], value, nextLine) && !isFinalLabel) continue;
+              if (isLikelyPhoneNumber(match[1], value)) continue;
               const w = isFinalLabel ? getFinalLabelWeight(lines[i]) : getGenericLabelWeight(lines[i]);
               if (isFinalLabel) finalAmounts.push({ value, weight: w });
               else labeledAmounts.push({ value, weight: w, index: i });
@@ -2142,7 +2160,13 @@ export async function extractOrderDetailsWithAi(
         if (/free\s*delivery|\brating|\breviews?\b|\bstars?\b|\d+\s*count\b/i.test(surroundingLine)) continue;
         inrValues.push(value);
       }
-      if (inrValues.length) return Math.max(...inrValues);
+      // For INR fallback: prefer the LAST value in the text (bottom of receipt is typically the total)
+      // If there are multiple, pick the one nearest to the end (most likely the final total)
+      if (inrValues.length) {
+        // If only 1 value, return it. Otherwise, prefer the last occurrence (bottom of receipt).
+        // Math.max was wrong here — MRP lines at the top are often the highest amount.
+        return inrValues[inrValues.length - 1];
+      }
 
       // Last resort: bare numbers that look like prices (₹10 – ₹9,99,999)
       const bareMatches = text.matchAll(BARE_AMOUNT_GLOBAL_RE);
@@ -2156,7 +2180,11 @@ export async function extractOrderDetailsWithAi(
         if ((match.index ?? 0) >= noiseZoneStart) continue;
         // Skip values that look like dates, years, phone numbers, pin codes
         if (/^\d{4}$/.test(match[1]) && value >= 1900 && value <= 2100) continue;
-        if (/^\d{6}$/.test(match[1]) && value >= 100000 && value <= 999999) continue; // 6-digit pincode
+        // Context-aware pincode check for bare numbers
+        const bl = text.lastIndexOf('\n', (match.index ?? 0));
+        const be = text.indexOf('\n', (match.index ?? 0) + match[0].length);
+        const bareLine = text.slice(Math.max(0, bl), be > 0 ? be : undefined);
+        if (isLikelyPincode(match[1], value, bareLine)) continue;
         if (/^\d{10}$/.test(match[1])) continue; // phone number
         if (/^\d{12}$/.test(match[1])) continue; // Aadhaar-like number
         // Unix timestamps (starts with 16/17, 10+ digits)
@@ -2165,7 +2193,8 @@ export async function extractOrderDetailsWithAi(
         if (/^\d{1}$/.test(match[1])) continue;
         bareValues.push(value);
       }
-      if (bareValues.length) return Math.max(...bareValues);
+      // For bare numbers: prefer the last value (nearest to bottom of receipt)
+      if (bareValues.length) return bareValues[bareValues.length - 1];
 
       return null;
     };

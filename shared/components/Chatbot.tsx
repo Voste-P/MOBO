@@ -316,11 +316,11 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
         return;
       }
       if (lowerText.includes('support') || lowerText.includes('tickets')) {
-        onNavigate?.('orders');
+        onNavigate?.('tickets');
         addMessage({
           id: makeMessageId(),
           role: 'model',
-          text: 'Opening **Tickets** for you.',
+          text: 'Opening **Tickets** for you. You can view your support tickets or raise a new one.',
           timestamp: Date.now(),
         });
         return;

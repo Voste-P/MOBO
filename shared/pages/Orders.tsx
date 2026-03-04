@@ -9,10 +9,11 @@ import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { formatCurrency } from '../utils/formatCurrency';
 import { getPrimaryOrderId } from '../utils/orderHelpers';
 import { csvSafe, downloadCsv } from '../utils/csvHelpers';
-import { Order, Product } from '../types';
+import { Order, Product, Ticket } from '../types';
 import { Button, EmptyState, Spinner } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { ProxiedImage } from '../components/ProxiedImage';
+import { RaiseTicketModal } from '../components/RaiseTicketModal';
 import { ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
 import {
   Clock,
@@ -32,6 +33,8 @@ import {
   FileSpreadsheet,
   Download,
   Info,
+  MessageSquare,
+  TicketCheck,
 } from 'lucide-react';
 
 /* ─── Sample Screenshot Guide ───────────────────────────────────────── */
@@ -205,7 +208,14 @@ export const Orders: React.FC = () => {
     productName: 'match' | 'mismatch' | 'none';
   }>({ id: 'none', amount: 'none', productName: 'none' });
   const [orderIdLocked, setOrderIdLocked] = useState(false);
+  const [productNameOverridden, setProductNameOverridden] = useState(false);
   const [sheetsExporting, setSheetsExporting] = useState(false);
+
+  // Buyer ticket state
+  const [myTickets, setMyTickets] = useState<Ticket[]>([]);
+  const [ticketsExpanded, setTicketsExpanded] = useState(false);
+  const [ticketModalOpen, setTicketModalOpen] = useState(false);
+  const [ticketOrderId, setTicketOrderId] = useState<string | undefined>();
 
 
   // Rating screenshot pre-validation state
@@ -257,6 +267,7 @@ export const Orders: React.FC = () => {
   useEffect(() => {
     if (user) {
       loadOrders();
+      loadMyTickets();
       api.products.getAll().then((data) => {
         setAvailableProducts(Array.isArray(data) ? data : []);
       }).catch((err) => {
@@ -267,6 +278,16 @@ export const Orders: React.FC = () => {
       setIsLoading(false);
     }
   }, [user]);
+
+  const loadMyTickets = async () => {
+    if (!user?.id) return;
+    try {
+      const data = await api.tickets.getAll();
+      const mine = Array.isArray(data) ? data.filter((t: Ticket) => t.userId === user.id) : [];
+      setMyTickets(mine.sort((a: Ticket, b: Ticket) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+    } catch { /* silently degrade — tickets are secondary */ }
+  };
+
   const loadOrders = async () => {
     if (!user?.id) return;
     try {
@@ -484,7 +505,7 @@ export const Orders: React.FC = () => {
         }
 
         if (productNameStatus === 'mismatch') {
-          toast.error('Product name in screenshot does not match the selected deal. Please upload the correct screenshot.');
+          toast.error('Product name in screenshot may not match the selected deal. You can override if this is correct.');
         } else if (hasId && hasAmount) {
           toast.success('Order ID and Amount detected successfully!');
         } else if (hasId) {
@@ -603,9 +624,9 @@ export const Orders: React.FC = () => {
       toast.error('Please upload a valid order image before submitting.');
       return;
     }
-    // Block if product name mismatch detected by AI
-    if (matchStatus.productName === 'mismatch') {
-      toast.error('The product in the screenshot does not match the selected deal. Please upload the correct order screenshot.');
+    // Block if product name mismatch detected by AI AND user hasn't overridden
+    if (matchStatus.productName === 'mismatch' && !productNameOverridden) {
+      toast.error('The product in the screenshot does not match the selected deal. Please upload the correct order screenshot or use the override button.');
       return;
     }
     submittingRef.current = true;
@@ -663,6 +684,7 @@ export const Orders: React.FC = () => {
       setExtractedDetails({ orderId: '', amount: '' });
       setMatchStatus({ id: 'none', amount: 'none', productName: 'none' });
       setOrderIdLocked(false);
+      setProductNameOverridden(false);
       loadOrders();
       toast.success('Order submitted successfully!');
     } catch (e: any) {
@@ -1263,7 +1285,85 @@ export const Orders: React.FC = () => {
             );
           })
         )}
+
+        {/* ─── My Tickets Section ──────────────────────────── */}
+        <div className="mt-6">
+          <button
+            type="button"
+            onClick={() => setTicketsExpanded(!ticketsExpanded)}
+            className="w-full flex items-center justify-between p-3 bg-white rounded-xl border border-zinc-200 hover:border-zinc-300 transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <TicketCheck size={16} className="text-red-500" />
+              <span className="text-sm font-bold text-slate-800">My Tickets</span>
+              {myTickets.filter(t => t.status === 'Open').length > 0 && (
+                <span className="px-1.5 py-0.5 text-[9px] font-bold bg-red-100 text-red-600 rounded-full">
+                  {myTickets.filter(t => t.status === 'Open').length} open
+                </span>
+              )}
+            </div>
+            {ticketsExpanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+          </button>
+
+          {ticketsExpanded && (
+            <div className="mt-2 space-y-2 animate-enter">
+              <button
+                type="button"
+                onClick={() => { setTicketOrderId(undefined); setTicketModalOpen(true); }}
+                className="w-full py-2.5 bg-red-50 text-red-600 font-bold text-xs rounded-xl border border-red-200 hover:bg-red-100 transition-all flex items-center justify-center gap-1.5"
+              >
+                <MessageSquare size={13} /> Raise a Ticket
+              </button>
+              {myTickets.length === 0 ? (
+                <p className="text-xs text-slate-400 font-medium text-center py-4">No tickets yet. Raise one if you need help!</p>
+              ) : (
+                myTickets.map((t) => (
+                  <div key={t.id} className="bg-white rounded-xl border border-zinc-200 p-3 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800">{t.issueType}</span>
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                        t.status === 'Resolved' ? 'bg-green-100 text-green-700' :
+                        t.status === 'Rejected' ? 'bg-red-100 text-red-700' :
+                        'bg-amber-100 text-amber-700'
+                      }`}>
+                        {t.status}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 line-clamp-2">{t.description}</p>
+                    {t.orderId && (
+                      <p className="text-[10px] text-slate-400"><span className="font-bold">Order:</span> {t.orderId}</p>
+                    )}
+                    {t.resolutionNote && (
+                      <p className="text-[10px] text-green-700 bg-green-50 p-1.5 rounded-lg">
+                        <span className="font-bold">Resolution:</span> {t.resolutionNote}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] text-slate-400">
+                        {new Date(t.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </span>
+                      {t.priority && t.priority !== 'medium' && (
+                        <span className={`text-[9px] font-bold ${
+                          t.priority === 'urgent' ? 'text-red-500' : t.priority === 'high' ? 'text-orange-500' : 'text-slate-400'
+                        }`}>
+                          {t.priority.toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Raise Ticket Modal for buyer */}
+      <RaiseTicketModal
+        open={ticketModalOpen}
+        onClose={() => { setTicketModalOpen(false); loadMyTickets(); }}
+        orderId={ticketOrderId}
+      />
 
       {/* SUBMIT PURCHASE MODAL (SMART UI) */}
       {isNewOrderModalOpen && (
@@ -1506,9 +1606,26 @@ export const Orders: React.FC = () => {
                           <CheckCircle2 size={12} /> AI suggests this is a valid proof.
                         </p>
                       )}
-                      {matchStatus.productName === 'mismatch' && (
-                        <p className="text-[10px] text-red-600 font-bold bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
-                          <AlertTriangle size={12} /> Product in screenshot doesn&apos;t match the selected deal. Upload the correct order screenshot.
+                      {matchStatus.productName === 'mismatch' && !productNameOverridden && (
+                        <div className="bg-red-50 p-2 rounded-lg animate-enter">
+                          <p className="text-[10px] text-red-600 font-bold flex items-center gap-1.5 mb-1.5">
+                            <AlertTriangle size={12} /> Product in screenshot may not match the selected deal.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProductNameOverridden(true);
+                              toast.success('Product name override applied. You can proceed.');
+                            }}
+                            className="text-[10px] font-bold text-red-600 underline hover:text-red-800 transition-colors"
+                          >
+                            Override — I confirm this is the correct order
+                          </button>
+                        </div>
+                      )}
+                      {matchStatus.productName === 'mismatch' && productNameOverridden && (
+                        <p className="text-[10px] text-amber-600 font-bold bg-amber-50 p-2 rounded-lg flex items-center gap-1.5">
+                          <AlertTriangle size={12} /> Product name overridden by user.
                         </p>
                       )}
                       {matchStatus.productName === 'match' && (
@@ -1576,7 +1693,7 @@ export const Orders: React.FC = () => {
                   !selectedProduct ||
                   !formScreenshot ||
                   isUploading ||
-                  matchStatus.productName === 'mismatch' ||
+                  (matchStatus.productName === 'mismatch' && !productNameOverridden) ||
                   !extractedDetails.orderId ||
                   !extractedDetails.amount
                 }
