@@ -528,7 +528,8 @@ export const api = {
       const rawBase64 = await readFileAsDataUrl(file);
       // Compress before sending — phone screenshots can be 5-15 MB raw,
       // exceeding the Vercel proxy 4.5 MB body limit.
-      const compressed = await compressImage(rawBase64, { maxDimension: 1600, quality: 0.8 });
+      // Use higher quality for extraction accuracy — OCR needs sharp text.
+      const compressed = await compressImage(rawBase64, { maxDimension: 2400, quality: 0.88 });
       return fetchJson('/ai/extract-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -989,6 +990,13 @@ export const api = {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ status, ...(resolutionNote ? { resolutionNote } : {}) }),
+      });
+    },
+    escalate: async (id: string) => {
+      await fetchOk(`/tickets/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ status: 'Open', escalate: true }),
       });
     },
     delete: async (id: string) => {

@@ -6,7 +6,7 @@ import type { Role } from '../middleware/auth.js';
 import { orderLog, businessLog } from '../config/logger.js';
 import { logChangeEvent, logAccessEvent, logErrorEvent } from '../config/appLogs.js';
 import { prisma } from '../database/prisma.js';
-import { createTicketSchema, updateTicketSchema, TICKET_TARGET_ROLE } from '../validations/tickets.js';
+import { createTicketSchema, updateTicketSchema, TICKET_TARGET_ROLE, ESCALATION_PATH } from '../validations/tickets.js';
 import { toUiTicket, toUiTicketForBrand } from '../utils/uiMappers.js';
 import { pgTicket } from '../utils/pgMappers.js';
 import { getRequester, isPrivileged } from '../services/authz.js';
@@ -220,8 +220,17 @@ export function makeTicketsController() {
         }
 
         if (roles.includes('brand')) {
-          // Brand sees agency tickets targeted to 'brand'
-          cascadeTargets.push({ targetRole: 'brand' });
+          // Brand sees agency tickets targeted to 'brand' — scoped to connected agencies only
+          const brand = await db.brand.findFirst({ where: { ownerUserId: pgUserId, isDeleted: false }, select: { connectedAgencyCodes: true } });
+          const connectedCodes = brand?.connectedAgencyCodes ?? [];
+          if (connectedCodes.length) {
+            // Resolve agency owner user IDs from connected agency codes
+            const connectedAgencies = await db.agency.findMany({ where: { agencyCode: { in: connectedCodes }, isDeleted: false }, select: { ownerUserId: true } });
+            const agencyOwnerIds = connectedAgencies.map(a => a.ownerUserId).filter(Boolean);
+            if (agencyOwnerIds.length) {
+              cascadeTargets.push({ targetRole: 'brand', userId: { in: agencyOwnerIds } });
+            }
+          }
         }
 
         const orderMongoIds = await getScopedOrderMongoIds({ roles, pgUserId, requesterUser: user });
@@ -325,6 +334,15 @@ export function makeTicketsController() {
 
         const previousStatus = String(existing.status || '');
         const updatePayload: any = { status: body.status, updatedBy: pgUserId };
+
+        // Handle escalation: advance targetRole to the next tier
+        if (body.escalate && existing.targetRole) {
+          const nextRole = ESCALATION_PATH[existing.targetRole];
+          if (!nextRole) throw new AppError(400, 'CANNOT_ESCALATE', 'Ticket cannot be escalated further');
+          updatePayload.targetRole = nextRole;
+          updatePayload.status = 'Open'; // keep open when escalating
+        }
+
         if ((body.status === 'Resolved' || body.status === 'Rejected') && previousStatus === 'Open') {
           updatePayload.resolvedBy = pgUserId;
           updatePayload.resolvedAt = new Date();
@@ -338,11 +356,12 @@ export function makeTicketsController() {
         publishRealtime({ type: 'tickets.changed', ts: new Date().toISOString(), payload: { ticketId: String(mapped._id), status: body.status }, audience });
         publishRealtime({ type: 'notifications.changed', ts: new Date().toISOString(), audience });
 
-        const auditAction = body.status === 'Resolved' ? 'TICKET_RESOLVED'
+        const auditAction = body.escalate ? 'TICKET_ESCALATED'
+          : body.status === 'Resolved' ? 'TICKET_RESOLVED'
           : body.status === 'Rejected' ? 'TICKET_REJECTED'
           : (previousStatus === 'Resolved' || previousStatus === 'Rejected') && body.status === 'Open' ? 'TICKET_REOPENED'
           : 'TICKET_UPDATED';
-        await writeAuditLog({ req, action: auditAction, entityType: 'Ticket', entityId: id, metadata: { previousStatus, newStatus: body.status, actorRole: String(user?.role || roles[0] || '') } });
+        await writeAuditLog({ req, action: auditAction, entityType: 'Ticket', entityId: id, metadata: { previousStatus, newStatus: body.status, actorRole: String(user?.role || roles[0] || ''), ...(body.escalate ? { escalatedTo: updatePayload.targetRole } : {}) } });
         businessLog.info(`[${String(user?.role || roles[0] || 'User').charAt(0).toUpperCase() + String(user?.role || roles[0] || 'User').slice(1)}] User ${req.auth?.userId} ${auditAction.toLowerCase().replace('ticket_', '')} ticket ${id} — ${previousStatus} → ${body.status}`, { actorUserId: req.auth?.userId, ticketId: id, previousStatus, newStatus: body.status, ip: req.ip });
         logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Ticket', entityId: id, action: 'TICKET_STATUS_CHANGE', changedFields: ['status'], before: { status: previousStatus }, after: { status: body.status } });
         logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Ticket', requestId: String((res as any).locals?.requestId || ''), metadata: { action: auditAction, ticketId: id, previousStatus, newStatus: body.status } });

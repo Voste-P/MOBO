@@ -29,7 +29,15 @@ export const createTicketSchema = z.object({
   role: z.string().min(1).max(50).optional(),
 });
 
+// Escalation: the next tier above each target role
+export const ESCALATION_PATH: Record<string, string> = {
+  mediator: 'agency',    // mediator → agency
+  agency: 'brand',       // agency → brand
+  brand: 'admin',        // brand → admin
+} as const;
+
 export const updateTicketSchema = z.object({
   status: z.enum(['Open', 'Resolved', 'Rejected']),
   resolutionNote: z.string().max(1000).optional(),
+  escalate: z.boolean().optional(),
 });

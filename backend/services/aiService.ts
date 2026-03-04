@@ -3004,8 +3004,9 @@ export async function extractOrderDetailsWithAi(
           pipeline = pipeline.extract({ left, top, width: cw, height: ch });
         }
 
-        // Upscale to help OCR with small fonts; keep aspect ratio. Don't enlarge small images unnecessarily.
-        pipeline = pipeline.resize({ width: 2400, withoutEnlargement: true });
+        // Upscale to help OCR with small fonts; keeps original size if already smaller to avoid
+        // double-preprocessing artifacts when runTesseractOcr applies its own resize+enhance.
+        pipeline = pipeline.resize({ width: 3000, withoutEnlargement: true });
 
         if (mode === 'inverted') {
           // Dark mode screenshots: invert BEFORE greyscale so dark backgrounds become white
@@ -3078,7 +3079,7 @@ export async function extractOrderDetailsWithAi(
     };
 
     /** Tesseract.js fallback: local OCR that works without any external API. */
-    const TESSERACT_TIMEOUT_MS = 30_000; // 30 seconds max for all Tesseract attempts
+    const TESSERACT_TIMEOUT_MS = 45_000; // 45 seconds max for all Tesseract attempts
     const runTesseractOcr = async (imageBase64: string): Promise<string> => {
       let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
       const deadline = Date.now() + TESSERACT_TIMEOUT_MS;
@@ -3116,14 +3117,30 @@ export async function extractOrderDetailsWithAi(
             .resize({ width: 2400, withoutEnlargement: false })
             .grayscale()
             .normalize()
-            .linear(1.6, -40) // Aggressive contrast
-            .sharpen({ sigma: 2 })
+            .linear(1.5, -40) // Aggressive contrast
+            .sharpen({ sigma: 1.8 })
             .jpeg({ quality: 95 })
             .toBuffer();
           await worker.setParameters({ tessedit_pageseg_mode: '3' as any });
           const { data: dataHc } = await worker.recognize(highContrast);
           const textHc = normalizeOcrText(dataHc.text || '');
           if (textHc.length > text.length) text = textHc;
+        }
+
+        // Try PSM 4 (column text) for screenshots with side-by-side layouts
+        if (Date.now() < deadline && (!text || text.length < 40)) {
+          const columnEnhanced = await sharp(buf)
+            .resize({ width: 2400, withoutEnlargement: false })
+            .grayscale()
+            .normalize()
+            .sharpen({ sigma: 1.5 })
+            .linear(1.4, -30)
+            .jpeg({ quality: 95 })
+            .toBuffer();
+          await worker.setParameters({ tessedit_pageseg_mode: '4' as any });
+          const { data: data4 } = await worker.recognize(columnEnhanced);
+          const text4 = normalizeOcrText(data4.text || '');
+          if (text4.length > text.length) text = text4;
         }
 
         if (Date.now() >= deadline) {
@@ -3505,8 +3522,8 @@ export async function extractOrderDetailsWithAi(
       );
     }
 
-    // When using Tesseract (no Gemini), limit variants — but try more than before
-    const ocrVariants = ai ? allOcrVariants : allOcrVariants.slice(0, 5);
+    // When using Tesseract (no Gemini), use more variants for better coverage
+    const ocrVariants = ai ? allOcrVariants : allOcrVariants.slice(0, 8);
 
     let ocrText = '';
     let ocrLabel = 'none';
@@ -3616,10 +3633,12 @@ export async function extractOrderDetailsWithAi(
         ocrLabel = variant.label;
         deterministic = candidateDeterministic;
       }
-      // Early exit if we have both from the same pass
-      if (score === 2) break;
-      // Also exit early if accumulated results from different passes give us both
-      if (accumulatedOrderId && accumulatedAmount) break;
+      // Early exit if we have both from the same pass — only for Gemini (reliable OCR)
+      // For Tesseract-only, continue scanning more variants for better quality results
+      if (ai && score === 2) break;
+      if (ai && accumulatedOrderId && accumulatedAmount) break;
+      // Tesseract-only: still break if we found both AND have good text length
+      if (!ai && accumulatedOrderId && accumulatedAmount && (ocrText?.length ?? 0) > 200) break;
     }
 
     // If individual passes found different pieces, merge them

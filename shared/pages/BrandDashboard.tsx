@@ -2488,11 +2488,8 @@ export const BrandDashboard: React.FC = () => {
                 icon={<HelpCircle size={22} className="text-zinc-400" />}
               />
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-[65vh] overflow-y-auto scrollbar-styled">
                 {tickets.map((t: Ticket) => (
-                  <div key={t.id} className="rounded-xl border border-zinc-100 bg-white px-4 py-4 shadow-sm space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-bold text-zinc-900 truncate">{String(t.issueType || 'Ticket')}</span>
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -2547,6 +2544,21 @@ export const BrandDashboard: React.FC = () => {
                             className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-50 border border-red-200 text-red-600 hover:bg-red-100"
                           >
                             ✗ Reject
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await api.tickets.escalate(t.id);
+                                toast.success('Ticket escalated to admin.');
+                                fetchData();
+                              } catch (err: any) {
+                                toast.error(formatErrorMessage(err, 'Failed to escalate ticket.'));
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100"
+                          >
+                            ↑ Escalate
                           </button>
                         </>
                       )}

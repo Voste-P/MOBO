@@ -1317,7 +1317,8 @@ export const Orders: React.FC = () => {
               {myTickets.length === 0 ? (
                 <p className="text-xs text-slate-400 font-medium text-center py-4">No tickets yet. Raise one if you need help!</p>
               ) : (
-                myTickets.map((t) => (
+                <div className="max-h-[50vh] overflow-y-auto scrollbar-styled space-y-2">
+                {myTickets.map((t) => (
                   <div key={t.id} className="bg-white rounded-xl border border-zinc-200 p-3 space-y-1.5">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-800">{t.issueType}</span>
@@ -1342,16 +1343,36 @@ export const Orders: React.FC = () => {
                       <span className="text-[9px] text-slate-400">
                         {new Date(t.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
                       </span>
-                      {t.priority && t.priority !== 'medium' && (
-                        <span className={`text-[9px] font-bold ${
-                          t.priority === 'urgent' ? 'text-red-500' : t.priority === 'high' ? 'text-orange-500' : 'text-slate-400'
-                        }`}>
-                          {t.priority.toUpperCase()}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        {t.priority && t.priority !== 'medium' && (
+                          <span className={`text-[9px] font-bold ${
+                            t.priority === 'urgent' ? 'text-red-500' : t.priority === 'high' ? 'text-orange-500' : 'text-slate-400'
+                          }`}>
+                            {t.priority.toUpperCase()}
+                          </span>
+                        )}
+                        {(t.status === 'Resolved' || t.status === 'Rejected') && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await api.tickets.update(t.id, 'Open');
+                                toast.success('Ticket reopened.');
+                                loadMyTickets();
+                              } catch (err: any) {
+                                toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
+                              }
+                            }}
+                            className="px-2 py-0.5 rounded-lg text-[9px] font-bold bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100"
+                          >
+                            Reopen
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))
+                </div>
               )}
             </div>
           )}
@@ -1632,6 +1653,18 @@ export const Orders: React.FC = () => {
                         <p className="text-[10px] text-green-600 font-bold bg-green-50 p-2 rounded-lg flex items-center gap-1.5">
                           <CheckCircle2 size={12} /> Product name matches the selected deal.
                         </p>
+                      )}
+                      {/* Guidance when AI could not extract anything */}
+                      {!isAnalyzing && !extractedDetails.orderId && !extractedDetails.amount && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 animate-enter">
+                          <p className="text-[10px] text-amber-700 font-bold flex items-center gap-1.5 mb-1">
+                            <AlertTriangle size={12} /> Could not auto-detect details from this screenshot.
+                          </p>
+                          <p className="text-[9px] text-amber-600 leading-relaxed">
+                            Please type your <strong>Order ID</strong> and <strong>Paid Amount</strong> manually in the fields above. 
+                            Tip: Use a clear, full-screen screenshot of the order details page.
+                          </p>
+                        </div>
                       )}
                     </div>
                   )}

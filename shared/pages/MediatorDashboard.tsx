@@ -574,8 +574,8 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
             icon={<HelpCircle size={22} className="text-zinc-400" />}
           />
         ) : (
-          <div className="space-y-2">
-            {tickets.slice(0, 20).map((t: Ticket) => (
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto scrollbar-styled">
+            {tickets.map((t: Ticket) => (
               <div
                 key={t.id}
                 className="rounded-xl border border-zinc-100 bg-white px-3 py-3 shadow-sm space-y-2"
@@ -636,6 +636,21 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                         className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-50 border border-red-200 text-red-600 hover:bg-red-100"
                       >
                         ✗ Reject
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await api.tickets.escalate(t.id);
+                            toast.success('Ticket escalated to agency.');
+                            onRefresh();
+                          } catch (err: any) {
+                            toast.error(formatErrorMessage(err, 'Failed to escalate ticket.'));
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100"
+                      >
+                        ↑ Escalate
                       </button>
                     </>
                   )}

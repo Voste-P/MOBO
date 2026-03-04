@@ -1236,7 +1236,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 max-h-[70vh] overflow-y-auto scrollbar-styled">
                   {isLoading ? (
                     <div className="col-span-full">
                       <EmptyState
