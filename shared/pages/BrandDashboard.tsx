@@ -50,12 +50,13 @@ import {
   Package,
   FileSpreadsheet,
   Sparkles,
+  HelpCircle,
 } from 'lucide-react';
 import { api, asArray } from '../services/api';
 import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
-import { User, Campaign, Order } from '../types';
+import { User, Campaign, Order, Ticket } from '../types';
 import { EmptyState, Spinner } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
@@ -79,7 +80,7 @@ import {
 } from '../components/LazyCharts';
 
 // --- TYPES ---
-type Tab = 'dashboard' | 'agencies' | 'campaigns' | 'requests' | 'orders' | 'profile';
+type Tab = 'dashboard' | 'agencies' | 'campaigns' | 'requests' | 'orders' | 'tickets' | 'profile';
 
 // formatCurrency, getPrimaryOrderId, csvSafe, downloadCsv imported from shared/utils
 
@@ -1246,7 +1247,7 @@ const OrdersView = ({ user }: any) => {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto scrollbar-hide space-y-6 pr-2">
+            <div className="flex-1 overflow-y-auto scrollbar-styled space-y-6 pr-2">
               {/* Product Summary */}
               <div className="flex gap-4 p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
                 <ProxiedImage
@@ -1644,7 +1645,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
           </h1>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1 overflow-y-auto scrollbar-hide">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1 overflow-y-auto scrollbar-styled">
           {/* FORM COLUMN */}
           <div className="lg:col-span-2 bg-white p-10 rounded-[2.5rem] shadow-xl border border-zinc-100">
             <form onSubmit={handleCreate} className="space-y-10">
@@ -2154,21 +2155,24 @@ export const BrandDashboard: React.FC = () => {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [sheetsExporting, setSheetsExporting] = useState(false);
   const [ticketOpen, setTicketOpen] = useState(false);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
 
   const fetchData = async () => {
     if (!user) return;
     setIsDataLoading(true);
     try {
-      const [camps, ags, ords, txns] = await Promise.all([
+      const [camps, ags, ords, txns, tix] = await Promise.all([
         api.brand.getBrandCampaigns(user.id),
         api.brand.getConnectedAgencies(user.id),
         api.brand.getBrandOrders(user.name),
         api.brand.getTransactions(user.id),
+        api.tickets.getAll().catch(() => []),
       ]);
       setCampaigns(asArray(camps));
       setAgencies(asArray(ags));
       setOrders(asArray(ords));
       setTransactions(asArray(txns));
+      setTickets(asArray<Ticket>(tix));
     } catch (e) {
       console.error('Dashboard data fetch failed', e);
       toast.error('Failed to load dashboard data');
@@ -2401,6 +2405,16 @@ export const BrandDashboard: React.FC = () => {
                 }}
                 badge={pendingRequests}
               />
+              <SidebarItem
+                icon={<HelpCircle />}
+                label="Tickets"
+                active={activeTab === 'tickets'}
+                onClick={() => {
+                  setActiveTab('tickets');
+                  setIsSidebarOpen(false);
+                }}
+                badge={tickets.filter((t) => String(t.status || '').toLowerCase() === 'open').length}
+              />
             </nav>
             <button
               onClick={() => setTicketOpen(true)}
@@ -2464,6 +2478,100 @@ export const BrandDashboard: React.FC = () => {
         )}
         {activeTab === 'orders' && <OrdersView user={user} />}
         {activeTab === 'profile' && <BrandProfileView />}
+        {activeTab === 'tickets' && (
+          <div className="max-w-3xl mx-auto animate-enter pb-12">
+            <h2 className="text-2xl font-extrabold text-zinc-900 tracking-tight mb-6">Tickets</h2>
+            {(!tickets || tickets.length === 0) ? (
+              <EmptyState
+                title="No tickets"
+                description="Support tickets assigned to your brand will appear here."
+                icon={<HelpCircle size={22} className="text-zinc-400" />}
+              />
+            ) : (
+              <div className="space-y-3">
+                {tickets.map((t: Ticket) => (
+                  <div key={t.id} className="rounded-xl border border-zinc-100 bg-white px-4 py-4 shadow-sm space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-zinc-900 truncate">{String(t.issueType || 'Ticket')}</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            String(t.status) === 'Resolved' ? 'bg-emerald-50 text-emerald-600' :
+                            String(t.status) === 'Rejected' ? 'bg-red-50 text-red-600' :
+                            'bg-amber-50 text-amber-600'
+                          }`}>{String(t.status || 'Open')}</span>
+                        </div>
+                        {t.priority && <div className="text-[10px] text-zinc-400 mt-0.5">Priority: {String(t.priority)}</div>}
+                      </div>
+                      <span className="text-[10px] text-zinc-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''}</span>
+                    </div>
+                    {t.description && (
+                      <div className="text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2 line-clamp-3">
+                        &ldquo;{String(t.description)}&rdquo;
+                      </div>
+                    )}
+                    {(t as any).userName && (
+                      <div className="text-[10px] text-zinc-400">From: {String((t as any).userName)} ({String((t as any).userRole || '')})</div>
+                    )}
+                    <div className="flex items-center gap-2 justify-end">
+                      {String(t.status || '').toLowerCase() === 'open' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await api.tickets.update(t.id, 'Resolved');
+                                toast.success('Ticket resolved.');
+                                fetchData();
+                              } catch (err: any) {
+                                toast.error(formatErrorMessage(err, 'Failed to resolve ticket.'));
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                          >
+                            ✓ Resolve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await api.tickets.update(t.id, 'Rejected');
+                                toast.success('Ticket rejected.');
+                                fetchData();
+                              } catch (err: any) {
+                                toast.error(formatErrorMessage(err, 'Failed to reject ticket.'));
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-50 border border-red-200 text-red-600 hover:bg-red-100"
+                          >
+                            ✗ Reject
+                          </button>
+                        </>
+                      )}
+                      {String(t.status || '').toLowerCase() !== 'open' && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await api.tickets.delete(t.id);
+                              toast.success('Ticket deleted.');
+                              fetchData();
+                            } catch (err: any) {
+                              toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-zinc-50 border border-zinc-200 text-zinc-600 hover:text-red-600 hover:border-red-200"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {activeTab === 'agencies' && (
           <div className="max-w-6xl mx-auto animate-enter pb-12">
@@ -2767,7 +2875,7 @@ export const BrandDashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto scrollbar-hide space-y-6">
+            <div className="flex-1 overflow-y-auto scrollbar-styled space-y-6">
               {/* Profile Info */}
               <div className="bg-zinc-50 p-5 rounded-2xl border border-zinc-100 space-y-3">
                 <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 flex items-center gap-2">

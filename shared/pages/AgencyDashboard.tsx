@@ -11,7 +11,7 @@ import { getApiBaseAbsolute } from '../utils/apiBaseUrl';
 import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
-import { User, Campaign, Order } from '../types';
+import { User, Campaign, Order, Ticket } from '../types';
 import { EmptyState, Spinner } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { DesktopShell } from '../components/DesktopShell';
@@ -64,6 +64,7 @@ import {
   FileSpreadsheet,
   Sparkles,
   Loader2,
+  HelpCircle,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -809,7 +810,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
           ))}
         </div>
 
-        <div className="flex-1 overflow-auto p-0 scrollbar-hide">
+        <div className="flex-1 overflow-auto p-0 scrollbar-styled">
           {/* === LEDGER VIEW === */}
           {financeViewMode === 'ledger' && (<>
           {ledger.length === 0 ? (
@@ -1310,7 +1311,7 @@ const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-0 scrollbar-hide">
+        <div className="flex-1 overflow-auto p-0 scrollbar-styled">
           {payouts.length === 0 ? (
             <div className="p-6">
               {loading ? (
@@ -2734,7 +2735,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
             </div>
 
             {/* Mediator List */}
-            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide space-y-2 pr-1 mb-2">
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-styled space-y-2 pr-1 mb-2">
               {activeMediatorsForAssign.length === 0 ? (
                 loading ? (
                   <EmptyState
@@ -3231,7 +3232,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
             {/* Modal Content */}
             <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden flex flex-col md:flex-row">
               {/* Order List Side */}
-              <div className="flex-1 overflow-visible md:overflow-y-auto p-6 scrollbar-hide border-r border-slate-100">
+              <div className="flex-1 overflow-visible md:overflow-y-auto p-6 scrollbar-styled border-r border-slate-100">
                 <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                   <FileText size={18} /> Order History
                 </h3>
@@ -3460,7 +3461,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto scrollbar-hide space-y-6 pr-2">
+            <div className="flex-1 overflow-y-auto scrollbar-styled space-y-6 pr-2">
               {/* Product Summary */}
               <div className="flex gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
                 <ProxiedImage
@@ -3724,7 +3725,7 @@ export const AgencyDashboard: React.FC = () => {
   const { toast } = useToast();
   useRealtimeConnection();
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'team' | 'inventory' | 'finance' | 'payouts' | 'brands' | 'profile'
+    'dashboard' | 'team' | 'inventory' | 'finance' | 'payouts' | 'brands' | 'tickets' | 'profile'
   >('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -3736,16 +3737,18 @@ export const AgencyDashboard: React.FC = () => {
   const [payouts, setPayouts] = useState<any[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [ticketOpen, setTicketOpen] = useState(false);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
 
   const fetchData = async () => {
     if (!user?.mediatorCode) return;
     setIsDataLoading(true);
     try {
-      const [meds, camps, ords, ledger] = await Promise.all([
+      const [meds, camps, ords, ledger, tix] = await Promise.all([
         api.ops.getMediators(user.mediatorCode),
         api.ops.getCampaigns(user.mediatorCode),
         api.ops.getMediatorOrders(user.mediatorCode, 'agency'),
         api.ops.getAgencyLedger(),
+        api.tickets.getAll().catch(() => []),
       ]);
       const safeMeds = asArray<User>(meds);
       const safeCamps = asArray<Campaign>(camps);
@@ -3756,6 +3759,7 @@ export const AgencyDashboard: React.FC = () => {
       setCampaigns(safeCamps);
       setOrders(safeOrds);
       setPayouts(safeLedger);
+      setTickets(asArray<Ticket>(tix));
 
       const revenue = safeOrds.reduce((sum: number, o: Order) => sum + (o.total || 0), 0);
 
@@ -3908,6 +3912,16 @@ export const AgencyDashboard: React.FC = () => {
                   setIsSidebarOpen(false);
                 }}
               />
+              <SidebarItem
+                icon={<HelpCircle />}
+                label="Tickets"
+                active={activeTab === 'tickets'}
+                onClick={() => {
+                  setActiveTab('tickets');
+                  setIsSidebarOpen(false);
+                }}
+                badge={tickets.filter((t) => String(t.status || '').toLowerCase() === 'open').length}
+              />
             </nav>
           </div>
 
@@ -3984,6 +3998,100 @@ export const AgencyDashboard: React.FC = () => {
         />
       )}
       {activeTab === 'brands' && <BrandsView />}
+      {activeTab === 'tickets' && (
+        <div className="max-w-3xl mx-auto animate-enter pb-12">
+          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-6">Tickets</h2>
+          {(!tickets || tickets.length === 0) ? (
+            <EmptyState
+              title="No tickets"
+              description="Support tickets assigned to your agency will appear here."
+              icon={<HelpCircle size={22} className="text-slate-400" />}
+            />
+          ) : (
+            <div className="space-y-3">
+              {tickets.map((t: Ticket) => (
+                <div key={t.id} className="rounded-xl border border-slate-100 bg-white px-4 py-4 shadow-sm space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-slate-900 truncate">{String(t.issueType || 'Ticket')}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          String(t.status) === 'Resolved' ? 'bg-emerald-50 text-emerald-600' :
+                          String(t.status) === 'Rejected' ? 'bg-red-50 text-red-600' :
+                          'bg-amber-50 text-amber-600'
+                        }`}>{String(t.status || 'Open')}</span>
+                      </div>
+                      {t.priority && <div className="text-[10px] text-slate-400 mt-0.5">Priority: {String(t.priority)}</div>}
+                    </div>
+                    <span className="text-[10px] text-slate-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''}</span>
+                  </div>
+                  {t.description && (
+                    <div className="text-xs text-slate-600 bg-slate-50 rounded-lg px-3 py-2 line-clamp-3">
+                      &ldquo;{String(t.description)}&rdquo;
+                    </div>
+                  )}
+                  {(t as any).userName && (
+                    <div className="text-[10px] text-slate-400">From: {String((t as any).userName)} ({String((t as any).userRole || '')})</div>
+                  )}
+                  <div className="flex items-center gap-2 justify-end">
+                    {String(t.status || '').toLowerCase() === 'open' && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await api.tickets.update(t.id, 'Resolved');
+                              toast.success('Ticket resolved.');
+                              fetchData();
+                            } catch (err: any) {
+                              toast.error(formatErrorMessage(err, 'Failed to resolve ticket.'));
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                        >
+                          ✓ Resolve
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await api.tickets.update(t.id, 'Rejected');
+                              toast.success('Ticket rejected.');
+                              fetchData();
+                            } catch (err: any) {
+                              toast.error(formatErrorMessage(err, 'Failed to reject ticket.'));
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-50 border border-red-200 text-red-600 hover:bg-red-100"
+                        >
+                          ✗ Reject
+                        </button>
+                      </>
+                    )}
+                    {String(t.status || '').toLowerCase() !== 'open' && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await api.tickets.delete(t.id);
+                            toast.success('Ticket deleted.');
+                            fetchData();
+                          } catch (err: any) {
+                            toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-50 border border-slate-200 text-slate-600 hover:text-red-600 hover:border-red-200"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {activeTab === 'profile' && <AgencyProfile user={user} />}
       <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />
     </DesktopShell>

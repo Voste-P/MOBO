@@ -575,38 +575,86 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
           />
         ) : (
           <div className="space-y-2">
-            {tickets.slice(0, 10).map((t: Ticket) => (
+            {tickets.slice(0, 20).map((t: Ticket) => (
               <div
                 key={t.id}
-                className="flex items-center justify-between gap-2 rounded-xl border border-zinc-100 bg-white px-3 py-2 shadow-sm"
+                className="rounded-xl border border-zinc-100 bg-white px-3 py-3 shadow-sm space-y-2"
               >
-                <div className="min-w-0">
-                  <div className="text-[11px] font-bold text-zinc-900 truncate">
-                    {String(t.issueType || 'Ticket')}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-zinc-900 truncate">{String(t.issueType || 'Ticket')}</span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                        String(t.status) === 'Resolved' ? 'bg-emerald-50 text-emerald-600' :
+                        String(t.status) === 'Rejected' ? 'bg-red-50 text-red-600' :
+                        'bg-amber-50 text-amber-600'
+                      }`}>{String(t.status || 'Open')}</span>
+                    </div>
+                    {t.priority && <div className="text-[9px] text-zinc-400 mt-0.5">Priority: {String(t.priority)}</div>}
                   </div>
-                  <div className="text-[10px] text-zinc-500 truncate">
-                    Status: {String(t.status || '')}
-                  </div>
+                  <span className="text-[9px] text-zinc-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      if (String(t.status || '').toLowerCase() === 'open') {
-                        toast.error('Ticket must be resolved or rejected before deletion.');
-                        return;
-                      }
-                      await api.tickets.delete(t.id);
-                      toast.success('Ticket deleted.');
-                      onRefresh();
-                    } catch (err: any) {
-                      toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
-                    }
-                  }}
-                  className="px-3 py-1 rounded-lg text-[10px] font-bold bg-zinc-50 border border-zinc-200 text-zinc-600 hover:text-red-600 hover:border-red-200"
-                >
-                  Delete
-                </button>
+                {t.description && (
+                  <div className="text-[10px] text-zinc-600 bg-zinc-50 rounded-lg px-2 py-1.5 line-clamp-3">
+                    &ldquo;{String(t.description)}&rdquo;
+                  </div>
+                )}
+                {(t as any).userName && (
+                  <div className="text-[9px] text-zinc-400">From: {String((t as any).userName)} ({String((t as any).userRole || '')})</div>
+                )}
+                <div className="flex items-center gap-1.5 justify-end">
+                  {String(t.status || '').toLowerCase() === 'open' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await api.tickets.update(t.id, 'Resolved');
+                            toast.success('Ticket resolved.');
+                            onRefresh();
+                          } catch (err: any) {
+                            toast.error(formatErrorMessage(err, 'Failed to resolve ticket.'));
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                      >
+                        ✓ Resolve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await api.tickets.update(t.id, 'Rejected');
+                            toast.success('Ticket rejected.');
+                            onRefresh();
+                          } catch (err: any) {
+                            toast.error(formatErrorMessage(err, 'Failed to reject ticket.'));
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-50 border border-red-200 text-red-600 hover:bg-red-100"
+                      >
+                        ✗ Reject
+                      </button>
+                    </>
+                  )}
+                  {String(t.status || '').toLowerCase() !== 'open' && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await api.tickets.delete(t.id);
+                          toast.success('Ticket deleted.');
+                          onRefresh();
+                        } catch (err: any) {
+                          toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
+                        }
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-zinc-50 border border-zinc-200 text-zinc-600 hover:text-red-600 hover:border-red-200"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -1448,7 +1496,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-3 scrollbar-hide">
+          <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-3 scrollbar-styled">
             {(viewMode === 'pending' ? pendingOrders : settledOrders).length === 0 ? (
               loading ? (
                 <EmptyState
@@ -1867,7 +1915,7 @@ export const MediatorDashboard: React.FC = () => {
                     </button>
                   </div>
                 </div>
-                <div className="space-y-2 max-h-[250px] overflow-y-auto scrollbar-hide">
+                <div className="space-y-2 max-h-[250px] overflow-y-auto scrollbar-styled">
                   {inboxNotifications.length === 0 && (
                     <div className="text-center py-6">
                       <p className="text-zinc-300 font-bold text-xs">All caught up!</p>
@@ -1924,7 +1972,7 @@ export const MediatorDashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 scrollbar-hide pb-[calc(7.5rem+env(safe-area-inset-bottom))]">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 scrollbar-styled pb-[calc(7.5rem+env(safe-area-inset-bottom))]">
         {activeTab === 'inbox' && (
           <InboxView
             orders={orders}
@@ -2027,7 +2075,7 @@ export const MediatorDashboard: React.FC = () => {
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide pb-28">
+          <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-styled pb-28">
             {/* 1. ORDER MATCHING SECTION */}
             <div className="bg-zinc-900/50 rounded-2xl border border-zinc-800 p-4">
               <h4 className="text-xs font-bold text-zinc-500 uppercase mb-3 flex items-center gap-2">

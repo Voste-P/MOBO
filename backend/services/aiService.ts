@@ -2883,17 +2883,24 @@ export async function extractOrderDetailsWithAi(
               '   - If you see both "MRP ₹999" and "You Pay ₹599", the correct amount is ₹599.',
               '3. EXTRACT the Order Date (when the order was placed).',
               '4. EXTRACT "Sold by" / Seller name.',
+              '   - Look for "Sold by:", "Seller:", "Shipped by:", "Fulfilled by:" labels.',
+              '   - Return ONLY the merchant/company name.',
+              '   - DO NOT include button text like "(Ask Product Question)", "(Visit Store)", "(Leave seller feedback)" that may appear next to the seller name.',
+              '   - Amazon OCR often captures nearby buttons: strip those out.',
               '5. EXTRACT the Product Name / Item title — the full product title as shown in the order.',
               '   - This is CRITICAL for fraud detection. Extract the complete product name, not just a partial match.',
-              '   - Look near the product image, near the price, or at the top of the order details section.',
-              '   - The product name is typically a descriptive title like "Samsung Galaxy M12 (Blue, 64GB)" or "Avimee Herbal Hair Oil 200ml".',
-              '   - It usually appears as the LARGEST text near the product image, or as a link/heading in the order details.',
-              '   - NEVER return a URL, web address, or "amazon.in/..." as the product name. The product name is the item title, not the page URL.',
-              '   - NEVER return delivery status text like "Arriving", "Shipped", "Delivered" as the product name.',
-              '   - NEVER return comma-separated category words like "Tablets, Earbuds, Watch, Blue" — those are category/breadcrumb navigation, not the actual product name.',
-              '   - NEVER return an address, city name, or pincode as the product name.',
-              '   - NEVER return navigation text like "Shop Now", "View Details", "Add to Cart" as the product name.',
-              '   - If you cannot find the product name, return an empty string rather than a URL, status, or category text.',
+              '   - The product name is the descriptive title of the physical item ordered.',
+              '   - It usually appears as a clickable link or large heading near the product image.',
+              '   - Examples: "Avimee Herbal Keshpallav Hair Oil with Rosemary for Hairfall Control" or "PROWL by Tiger Shroff Gift Hamper Box".',
+              '   - NEVER return ANY of these as the product name:',
+              '     * Website header text: "Deliver to [Name]", "Hello, [Name]", "Returns & Orders", "Account & Lists"',
+              '     * Delivery status: "Arriving tomorrow", "Shipped", "Delivered Feb 13", "Out for delivery"',
+              '     * URLs, web addresses, or "amazon.in/..."',
+              '     * Address/location text with city names, pincodes, "MAHARASHTRA", "411027"',
+              '     * Category breadcrumbs: "Tablets, Earbuds, Watch"',
+              '     * Navigation buttons: "Track package", "Cancel items", "Write a review", "Buy it again"',
+              '     * Account greeting: "Hello, Ashok", "Hello, Sumit"',
+              '   - If the DETERMINISTIC_PRODUCT_NAME looks like garbage (contains "Deliver to", "Hello,", "Returns", or is very short/nonsensical), override it with the correct product name from the OCR text.',
               '6. IGNORE ambiguous single/double digit numbers.',
               '7. IGNORE system UUIDs or IDs that look like "SYS-..." or internal codes.',
               '8. If a DETERMINISTIC value is provided and looks correct, confirm it.',
@@ -2944,29 +2951,69 @@ export async function extractOrderDetailsWithAi(
           { inlineData: { mimeType: imgMimeType, data: imageBase64.split(',')[1] || imageBase64 } },
           { text: [
             'TASK: EXTRACT E-COMMERCE ORDER DETAILS FROM THIS SCREENSHOT.',
-            'PRIORITY: GOD-LEVEL ACCURACY REQUIRED.',
+            'PRIORITY: GOD-LEVEL ACCURACY REQUIRED. Every field must be 100% correct.',
             'This screenshot may be from ANY device: mobile, desktop, tablet, laptop.',
             'Desktop screenshots have wide horizontal layouts. Mobile screenshots are narrow and vertical.',
             '',
-            'EXTRACT:',
-            '1. ORDER ID — The unique order identifier. Look for "Order ID", "Order No", "Order #".',
-            '   Platform patterns: Amazon (3-7-7 digits like 404-1234567-1234567), Flipkart (OD+digits), Myntra (MYN/ORD), Meesho (MSH), AJIO (FN), JIO, Nykaa (NYK), Tata (TCL), Snapdeal (SD), BigBasket (BB), etc.',
-            '   IGNORE: Tracking IDs, Shipment numbers, AWB, Invoice numbers, Transaction IDs, UTR, UPI references.',
-            '2. GRAND TOTAL / FINAL AMOUNT PAID — Amount ACTUALLY paid after all discounts.',
-            '   Look for: "Grand Total", "Amount Paid", "You Paid", "Order Total", "Payable", "Net Amount".',
-            '   IGNORE: MRP, List Price, Item Price, Subtotal unless no other total exists.',
-            '   CRITICAL: The amount MUST NOT be digits from the Order ID. Example: if Order ID is 408-0258263-2409973, then 2409973 is NOT the amount.',
-            '   Typical Indian e-commerce amounts: ₹50 to ₹50,000.',
-            '3. ORDER DATE — When the order was placed.',
-            '4. SOLD BY / SELLER NAME.',
-            '5. PRODUCT NAME — Full product title/name as shown in the order.',
-            '   NEVER return a URL, webpage address, or "amazon.in/..." as the product name.',
-            '   The product name is the descriptive title like "Samsung Galaxy M12" or "Avimee Herbal Oil".',
-            '   NEVER return category breadcrumbs like "Tablets, Earbuds, Watch" — find the actual item title.',
-            '   NEVER return delivery status, addresses, pincodes, or navigation text as the product name.',
-            '   Look for the item title near the product image or the price amount.',
+            'IMPORTANT CONTEXT:',
+            '- This is an Indian e-commerce order screenshot (Amazon.in, Flipkart, Myntra, Meesho, Blinkit, Nykaa, AJIO, JioMart, etc.).',
+            '- The screenshot is an ORDER DETAILS page showing a purchased product.',
+            '- Currency is Indian Rupees (₹ / Rs / INR).',
+            '- DO NOT confuse website header/navigation text with order data.',
+            '- The Amazon header shows "Deliver to [Name]", "Hello, [Name]", "Returns & Orders" — these are NOT product data.',
+            '- The Flipkart header shows "Explore Plus", account name, cart icon — these are NOT product data.',
             '',
-            'Return JSON. Set confidenceScore 0-100 based on clarity.',
+            'EXTRACT THESE 5 FIELDS:',
+            '',
+            '1. ORDER ID — The unique order identifier:',
+            '   - Amazon: 3-7-7 digit format like "403-6379089-0697917" (found near "Order number" or "Order #")',
+            '   - Flipkart: Starts with "OD" followed by 10+ digits like "OD436768365753640100" (found near the product name at top)',
+            '   - Myntra: "MYN-" or "ORD-" prefix + digits',
+            '   - Meesho: "MSH-" prefix + digits',
+            '   - Blinkit: "BLK-" prefix + digits',
+            '   - AJIO: "FN-" prefix + digits',
+            '   - IGNORE: Tracking IDs, Shipment numbers, AWB, Invoice numbers, Transaction IDs.',
+            '',
+            '2. AMOUNT (Grand Total / Final Amount Paid):',
+            '   - Look for labels: "Grand Total", "Total amount", "Amount Paid", "You Paid", "Total"',
+            '   - On Amazon: Look in the "Order Summary" section on the right side for "Grand Total: ₹XXX"',
+            '   - On Flipkart: Look in "Price details" section on the right side for "Total amount: ₹XXX"',
+            '   - This is the FINAL amount after all discounts, NOT the MRP or list price.',
+            '   - CRITICAL: Amount MUST NOT be digits extracted from the Order ID.',
+            '   - Typical range: ₹50 to ₹50,000 for individual orders.',
+            '',
+            '3. ORDER DATE — When the order was placed:',
+            '   - Amazon: Near "Order placed [date]" at the top of order details',
+            '   - Flipkart: Near "Order Confirmed, [date]" in the timeline section',
+            '   - Return the full date string as displayed (e.g., "7 February 2026", "Feb 11")',
+            '',
+            '4. SOLD BY / SELLER NAME:',
+            '   - Amazon: Labeled "Sold by: [Seller Name]" near the product',
+            '   - Flipkart: Labeled "Seller: [Name]" below the product name',
+            '   - Return ONLY the seller/merchant company name',
+            '   - DO NOT include button text like "(Ask Product Question)" or "(Visit Store)" or "(Leave seller feedback)"',
+            '   - DO NOT include action links or buttons that appear near the seller name',
+            '',
+            '5. PRODUCT NAME — The full product title:',
+            '   - This is the main item that was ordered — the product title/name',
+            '   - Amazon: It appears as a clickable link/heading in the order, usually below "Arriving/Delivered" status and above "Sold by"',
+            '   - Flipkart: It appears at the top of the page or below the order ID',
+            '   - It is typically the LONGEST descriptive text about the physical item being ordered',
+            '   - Examples: "Avimee Herbal Keshpallav Hair Oil with Rosemary for Hairfall Control and Growth Hair Oil"',
+            '   - Examples: "PROWL by Tiger Shroff Valentine Gift Hamper Box for Mens Grooming | Facewash, Face Cream, Sunscreen"',
+            '   - Examples: "NICONI Tan Vanish Gluta-Kojic Skin Polish | Instant Tan Removal & Glow"',
+            '   - Examples: "Arabian Aroma Old Money Eau de Parfum – Long Lasting Perfume for Man"',
+            '   - NEVER return these as product name:',
+            '     * Navigation text: "Deliver to [Name]", "Hello, [Name]", "Returns & Orders", "Sign In"',
+            '     * Delivery status: "Arriving tomorrow", "Delivered", "Shipped", "Out for delivery"',
+            '     * URLs or web addresses',
+            '     * Address/location text with city names and pincodes',
+            '     * Category breadcrumbs: "Electronics > Mobiles > Smartphones"',
+            '     * Action buttons: "Track package", "Cancel items", "Write a review"',
+            '     * Account info or greeting text',
+            '',
+            'Return JSON with: orderId (string), amount (number), orderDate (string), soldBy (string), productName (string), confidenceScore (0-100 integer).',
+            'If a field is not found, return empty string for strings and 0 for amount.',
           ].join('\n') },
         ],
         config: {
@@ -3378,9 +3425,11 @@ export async function extractOrderDetailsWithAi(
               })()
             : false;
 
-          // Guard: reject AI product name if it looks like a URL
+          // Guard: reject AI product name if it looks like a URL or navigation garbage
           const isProductNameUrl = aiResult.suggestedProductName
             && /https?:\/\/|www\.|\.com\/|\.in\/|orderID=|order-details|ref=/i.test(aiResult.suggestedProductName);
+          const isProductNameNavGarbage = aiResult.suggestedProductName
+            && /^\s*(Deliver\s*to|Hello[,\s]|Returns?\s|Account|Sign\s*in|Cart|Buy\s*Again)/i.test(aiResult.suggestedProductName);
 
           if (!finalOrderId && aiSuggestedOrderId && (orderIdVisible || aiConfidence >= 75)) {
             finalOrderId = aiSuggestedOrderId;
@@ -3405,13 +3454,37 @@ export async function extractOrderDetailsWithAi(
             finalOrderDate = aiResult.suggestedOrderDate;
             notes.push('Order date from AI.');
           }
-          if (!finalSoldBy && aiResult.suggestedSoldBy) {
-            finalSoldBy = aiResult.suggestedSoldBy;
-            notes.push('Seller from AI.');
+          if (aiResult.suggestedSoldBy) {
+            // Clean up soldBy from AI
+            const cleanedAiSoldBy = aiResult.suggestedSoldBy
+              .replace(/\s*\(\s*(Ask\s*Product\s*Question|Visit\s*(the\s*)?Store|See\s*All|View\s*More|Follow|Contact|Report|Share)[^)]*\)/gi, '')
+              .replace(/\s*Ask\s*Product\s*Question\s*/gi, '')
+              .replace(/\s*Visit\s*(the\s*)?Store\s*/gi, '')
+              .replace(/\s{2,}/g, ' ')
+              .trim();
+            if (!finalSoldBy && cleanedAiSoldBy.length >= 2) {
+              finalSoldBy = cleanedAiSoldBy;
+              notes.push('Seller from AI.');
+            } else if (finalSoldBy && cleanedAiSoldBy.length >= 2 && aiConfidence >= 75) {
+              // AI can correct OCR-garbled seller names
+              const currentHasGarbage = /\b(Ask\s*Product|Visit\s*Store|Leave\s*seller|Track\s*package|Cancel\s*items|Write\s*a\s*review|Return\s*or\s*replace)\b/i.test(finalSoldBy);
+              if (currentHasGarbage) {
+                finalSoldBy = cleanedAiSoldBy;
+                notes.push('AI corrected seller name (removed button text).');
+              }
+            }
           }
-          if (!finalProductName && aiResult.suggestedProductName && !isProductNameUrl) {
+          if (!finalProductName && aiResult.suggestedProductName && !isProductNameUrl && !isProductNameNavGarbage) {
             finalProductName = aiResult.suggestedProductName;
             notes.push('Product name from AI.');
+          }
+          // AI can correct garbage deterministic product name
+          if (finalProductName && aiResult.suggestedProductName && !isProductNameUrl && !isProductNameNavGarbage && aiConfidence >= 70) {
+            const currentIsGarbage = /\b(Deliver\s*to|Hello[,\s]|Returns?\s*(&|\d)|Account|Sign\s*in|Buy\s*Again)\b/i.test(finalProductName);
+            if (currentIsGarbage && aiResult.suggestedProductName.length >= 10) {
+              finalProductName = aiResult.suggestedProductName;
+              notes.push('AI corrected product name (deterministic was navigation garbage).');
+            }
           }
 
           // Update confidence
@@ -3439,8 +3512,9 @@ export async function extractOrderDetailsWithAi(
         }
       }
 
-      // Step 2: Direct image extraction (fallback — sends image to Gemini vision)
-      if (!finalOrderId || !finalAmount) {
+      // Step 2: Direct image extraction — runs when ANY field is missing (not just ID/amount)
+      // Gemini Vision understands screenshot layout far better than OCR text parsing
+      if (!finalOrderId || !finalAmount || !finalProductName || !finalSoldBy || !finalOrderDate) {
         for (const model of GEMINI_MODEL_FALLBACKS.slice(0, 2)) {
           try {
             // eslint-disable-next-line no-await-in-loop
@@ -3477,20 +3551,51 @@ export async function extractOrderDetailsWithAi(
               notes.push('Amount from direct image AI.');
             }
             if (!finalOrderDate && directResult.orderDate) finalOrderDate = directResult.orderDate;
-            if (!finalSoldBy && directResult.soldBy) finalSoldBy = directResult.soldBy;
-            // Guard: reject direct AI product name if it looks like a URL
+            // For soldBy from vision: trust it even if OCR found something (vision is more accurate)
+            if (directResult.soldBy) {
+              const cleanedSoldBy = directResult.soldBy
+                .replace(/\s*\(\s*(Ask\s*Product\s*Question|Visit\s*(the\s*)?Store|See\s*All|View\s*More|Follow|Contact|Report|Share)\s*\)/gi, '')
+                .replace(/\s{2,}/g, ' ')
+                .trim();
+              if (cleanedSoldBy.length >= 2) {
+                if (!finalSoldBy) {
+                  finalSoldBy = cleanedSoldBy;
+                } else if (directConfidence >= 70) {
+                  finalSoldBy = cleanedSoldBy;
+                  notes.push('Seller updated from direct image AI (higher accuracy).');
+                }
+              }
+            }
+            // Guard: reject direct AI product name if it looks like a URL or navigation text
             const directProductIsUrl = directResult.productName
               && /https?:\/\/|www\.|\.com\/|\.in\/|orderID=|order-details|ref=/i.test(directResult.productName);
-            if (!finalProductName && directResult.productName && !directProductIsUrl) {
-              finalProductName = directResult.productName;
+            const directProductIsNavCrap = directResult.productName
+              && /^\s*(Deliver\s*to|Hello[,\s]|Returns?\s|Account|Sign\s*in|Cart|Buy\s*Again)/i.test(directResult.productName);
+            if (directResult.productName && !directProductIsUrl && !directProductIsNavCrap) {
+              const cleanedProductName = directResult.productName
+                .replace(/^[\s\-:•·|>]+/, '')
+                .replace(/[\s\-:•·|]+$/, '')
+                .replace(/\s{2,}/g, ' ')
+                .trim();
+              if (cleanedProductName.length >= 5) {
+                if (!finalProductName) {
+                  finalProductName = cleanedProductName;
+                } else if (directConfidence >= 70 && cleanedProductName.length > (finalProductName?.length ?? 0)) {
+                  // Vision result is likely more accurate for product names
+                  finalProductName = cleanedProductName;
+                  notes.push('Product name updated from direct image AI (higher accuracy).');
+                }
+              }
             }
 
-            if (finalOrderId || finalAmount) {
+            if (finalOrderId || finalAmount || directResult.productName || directResult.soldBy) {
               confidenceScore = Math.max(confidenceScore, directConfidence);
               aiUsed = true;
               aiLog.info('Order extract direct AI', {
                 orderId: directOrderId,
                 amount: directAmount,
+                productName: directResult.productName,
+                soldBy: directResult.soldBy,
                 confidence: directConfidence,
               });
             }
@@ -3625,6 +3730,40 @@ export async function extractOrderDetailsWithAi(
         .trim();
       if (finalProductName.length < 3) {
         finalProductName = null;
+      }
+    }
+
+    // 6j. Reject product name if it contains navigation chrome from Amazon/Flipkart header
+    if (finalProductName && /\b(Deliver\s*to\s|Hello[,\s]|Returns?\s*&|My\s*Account|Sign\s*In|Your\s*Orders?|Prime|Explore\s*Plus)/i.test(finalProductName)) {
+      const hasProductKeyword = /\b(phone|laptop|tablet|watch|earbuds?|headphone|shirt|shoe|bag|cream|oil|gel|powder|serum|shampoo|charger|cable|cover|case|book|pack|ml|gm|kg|pcs|combo|set|kit|perfume|lotion|lipstick|foundation|vitamin|trimmer|bottle|brush)\b/i.test(finalProductName);
+      if (!hasProductKeyword) {
+        notes.push('Product name contained navigation chrome — rejected.');
+        finalProductName = null;
+      }
+    }
+
+    // 6k. Reject product name if it looks like "Deliver to X something" or "Hello, X something"
+    if (finalProductName && /^\s*(Deliver\s*to\s|Hello[,\s])/i.test(finalProductName)) {
+      notes.push('Product name was address/greeting header — rejected.');
+      finalProductName = null;
+    }
+
+    // 9. Clean up soldBy: strip common Amazon/Flipkart button text that OCR captured
+    if (finalSoldBy) {
+      finalSoldBy = finalSoldBy
+        .replace(/\s*\(\s*(Ask\s*Product\s*Question|Visit\s*(the\s*)?Store|See\s*All|View\s*More|Follow|Contact|Report|Share)[^)]*\)/gi, '')
+        .replace(/\s*Ask\s*Product\s*Question\s*/gi, '')
+        .replace(/\s*Visit\s*(the\s*)?Store\s*/gi, '')
+        .replace(/\s*Write\s*a\s*product\s*review\s*/gi, '')
+        .replace(/\s*Leave\s*seller\s*feedback\s*/gi, '')
+        .replace(/\s*Leave\s*delivery\s*feedback\s*/gi, '')
+        .replace(/\s*Return\s*or\s*replace\s*items?\s*/gi, '')
+        .replace(/\s*Track\s*package\s*/gi, '')
+        .replace(/\s*Cancel\s*items?\s*/gi, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+      if (finalSoldBy.length < 2) {
+        finalSoldBy = null;
       }
     }
 
