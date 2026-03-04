@@ -983,7 +983,7 @@ const OrdersView = ({ user }: any) => {
         </div>
 
         <div className="bg-white rounded-[2.5rem] border border-zinc-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto scrollbar-styled">
 
             {/* === ORDERS VIEW (default) === */}
             {orderViewMode === 'orders' && (
@@ -2665,7 +2665,7 @@ export const BrandDashboard: React.FC = () => {
                 </div>
               </div>
               <div className="bg-white rounded-[2rem] border border-zinc-100 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto scrollbar-styled">
                   <table className="w-full text-left min-w-[600px]">
                     <thead className="bg-zinc-50 text-zinc-400 text-xs font-bold uppercase tracking-wider">
                       <tr>

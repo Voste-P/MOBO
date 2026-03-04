@@ -224,6 +224,67 @@ export function makeNotificationsController() {
           }
         }
 
+        // ── Ticket status notifications (all roles) ──────────────────────
+        // Show recent ticket updates — resolved/rejected/reopened tickets for the ticket owner
+        try {
+          const ticketWhere: any = { userId: pgUserId, isDeleted: false };
+          const recentTickets = await db().ticket.findMany({
+            where: ticketWhere,
+            orderBy: { updatedAt: 'desc' },
+            take: 20,
+            select: {
+              id: true,
+              mongoId: true,
+              status: true,
+              issueType: true,
+              resolvedAt: true,
+              resolvedBy: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          });
+
+          for (const t of recentTickets) {
+            const tid = String(t.mongoId || t.id);
+            const status = String(t.status || '').trim();
+            const issueType = String(t.issueType || 'Issue');
+            const ts = safeIso(t.updatedAt) ?? safeIso(t.createdAt) ?? nowIso();
+
+            if (status === 'Resolved') {
+              notifications.push({
+                id: `ticket:${tid}:resolved:${ts}`,
+                type: 'success',
+                title: 'Ticket resolved',
+                message: `Your "${issueType}" ticket has been resolved.`,
+                createdAt: ts,
+              });
+            } else if (status === 'Rejected') {
+              notifications.push({
+                id: `ticket:${tid}:rejected:${ts}`,
+                type: 'alert',
+                title: 'Ticket rejected',
+                message: `Your "${issueType}" ticket was rejected. You can create a new ticket if the issue persists.`,
+                createdAt: ts,
+              });
+            } else if (status === 'Open') {
+              // Check if it was recently created (within the last 24h) to show confirmation
+              const createdMs = t.createdAt ? new Date(t.createdAt).getTime() : 0;
+              if (createdMs && Date.now() - createdMs < 86_400_000) {
+                notifications.push({
+                  id: `ticket:${tid}:open:${ts}`,
+                  type: 'info',
+                  title: 'Ticket submitted',
+                  message: `Your "${issueType}" ticket is being reviewed.`,
+                  createdAt: ts,
+                });
+              }
+            }
+          }
+        } catch (ticketErr) {
+          // Don't break notifications if ticket query fails
+          businessLog.warn('[notifications] Failed to load ticket notifications', { error: ticketErr });
+        }
+
         // Sort newest-first and cap.
         notifications.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
 

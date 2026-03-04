@@ -1839,8 +1839,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     className="text-sm"
                   />
                 </div>
+                <div className="overflow-x-auto max-h-[70vh] overflow-y-auto scrollbar-styled">
                 <table className="w-full text-left">
-                  <thead className="bg-slate-50 text-xs font-extrabold uppercase text-slate-400 tracking-wider">
+                  <thead className="bg-slate-50 text-xs font-extrabold uppercase text-slate-400 tracking-wider sticky top-0 z-10">
                     <tr>
                       <th className="p-5">Product</th>
                       <th className="p-5">Category</th>
@@ -1894,6 +1895,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
 
@@ -2011,9 +2013,10 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   />
                 </div>
                 <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto max-h-[70vh] overflow-y-auto scrollbar-styled">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200">
+                      <tr className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
                         <th className="p-4 text-left text-[10px] font-bold text-slate-400 uppercase">Time</th>
                         <th className="p-4 text-left text-[10px] font-bold text-slate-400 uppercase">Action</th>
                         <th className="p-4 text-left text-[10px] font-bold text-slate-400 uppercase">Entity</th>
@@ -2064,6 +2067,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       )}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               </div>
             )}

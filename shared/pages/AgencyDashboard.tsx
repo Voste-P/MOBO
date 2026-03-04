@@ -2046,7 +2046,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
 
       {/* Content Area */}
       <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm flex-1">
-        <div className="overflow-x-auto h-full scrollbar-hide">
+        <div className="overflow-x-auto h-full scrollbar-styled">
           {subTab === 'inventory' ? (
             <table className="w-full text-left">
               <thead className="bg-slate-50 text-slate-400 text-[10px] font-extrabold uppercase tracking-wider sticky top-0 z-10 shadow-sm">
@@ -2353,7 +2353,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
           onClick={() => setCreateModal(false)}
         >
           <div
-            className="bg-white w-[95%] md:w-full max-w-lg rounded-[2rem] p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto scrollbar-hide animate-slide-up"
+            className="bg-white w-[95%] md:w-full max-w-lg rounded-[2rem] p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto scrollbar-styled animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-6">
@@ -3077,7 +3077,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
 
       {/* Main List */}
       <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm flex-1">
-        <div className="overflow-x-auto h-full">
+        <div className="overflow-x-auto h-full scrollbar-styled">
           <table className="w-full text-left">
             <thead className="bg-slate-50 text-slate-400 text-[10px] font-extrabold uppercase tracking-wider sticky top-0 z-10 shadow-sm">
               <tr>

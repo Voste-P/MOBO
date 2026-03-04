@@ -2106,7 +2106,22 @@ export async function extractOrderDetailsWithAi(
         return sorted[0].value;
       }
 
-      // Fallback: any INR-prefixed value in the entire text
+      // ── "Recommended for you" / "Similar products" zone detection ──
+      // Find the character offset where a recommendation section starts so we
+      // can SKIP all amounts after that offset in the INR/bare fallbacks.
+      const RECO_SECTION_RE = /\b(recommended\s*for\s*you|people\s*also\s*(bought|viewed)|similar\s*products?|you\s*may\s*also|frequently\s*bought|inspired\s*by\s*your|customers?\s*(also|who)|keep\s*shopping|based\s*on\s*your)\b/i;
+      const recoMatch = RECO_SECTION_RE.exec(text);
+      const recoStartOffset = recoMatch ? (recoMatch.index ?? text.length) : text.length;
+
+      // Also detect Amazon bottom nav bar zone: "Home  You  Wallet  Cart  Menu  Rufus"
+      const NAV_BAR_RE = /\b(Home|You|Wallet|Cart|Menu|Rufus)\b.*\b(Home|You|Wallet|Cart|Menu|Rufus)\b/;
+      const navMatch = NAV_BAR_RE.exec(text);
+      const navStartOffset = navMatch ? (navMatch.index ?? text.length) : text.length;
+
+      // Use the EARLIER of the two as the "noise zone" cutoff
+      const noiseZoneStart = Math.min(recoStartOffset, navStartOffset);
+
+      // Fallback: any INR-prefixed value in the entire text (BEFORE noise zone)
       const inrMatches = text.matchAll(INR_VALUE_GLOBAL_RE);
       const inrValues: number[] = [];
       for (const match of inrMatches) {
@@ -2114,6 +2129,8 @@ export async function extractOrderDetailsWithAi(
         if (!value) continue;
         if (isOrderIdFragment(match[1])) continue;
         if (isLikelyPhoneNumber(match[1], value)) continue;
+        // Skip amounts after the "Recommended for you" / nav bar zone
+        if ((match.index ?? 0) >= noiseZoneStart) continue;
         // Skip if the value's surrounding line is address/contact context
         const lineIdx = text.lastIndexOf('\n', (match.index ?? 0));
         const lineEnd = text.indexOf('\n', (match.index ?? 0) + match[0].length);
@@ -2121,6 +2138,8 @@ export async function extractOrderDetailsWithAi(
         if (isAddressOrContactLine(surroundingLine) && !FINAL_AMOUNT_LABEL_RE.test(surroundingLine)) continue;
         // Skip INR values on EXCLUDED lines (MRP, listing price, discount, fee lines)
         if (EXCLUDED_AMOUNT_LABEL_RE.test(surroundingLine) && !FINAL_AMOUNT_LABEL_RE.test(surroundingLine)) continue;
+        // Skip values on "FREE Delivery" / rating / review count lines
+        if (/free\s*delivery|\brating|\breviews?\b|\bstars?\b|\d+\s*count\b/i.test(surroundingLine)) continue;
         inrValues.push(value);
       }
       if (inrValues.length) return Math.max(...inrValues);
@@ -2133,6 +2152,8 @@ export async function extractOrderDetailsWithAi(
         if (!value) continue;
         if (value < 1 || value > 9_999_999) continue;
         if (isOrderIdFragment(match[1])) continue; // Skip order ID digit fragments
+        // Skip amounts after the "Recommended for you" / nav bar zone
+        if ((match.index ?? 0) >= noiseZoneStart) continue;
         // Skip values that look like dates, years, phone numbers, pin codes
         if (/^\d{4}$/.test(match[1]) && value >= 1900 && value <= 2100) continue;
         if (/^\d{6}$/.test(match[1]) && value >= 100000 && value <= 999999) continue; // 6-digit pincode
@@ -2368,7 +2389,32 @@ export async function extractOrderDetailsWithAi(
         /^MYN\d{6,}$/i,
         /^MSH\d{6,}$/i,
         /^FN\d{6,}$/i,
+        // ── E-commerce domain / URL bar text that OCR might capture ──
+        /^(amazon|flipkart|myntra|meesho|nykaa|purplle|ajio|snapdeal|jiomart|blinkit|bigbasket|zepto|swiggy|shopsy|tatacliq|croma|reliance)\s*\.?\s*(in|com|co\.in|app)\s*$/i,
+        /^(www\.)?(amazon|flipkart|myntra|meesho|nykaa)\.(in|com)/i,
+        // ── Amazon/Flipkart bottom navigation bar text ──
+        /^(Home|You|Wallet|Cart|Menu|Rufus)\s*$/i,
+        // ── "FREE Delivery" / delivery info lines ──
+        /^free\s*delivery/i,
+        /^(delivery|shipping)\s*by\s/i,
+        // ── Star rating / review count lines that OCR can pick up ──
+        /^\d[\d,]*\s*(ratings?|reviews?)\s*$/i,
+        /^\d+(\.\d)?\s*out\s*of\s*5/i,
+        // ── "Buy it again" / "View your item" / action buttons ──
+        /^(buy\s*it\s*again|view\s*your\s*item|view\s*order|leave\s*(seller|delivery)\s*feedback)/i,
+        // ── Recommendation section product cards (after "Recommended" header) ──
+        // These may look like real products but belong to the suggestion section
+        /^\d+%\s*off$/i,  // "5% off" discount badges on recommended cards
+        /^M\.?R\.?P\.?\s*[:\-]?\s*₹/i,  // MRP lines in recommendation cards
       ];
+
+      // ── Detect "Recommended for you" section position ──
+      // Products listed AFTER this header should not be considered as the order's product.
+      const recoSectionHeaderIdx = lines.findIndex(l =>
+        /\b(recommended\s*for\s*you|people\s*also\s*(bought|viewed)|similar\s*products?|you\s*may\s*also|frequently\s*bought|inspired\s*by\s*your|customers?\s*(also|who)|keep\s*shopping|based\s*on\s*your)\b/i.test(l)
+      );
+      // Effective end-of-content: only scan lines BEFORE the recommendation section
+      const productScanEndIdx = recoSectionHeaderIdx >= 0 ? recoSectionHeaderIdx : lines.length;
 
       // ── PHASE 1: Platform-specific product name extraction ──
       // Platform-specific patterns locate product names more precisely by understanding page layout.
@@ -2377,7 +2423,7 @@ export async function extractOrderDetailsWithAi(
       if (platform === 'amazon') {
         // Amazon: product name appears AFTER "Order placed/Arriving/Delivered" and BEFORE "Sold by"
         // Product names can span MULTIPLE LINES — we need to merge adjacent descriptive lines.
-        for (let i = 0; i < lines.length; i++) {
+        for (let i = 0; i < productScanEndIdx; i++) {
           const line = lines[i];
           // Look for product title lines between key markers
           const isAfterOrderInfo = i > 0 && lines.slice(Math.max(0, i - 5), i).some(
@@ -2443,7 +2489,7 @@ export async function extractOrderDetailsWithAi(
             prev => /^(delivery\s*details?|ship\s*to|deliver\s*to|billing|shipping\s*address|contact\s*details?)/i.test(prev)
           );
 
-        for (let i = 0; i < lines.length; i++) {
+        for (let i = 0; i < productScanEndIdx; i++) {
           const line = lines[i];
           if (line.length < 10) continue;
           if (!isFlipkartProductLine(line, i)) continue;
@@ -2477,7 +2523,7 @@ export async function extractOrderDetailsWithAi(
         }
       } else if (platform === 'myntra') {
         // Myntra: Brand name on one line, then product type on the next
-        for (let i = 0; i < lines.length; i++) {
+        for (let i = 0; i < productScanEndIdx; i++) {
           const line = lines[i];
           if (line.length < 4) continue;
           if (excludePatterns.some(p => p.test(line))) continue;
@@ -2510,7 +2556,7 @@ export async function extractOrderDetailsWithAi(
         }
       } else if (platform === 'meesho') {
         // Meesho: product name is usually a descriptive line near the price
-        for (let i = 0; i < lines.length; i++) {
+        for (let i = 0; i < productScanEndIdx; i++) {
           const line = lines[i];
           if (line.length < 10) continue;
           if (excludePatterns.some(p => p.test(line))) continue;
@@ -2524,7 +2570,7 @@ export async function extractOrderDetailsWithAi(
         }
       } else if (platform === 'nykaa' || platform === 'purplle') {
         // Nykaa/Purplle: beauty product names, often with brand + product type + size
-        for (let i = 0; i < lines.length; i++) {
+        for (let i = 0; i < productScanEndIdx; i++) {
           const line = lines[i];
           if (line.length < 10) continue;
           if (excludePatterns.some(p => p.test(line))) continue;
@@ -2544,7 +2590,7 @@ export async function extractOrderDetailsWithAi(
         }
       } else if (platform === 'blinkit' || platform === 'zepto' || platform === 'bigbasket' || platform === 'swiggy') {
         // Grocery/quick commerce: product names include brand + item + weight
-        for (let i = 0; i < lines.length; i++) {
+        for (let i = 0; i < productScanEndIdx; i++) {
           const line = lines[i];
           if (line.length < 8) continue;
           if (excludePatterns.some(p => p.test(line))) continue;
@@ -2571,7 +2617,7 @@ export async function extractOrderDetailsWithAi(
         candidates.push({ name: platformCandidate, score: 15 }); // High priority for platform-detected names
       }
 
-      for (let i = 0; i < lines.length; i++) {
+      for (let i = 0; i < productScanEndIdx; i++) {
         const line = lines[i];
         if (line.length < 6 || line.length > 250) continue;
         if (excludePatterns.some(p => p.test(line))) continue;

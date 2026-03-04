@@ -1827,4 +1827,218 @@ describe('order extraction (Tesseract fallback)', () => {
       expect(result.orderDate).toMatch(/3.*March.*2026|March.*3.*2026/i);
     }
   });
+
+  // ── REAL IndianTester.com screenshots: "Recommended for you" noise ──
+
+  it('Screenshot 22: Amazon mobile with "Recommended for you" section — should pick Grand Total not recommended price', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'Order Details',
+      'Order placed   2 June 2025',
+      'Order number   408-8278277-3924353',
+      '',
+      'Arriving Thursday',
+      'NUTROVA Complete Omega 3 Vegan and Gelatin-Free 60 capsules',
+      'Sold by: Nutrova',
+      'Rs 1,013.00',
+      '',
+      'Track package',
+      'Cancel Items',
+      'Write a product review',
+      'Ask Product Question',
+      '',
+      'Payment method',
+      'BHIM UPI',
+      '',
+      'Ship to',
+      'MUMBAI MAHARASHTRA 400093',
+      '',
+      'Order Summary',
+      'Items: Rs 1,013.00',
+      'Delivery: FREE',
+      'COD Fee: Rs 17.00',
+      'Grand Total: Rs 1,030.00',
+      '',
+      'Recommended for you',
+      'Based on NUTROVA Complete Omega 3',
+      'NUTROVA Kerastrength',
+      'Rs 1,070.00',
+      '4.1 out of 5 stars  2345 ratings',
+      'Origins Nutra Bone Strength',
+      'Rs 1,273.00',
+      '4.3 out of 5 stars  1876 ratings',
+      'Himalaya Wellness Pure Herbs',
+      'Rs 599.00',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 22 result:', JSON.stringify(result, null, 2));
+
+    // Grand Total must be 1030, NOT 1070 or 1273 from recommendations
+    if (result.amount) {
+      expect(result.amount).toBe(1030);
+      expect(result.amount).not.toBe(1070);
+      expect(result.amount).not.toBe(1273);
+      expect(result.amount).not.toBe(599);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/408-8278277-3924353/);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/nutrova.*omega|omega.*3/i);
+      // Must NOT pick recommended product names
+      expect(result.productName).not.toMatch(/Kerastrength/i);
+      expect(result.productName).not.toMatch(/Origins\s*Nutra/i);
+      expect(result.productName).not.toMatch(/Himalaya/i);
+      expect(result.productName).not.toMatch(/Bone\s*Strength/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/Nutrova/i);
+    }
+    if (result.orderDate) {
+      expect(result.orderDate).toMatch(/2.*June.*2025|June.*2.*2025/i);
+    }
+  });
+
+  it('Screenshot 23: Amazon mobile cropped — Grand Total NOT visible, should pick item price', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'Order Details',
+      'Order placed   2 June 2025',
+      'Order number   406-0028956-0486700',
+      '',
+      'Arriving Friday',
+      'Nutrova Whey Protein Isolate Dark Chocolate 120g 24g Protein',
+      'Sold by: Nutrova',
+      'Rs 665.00',
+      '',
+      'Track package',
+      'Cancel Items',
+      '',
+      'Payment method',
+      'BHIM UPI',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 23 result:', JSON.stringify(result, null, 2));
+
+    // Only visible price is the item price 665
+    if (result.amount) {
+      expect(result.amount).toBe(665);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/406-0028956-0486700/);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/nutrova.*whey|whey.*protein/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/Nutrova/i);
+    }
+  });
+
+  it('Screenshot 24: Amazon mobile dark mode with COD fee — Grand Total must win over subtotal', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'Order Details',
+      'Order placed   2 June 2025',
+      'Order number   402-8543328-9589145',
+      '',
+      'Arriving Saturday',
+      'Droop Unisex Cotton Baseball Cap Stylish Sports Cap for Girls',
+      'Sold by: Blazrt Industries',
+      'Rs 599.00',
+      '',
+      'Track package',
+      'Write a product review',
+      '',
+      'Payment method',
+      'Cash on Delivery',
+      '',
+      'Ship to',
+      'MUMBAI MAHARASHTRA 400061',
+      '',
+      'Order Summary',
+      'Items: Rs 599.00',
+      'Delivery: FREE',
+      'COD Fee: Rs 14.00',
+      'Grand Total: Rs 613.00',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 24 result:', JSON.stringify(result, null, 2));
+
+    if (result.amount) {
+      expect(result.amount).toBe(613);
+      expect(result.amount).not.toBe(599);
+      expect(result.amount).not.toBe(14);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/402-8543328-9589145/);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/droop.*cap|cotton.*cap|baseball.*cap/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/Blazrt\s*Industries/i);
+    }
+    if (result.orderDate) {
+      expect(result.orderDate).toMatch(/2.*June.*2025|June.*2.*2025/i);
+    }
+  });
+
+  it('Screenshot 25: Amazon mobile with promotion discount — Grand Total after promotion must be picked', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'Order Details',
+      'Order placed   1 June 2025',
+      'Order number   403-5861220-2183552',
+      '',
+      'Arriving Wednesday',
+      'NUTROVA Kerastrength For Men and Women 30 Capsules',
+      'Sold by: Nutrova',
+      'Rs 1,070.00',
+      '',
+      'Track package',
+      'Cancel Items',
+      'Write a product review',
+      'Ask Product Question',
+      '',
+      'Payment method',
+      'Cash on Delivery',
+      '',
+      'Ship to',
+      'MUMBAI MAHARASHTRA 400093',
+      '',
+      'Order Summary',
+      'Items: Rs 1,070.00',
+      'Shipping: Rs 40.00',
+      'COD Fee: Rs 17.00',
+      'Promotion Applied: -Rs 82.80',
+      'Grand Total: Rs 1,044.20',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 25 result:', JSON.stringify(result, null, 2));
+
+    if (result.amount) {
+      expect(result.amount).toBe(1044.2);
+      expect(result.amount).not.toBe(1070);
+      expect(result.amount).not.toBe(40);
+      expect(result.amount).not.toBe(17);
+      expect(result.amount).not.toBe(82.80);
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/403-5861220-2183552/);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/nutrova.*kerastrength|kerastrength/i);
+    }
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/Nutrova/i);
+    }
+    if (result.orderDate) {
+      expect(result.orderDate).toMatch(/1.*June.*2025|June.*1.*2025/i);
+    }
+  });
 });
