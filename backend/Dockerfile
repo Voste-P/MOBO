@@ -53,9 +53,6 @@ COPY --from=builder /app/backend/dist backend/dist
 COPY --from=builder /app/backend/generated backend/generated
 COPY --from=builder /app/backend/prisma backend/prisma
 
-# Copy deploy-migrate script (direct SQL migration runner for production)
-COPY backend/scripts/deploy-migrate.cjs backend/scripts/deploy-migrate.cjs
-
 # Copy shared (needed at runtime for type imports resolved via dist)
 COPY --from=builder /app/shared shared/
 
@@ -75,4 +72,4 @@ EXPOSE 8080
 # Start the server with tini for proper signal forwarding
 ENV NODE_ENV=production
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "cd backend && node scripts/deploy-migrate.cjs && node dist/index.js"]
+CMD ["sh", "-c", "cd backend && npx prisma migrate deploy && node dist/index.js"]
