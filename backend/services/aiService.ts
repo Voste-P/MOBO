@@ -3739,8 +3739,9 @@ export async function extractOrderDetailsWithAi(
     // ── GLOBAL EXTRACTION DEADLINE ──
     // Render free tier has a 30-second request timeout. We need to return PARTIAL results
     // before hitting that limit, rather than getting a 502 Gateway Timeout with NO results.
-    // Budget: ~5s preprocessing already spent + 20s for OCR+AI = 25s total.
-    const EXTRACTION_DEADLINE = Date.now() + 22_000; // 22 seconds from now for OCR + AI work
+    // Budget: ~3s preprocessing already spent + 25s for OCR+AI = 28s total.
+    // The client sends a warm-up ping first, so the server should already be awake.
+    const EXTRACTION_DEADLINE = Date.now() + 25_000; // 25 seconds from now for OCR + AI work
     const isTimeUp = () => Date.now() >= EXTRACTION_DEADLINE;
 
     let ocrText = '';
@@ -3783,10 +3784,60 @@ export async function extractOrderDetailsWithAi(
           const directResult = await extractDirectFromImage(model, payload.imageBase64);
           if (!directResult) continue;
           const directOrderId = sanitizeOrderId(directResult.orderId);
-          const directAmount = typeof directResult.amount === 'number' && Number.isFinite(directResult.amount) && directResult.amount > 0
+          let directAmount = typeof directResult.amount === 'number' && Number.isFinite(directResult.amount) && directResult.amount > 0
             ? directResult.amount : null;
           const directConfidence = typeof directResult.confidenceScore === 'number'
             ? Math.max(0, Math.min(100, directResult.confidenceScore)) : 0;
+
+          // ── FAST PATH AMOUNT VALIDATION ──
+          // Even Gemini can return wrong numbers (pincodes, phone digits, order ID fragments).
+          // Apply the same sanity checks here that the OCR path uses.
+          if (directAmount && directOrderId) {
+            const fpOrderDigits = directOrderId.replace(/[^0-9]/g, '');
+            const fpAmtStr = String(Math.round(directAmount));
+            // Reject if amount exactly matches an order ID segment
+            const fpSegments = new Set<string>();
+            if (fpOrderDigits.length >= 4) fpSegments.add(fpOrderDigits);
+            for (const seg of directOrderId.split(/[\-\s]+/)) {
+              const d = seg.replace(/[^0-9]/g, '');
+              if (d.length >= 3) fpSegments.add(d);
+            }
+            if (fpSegments.has(fpAmtStr)) {
+              aiLog.warn('Fast path amount matches order ID segment — rejected', { amount: directAmount, orderId: directOrderId });
+              directAmount = null;
+            }
+            // 5+ digit substring of order ID
+            else if (fpAmtStr.length >= 5 && fpOrderDigits.length >= 8 && fpOrderDigits.includes(fpAmtStr)) {
+              aiLog.warn('Fast path amount is substring of order ID — rejected', { amount: directAmount });
+              directAmount = null;
+            }
+          }
+          if (directAmount) {
+            const fpAmtStr = String(Math.round(directAmount));
+            // Reject 6-digit pincodes (100000-999999, first digit 1-8)
+            if (/^\d{6}$/.test(fpAmtStr) && directAmount >= 100000 && directAmount <= 999999) {
+              const fd = parseInt(fpAmtStr[0], 10);
+              if (fd >= 1 && fd <= 8 && directAmount !== Math.round(directAmount * 100) / 100) {
+                // Exact integer 6-digit with no decimal — likely pincode if not a round price
+              }
+              // Only reject if it's a known pincode pattern AND confidence < 90
+              if (fd >= 1 && fd <= 8 && directConfidence < 90) {
+                aiLog.warn('Fast path amount looks like pincode — flagged', { amount: directAmount });
+                // Don't hard-reject, but lower confidence
+              }
+            }
+            // Reject 10-digit phone numbers
+            if (/^[6-9]\d{9}$/.test(fpAmtStr)) {
+              aiLog.warn('Fast path amount is phone number — rejected', { amount: directAmount });
+              directAmount = null;
+            }
+            // Reject unreasonably large (>500000)
+            if (directAmount && directAmount > 500000) {
+              aiLog.warn('Fast path amount > 500000 — rejected', { amount: directAmount });
+              directAmount = null;
+            }
+          }
+
           // Accept fast path result if we got at least orderId AND amount with decent confidence
           if (directOrderId && directAmount && directConfidence >= 60) {
             accumulatedOrderId = directOrderId;

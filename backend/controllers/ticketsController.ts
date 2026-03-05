@@ -6,7 +6,8 @@ import type { Role } from '../middleware/auth.js';
 import { orderLog, businessLog } from '../config/logger.js';
 import { logChangeEvent, logAccessEvent, logErrorEvent } from '../config/appLogs.js';
 import { prisma } from '../database/prisma.js';
-import { createTicketSchema, updateTicketSchema, TICKET_TARGET_ROLE, ESCALATION_PATH } from '../validations/tickets.js';
+import { sendPushToUser } from '../services/pushNotifications.js';
+import { createTicketSchema, updateTicketSchema, TICKET_TARGET_ROLE, ESCALATION_PATH, ROLE_ISSUE_TYPES } from '../validations/tickets.js';
 import { toUiTicket, toUiTicketForBrand } from '../utils/uiMappers.js';
 import { pgTicket } from '../utils/pgMappers.js';
 import { getRequester, isPrivileged } from '../services/authz.js';
@@ -151,7 +152,7 @@ async function assertCanReferenceOrder(params: { orderId: string; pgUserId: stri
   throw new AppError(403, 'FORBIDDEN', 'Insufficient role');
 }
 
-export function makeTicketsController() {
+export function makeTicketsController(env: import('../config/env.js').Env) {
   return {
     listTickets: async (req: Request, res: Response, next: NextFunction) => {
       try {
@@ -293,6 +294,12 @@ export function makeTicketsController() {
         const role = String(user?.role || roles[0] || 'shopper');
         const db = prisma();
 
+        // Server-side issueType validation against role-specific allowed types
+        const allowedTypes = ROLE_ISSUE_TYPES[role];
+        if (allowedTypes && !allowedTypes.includes(body.issueType)) {
+          throw new AppError(400, 'INVALID_ISSUE_TYPE', `Invalid issue type "${body.issueType}" for role ${role}. Allowed: ${allowedTypes.join(', ')}`);
+        }
+
         if (body.orderId) {
           await assertCanReferenceOrder({ orderId: body.orderId, pgUserId, roles, user });
         }
@@ -375,6 +382,33 @@ export function makeTicketsController() {
         const audience = await buildTicketAudience(mapped);
         publishRealtime({ type: 'tickets.changed', ts: new Date().toISOString(), payload: { ticketId: String(mapped._id), status: body.status }, audience });
         publishRealtime({ type: 'notifications.changed', ts: new Date().toISOString(), audience });
+
+        // ── Push notification to the ticket creator ──
+        // Notify the original ticket creator when their ticket is resolved, rejected, or escalated
+        // (but don't notify the person who performed the action on their own ticket).
+        if (existing.userId && existing.userId !== pgUserId) {
+          const resolverName = String(user?.name || 'Support team');
+          const pushTitle = body.escalate ? 'Ticket Escalated'
+            : body.status === 'Resolved' ? 'Ticket Resolved \u2705'
+            : body.status === 'Rejected' ? 'Ticket Rejected'
+            : previousStatus !== 'Open' && body.status === 'Open' ? 'Ticket Reopened'
+            : null;
+          const pushBody = body.escalate
+            ? `Your ticket has been escalated to ${updatePayload.targetRole} for further review.`
+            : body.status === 'Resolved'
+            ? `${resolverName} resolved your "${existing.issueType}" ticket.${updatePayload.resolutionNote ? ` Note: ${updatePayload.resolutionNote.slice(0, 100)}` : ''}`
+            : body.status === 'Rejected'
+            ? `Your "${existing.issueType}" ticket was rejected.${updatePayload.resolutionNote ? ` Reason: ${updatePayload.resolutionNote.slice(0, 100)}` : ''}`
+            : previousStatus !== 'Open' && body.status === 'Open'
+            ? `Your "${existing.issueType}" ticket has been reopened.`
+            : null;
+          if (pushTitle && pushBody) {
+            const ticketCreatorRole = String(existing.role || 'shopper');
+            const pushApp = ticketCreatorRole === 'mediator' ? 'mediator' as const : 'buyer' as const;
+            sendPushToUser({ env, userId: existing.userId, app: pushApp, payload: { title: pushTitle, body: pushBody, url: '/' } })
+              .catch(() => { /* push delivery is best-effort */ });
+          }
+        }
 
         const auditAction = body.escalate ? 'TICKET_ESCALATED'
           : body.status === 'Resolved' ? 'TICKET_RESOLVED'

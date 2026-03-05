@@ -253,6 +253,9 @@ export function createApp(env: Env) {
   app.use((req, res, next) => {
     // Skip SSE streams — they're intentionally long-lived.
     if (req.path.startsWith('/api/realtime/')) return next();
+    // Skip extraction routes — they manage their own internal deadline (25s)
+    // and need extra headroom for image upload + Gemini Vision API calls.
+    if (req.path === '/api/ai/extract-order') return next();
     const timer = setTimeout(() => {
       if (!res.headersSent) {
         httpLog.warn('Request timeout', {

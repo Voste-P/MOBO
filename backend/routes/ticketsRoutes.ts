@@ -7,7 +7,7 @@ import { ROLE_ISSUE_TYPES } from '../validations/tickets.js';
 
 export function ticketsRoutes(env: Env): Router {
   const router = Router();
-  const tickets = makeTicketsController();
+  const tickets = makeTicketsController(env);
 
   // Rate-limit ticket write operations to prevent spam.
   const ticketWriteLimiter = rateLimit({

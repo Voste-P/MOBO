@@ -530,24 +530,52 @@ export const api = {
       // exceeding the Vercel proxy 4.5 MB body limit.
       // Use higher quality for extraction accuracy — OCR needs sharp text.
       const compressed = await compressImage(rawBase64, { maxDimension: 2400, quality: 0.92 });
-      // Client-side timeout: 35 seconds. Prevents infinite waiting when Render cold-starts
-      // or extraction runs long. The backend has its own 22s internal deadline.
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 35_000);
+
+      // --- SERVER WARM-UP ---
+      // Render free tier spins down after 15min idle; cold start takes 15-30s.
+      // Wake the server FIRST with a lightweight health check, so extraction
+      // doesn't waste its timeout budget waiting for the container to start.
       try {
-        return await fetchJson('/ai/extract-order', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body: JSON.stringify({ imageBase64: compressed }),
-          signal: controller.signal,
-        });
-      } catch (err: any) {
-        if (err?.name === 'AbortError' || controller.signal.aborted) {
-          throw new Error('Screenshot analysis timed out. The server may be starting up — please try again in 30 seconds.');
+        const warmupCtrl = new AbortController();
+        const warmupTimer = setTimeout(() => warmupCtrl.abort(), 40_000);
+        await fetch(`${API_URL}/health`, { signal: warmupCtrl.signal, method: 'GET' }).catch(() => {});
+        clearTimeout(warmupTimer);
+      } catch { /* ignore — extraction will retry anyway */ }
+
+      // --- EXTRACTION WITH AUTO-RETRY ---
+      // Attempt extraction up to 2 times. First attempt has generous 60s timeout.
+      // If it fails (cold start, network hiccup), retry once with 60s more.
+      const attemptExtraction = async (timeoutMs: number): Promise<any> => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          return await fetchJson('/ai/extract-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({ imageBase64: compressed }),
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeoutId);
         }
-        throw err;
-      } finally {
-        clearTimeout(timeoutId);
+      };
+
+      // First attempt: 60s timeout
+      try {
+        return await attemptExtraction(60_000);
+      } catch (err: any) {
+        const isTimeout = err?.name === 'AbortError' || /timed?\s*out|took too long/i.test(err?.message || '');
+        if (!isTimeout) throw err;
+        // Auto-retry once on timeout (server may have just finished cold-starting)
+        try {
+          return await attemptExtraction(60_000);
+        } catch (retryErr: any) {
+          const isRetryTimeout = retryErr?.name === 'AbortError' || /timed?\s*out|took too long/i.test(retryErr?.message || '');
+          if (isRetryTimeout) {
+            throw new Error('Screenshot analysis timed out after retrying. The server may be under heavy load — please try again in a minute.');
+          }
+          throw retryErr;
+        }
       }
     },
     /** Pre-validate rating screenshot: checks account name + product name match */

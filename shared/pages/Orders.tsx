@@ -216,6 +216,7 @@ export const Orders: React.FC = () => {
   const [ticketsExpanded, setTicketsExpanded] = useState(false);
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
   const [ticketOrderId, setTicketOrderId] = useState<string | undefined>();
+  const [ticketStatusFilter, setTicketStatusFilter] = useState<'All' | 'Open' | 'Resolved' | 'Rejected'>('All');
 
 
   // Rating screenshot pre-validation state
@@ -1320,11 +1321,36 @@ export const Orders: React.FC = () => {
               >
                 <MessageSquare size={13} /> Raise a Ticket
               </button>
-              {myTickets.length === 0 ? (
-                <p className="text-xs text-slate-400 font-medium text-center py-4">No tickets yet. Raise one if you need help!</p>
-              ) : (
+              {/* Status filter pills */}
+              <div className="flex gap-1.5 flex-wrap">
+                {(['All', 'Open', 'Resolved', 'Rejected'] as const).map(st => {
+                  const count = st === 'All' ? myTickets.length : myTickets.filter(t => t.status === st).length;
+                  const active = ticketStatusFilter === st;
+                  return (
+                    <button key={st} type="button" onClick={() => setTicketStatusFilter(st)}
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all border ${
+                        active
+                          ? st === 'Open' ? 'bg-amber-500 text-white border-amber-500' :
+                            st === 'Resolved' ? 'bg-green-500 text-white border-green-500' :
+                            st === 'Rejected' ? 'bg-red-500 text-white border-red-500' :
+                            'bg-slate-800 text-white border-slate-800'
+                          : 'bg-white text-slate-600 border-zinc-200 hover:border-zinc-300'
+                      }`}>
+                      {st} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+              {(() => {
+                const filtered = ticketStatusFilter === 'All' ? myTickets : myTickets.filter(t => t.status === ticketStatusFilter);
+                if (filtered.length === 0) return (
+                  <p className="text-xs text-slate-400 font-medium text-center py-4">
+                    {myTickets.length === 0 ? 'No tickets yet. Raise one if you need help!' : `No ${ticketStatusFilter.toLowerCase()} tickets.`}
+                  </p>
+                );
+                return (
                 <div className="max-h-[50vh] overflow-y-auto scrollbar-styled space-y-2">
-                {myTickets.map((t) => (
+                {filtered.map((t) => (
                   <div key={t.id} className="bg-white rounded-xl border border-zinc-200 p-3 space-y-1.5">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-800">{t.issueType}</span>
@@ -1386,7 +1412,8 @@ export const Orders: React.FC = () => {
                   </div>
                 ))}
                 </div>
-              )}
+                );
+              })()}
             </div>
           )}
         </div>
