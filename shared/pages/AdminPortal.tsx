@@ -45,6 +45,7 @@ import {
   ExternalLink,
   AlertCircle,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -207,6 +208,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   const [userSearch, setUserSearch] = useState('');
   const [ticketRoleFilter, setTicketRoleFilter] = useState<string>('All');
   const [ticketStatusFilter, setTicketStatusFilter] = useState<string>('All');
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [ticketPriorityFilter, setTicketPriorityFilter] = useState<string>('All');
   const [inviteRole, setInviteRole] = useState<'agency' | 'brand'>('agency');
   const [inviteLabel, setInviteLabel] = useState('');
 
@@ -559,6 +562,39 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     } catch (e: any) {
       toast.error(formatErrorMessage(e, 'Failed to delete ticket'));
     }
+  };
+
+  const reopenTicket = async (id: string) => {
+    try {
+      await api.tickets.update(id, 'Open');
+      setTickets(tickets.map((t) => (t.id === id ? { ...t, status: 'Open' as const } : t)));
+      toast.success('Ticket reopened');
+    } catch (e: any) {
+      toast.error(formatErrorMessage(e, 'Failed to reopen ticket'));
+    }
+  };
+
+  const exportTicketsCsv = () => {
+    const supportTickets = tickets.filter((t) => t.issueType !== 'Feedback');
+    if (supportTickets.length === 0) { toast.error('No tickets to export'); return; }
+    const header = ['Ticket ID', 'Status', 'Priority', 'Issue Type', 'Description', 'User', 'Role', 'Target Role', 'Order ID', 'Resolution Note', 'Resolved By', 'Resolved At', 'Created At'].map(csvSafe).join(',');
+    const rows = supportTickets.map((t) => [
+      csvSafe(t.id.slice(-8)),
+      csvSafe(t.status),
+      csvSafe((t as any).priority || 'medium'),
+      csvSafe(t.issueType),
+      csvSafe(t.description),
+      csvSafe(t.userName),
+      csvSafe(t.role || ''),
+      csvSafe((t as any).targetRole || ''),
+      csvSafe(t.orderId || ''),
+      csvSafe((t as any).resolutionNote || ''),
+      csvSafe((t as any).resolvedByName || ''),
+      csvSafe((t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString() : ''),
+      csvSafe(t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''),
+    ].join(','));
+    downloadCsv(`tickets_${new Date().toISOString().slice(0, 10)}.csv`, [header, ...rows].join('\n'));
+    toast.success(`Exported ${supportTickets.length} tickets`);
   };
 
   const deleteInvite = async (code: string) => {
@@ -1171,6 +1207,17 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
               const filteredTickets = supportTickets.filter((t) => {
                 if (ticketRoleFilter !== 'All' && (t.role || '').toLowerCase() !== ticketRoleFilter.toLowerCase()) return false;
                 if (ticketStatusFilter !== 'All' && t.status !== ticketStatusFilter) return false;
+                if (ticketPriorityFilter !== 'All' && ((t as any).priority || 'medium') !== ticketPriorityFilter) return false;
+                if (ticketSearch.trim()) {
+                  const q = ticketSearch.trim().toLowerCase();
+                  if (
+                    !(t.issueType || '').toLowerCase().includes(q) &&
+                    !(t.description || '').toLowerCase().includes(q) &&
+                    !(t.userName || '').toLowerCase().includes(q) &&
+                    !(t.orderId || '').toLowerCase().includes(q) &&
+                    !t.id.toLowerCase().includes(q)
+                  ) return false;
+                }
                 return true;
               });
               const roleCounts = {
@@ -1194,10 +1241,24 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       </p>
                     </div>
                   </div>
-                  <div className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-xl text-xs font-bold">
-                    {filteredTickets.filter((t) => t.status === 'Open').length} Pending
+                  <div className="flex items-center gap-2">
+                    <div className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-xl text-xs font-bold">
+                      {filteredTickets.filter((t) => t.status === 'Open').length} Pending
+                    </div>
+                    <button type="button" onClick={exportTicketsCsv} className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-all">
+                      Export CSV
+                    </button>
                   </div>
                 </div>
+
+                {/* Search Bar */}
+                <input
+                  type="text"
+                  value={ticketSearch}
+                  onChange={(e) => setTicketSearch(e.target.value)}
+                  placeholder="Search tickets by name, issue, description, order ID..."
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 transition-all"
+                />
 
                 {/* Role Filter Tabs */}
                 <div className="flex flex-wrap gap-2">
@@ -1234,6 +1295,24 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Priority Filter */}
+                <div className="flex flex-wrap gap-1.5">
+                  {(['All', 'urgent', 'high', 'medium', 'low'] as const).map((p) => (
+                    <button key={p} type="button" onClick={() => setTicketPriorityFilter(p)}
+                      className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all border ${
+                        ticketPriorityFilter === p
+                          ? p === 'urgent' ? 'bg-red-500 text-white border-red-500' :
+                            p === 'high' ? 'bg-orange-500 text-white border-orange-500' :
+                            p === 'medium' ? 'bg-blue-500 text-white border-blue-500' :
+                            p === 'low' ? 'bg-slate-500 text-white border-slate-500' :
+                            'bg-slate-700 text-white border-slate-700'
+                          : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
+                      }`}>
+                      {p === 'All' ? 'All Priorities' : p.charAt(0).toUpperCase() + p.slice(1)}
+                    </button>
+                  ))}
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 max-h-[70vh] overflow-y-auto scrollbar-styled">
@@ -1288,6 +1367,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                           <p className="text-xs text-slate-600 font-medium leading-relaxed">
                             "{t.description}"
                           </p>
+                          {t.orderId && (
+                            <p className="text-[10px] text-slate-400 mt-1.5"><span className="font-bold">Order:</span> {t.orderId}</p>
+                          )}
                         </div>
 
                         {/* Resolution Note */}
@@ -1332,6 +1414,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
 
                           {t.status !== 'Open' && (
                             <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => reopenTicket(t.id)}
+                                className="p-2 bg-amber-100 text-amber-600 rounded-lg hover:bg-amber-200 transition-colors"
+                                title="Reopen"
+                              >
+                                <RefreshCw size={16} />
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => deleteTicket(t.id)}

@@ -323,6 +323,7 @@ export const Orders: React.FC = () => {
     };
     const unsub = subscribeRealtime((msg) => {
       if (msg.type === 'orders.changed' || msg.type === 'notifications.changed') schedule();
+      if (msg.type === 'tickets.changed') loadMyTickets();
       if (msg.type === 'deals.changed') {
         // Keep filters/product titles in sync (non-critical, but avoids stale UI).
         api.products
@@ -1285,6 +1286,13 @@ export const Orders: React.FC = () => {
                         {rejectionType === 'returnWindow' ? 'Reupload Return Window' : 'Upload Return Window'}
                       </button>
                     )}
+                    {/* Raise Ticket for this specific order */}
+                    <button
+                      onClick={() => { setTicketOrderId(order.id); setTicketModalOpen(true); }}
+                      className="text-[10px] font-bold uppercase text-red-500 hover:text-red-700"
+                    >
+                      Raise Ticket
+                    </button>
                   </div>
                 </div>
 

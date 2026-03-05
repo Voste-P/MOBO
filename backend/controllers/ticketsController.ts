@@ -404,7 +404,10 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
             : null;
           if (pushTitle && pushBody) {
             const ticketCreatorRole = String(existing.role || 'shopper');
-            const pushApp = ticketCreatorRole === 'mediator' ? 'mediator' as const : 'buyer' as const;
+            const pushApp = ticketCreatorRole === 'mediator' ? 'mediator' as const
+              : ticketCreatorRole === 'agency' ? 'agency' as const
+              : ticketCreatorRole === 'brand' ? 'brand' as const
+              : 'buyer' as const;
             sendPushToUser({ env, userId: existing.userId, app: pushApp, payload: { title: pushTitle, body: pushBody, url: '/' } })
               .catch(() => { /* push delivery is best-effort */ });
           }

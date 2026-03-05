@@ -59,12 +59,15 @@ async function removeInvalidSubscription(endpoint: string) {
 export async function sendPushToUser(params: {
   env: Env;
   userId: string;
-  app: 'buyer' | 'mediator';
+  app: 'buyer' | 'mediator' | 'agency' | 'brand' | 'admin';
   payload: PushPayload;
 }) {
   if (!params.userId) return;
 
   configureWebPush(params.env);
+
+  // Map app to PushApp enum values (agency/brand/admin use 'buyer' subscriptions for now)
+  const dbApp = (params.app === 'buyer' || params.app === 'mediator') ? params.app : 'buyer' as const;
 
   // Read push subscriptions from PostgreSQL (primary)
   let subscriptions: Array<{ endpoint: string; keysP256dh: string | null; keysAuth: string | null; expirationTime: Date | number | null }> = [];
@@ -77,7 +80,7 @@ export async function sendPushToUser(params: {
     });
     if (pgUser) {
       subscriptions = await db.pushSubscription.findMany({
-        where: { userId: pgUser.id, app: params.app, isDeleted: false },
+        where: { userId: pgUser.id, app: dbApp, isDeleted: false },
         select: { endpoint: true, keysP256dh: true, keysAuth: true, expirationTime: true },
       });
     }

@@ -564,9 +564,28 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
       <section>
         <div className="flex items-center justify-between mb-3 px-1">
           <h3 className="font-bold text-base text-zinc-900 tracking-tight">Tickets</h3>
-          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600">
-            {Array.isArray(tickets) ? tickets.length : 0}
-          </span>
+          <div className="flex items-center gap-2">
+            {tickets && tickets.length > 0 && (
+              <button type="button" onClick={() => {
+                const supportTickets = tickets.filter((t: Ticket) => t.issueType !== 'Feedback');
+                if (!supportTickets.length) { toast.error('No tickets to export'); return; }
+                const headers = ['Ticket ID', 'Status', 'Issue Type', 'Description', 'User', 'Order ID', 'Resolution Note', 'Created At'];
+                const rows = supportTickets.map((t: Ticket) => [
+                  t.id.slice(-8), String(t.status), String(t.issueType), String(t.description || ''),
+                  String((t as any).userName || ''), String(t.orderId || ''),
+                  String((t as any).resolutionNote || ''),
+                  t.createdAt ? new Date(t.createdAt).toLocaleDateString() : '',
+                ]);
+                downloadCsv(`mediator-tickets-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+                toast.success(`Exported ${supportTickets.length} tickets`);
+              }} className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100">
+                Export CSV
+              </button>
+            )}
+            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600">
+              {Array.isArray(tickets) ? tickets.length : 0}
+            </span>
+          </div>
         </div>
         {/* Status filter tabs */}
         {tickets && tickets.length > 0 && (
@@ -620,6 +639,9 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                 )}
                 {(t as any).userName && (
                   <div className="text-[9px] text-zinc-400">From: {String((t as any).userName)} ({String((t as any).userRole || '')})</div>
+                )}
+                {t.orderId && (
+                  <div className="text-[9px] text-zinc-400"><span className="font-bold">Order:</span> {String(t.orderId)}</div>
                 )}
                 {(t as any).resolutionNote && (
                   <div className="text-[10px] text-green-700 bg-green-50 rounded-lg px-2 py-1.5">
@@ -686,21 +708,38 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                     </>
                   )}
                   {String(t.status || '').toLowerCase() !== 'open' && (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        try {
-                          await api.tickets.delete(t.id);
-                          toast.success('Ticket deleted.');
-                          onRefresh();
-                        } catch (err: any) {
-                          toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
-                        }
-                      }}
-                      className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-zinc-50 border border-zinc-200 text-zinc-600 hover:text-red-600 hover:border-red-200"
-                    >
-                      Delete
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await api.tickets.update(t.id, 'Open');
+                            toast.success('Ticket reopened.');
+                            onRefresh();
+                          } catch (err: any) {
+                            toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100"
+                      >
+                        Reopen
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await api.tickets.delete(t.id);
+                            toast.success('Ticket deleted.');
+                            onRefresh();
+                          } catch (err: any) {
+                            toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-zinc-50 border border-zinc-200 text-zinc-600 hover:text-red-600 hover:border-red-200"
+                      >
+                        Delete
+                      </button>
+                    </>
                   )}
                 </div>
               </div>

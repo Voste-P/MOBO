@@ -2482,6 +2482,26 @@ export const BrandDashboard: React.FC = () => {
         {activeTab === 'tickets' && (
           <div className="max-w-3xl mx-auto animate-enter pb-12">
             <h2 className="text-2xl font-extrabold text-zinc-900 tracking-tight mb-6">Tickets</h2>
+            {/* Export CSV */}
+            {tickets && tickets.length > 0 && (
+              <button type="button" onClick={() => {
+                const supportTickets = tickets.filter(t => t.issueType !== 'Feedback');
+                if (!supportTickets.length) { toast.error('No tickets to export'); return; }
+                const header = ['Ticket ID','Status','Priority','Issue Type','Description','User','Role','Order ID','Resolution Note','Resolved By','Resolved At','Created At'].map(csvSafe).join(',');
+                const rows = supportTickets.map(t => [
+                  csvSafe(t.id.slice(-8)), csvSafe(String(t.status)), csvSafe(String((t as any).priority || 'medium')),
+                  csvSafe(String(t.issueType)), csvSafe(String(t.description || '')), csvSafe(String((t as any).userName || '')),
+                  csvSafe(String((t as any).role || '')), csvSafe(String(t.orderId || '')),
+                  csvSafe(String((t as any).resolutionNote || '')), csvSafe(String((t as any).resolvedByName || '')),
+                  csvSafe((t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString() : ''),
+                  csvSafe(t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''),
+                ].join(','));
+                downloadCsv(`brand-tickets-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...rows].join('\n'));
+                toast.success(`Exported ${supportTickets.length} tickets`);
+              }} className="mb-4 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-all">
+                Export Tickets CSV
+              </button>
+            )}
             {/* Status filter tabs */}
             {tickets && tickets.length > 0 && (
               <div className="flex items-center gap-2 mb-4 flex-wrap">
@@ -2531,6 +2551,9 @@ export const BrandDashboard: React.FC = () => {
                     )}
                     {(t as any).userName && (
                       <div className="text-[10px] text-zinc-400">From: {String((t as any).userName)} ({String((t as any).userRole || '')})</div>
+                    )}
+                    {t.orderId && (
+                      <div className="text-[10px] text-zinc-400"><span className="font-bold">Order:</span> {String(t.orderId)}</div>
                     )}
                     {(t as any).resolutionNote && (
                       <div className="text-[10px] text-green-700 bg-green-50 rounded-lg px-2 py-1.5">
@@ -2597,21 +2620,38 @@ export const BrandDashboard: React.FC = () => {
                         </>
                       )}
                       {String(t.status || '').toLowerCase() !== 'open' && (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            try {
-                              await api.tickets.delete(t.id);
-                              toast.success('Ticket deleted.');
-                              fetchData();
-                            } catch (err: any) {
-                              toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
-                            }
-                          }}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-zinc-50 border border-zinc-200 text-zinc-600 hover:text-red-600 hover:border-red-200"
-                        >
-                          Delete
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await api.tickets.update(t.id, 'Open');
+                                toast.success('Ticket reopened.');
+                                fetchData();
+                              } catch (err: any) {
+                                toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100"
+                          >
+                            Reopen
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await api.tickets.delete(t.id);
+                                toast.success('Ticket deleted.');
+                                fetchData();
+                              } catch (err: any) {
+                                toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-zinc-50 border border-zinc-200 text-zinc-600 hover:text-red-600 hover:border-red-200"
+                          >
+                            Delete
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>

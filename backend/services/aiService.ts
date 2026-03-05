@@ -2033,6 +2033,8 @@ export async function extractOrderDetailsWithAi(
         if (/^[6-9]\d{9}$/.test(cleaned)) return true;
         // With country code
         if (/^91\d{10}$/.test(cleaned)) return true;
+        // 0-prefixed Indian number (11 digits)
+        if (/^0[6-9]\d{9}$/.test(cleaned)) return true;
         // 10 digit number in general
         if (/^\d{10}$/.test(cleaned) && value >= 1000000000) return true;
         return false;
@@ -2042,8 +2044,7 @@ export async function extractOrderDetailsWithAi(
       const isAddressOrContactLine = (line: string): boolean => {
         return /\b(pincode|pin\s*code|zip|postal|address|deliver\s*to|ship\s*to|phone|mobile|contact|tel|fax)\b/i.test(line)
           || /\b(maharashtra|karnataka|tamil\s*nadu|delhi|mumbai|bangalore|chennai|hyderabad|kolkata|pune|jaipur|lucknow|ahmedabad|india|mhasas|jalgaon|pachora|vakad|pimpri|chinchwad|hingne|budrukh|karve\s*nagar|ajmer|rajasthan|uttar\s*pradesh|madhya\s*pradesh|andhra\s*pradesh|telangana|kerala|gujarat|bihar|odisha|assam|west\s*bengal|chhattisgarh|jharkhand|uttarakhand|himachal|goa|chandigarh|noida|gurgaon|gurugram|faridabad|ghaziabad|indore|bhopal|nagpur|surat|vadodara|coimbatore|visakhapatnam|patna|ranchi|bhubaneswar|dehradun|thiruvananthapuram|kochi|mangalore|mysore|jodhpur|udaipur|agra|varanasi|allahabad|kanpur|meerut|ludhiana|amritsar|jammu|srinagar)\b/i.test(line)
-          || /\b\d{6}\b.*\b(india|in)\b/i.test(line)
-          || /\bchetan\b.*\b(chaudhari|dnyaneshwar)\b/i.test(line);
+          || /\b\d{6}\b.*\b(india|in)\b/i.test(line);
       };
 
       const processAmountOnLine = (match: RegExpMatchArray, isFinalLabel: boolean, line: string, lineIndex: number) => {
@@ -2277,6 +2278,12 @@ export async function extractOrderDetailsWithAi(
         if (!value || value < 10) continue;
         if (isOrderIdFragment(match[1])) continue;
         if (isLikelyPhoneNumber(match[1], value)) continue;
+        // Pincode check: locate the line context for this match
+        const bInrLine = bottomText.slice(
+          Math.max(0, bottomText.lastIndexOf('\n', match.index ?? 0)),
+          (bottomText.indexOf('\n', (match.index ?? 0) + match[0].length) + 1) || undefined,
+        );
+        if (isLikelyPincode(match[1], value, bInrLine)) continue;
         bottomValues.push(value);
       }
       if (bottomValues.length) return bottomValues[bottomValues.length - 1];
@@ -2344,7 +2351,7 @@ export async function extractOrderDetailsWithAi(
     const extractSoldBy = (text: string): string | null => {
       const lines = text.split('\n').map(normalizeLine).filter(Boolean);
 
-      const soldByRe = /\b(sold\s*by|seller|shipped\s*by|fulfilled\s*by|dispatched\s*by|supplied\s*by|marketed\s*by|manufactured\s*by|packed\s*by|brand\s*store|authorized\s*seller|brand\s*[:\-])\s*[:\-]?\s*/i;
+      const soldByRe = /\b(sold\s*by|seller\s*[:\-]|shipped\s*by|fulfilled\s*by|dispatched\s*by|supplied\s*by|brand\s*store|authorized\s*seller)\s*[:\-]?\s*/i;
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -3569,7 +3576,7 @@ export async function extractOrderDetailsWithAi(
         ],
         config: {
           temperature: 0,
-          maxOutputTokens: 512,
+          maxOutputTokens: 1024,
           responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,
@@ -3817,13 +3824,9 @@ export async function extractOrderDetailsWithAi(
             // Reject 6-digit pincodes (100000-999999, first digit 1-8)
             if (/^\d{6}$/.test(fpAmtStr) && directAmount >= 100000 && directAmount <= 999999) {
               const fd = parseInt(fpAmtStr[0], 10);
-              if (fd >= 1 && fd <= 8 && directAmount !== Math.round(directAmount * 100) / 100) {
-                // Exact integer 6-digit with no decimal — likely pincode if not a round price
-              }
-              // Only reject if it's a known pincode pattern AND confidence < 90
               if (fd >= 1 && fd <= 8 && directConfidence < 90) {
-                aiLog.warn('Fast path amount looks like pincode — flagged', { amount: directAmount });
-                // Don't hard-reject, but lower confidence
+                aiLog.warn('Fast path amount looks like pincode — rejected', { amount: directAmount });
+                directAmount = null;
               }
             }
             // Reject 10-digit phone numbers
@@ -4162,6 +4165,25 @@ export async function extractOrderDetailsWithAi(
             }
           }
 
+          // AI can correct a wrong deterministic amount (e.g., ₹ misread as digit 7)
+          if (finalAmount && aiSuggestedAmount && !isAmountFromOrderId && finalAmount !== aiSuggestedAmount && aiConfidence >= 75) {
+            const aiAmtStr = String(aiSuggestedAmount);
+            const detAmtStr = String(finalAmount);
+            // Case 1: Deterministic is ~10x AI value (₹ sign misread as leading digit)
+            const ratio = finalAmount / aiSuggestedAmount;
+            const isRupeeSignMisread = ratio >= 5 && ratio <= 20 && amountVisible;
+            // Case 2: Deterministic value is a pincode (6-digit, starts 1-8)
+            const detIsPincode = /^\d{6}$/.test(detAmtStr) && finalAmount >= 100000 && finalAmount <= 999999 && parseInt(detAmtStr[0]) >= 1 && parseInt(detAmtStr[0]) <= 8;
+            // Case 3: Deterministic value is a phone number (10 digits starting 6-9)
+            const detIsPhone = /^[6-9]\d{9}$/.test(detAmtStr) && finalAmount >= 6000000000;
+            // Case 4: AI amount is visible in OCR text but deterministic is inflated
+            const aiAmtInOcr = ocrNorm.includes(aiAmtStr) || ocrNorm.includes(aiAmtStr.replace('.', ''));
+            if ((isRupeeSignMisread && aiAmtInOcr) || detIsPincode || detIsPhone) {
+              finalAmount = aiSuggestedAmount;
+              notes.push(`AI corrected amount: ₹${detAmtStr} → ₹${aiAmtStr} (${isRupeeSignMisread ? '₹ sign misread' : detIsPincode ? 'was pincode' : 'was phone'}).`);
+            }
+          }
+
           // Fill metadata from AI: orderDate, soldBy, productName
           if (!finalOrderDate && aiResult.suggestedOrderDate) {
             finalOrderDate = aiResult.suggestedOrderDate;
@@ -4191,12 +4213,16 @@ export async function extractOrderDetailsWithAi(
             finalProductName = aiResult.suggestedProductName;
             notes.push('Product name from AI.');
           }
-          // AI can correct garbage deterministic product name
+          // AI can correct poor deterministic product name (expanded garbage detection)
           if (finalProductName && aiResult.suggestedProductName && !isProductNameUrl && !isProductNameNavGarbage && aiConfidence >= 70) {
-            const currentIsGarbage = /\b(Deliver\s*to|Hello[,\s]|Returns?\s*(&|\d)|Account|Sign\s*in|Buy\s*Again)\b/i.test(finalProductName);
-            if (currentIsGarbage && aiResult.suggestedProductName.length >= 10) {
+            const currentIsGarbage = /\b(Deliver\s*to|Hello[,\s]|Returns?\s*(&|\d)|Account|Sign\s*in|Buy\s*Again|Explore\s*Plus|Search|Categories|Home|My\s*Orders?|Cart|Wishlist|Profile|Notifications?|Offers?)\b/i.test(finalProductName);
+            // Also detect: name is just a color/size/quantity, too short (< 10 chars with low alpha), or looks like UI chrome
+            const isTooShort = finalProductName.replace(/[^a-zA-Z]/g, '').length < 8;
+            const isColorOrSize = /^(\s*(black|white|blue|red|green|pink|grey|gray|silver|gold|beige|brown|navy|purple|orange|yellow|maroon|\d+\s*(gb|tb|mb|ml|l|kg|g|mm|cm|m|xl|xxl|xxxl|s|xs))\s*[,\/]?\s*){1,3}$/i.test(finalProductName);
+            const aiNameLonger = aiResult.suggestedProductName.length >= finalProductName.length * 1.5;
+            if ((currentIsGarbage || isColorOrSize || (isTooShort && aiNameLonger)) && aiResult.suggestedProductName.length >= 10) {
               finalProductName = aiResult.suggestedProductName;
-              notes.push('AI corrected product name (deterministic was navigation garbage).');
+              notes.push('AI corrected product name (deterministic was low quality).');
             }
           }
 
@@ -4323,10 +4349,14 @@ export async function extractOrderDetailsWithAi(
               if (cleanedProductName.length >= 5) {
                 if (!finalProductName) {
                   finalProductName = cleanedProductName;
-                } else if (directConfidence >= 70 && cleanedProductName.length > (finalProductName?.length ?? 0)) {
-                  // Vision result is likely more accurate for product names
-                  finalProductName = cleanedProductName;
-                  notes.push('Product name updated from direct image AI (higher accuracy).');
+                } else if (directConfidence >= 70) {
+                  // Vision result: prefer if longer, or if current name is short/low-quality
+                  const currentAlpha = (finalProductName || '').replace(/[^a-zA-Z]/g, '').length;
+                  const visionAlpha = cleanedProductName.replace(/[^a-zA-Z]/g, '').length;
+                  if (cleanedProductName.length > (finalProductName?.length ?? 0) || (currentAlpha < 10 && visionAlpha >= 10)) {
+                    finalProductName = cleanedProductName;
+                    notes.push('Product name updated from direct image AI (higher accuracy).');
+                  }
                 }
               }
             }
@@ -4645,6 +4675,36 @@ export async function extractOrderDetailsWithAi(
     // 8. Cross-validate: if amount is exactly 0 after rounding, clear it
     if (finalAmount !== null && finalAmount <= 0) {
       finalAmount = null;
+    }
+
+    // 8b. Reject suspiciously low amounts (₹1-₹9) — usually convenience fees or COD charges
+    if (finalAmount !== null && finalAmount > 0 && finalAmount < 10) {
+      notes.push(`Amount ₹${finalAmount} is suspiciously low (< ₹10) — rejected.`);
+      finalAmount = null;
+      confidenceScore = Math.max(30, confidenceScore - 15);
+    }
+
+    // 9. Normalize order date to a consistent format (DD Month YYYY)
+    if (finalOrderDate) {
+      try {
+        const d = new Date(finalOrderDate);
+        if (!isNaN(d.getTime()) && d.getFullYear() >= 2015 && d.getFullYear() <= 2030) {
+          const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+          finalOrderDate = `${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
+        } else {
+          // Try manual dd/mm/yyyy parse
+          const ddmmyyyy = finalOrderDate.match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
+          if (ddmmyyyy) {
+            const day = parseInt(ddmmyyyy[1]);
+            const mon = parseInt(ddmmyyyy[2]);
+            const yr = parseInt(ddmmyyyy[3]);
+            if (day >= 1 && day <= 31 && mon >= 1 && mon <= 12 && yr >= 2015 && yr <= 2030) {
+              const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+              finalOrderDate = `${String(day).padStart(2, '0')} ${months[mon - 1]} ${yr}`;
+            }
+          }
+        }
+      } catch { /* keep original */ }
     }
 
     aiLog.info('Order extract final', {
