@@ -515,7 +515,11 @@ export const Orders: React.FC = () => {
         } else if (hasAmount) {
           toast.success('Amount detected! You can enter the Order ID below.');
         } else {
-          toast.info('Screenshot uploaded. You can enter the Order ID and Amount below if needed.');
+          // Show the notes from extraction so users understand WHY extraction failed
+          const extractionNote = typeof details.notes === 'string' && details.notes.length > 0
+            ? ` (${details.notes})`
+            : '';
+          toast.info(`Screenshot uploaded but extraction couldn't read the details${extractionNote}. Please enter Order ID and Amount manually.`);
         }
       }
     } catch (e: any) {

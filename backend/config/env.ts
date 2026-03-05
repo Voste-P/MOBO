@@ -52,7 +52,7 @@ const envSchema = z.object({
   AI_DAILY_LIMIT_ANON: z.coerce.number().int().positive().default(40),
   AI_MAX_OUTPUT_TOKENS_CHAT: z.coerce.number().int().positive().default(512),
   AI_MAX_OUTPUT_TOKENS_PROOF: z.coerce.number().int().positive().default(256),
-  AI_MAX_OUTPUT_TOKENS_EXTRACT: z.coerce.number().int().positive().default(256),
+  AI_MAX_OUTPUT_TOKENS_EXTRACT: z.coerce.number().int().positive().default(4096),
   AI_MAX_INPUT_CHARS: z.coerce.number().int().positive().default(4000),
   AI_MAX_IMAGE_CHARS: z.coerce.number().int().positive().default(80_000_000),
   AI_MAX_ESTIMATED_TOKENS: z.coerce.number().int().positive().default(20000),

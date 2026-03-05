@@ -3206,7 +3206,7 @@ export async function extractOrderDetailsWithAi(
         ],
         config: {
           temperature: 0,
-          maxOutputTokens: Math.min(env.AI_MAX_OUTPUT_TOKENS_EXTRACT, 2048),
+          maxOutputTokens: Math.min(env.AI_MAX_OUTPUT_TOKENS_EXTRACT, 8192),
           responseMimeType: 'text/plain',
         },
       }));
@@ -3231,7 +3231,7 @@ export async function extractOrderDetailsWithAi(
     };
 
     /** Tesseract.js fallback: local OCR that works without any external API. */
-    const TESSERACT_TIMEOUT_MS = 45_000; // 45 seconds max for all Tesseract attempts
+    const TESSERACT_TIMEOUT_MS = 20_000; // 20 seconds max for all Tesseract attempts (reduced from 45s to stay within Render's 30s request limit)
     const runTesseractOcr = async (imageBase64: string, preProcessed = false): Promise<string> => {
       let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
       const deadline = Date.now() + TESSERACT_TIMEOUT_MS;
@@ -3733,7 +3733,15 @@ export async function extractOrderDetailsWithAi(
 
     // When using Tesseract (no Gemini), use more variants for better coverage
     // Include all device-specific crops (phone: 7, base: 4 = 11 total; desktop/tablet: up to 12+)
-    const ocrVariants = ai ? allOcrVariants : allOcrVariants.slice(0, 12);
+    // Limit to 6 for Tesseract-only to stay within request timeout budgets (Render 30s limit)
+    const ocrVariants = ai ? allOcrVariants : allOcrVariants.slice(0, 6);
+
+    // ── GLOBAL EXTRACTION DEADLINE ──
+    // Render free tier has a 30-second request timeout. We need to return PARTIAL results
+    // before hitting that limit, rather than getting a 502 Gateway Timeout with NO results.
+    // Budget: ~5s preprocessing already spent + 20s for OCR+AI = 25s total.
+    const EXTRACTION_DEADLINE = Date.now() + 22_000; // 22 seconds from now for OCR + AI work
+    const isTimeUp = () => Date.now() >= EXTRACTION_DEADLINE;
 
     let ocrText = '';
     let ocrLabel = 'none';
@@ -3763,7 +3771,98 @@ export async function extractOrderDetailsWithAi(
       });
     }
 
+    // ── FAST PATH: Gemini direct vision extraction ──
+    // When Gemini is available, try direct image-to-structured-data extraction FIRST.
+    // This is a SINGLE API call that extracts all 5 fields from the raw image.
+    // It avoids the expensive multi-variant OCR loop entirely for successful cases.
+    // This is the #1 latency optimization — takes ~2-5s vs 20-60s for multi-crop OCR.
+    let fastPathSuccess = false;
+    if (ai && !isGeminiCircuitOpen()) {
+      for (const model of GEMINI_MODEL_FALLBACKS.slice(0, 2)) {
+        try {
+          const directResult = await extractDirectFromImage(model, payload.imageBase64);
+          if (!directResult) continue;
+          const directOrderId = sanitizeOrderId(directResult.orderId);
+          const directAmount = typeof directResult.amount === 'number' && Number.isFinite(directResult.amount) && directResult.amount > 0
+            ? directResult.amount : null;
+          const directConfidence = typeof directResult.confidenceScore === 'number'
+            ? Math.max(0, Math.min(100, directResult.confidenceScore)) : 0;
+          // Accept fast path result if we got at least orderId AND amount with decent confidence
+          if (directOrderId && directAmount && directConfidence >= 60) {
+            accumulatedOrderId = directOrderId;
+            accumulatedAmount = directAmount;
+            accumulatedOrderDate = directResult.orderDate || null;
+            // Clean sold-by from vision
+            if (directResult.soldBy) {
+              accumulatedSoldBy = directResult.soldBy
+                .replace(/\s*\(\s*(Ask\s*Product\s*Question|Visit\s*(the\s*)?Store)[^)]*\)/gi, '')
+                .replace(/\s*Ask\s*Product\s*Question\s*/gi, '')
+                .replace(/\s*Visit\s*(the\s*)?Store\s*/gi, '')
+                .replace(/\s{2,}/g, ' ').trim() || null;
+            }
+            if (directResult.productName && directResult.productName.length >= 5
+              && !/https?:\/\/|Deliver\s*to|Hello[,\s]|Returns?\s/i.test(directResult.productName)) {
+              accumulatedProductName = directResult.productName;
+            }
+            deterministic = {
+              orderId: directOrderId,
+              amount: directAmount,
+              orderDate: accumulatedOrderDate,
+              soldBy: accumulatedSoldBy,
+              productName: accumulatedProductName,
+              notes: ['Fast path: extracted via Gemini Vision direct.'],
+            };
+            bestScore = 2;
+            ocrText = '[Gemini Vision direct extraction — no OCR text]';
+            ocrLabel = 'gemini-vision-fast';
+            fastPathSuccess = true;
+            recordGeminiSuccess();
+            aiLog.info('Order extract FAST PATH success', {
+              model, orderId: directOrderId, amount: directAmount,
+              confidence: directConfidence, productName: accumulatedProductName,
+            });
+            break;
+          }
+          // Partial result — save it but continue to OCR loop for more
+          if (directOrderId) {
+            accumulatedOrderId = directOrderId;
+            accumulatedOrderIdScore = 15; // Vision-sourced, high trust
+          }
+          if (directAmount) accumulatedAmount = directAmount;
+          if (directResult.orderDate) accumulatedOrderDate = directResult.orderDate;
+          if (directResult.soldBy) {
+            accumulatedSoldBy = directResult.soldBy
+              .replace(/\s*\(\s*(Ask\s*Product\s*Question|Visit\s*(the\s*)?Store)[^)]*\)/gi, '')
+              .replace(/\s{2,}/g, ' ').trim() || null;
+          }
+          if (directResult.productName && directResult.productName.length >= 5
+            && !/https?:\/\/|Deliver\s*to|Hello[,\s]|Returns?\s/i.test(directResult.productName)) {
+            accumulatedProductName = directResult.productName;
+          }
+          recordGeminiSuccess();
+          aiLog.info('Order extract fast path partial', { model, orderId: directOrderId, amount: directAmount });
+          break;
+        } catch (err) {
+          aiLog.warn('[Extract] Fast path model error', { model, error: err instanceof Error ? err.message : err });
+          _lastError = err;
+          continue;
+        }
+      }
+    }
+
+    // ── OCR VARIANT LOOP: Only needed when fast path didn't get both orderId + amount ──
+    if (!fastPathSuccess) {
     for (const variant of ocrVariants) {
+      // ── Global deadline check: stop processing more variants if time is running out ──
+      if (isTimeUp()) {
+        aiLog.warn('Global extraction deadline reached — stopping OCR variant loop.', {
+          processedVariants: allOcrTexts.length,
+          totalVariants: ocrVariants.length,
+          hasOrderId: Boolean(accumulatedOrderId),
+          hasAmount: Boolean(accumulatedAmount),
+        });
+        break;
+      }
       const candidateText = await runOcrPass(variant.image, variant.label);
       if (!candidateText) continue;
       allOcrTexts.push(candidateText);
@@ -3849,7 +3948,10 @@ export async function extractOrderDetailsWithAi(
       if (ai && accumulatedOrderId && accumulatedAmount) break;
       // Tesseract-only: still break if we found both AND have good text length
       if (!ai && accumulatedOrderId && accumulatedAmount && (ocrText?.length ?? 0) > 200) break;
+      // Deadline-based early exit: if we have at least one field and time is running low, stop
+      if (isTimeUp() && (accumulatedOrderId || accumulatedAmount)) break;
     }
+    } // end if (!fastPathSuccess)
 
     // If individual passes found different pieces, merge them
     if (!deterministic.orderId && accumulatedOrderId) {
@@ -3944,9 +4046,10 @@ export async function extractOrderDetailsWithAi(
     let aiUsed = false;
 
     // ALWAYS run AI when available and circuit breaker is closed — for validation, gap-filling, and cross-checking
-    if (ai && !isGeminiCircuitOpen()) {
+    if (ai && !isGeminiCircuitOpen() && !isTimeUp()) {
       // Step 1: Text-based refinement (cheap — sends OCR text only)
       for (const model of GEMINI_MODEL_FALLBACKS.slice(0, 3)) {
+        if (isTimeUp()) break;
         try {
           // eslint-disable-next-line no-await-in-loop
           const aiResult = await refineWithAi(model, ocrText, deterministic);
@@ -4073,8 +4176,10 @@ export async function extractOrderDetailsWithAi(
 
       // Step 2: Direct image extraction — runs when ANY field is missing (not just ID/amount)
       // Gemini Vision understands screenshot layout far better than OCR text parsing
-      if (!finalOrderId || !finalAmount || !finalProductName || !finalSoldBy || !finalOrderDate) {
+      // Skip if fast path already did direct vision extraction successfully
+      if (!fastPathSuccess && !isTimeUp() && (!finalOrderId || !finalAmount || !finalProductName || !finalSoldBy || !finalOrderDate)) {
         for (const model of GEMINI_MODEL_FALLBACKS.slice(0, 2)) {
+          if (isTimeUp()) break;
           try {
             // eslint-disable-next-line no-await-in-loop
             const directResult = await extractDirectFromImage(model, payload.imageBase64);

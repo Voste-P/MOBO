@@ -530,11 +530,25 @@ export const api = {
       // exceeding the Vercel proxy 4.5 MB body limit.
       // Use higher quality for extraction accuracy — OCR needs sharp text.
       const compressed = await compressImage(rawBase64, { maxDimension: 2400, quality: 0.92 });
-      return fetchJson('/ai/extract-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ imageBase64: compressed }),
-      });
+      // Client-side timeout: 35 seconds. Prevents infinite waiting when Render cold-starts
+      // or extraction runs long. The backend has its own 22s internal deadline.
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 35_000);
+      try {
+        return await fetchJson('/ai/extract-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify({ imageBase64: compressed }),
+          signal: controller.signal,
+        });
+      } catch (err: any) {
+        if (err?.name === 'AbortError' || controller.signal.aborted) {
+          throw new Error('Screenshot analysis timed out. The server may be starting up — please try again in 30 seconds.');
+        }
+        throw err;
+      } finally {
+        clearTimeout(timeoutId);
+      }
     },
     /** Pre-validate rating screenshot: checks account name + product name match */
     verifyRating: async (file: File, expectedBuyerName: string, expectedProductName: string, expectedReviewerName?: string) => {
