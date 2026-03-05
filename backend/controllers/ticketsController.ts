@@ -154,6 +154,158 @@ async function assertCanReferenceOrder(params: { orderId: string; pgUserId: stri
 
 export function makeTicketsController(env: import('../config/env.js').Env) {
   return {
+    getTicketById: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const id = String(req.params.id || '').trim();
+        if (!id) throw new AppError(400, 'INVALID_TICKET_ID', 'Invalid ticket id');
+
+        const { roles, pgUserId, user } = getRequester(req);
+        const db = prisma();
+
+        const ticket = await db.ticket.findFirst({
+          where: { ...idWhere(id), isDeleted: false },
+          include: { comments: { where: { isDeleted: false }, orderBy: { createdAt: 'asc' } } },
+        });
+        if (!ticket) throw new AppError(404, 'TICKET_NOT_FOUND', 'Ticket not found');
+
+        // Only allow the ticket owner, referenced order participants, or privileged roles
+        if (!isPrivileged(roles) && ticket.userId !== pgUserId) {
+          if (ticket.orderId) {
+            await assertCanReferenceOrder({ orderId: ticket.orderId, pgUserId, roles, user });
+          } else {
+            throw new AppError(403, 'FORBIDDEN', 'Not allowed');
+          }
+        }
+
+        const mapped = pgTicket(ticket);
+        const enriched = (await enrichTicketsWithResolverNames([mapped]))[0];
+        const uiTicket = roles.includes('brand') ? toUiTicketForBrand(enriched) : toUiTicket(enriched);
+
+        res.json({
+          ...uiTicket,
+          comments: (ticket.comments || []).map((c: any) => ({
+            id: c.id,
+            userId: c.userId,
+            userName: c.userName,
+            role: c.role,
+            message: c.message,
+            createdAt: c.createdAt,
+          })),
+        });
+      } catch (err) {
+        next(err);
+      }
+    },
+
+    listComments: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const ticketId = String(req.params.id || '').trim();
+        if (!ticketId) throw new AppError(400, 'INVALID_TICKET_ID', 'Invalid ticket id');
+
+        const { roles, pgUserId, user } = getRequester(req);
+        const db = prisma();
+
+        const ticket = await db.ticket.findFirst({ where: { ...idWhere(ticketId), isDeleted: false } });
+        if (!ticket) throw new AppError(404, 'TICKET_NOT_FOUND', 'Ticket not found');
+
+        // Access check
+        if (!isPrivileged(roles) && ticket.userId !== pgUserId) {
+          if (ticket.orderId) {
+            await assertCanReferenceOrder({ orderId: ticket.orderId, pgUserId, roles, user });
+          } else {
+            throw new AppError(403, 'FORBIDDEN', 'Not allowed');
+          }
+        }
+
+        const comments = await db.ticketComment.findMany({
+          where: { ticketId: ticket.id, isDeleted: false },
+          orderBy: { createdAt: 'asc' },
+        });
+
+        res.json({
+          comments: comments.map((c) => ({
+            id: c.id,
+            userId: c.userId,
+            userName: c.userName,
+            role: c.role,
+            message: c.message,
+            createdAt: c.createdAt,
+          })),
+        });
+      } catch (err) {
+        next(err);
+      }
+    },
+
+    addComment: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const ticketId = String(req.params.id || '').trim();
+        if (!ticketId) throw new AppError(400, 'INVALID_TICKET_ID', 'Invalid ticket id');
+
+        const message = String(req.body.message || '').trim();
+        if (!message || message.length > 2000) throw new AppError(400, 'INVALID_COMMENT', 'Comment must be 1-2000 characters');
+
+        const { roles, pgUserId, user } = getRequester(req);
+        const db = prisma();
+
+        const ticket = await db.ticket.findFirst({ where: { ...idWhere(ticketId), isDeleted: false } });
+        if (!ticket) throw new AppError(404, 'TICKET_NOT_FOUND', 'Ticket not found');
+
+        // Access check
+        if (!isPrivileged(roles) && ticket.userId !== pgUserId) {
+          if (ticket.orderId) {
+            await assertCanReferenceOrder({ orderId: ticket.orderId, pgUserId, roles, user });
+          } else {
+            throw new AppError(403, 'FORBIDDEN', 'Not allowed');
+          }
+        }
+
+        const userName = String(user?.name || 'User');
+        const role = String(user?.role || roles[0] || 'shopper');
+        const comment = await db.ticketComment.create({
+          data: {
+            ticketId: ticket.id,
+            userId: pgUserId,
+            userName,
+            role,
+            message,
+          },
+        });
+
+        // Publish realtime update for the ticket thread
+        const mapped = pgTicket(ticket);
+        const audience = await buildTicketAudience(mapped);
+        publishRealtime({ type: 'tickets.changed', ts: new Date().toISOString(), payload: { ticketId: String(mapped._id), commentAdded: true }, audience });
+
+        // Push notification to ticket creator if comment is from someone else
+        if (ticket.userId !== pgUserId) {
+          const ticketCreatorRole = String(ticket.role || 'shopper');
+          const pushApp = ticketCreatorRole === 'mediator' ? 'mediator' as const
+            : ticketCreatorRole === 'agency' ? 'agency' as const
+            : ticketCreatorRole === 'brand' ? 'brand' as const
+            : 'buyer' as const;
+          sendPushToUser({
+            env, userId: ticket.userId, app: pushApp,
+            payload: { title: 'New Comment on Your Ticket', body: `${userName} replied: ${message.slice(0, 100)}`, url: '/' },
+          }).catch(() => { /* best-effort */ });
+        }
+
+        businessLog.info(`[Comment] User ${req.auth?.userId} commented on ticket ${ticketId}`, { ticketId, userId: req.auth?.userId });
+        await writeAuditLog({ req, action: 'TICKET_COMMENT_ADDED', entityType: 'Ticket', entityId: ticketId, metadata: { commentId: comment.id, role } });
+
+        res.status(201).json({
+          id: comment.id,
+          userId: comment.userId,
+          userName: comment.userName,
+          role: comment.role,
+          message: comment.message,
+          createdAt: comment.createdAt,
+        });
+      } catch (err) {
+        next(err);
+      }
+    },
+
     listTickets: async (req: Request, res: Response, next: NextFunction) => {
       try {
         const { roles, pgUserId, user } = getRequester(req);

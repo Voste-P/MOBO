@@ -26,8 +26,13 @@ export function ticketsRoutes(env: Env): Router {
 
   router.get('/tickets', requireAuth(env), tickets.listTickets);
   router.post('/tickets', requireAuth(env), ticketWriteLimiter, tickets.createTicket);
+  router.get('/tickets/:id', requireAuth(env), tickets.getTicketById);
   router.patch('/tickets/:id', requireAuth(env), ticketWriteLimiter, tickets.updateTicket);
   router.delete('/tickets/:id', requireAuth(env), ticketWriteLimiter, tickets.deleteTicket);
+
+  // Ticket comments (thread-style)
+  router.get('/tickets/:id/comments', requireAuth(env), tickets.listComments);
+  router.post('/tickets/:id/comments', requireAuth(env), ticketWriteLimiter, tickets.addComment);
 
   return router;
 }

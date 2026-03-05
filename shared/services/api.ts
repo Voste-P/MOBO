@@ -1021,21 +1021,21 @@ export const api = {
         headers: { ...authHeaders() },
       }),
     create: async (data: any) => {
-      await fetchOk('/tickets', {
+      return fetchJson('/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify(data),
       });
     },
     update: async (id: string, status: string, resolutionNote?: string) => {
-      await fetchOk(`/tickets/${id}`, {
+      return fetchJson(`/tickets/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ status, ...(resolutionNote ? { resolutionNote } : {}) }),
       });
     },
     escalate: async (id: string) => {
-      await fetchOk(`/tickets/${id}`, {
+      return fetchJson(`/tickets/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ status: 'Open', escalate: true }),
@@ -1047,6 +1047,20 @@ export const api = {
         headers: { ...authHeaders() },
       });
     },
+    getById: async (id: string) =>
+      fetchJson(`/tickets/${encodeURIComponent(id)}`, {
+        headers: { ...authHeaders() },
+      }),
+    getComments: async (ticketId: string) =>
+      fetchJson(`/tickets/${encodeURIComponent(ticketId)}/comments`, {
+        headers: { ...authHeaders() },
+      }),
+    addComment: async (ticketId: string, message: string) =>
+      fetchJson(`/tickets/${encodeURIComponent(ticketId)}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ message }),
+      }),
   },
   /** AI-powered features for chat and proof verification */
   ai: {

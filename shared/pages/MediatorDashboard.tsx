@@ -573,11 +573,12 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
               <button type="button" onClick={() => {
                 const supportTickets = tickets.filter((t: Ticket) => t.issueType !== 'Feedback');
                 if (!supportTickets.length) { toast.error('No tickets to export'); return; }
-                const headers = ['Ticket ID', 'Status', 'Issue Type', 'Description', 'User', 'Order ID', 'Resolution Note', 'Created At'];
+                const headers = ['Ticket ID', 'Status', 'Priority', 'Issue Type', 'Description', 'User', 'Role', 'Order ID', 'Resolution Note', 'Resolved By', 'Resolved At', 'Created At'];
                 const rows = supportTickets.map((t: Ticket) => [
-                  t.id.slice(-8), String(t.status), String(t.issueType), String(t.description || ''),
-                  String((t as any).userName || ''), String(t.orderId || ''),
-                  String((t as any).resolutionNote || ''),
+                  t.id.slice(-8), String(t.status), String((t as any).priority || 'medium'), String(t.issueType), String(t.description || ''),
+                  String((t as any).userName || ''), String((t as any).role || ''), String(t.orderId || ''),
+                  String((t as any).resolutionNote || ''), String((t as any).resolvedByName || ''),
+                  (t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString() : '',
                   t.createdAt ? new Date(t.createdAt).toLocaleDateString() : '',
                 ]);
                 downloadCsv(`mediator-tickets-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);

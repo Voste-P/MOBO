@@ -1861,6 +1861,16 @@ export async function extractOrderDetailsWithAi(
             .replace(/\u200c/g, '')       // zero-width non-joiner
             .replace(/\u200d/g, '')       // zero-width joiner
             .replace(/\ufeff/g, '')       // BOM
+            // ── Fix ₹ sign misread as a digit before amounts ──
+            // Tesseract commonly reads ₹ as 2, 7, t, z, %, #, { placed before digits
+            // Pattern: single char that is a known ₹ misread + space? + digits with commas
+            // e.g. "2 599" → "₹ 599", "7,599" where 7 is the ₹ sign → "₹599"
+            // We only do this after a price label (Total, Amount, etc.) context — handled at extraction time
+            // Here we normalize obvious patterns: single ₹-lookalike char directly attached to amounts
+            .replace(/(?<=\b(?:total|amount|paid|price|grand|payable|you\s*pay|bill)\s*:?\s*)[tTzZ%]\s*(?=\d{2,6}(?:[.,]\d{1,2})?\b)/gi, '₹')
+            // Note: digit-as-₹ correction (e.g. "2599" where 2 is ₹) is handled by the
+            // detectRupeeSignAsDigit post-processing check rather than text normalization,
+            // because we can't distinguish a real leading digit from a misread ₹ at this stage.
         : '';
 
     const normalizeLine = (line: string) => line.trim();
@@ -1926,11 +1936,46 @@ export async function extractOrderDetailsWithAi(
     const parseAmountString = (raw: string | undefined | null) => {
       if (!raw) return null;
       // Indian format: 1,23,456.00 → remove commas. Standard: 123,456.00 → remove commas.
-      const cleaned = raw.replace(/,/g, '');
+      let cleaned = raw.replace(/,/g, '');
+      // Strip leading zero that OCR sometimes adds (e.g., "0599" → "599")
+      cleaned = cleaned.replace(/^0+(?=\d)/, '');
       const value = Number(cleaned);
       if (!Number.isFinite(value) || value <= 0) return null;
       // Round to 2 decimals to avoid floating point noise
       return Math.round(value * 100) / 100;
+    };
+
+    /**
+     * Detect if an extracted amount looks like it has a misread ₹ sign as its leading digit.
+     * Common OCR misreads: ₹ → 2, 7, t, z, %, {, <, #
+     * Heuristic: if the amount has a leading digit and the "true" amount (without leading digit)
+     * also appears on an amount-labeled line in the OCR text, the leading digit was likely ₹.
+     * Returns the corrected amount or null if no correction needed.
+     */
+    const detectRupeeSignAsDigit = (amount: number, ocrTextRef: string): number | null => {
+      const amtStr = String(Math.round(amount));
+      if (amtStr.length < 3) return null; // Too short to have a ₹ prefix digit
+      // Check if removing the first digit yields a plausible amount visible in OCR text
+      const withoutFirst = amtStr.slice(1);
+      const withoutFirstVal = Number(withoutFirst);
+      if (!withoutFirstVal || withoutFirstVal < 10) return null;
+      // The ratio between original and corrected should be roughly 10x (leading digit = ₹ misread)
+      const ratio = amount / withoutFirstVal;
+      if (ratio < 5 || ratio > 25) return null;
+      // Check if the corrected amount appears after a price label in OCR text
+      const labelRe = /(?:total|amount|paid|payable|grand|you\s*pay|bill|price)\s*:?\s*(?:₹|rs\.?|inr)?\s*/gi;
+      let match;
+      while ((match = labelRe.exec(ocrTextRef)) !== null) {
+        const afterLabel = ocrTextRef.slice(match.index + match[0].length, match.index + match[0].length + 20);
+        // Check if the corrected amount (with commas) appears right after the label
+        const withCommas = withoutFirstVal >= 1000
+          ? withoutFirstVal.toLocaleString('en-IN')
+          : String(withoutFirstVal);
+        if (afterLabel.includes(String(withoutFirstVal)) || afterLabel.includes(withCommas)) {
+          return withoutFirstVal;
+        }
+      }
+      return null;
     };
 
     const extractAmounts = (text: string, detectedOrderId?: string | null) => {
@@ -4682,6 +4727,27 @@ export async function extractOrderDetailsWithAi(
       notes.push(`Amount ₹${finalAmount} is suspiciously low (< ₹10) — rejected.`);
       finalAmount = null;
       confidenceScore = Math.max(30, confidenceScore - 15);
+    }
+
+    // 8c. Deterministic ₹-as-digit correction (conservative, OCR-only mode)
+    // Only apply when: (1) no AI was used, (2) the original amount does NOT appear near any
+    // price label in OCR text, AND (3) the corrected amount DOES appear near a label.
+    // This avoids false positives where "₹6,695" is a real price and gets wrongly corrected to 695.
+    if (finalAmount && ocrText && !aiUsed) {
+      const amtStr = String(Math.round(finalAmount));
+      // Check if the ORIGINAL amount is visible near a price label — if so, it's correct
+      const originalNearLabel = new RegExp(
+        `(?:total|amount|paid|payable|grand|you\\s*pay|bill|price)\\s*:?\\s*(?:₹|rs\\.?|inr)?\\s*${amtStr.replace(/(\d)/g, '$1[,.]?')}`,
+        'i'
+      ).test(ocrText);
+      if (!originalNearLabel) {
+        const corrected = detectRupeeSignAsDigit(finalAmount, ocrText);
+        if (corrected !== null) {
+          notes.push(`Deterministic ₹-as-digit correction: ₹${finalAmount} → ₹${corrected} (leading digit was misread ₹ sign).`);
+          finalAmount = corrected;
+          confidenceScore = Math.max(confidenceScore, 70);
+        }
+      }
     }
 
     // 9. Normalize order date to a consistent format (DD Month YYYY)

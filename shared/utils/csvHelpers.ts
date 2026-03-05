@@ -27,9 +27,22 @@ export function csvSafe(val: unknown): string {
 /**
  * Trigger a browser download of a CSV string with proper UTF-8 BOM
  * so Excel opens it correctly (including ₹ and other Unicode chars).
+ * 
+ * Overloads:
+ *  - `downloadCsv(filename, csvString)` — Download a pre-formatted CSV string
+ *  - `downloadCsv(filename, headers, rows)` — Build CSV from headers + row arrays (auto-safe)
  */
-export function downloadCsv(filename: string, csvString: string): void {
+export function downloadCsv(filename: string, csvStringOrHeaders: string | string[], rows?: string[][]): void {
   if (typeof window === 'undefined') return;
+  let csvString: string;
+  if (Array.isArray(csvStringOrHeaders)) {
+    // Build CSV from headers + rows arrays
+    const headerLine = csvStringOrHeaders.map(csvSafe).join(',');
+    const dataLines = (rows || []).map(row => row.map(csvSafe).join(','));
+    csvString = [headerLine, ...dataLines].join('\n');
+  } else {
+    csvString = csvStringOrHeaders;
+  }
   const blob = new Blob(['\uFEFF' + csvString], { type: 'text/csv;charset=utf-8' });
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
