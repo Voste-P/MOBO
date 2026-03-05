@@ -32,12 +32,12 @@ describe('tickets routes', () => {
     const createRes = await request(app)
       .post('/api/tickets')
       .set('Authorization', `Bearer ${shopperToken}`)
-      .send({ issueType: 'Payment', description: 'E2E test ticket' });
+      .send({ issueType: 'Order Issue', description: 'E2E test ticket' });
 
     expect(createRes.status).toBe(201);
     expect(createRes.body).toHaveProperty('id');
     expect(createRes.body).toHaveProperty('status', 'Open');
-    expect(createRes.body).toHaveProperty('issueType', 'Payment');
+    expect(createRes.body).toHaveProperty('issueType', 'Order Issue');
 
     const ticketId = createRes.body.id as string;
 
@@ -89,7 +89,7 @@ describe('tickets routes', () => {
     const createRes = await request(app)
       .post('/api/tickets')
       .set('Authorization', `Bearer ${shopperToken}`)
-      .send({ issueType: 'Payment', description: 'E2E delete test ticket' });
+      .send({ issueType: 'Order Issue', description: 'E2E delete test ticket' });
     expect(createRes.status).toBe(201);
     const ticketId = createRes.body.id as string;
 
