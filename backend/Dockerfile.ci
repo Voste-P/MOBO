@@ -4,36 +4,37 @@ FROM node:20-alpine
 # Install tini for proper PID 1 signal handling
 RUN apk add --no-cache tini
 
+# Create non-root user and set ownership early
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
 WORKDIR /app
+RUN chown appuser:appgroup /app
+
+# Switch to non-root user before operations
+USER appuser
 
 # Copy root package files for workspace setup
-COPY package.json package-lock.json ./
-COPY backend/package.json ./backend/
-COPY shared/package.json ./shared/
+COPY --chown=appuser:appgroup package.json package-lock.json ./
+COPY --chown=appuser:appgroup backend/package.json ./backend/
+COPY --chown=appuser:appgroup shared/package.json ./shared/
 
 # Copy prisma schema first (needed for generate)
-COPY backend/prisma ./backend/prisma
+COPY --chown=appuser:appgroup backend/prisma ./backend/prisma
 
 # Install production dependencies (this will run postinstall and generate prisma client)
 RUN npm ci --workspace=@mobo/backend --omit=dev
 
 # Copy pre-built dist from CI
-COPY backend/dist ./backend/dist
+COPY --chown=appuser:appgroup backend/dist ./backend/dist
 
 # Copy prisma config (needed for Prisma 7 CLI commands)
-COPY backend/prisma.config.ts ./backend/prisma.config.ts
+COPY --chown=appuser:appgroup backend/prisma.config.ts ./backend/prisma.config.ts
 
 # Copy deploy-migrate script
-COPY backend/scripts/deploy-migrate.cjs ./backend/scripts/deploy-migrate.cjs
+COPY --chown=appuser:appgroup backend/scripts/deploy-migrate.cjs ./backend/scripts/deploy-migrate.cjs
 
 # Copy traineddata for OCR
-COPY backend/eng.traineddata ./backend/
-
-# Create non-root user and set ownership
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
-    && chown -R appuser:appgroup /app
-
-USER appuser
+COPY --chown=appuser:appgroup backend/eng.traineddata ./backend/
 
 # Set environment
 ENV NODE_ENV=production
