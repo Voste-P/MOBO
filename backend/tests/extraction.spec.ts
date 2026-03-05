@@ -2042,4 +2042,69 @@ describe('order extraction (Tesseract fallback)', () => {
       expect(result.orderDate).toMatch(/1.*June.*2025|June.*1.*2025/i);
     }
   });
+
+  // ── Screenshot 26: Verify 4-digit prices are NOT rejected as order ID fragments ──
+  // When order ID digits contain the same 4 digits as the price (e.g. price ₹4089
+  // and order ID "404-6759408-9041956" → digits contain "4089" at positions 7-10),
+  // the amount must NOT be falsely rejected.
+  it('does NOT reject 4-digit amounts that overlap order ID digit substrings', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'Order placed 15 March 2026',
+      'Order #404-6759408-9041956',
+      '',
+      'Delivered 18 March',
+      'Samsung Galaxy Buds FE (Graphite)',
+      '',
+      'Sold by: RetailNet India',
+      '',
+      'Order Summary',
+      'Item(s) Subtotal: ₹4,599',
+      'Discount: -₹510',
+      'Shipping: FREE',
+      'Grand Total: ₹4,089',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 26 result:', JSON.stringify(result, null, 2));
+
+    // "4089" appears as substring at positions 7-10 in digit string "40467594089041956"
+    // but it MUST still be extracted as a valid price
+    expect(result.amount).toBe(4089);
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/404-6759408-9041956/);
+    }
+    if (result.productName) {
+      expect(result.productName!.toLowerCase()).toMatch(/samsung|galaxy|buds/i);
+    }
+  });
+
+  // ── Screenshot 27: Common prices that share digits with Flipkart order IDs ──
+  it('extracts ₹6,695 correctly despite Flipkart order ID containing "6695"', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'Order #OD224446047669586000',
+      'Order Confirmed, Mar 18, 2022',
+      '',
+      'Infinix Hot 11 (Silver Wave, 64 GB)',
+      '',
+      'Seller: Flashstar Commerce',
+      '',
+      'Price details',
+      'Listing price: ₹9,999',
+      'Selling price: ₹7,999',
+      'Total fees: ₹349',
+      'Total amount: ₹6,695',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 27 result:', JSON.stringify(result, null, 2));
+
+    // "6695" exists in Flipkart order ID digits at positions 10-13
+    // but must NOT be rejected — it's a valid total amount
+    expect(result.amount).toBe(6695);
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/OD224446047669586000/i);
+    }
+  });
 });

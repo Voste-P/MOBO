@@ -1938,32 +1938,41 @@ export async function extractOrderDetailsWithAi(
       const finalAmounts: Array<{ value: number; weight: number }> = [];   // "grand total", "amount paid", etc.
       const labeledAmounts: Array<{ value: number; weight: number; index: number }> = [];  // "total", "price", "subtotal", etc.
 
-      // Build a set of numeric substrings from the order ID so we can
-      // filter them out when they appear as bare amounts.
-      // e.g. order ID "408-0258263-2409973" → segments ["408","0258263","2409973","4080258263","02582632409973","4080258263240997", full 17-digit]
-      const orderIdDigitSegments = new Set<string>();
+      // Build a set of EXACT segments from the order ID so we can
+      // filter out order-ID-derived numbers when they appear as bare amounts.
+      // e.g. order ID "408-0258263-2409973" → exact segments ["408","0258263","2409973", full "40802582632409973"]
+      // IMPORTANT: We do NOT generate all 4+ digit contiguous substrings because that
+      // falsely rejects MANY valid prices. A 17-digit Amazon order ID would generate
+      // 105+ substring patterns that overlap with common ₹1000-₹9999 prices.
+      const orderIdExactSegments = new Set<string>();
+      let orderIdFullDigits = '';
       if (detectedOrderId) {
-        const digitsOnly = detectedOrderId.replace(/[^0-9]/g, '');
-        // Add the full digits
-        if (digitsOnly.length >= 4) orderIdDigitSegments.add(digitsOnly);
-        // Add each hyphen-separated segment
+        orderIdFullDigits = detectedOrderId.replace(/[^0-9]/g, '');
+        // Add the full concatenated digits
+        if (orderIdFullDigits.length >= 4) orderIdExactSegments.add(orderIdFullDigits);
+        // Add each hyphen/space-separated segment (e.g. "404", "6759408", "9041956")
         for (const seg of detectedOrderId.split(/[\-\s]+/)) {
           const d = seg.replace(/[^0-9]/g, '');
-          if (d.length >= 3) orderIdDigitSegments.add(d);
-        }
-        // Add contiguous sub-runs of 4+ digits (lowered from 5 to catch more fragments)
-        for (let start = 0; start < digitsOnly.length; start++) {
-          for (let len = 4; len <= digitsOnly.length - start; len++) {
-            orderIdDigitSegments.add(digitsOnly.slice(start, start + len));
-          }
+          if (d.length >= 3) orderIdExactSegments.add(d);
         }
       }
 
-      /** Check if a raw numeric string is actually a sub-segment of the order ID */
+      /** Check if a raw numeric string is actually a sub-segment of the order ID.
+       *  Uses conservative matching to avoid rejecting valid prices:
+       *  - 3-4 digit amounts: only reject if they EXACTLY match a hyphen-separated segment
+       *  - 5+ digit amounts: reject if they appear as a contiguous substring of the full digit string
+       *  - Any length: reject if they exactly match a segment or the full digit string
+       */
       const isOrderIdFragment = (raw: string) => {
-        if (!detectedOrderId || orderIdDigitSegments.size === 0) return false;
+        if (!detectedOrderId || !orderIdFullDigits) return false;
         const cleaned = raw.replace(/,/g, '').replace(/\.\d{1,2}$/, '');
-        return orderIdDigitSegments.has(cleaned);
+        if (!cleaned) return false;
+        // Exact match against any hyphen-separated segment or full digit string
+        if (orderIdExactSegments.has(cleaned)) return true;
+        // For 5+ digit amounts, check if they appear as a contiguous substring of the full digit string
+        // (4-digit prices like ₹1408, ₹4089 are too common to reject based on substring matching)
+        if (cleaned.length >= 5 && orderIdFullDigits.includes(cleaned)) return true;
+        return false;
       };
 
       /** Weight final-amount labels by specificity to prefer "Grand Total" over just "Total" */
@@ -2090,10 +2099,11 @@ export async function extractOrderDetailsWithAi(
           }
         }
 
-        // If no amount on this line, check the next 3 lines (label on one line, value below)
+        // If no amount on this line, check the next 5 lines (label on one line, value below)
+        // OCR sometimes splits labels and values across many lines
         if (!foundOnLine) {
           const lookaheadSeen = new Set<number>();
-          for (let offset = 1; offset <= 3 && i + offset < lines.length; offset++) {
+          for (let offset = 1; offset <= 5 && i + offset < lines.length; offset++) {
             const nextLine = lines[i + offset];
             // Stop if the next line has its own label
             if (AMOUNT_LABEL_RE.test(nextLine)) break;
@@ -2136,6 +2146,50 @@ export async function extractOrderDetailsWithAi(
       if (labeledAmounts.length) {
         // Among labeled amounts, prefer highest weight (subtotal > price), then last occurrence (bottom of receipt)
         const sorted = [...labeledAmounts].sort((a, b) => b.weight - a.weight || b.index - a.index);
+        return sorted[0].value;
+      }
+
+      // ── REVERSE LOOKBEHIND: Check amounts on unlabeled lines that have a label ABOVE them ──
+      // OCR may place the label and amount on different lines with blank/noise lines between.
+      // Scan every line with an INR-prefixed amount and check if any of the previous 5 lines had a label.
+      const reverseLookbehind: Array<{ value: number; weight: number }> = [];
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (AMOUNT_LABEL_RE.test(line)) continue; // Already handled above
+        if (EXCLUDED_AMOUNT_LABEL_RE.test(line)) continue;
+        INR_VALUE_GLOBAL_RE.lastIndex = 0;
+        const inrOnLine = Array.from(line.matchAll(INR_VALUE_GLOBAL_RE));
+        if (!inrOnLine.length) continue;
+
+        // Check if any of the previous 5 lines had a final/general amount label
+        let bestLabelWeight = 0;
+        let isFinal = false;
+        for (let back = 1; back <= 5 && i - back >= 0; back++) {
+          const prevLine = lines[i - back];
+          if (FINAL_AMOUNT_LABEL_RE.test(prevLine)) {
+            bestLabelWeight = Math.max(bestLabelWeight, getFinalLabelWeight(prevLine));
+            isFinal = true;
+            break;
+          }
+          if (AMOUNT_LABEL_RE.test(prevLine) && !EXCLUDED_AMOUNT_LABEL_RE.test(prevLine)) {
+            bestLabelWeight = Math.max(bestLabelWeight, getGenericLabelWeight(prevLine));
+            break;
+          }
+        }
+        if (!bestLabelWeight) continue;
+
+        for (const match of inrOnLine) {
+          const value = parseAmountString(match[1]);
+          if (!value) continue;
+          if (isOrderIdFragment(match[1])) continue;
+          if (isLikelyPincode(match[1], value, line)) continue;
+          if (isLikelyPhoneNumber(match[1], value)) continue;
+          if (isAddressOrContactLine(line)) continue;
+          reverseLookbehind.push({ value, weight: bestLabelWeight });
+        }
+      }
+      if (reverseLookbehind.length) {
+        const sorted = [...reverseLookbehind].sort((a, b) => b.weight - a.weight);
         return sorted[0].value;
       }
 
@@ -4153,22 +4207,37 @@ export async function extractOrderDetailsWithAi(
 
     // ─── POST-PROCESSING SANITY CHECKS ─── //
 
-    // 1. If the amount is actually a substring of the order ID digits, reject it
-    //    Lowered threshold from 5 to 3 digits to catch more false positives like "408" from "408-0258263-..."
+    // 1. If the amount EXACTLY matches a hyphen-separated segment of the order ID, reject it.
+    //    For 5+ digit amounts, also reject if it's a contiguous substring of the full digit string.
+    //    But do NOT reject 3-4 digit amounts merely because they appear somewhere in a 17-digit order ID
+    //    — that would falsely reject common ₹1000-₹9999 prices.
     if (finalAmount && finalOrderId) {
       const orderDigits = finalOrderId.replace(/[^0-9]/g, '');
       const amountStr = String(Math.round(finalAmount));
-      // Check: full amount string is a contiguous substring of order ID digits
-      if (orderDigits.length >= 8 && amountStr.length >= 3 && orderDigits.includes(amountStr)) {
-        // Only reject if amount is 5+ digits matching inside order ID (very suspicious)
-        // For 3-4 digit amounts, only reject if they appear at the START of order ID (e.g. "408" from "408-xxx")
-        // This prevents valid amounts like ₹2409 from being dropped when order ID contains those digits
-        const isStartMatch = orderDigits.startsWith(amountStr);
-        if (amountStr.length >= 5 || (amountStr.length === 3 && isStartMatch)) {
-          notes.push(`Amount ₹${finalAmount} appears to be digits from Order ID — rejected.`);
-          finalAmount = null;
-          confidenceScore = Math.max(30, confidenceScore - 20);
-        }
+      // Build exact segments (same logic as extractAmounts)
+      const postSegments = new Set<string>();
+      if (orderDigits.length >= 4) postSegments.add(orderDigits);
+      for (const seg of finalOrderId.split(/[\-\s]+/)) {
+        const d = seg.replace(/[^0-9]/g, '');
+        if (d.length >= 3) postSegments.add(d);
+      }
+      // Exact segment match — always reject
+      if (postSegments.has(amountStr)) {
+        notes.push(`Amount ₹${finalAmount} exactly matches an Order ID segment — rejected.`);
+        finalAmount = null;
+        confidenceScore = Math.max(30, confidenceScore - 20);
+      }
+      // 5+ digit amounts that appear as substring of full order ID digits — reject
+      else if (amountStr.length >= 5 && orderDigits.length >= 8 && orderDigits.includes(amountStr)) {
+        notes.push(`Amount ₹${finalAmount} appears to be digits from Order ID — rejected.`);
+        finalAmount = null;
+        confidenceScore = Math.max(30, confidenceScore - 20);
+      }
+      // 3-digit amounts at the START of order ID (e.g. "408" from "408-xxx") — reject
+      else if (amountStr.length === 3 && orderDigits.startsWith(amountStr)) {
+        notes.push(`Amount ₹${finalAmount} matches start of Order ID — rejected.`);
+        finalAmount = null;
+        confidenceScore = Math.max(30, confidenceScore - 20);
       }
     }
 
