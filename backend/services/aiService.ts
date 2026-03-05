@@ -2163,12 +2163,10 @@ export async function extractOrderDetailsWithAi(
 
         // Check if any of the previous 5 lines had a final/general amount label
         let bestLabelWeight = 0;
-        let isFinal = false;
         for (let back = 1; back <= 5 && i - back >= 0; back++) {
           const prevLine = lines[i - back];
           if (FINAL_AMOUNT_LABEL_RE.test(prevLine)) {
             bestLabelWeight = Math.max(bestLabelWeight, getFinalLabelWeight(prevLine));
-            isFinal = true;
             break;
           }
           if (AMOUNT_LABEL_RE.test(prevLine) && !EXCLUDED_AMOUNT_LABEL_RE.test(prevLine)) {
