@@ -469,14 +469,18 @@ export function aiRoutes(env: Env): Router {
 
       if (normalizedMessage.includes('ticket') || normalizedMessage.includes('support')) {
         if (hasTickets) {
-          const latest = (payload.tickets ?? [])[0] as any;
-          const status = normalizeStatus(latest?.status) || 'Open';
-          const issue = normalizeStatus(latest?.issueType) || 'Support';
-          res.json({
-            text: `Your latest ticket (**${issue}**) is **${status}**.`,
-            intent: 'check_ticket_status',
-          });
-          return;
+          // Filter out Feedback entries — only show actual support tickets
+          const supportTickets = (payload.tickets ?? []).filter((t: any) => t?.issueType !== 'Feedback');
+          const latest = supportTickets[0] as any;
+          if (latest) {
+            const status = normalizeStatus(latest?.status) || 'Open';
+            const issue = normalizeStatus(latest?.issueType) || 'Support';
+            res.json({
+              text: `Your latest ticket (**${issue}**) is **${status}**.`,
+              intent: 'check_ticket_status',
+            });
+            return;
+          }
         }
         res.json({
           text: 'No tickets found. You can create one from the Tickets tab.',

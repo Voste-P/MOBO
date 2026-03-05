@@ -92,6 +92,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
   // Orders can remain UNDER_REVIEW even after purchase verification if review/rating is still pending.
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
+  const [ticketFilter, setTicketFilter] = useState<'All' | 'Open' | 'Resolved' | 'Rejected'>('All');
 
   const actionRequiredOrders = useMemo(() =>
     orders.filter((o: Order) => String(o.workflowStatus || '') === 'UNDER_REVIEW')
@@ -567,6 +568,24 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
             {Array.isArray(tickets) ? tickets.length : 0}
           </span>
         </div>
+        {/* Status filter tabs */}
+        {tickets && tickets.length > 0 && (
+          <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+            {(['All', 'Open', 'Resolved', 'Rejected'] as const).map(f => {
+              const count = f === 'All' ? tickets.length : tickets.filter((t: Ticket) => String(t.status) === f).length;
+              return (
+                <button key={f} type="button" onClick={() => setTicketFilter(f)}
+                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all ${
+                    ticketFilter === f
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                      : 'bg-white text-zinc-600 border-zinc-200 hover:border-indigo-300'
+                  }`}>
+                  {f} ({count})
+                </button>
+              );
+            })}
+          </div>
+        )}
         {(!tickets || tickets.length === 0) ? (
           <EmptyState
             title="No tickets"
@@ -575,7 +594,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
           />
         ) : (
           <div className="space-y-2 max-h-[60vh] overflow-y-auto scrollbar-styled">
-            {tickets.map((t: Ticket) => (
+            {tickets.filter((t: Ticket) => ticketFilter === 'All' || String(t.status) === ticketFilter).map((t: Ticket) => (
               <div
                 key={t.id}
                 className="rounded-xl border border-zinc-100 bg-white px-3 py-3 shadow-sm space-y-2"
@@ -601,6 +620,18 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                 )}
                 {(t as any).userName && (
                   <div className="text-[9px] text-zinc-400">From: {String((t as any).userName)} ({String((t as any).userRole || '')})</div>
+                )}
+                {(t as any).resolutionNote && (
+                  <div className="text-[10px] text-green-700 bg-green-50 rounded-lg px-2 py-1.5">
+                    <span className="font-bold">Resolution:</span> {String((t as any).resolutionNote)}
+                  </div>
+                )}
+                {(String(t.status) === 'Resolved' || String(t.status) === 'Rejected') && ((t as any).resolvedByName || (t as any).resolvedAt) && (
+                  <div className="text-[9px] text-zinc-400">
+                    {String(t.status) === 'Resolved' ? 'Resolved' : 'Rejected'}
+                    {(t as any).resolvedByName ? ` by ${String((t as any).resolvedByName)}` : ''}
+                    {(t as any).resolvedAt ? ` on ${new Date(String((t as any).resolvedAt)).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
+                  </div>
                 )}
                 <div className="flex items-center gap-1.5 justify-end">
                   {String(t.status || '').toLowerCase() === 'open' && (
@@ -1768,7 +1799,7 @@ export const MediatorDashboard: React.FC = () => {
       setDeals(safeDeals);
       setPendingUsers(safePend);
       setVerifiedUsers(safeVer);
-      setTickets(safeTix);
+      setTickets(safeTix.filter((t: Ticket) => t.issueType !== 'Feedback'));
 
       // Keep the open proof-verification modal in sync with realtime order updates
       // (e.g., buyer uploaded a new proof while the modal is open).

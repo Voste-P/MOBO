@@ -600,6 +600,7 @@ export function toUiTicket(t: any) {
     targetRole: t.targetRole || null,
     resolutionNote: t.resolutionNote || null,
     resolvedBy: t.resolvedBy || null,
+    resolvedByName: t.resolvedByName || null,
     resolvedAt: safeIso(t.resolvedAt) ?? null,
     createdAt: safeIso(t.createdAt) ?? new Date().toISOString(),
   };

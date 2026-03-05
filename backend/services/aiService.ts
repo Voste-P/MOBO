@@ -2003,6 +2003,14 @@ export async function extractOrderDetailsWithAi(
           if (lineCtx && AMOUNT_LABEL_RE.test(lineCtx)) return false;
           // If the line has an INR prefix (₹, Rs) before this number — NOT a pincode
           if (lineCtx && /[₹]|\brs\.?\s/i.test(lineCtx)) return false;
+          // ── AGGRESSIVE PINCODE REJECTION ──
+          // If the value is exactly 6 digits with no decimal, first digit 1-8,
+          // and the line does NOT have any price/payment keyword, treat as pincode.
+          // This catches bare 6-digit numbers that OCR picks up from address sections.
+          if (firstDigit >= 1 && firstDigit <= 8 && lineCtx) {
+            const hasPriceContext = /\b(price|amount|total|paid|pay|charge|fee|cost|value|₹|rs|inr|rupee|bill|invoice|debit|credit)\b/i.test(lineCtx);
+            if (!hasPriceContext) return true;
+          }
           // Default: treat standalone 6-digit numbers as possible pincodes only without any price context
           return !lineCtx;
         }
@@ -2475,7 +2483,28 @@ export async function extractOrderDetailsWithAi(
         // These may look like real products but belong to the suggestion section
         /^\d+%\s*off$/i,  // "5% off" discount badges on recommended cards
         /^M\.?R\.?P\.?\s*[:\-]?\s*₹/i,  // MRP lines in recommendation cards
+        // ── Person names (2-3 proper-case words, < 35 chars, no product keywords) ──
+        // Catches "Chetan Chaudhari", "Sagar Patil", "Gaurav Chafle", "Ashok Kumar Singh" etc.
+        // These often appear in address/delivery sections and OCR picks them up.
       ];
+
+      /** Check if a line looks like a person name (2-3 proper-case words, no product keywords) */
+      const isLikelyPersonName = (line: string): boolean => {
+        const trimmed = line.trim();
+        if (trimmed.length > 40 || trimmed.length < 4) return false;
+        const words = trimmed.split(/\s+/);
+        if (words.length < 2 || words.length > 4) return false;
+        // Each word should be proper case (first letter upper) or all-upper short (< 5 chars)
+        const allProperCase = words.every(w =>
+          (/^[A-Z][a-z]+$/.test(w)) || (/^[A-Z]{1,5}$/.test(w)) || (/^[A-Z][a-z]+'s?$/.test(w))
+        );
+        if (!allProperCase) return false;
+        // Must NOT contain product keywords
+        if (/\b(phone|laptop|tablet|watch|earbuds?|headphone|speaker|shirt|shoe|bag|cream|oil|powder|book|cable|charger|mouse|keyboard|camera|pack|set|kit|ml|gm|kg|combo|serum|lotion|perfume|brush|bottle|cover|case|stand|holder|adapter|usb|bluetooth|wireless|cotton|leather|steel|glass|plastic|wooden|bamboo|silicone)\b/i.test(trimmed)) return false;
+        // Common Indian first names as extra signal (optional — catch even more)
+        if (/\b(Chetan|Sagar|Gaurav|Ashok|Sumit|Abhilash|Rajesh|Suresh|Pramod|Anil|Vijay|Rahul|Amit|Deepak|Manoj|Ravi|Sunil|Vinod|Ajay|Sanjay|Priya|Pooja|Neha|Anita|Rekha|Sunita|Kavita|Meena|Geeta|Savita|Root|Admin|User|Guest|Customer|Buyer|Shopper)\b/i.test(trimmed)) return true;
+        return allProperCase;
+      };
 
       // ── Detect "Recommended for you" section position ──
       // Products listed AFTER this header should not be considered as the order's product.
@@ -2746,9 +2775,36 @@ export async function extractOrderDetailsWithAi(
         // Bonus: line near "product" or "item" keywords on prev/same line
         if (/\b(product|item)\s*(name|title|details?|description)?\s*[:\-]?\s*$/i.test(lines[i - 1] || '')) score += 4;
         if (/\b(product|item)\s*(name|title)\s*[:\-]\s*/i.test(line)) score += 3;
+        // ── PERSON NAME PENALTY ──
+        // Lines that look like person names (2-3 proper-case words) are NOT product names
+        if (isLikelyPersonName(line)) score -= 6;
+        // ── Additional address-line penalty ──
+        // Lines with "flat", "floor", "house", "bldg" etc. are address fragments
+        if (/\b(flat\s*no|floor|house\s*no|bldg|building|tower|wing|society|apartment|residency|enclave|layout|garden)\b/i.test(line)) score -= 4;
 
         if (score >= 3) {
-          candidates.push({ name: line.replace(/\s{2,}/g, ' ').trim(), score });
+          // ── MULTI-LINE MERGE for generic candidates ──
+          // If the current line scores well, check if adjacent lines can be merged
+          // to form a more complete product name (handles OCR splitting long titles)
+          let mergedName = line.trim();
+          for (let j = i + 1; j < Math.min(productScanEndIdx, i + 4); j++) {
+            const nextLine = lines[j];
+            if (!nextLine || nextLine.length < 3) break;
+            // Stop merging at price, seller, quantity, status, or excluded-pattern lines
+            if (/^₹|^rs\.?|sold\s*by|seller|^(size|color|qty|quantity)\s*[:\-]/i.test(nextLine)) break;
+            if (/^\d+\.\d{2}$/.test(nextLine)) break;
+            if (excludePatterns.some(p => p.test(nextLine))) break;
+            if (isLikelyPersonName(nextLine)) break;
+            // Don't merge standalone color names
+            if (/^(black|white|blue|red|green|yellow|pink|purple|grey|gray|silver|gold|orange|brown|navy|maroon|beige|cream)\s*$/i.test(nextLine)) break;
+            // Continuation: text with letters, reasonable length
+            if (/[a-zA-Z]/.test(nextLine) && (nextLine.match(/[a-zA-Z]/g) || []).length / nextLine.length > 0.3) {
+              mergedName += ' ' + nextLine.trim();
+            } else {
+              break;
+            }
+          }
+          candidates.push({ name: mergedName.replace(/\s{2,}/g, ' ').trim(), score });
         }
       }
 
@@ -2757,6 +2813,8 @@ export async function extractOrderDetailsWithAi(
       // If top candidate looks like a generic category list, skip it
       const top = candidates[0].name;
       if (/^[A-Z][a-z]+(,\s*[A-Z][a-z]+)+$/.test(top)) return candidates[1]?.name || null;
+      // If top candidate looks like a person name, skip it
+      if (isLikelyPersonName(top)) return candidates[1]?.name || null;
       return top;
     };
 
@@ -3314,6 +3372,10 @@ export async function extractOrderDetailsWithAi(
               '8. VERIFY: suggestedAmount must NOT be a substring of suggestedOrderId digits.',
               '9. VERIFY: suggestedAmount must NOT be a 6-digit pincode or 10-digit phone number.',
               '10. If you see multiple amounts, PREFER "Grand Total" > "Amount Paid" > "Total amount" > "Total" > "Payable" over unlabeled amounts.',
+              '11. CRITICAL: The ₹ (rupee) symbol is NOT a digit. If OCR text shows "₹599", the amount is 599, NOT 8599 or 7599. Never include OCR misreads of ₹ as part of the number.',
+              '12. CRITICAL: Product name must NEVER be a person\'s name (e.g., "Chetan Chaudhari", "Sagar Patil"). Person names are from the delivery address section, NOT the product.',
+              '13. CRITICAL: If the product name spans MULTIPLE LINES in the screenshot, concatenate ALL lines into one continuous string. Do NOT return just the last line.',
+              '14. CRITICAL: Address text (city names, state names, pincodes, "India", road/street names) must NEVER appear as product name.',
               `OCR_TEXT (Start):\n${ocrText}\n(End OCR_TEXT)`,
               `DETERMINISTIC_ORDER_ID: ${deterministic.orderId ?? 'null'}`,
               `DETERMINISTIC_AMOUNT: ${deterministic.amount ?? 'null'}`,
@@ -3443,6 +3505,10 @@ export async function extractOrderDetailsWithAi(
             'VALIDATION RULES:',
             '- Amount must be a plausible price (₹1 to ₹500000), NOT a pincode (6 digits like 411052), NOT a phone number (10 digits), NOT order ID digits.',
             '- Product name must describe a physical item, NOT navigation chrome or addresses.',
+            '- Product name must NEVER be a person\'s name (e.g., "Chetan Chaudhari", "Sagar Patil", "Ashok Kumar"). Person names come from the delivery address section.',
+            '- If the product name spans MULTIPLE LINES, concatenate ALL lines into one string. Do NOT return only the last line.',
+            '- The ₹ (rupee) symbol is NOT a digit. If you see "₹599", amount is 599 — never add the ₹ symbol as a digit like "8599".',
+            '- Address text (city names, state names, pincodes, street names, "India") must NEVER be the product name.',
             '- Order ID must follow the exact platform format described above.',
             '',
             'Return JSON with: orderId (string), amount (number), orderDate (string), soldBy (string), productName (string), confidenceScore (0-100 integer).',
@@ -4154,6 +4220,21 @@ export async function extractOrderDetailsWithAi(
     if (finalProductName && /^(chat\s*with\s*us|see\s*all\s*updates?|download\s*invoice|rate\s*(your|the)\s*(experience|product)|how\s*do\s*i|return\s*window|payment\s*method|cash\s*on\s*delivery|stop\s*sharing)/i.test(finalProductName)) {
       notes.push('Product name was UI chrome — rejected.');
       finalProductName = null;
+    }
+
+    // 5e. Reject product name if it looks like a person name (2-4 proper-case words, < 40 chars)
+    if (finalProductName) {
+      const trimmedPN = finalProductName.trim();
+      const pnWords = trimmedPN.split(/\s+/);
+      if (pnWords.length >= 2 && pnWords.length <= 4 && trimmedPN.length < 40) {
+        const allProperCase = pnWords.every(w =>
+          /^[A-Z][a-z]+$/.test(w) || /^[A-Z]{1,5}$/.test(w) || /^[A-Z][a-z]+'s?$/.test(w)
+        );
+        if (allProperCase && !/\b(phone|laptop|tablet|watch|earbuds?|headphone|speaker|shirt|shoe|bag|cream|oil|powder|book|cable|charger|mouse|keyboard|camera|pack|set|kit|ml|gm|kg|combo|serum|lotion|perfume|brush|bottle|cover|case|stand|holder|adapter|usb|bluetooth|wireless|cotton|leather|steel|glass|trimmer|mixer|blender|cooker)\b/i.test(trimmedPN)) {
+          notes.push('Product name looked like a person name — rejected.');
+          finalProductName = null;
+        }
+      }
     }
 
     // 6. Reject product name if it's just generic text / navigation chrome

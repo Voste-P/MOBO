@@ -15,6 +15,22 @@ import { publishRealtime } from '../services/realtimeHub.js';
 import { writeAuditLog } from '../services/audit.js';
 import { parsePagination, paginatedResponse } from '../utils/pagination.js';
 
+/** Batch-resolve resolvedBy user IDs to user names for a list of tickets */
+async function enrichTicketsWithResolverNames(tickets: any[]): Promise<any[]> {
+  const db = prisma();
+  const resolverIds = [...new Set(tickets.map(t => t.resolvedBy).filter(Boolean))];
+  if (!resolverIds.length) return tickets;
+  const resolvers = await db.user.findMany({
+    where: { id: { in: resolverIds } },
+    select: { id: true, name: true },
+  });
+  const nameMap = new Map(resolvers.map(r => [r.id, r.name]));
+  return tickets.map(t => ({
+    ...t,
+    resolvedByName: t.resolvedBy ? (nameMap.get(t.resolvedBy) || null) : null,
+  }));
+}
+
 async function buildTicketAudience(ticket: any) {
   const privilegedRoles: Role[] = ['admin', 'ops'];
   const userIds = new Set<string>();
@@ -170,7 +186,8 @@ export function makeTicketsController() {
             db.ticket.findMany({ where: ticketWhere, orderBy: { createdAt: 'desc' }, skip, take: limit }),
             db.ticket.count({ where: ticketWhere }),
           ]);
-          res.json(paginatedResponse(tickets.map((t) => { try { return toUiTicket(pgTicket(t)); } catch (e) { orderLog.error(`[tickets] toUiTicket failed for ${t.id}`, { error: e }); return null; } }).filter(Boolean) as any[], total, page, limit, isPaginated));
+          const enriched = await enrichTicketsWithResolverNames(tickets);
+          res.json(paginatedResponse(enriched.map((t) => { try { return toUiTicket(pgTicket(t)); } catch (e) { orderLog.error(`[tickets] toUiTicket failed for ${t.id}`, { error: e }); return null; } }).filter(Boolean) as any[], total, page, limit, isPaginated));
           logTicketAccess(tickets.length);
           return;
         }
@@ -182,7 +199,8 @@ export function makeTicketsController() {
             db.ticket.findMany({ where: shopperWhere, orderBy: { createdAt: 'desc' }, skip, take: limit }),
             db.ticket.count({ where: shopperWhere }),
           ]);
-          res.json(paginatedResponse(tickets.map((t) => { try { return toUiTicket(pgTicket(t)); } catch (e) { orderLog.error(`[tickets] toUiTicket failed for ${t.id}`, { error: e }); return null; } }).filter(Boolean) as any[], total, page, limit, isPaginated));
+          const enriched = await enrichTicketsWithResolverNames(tickets);
+          res.json(paginatedResponse(enriched.map((t) => { try { return toUiTicket(pgTicket(t)); } catch (e) { orderLog.error(`[tickets] toUiTicket failed for ${t.id}`, { error: e }); return null; } }).filter(Boolean) as any[], total, page, limit, isPaginated));
           logTicketAccess(tickets.length);
           return;
         }
@@ -252,12 +270,14 @@ export function makeTicketsController() {
           db.ticket.count({ where: ticketWhere }),
         ]);
 
+        const enriched = await enrichTicketsWithResolverNames(tickets);
+
         if (roles.includes('brand')) {
-          res.json(paginatedResponse(tickets.map((t) => { try { return toUiTicketForBrand(pgTicket(t)); } catch (e) { orderLog.error(`[tickets] toUiTicketForBrand failed for ${t.id}`, { error: e }); return null; } }).filter(Boolean) as any[], total, page, limit, isPaginated));
+          res.json(paginatedResponse(enriched.map((t) => { try { return toUiTicketForBrand(pgTicket(t)); } catch (e) { orderLog.error(`[tickets] toUiTicketForBrand failed for ${t.id}`, { error: e }); return null; } }).filter(Boolean) as any[], total, page, limit, isPaginated));
           logTicketAccess(tickets.length);
           return;
         }
-        res.json(paginatedResponse(tickets.map((t) => { try { return toUiTicket(pgTicket(t)); } catch (e) { orderLog.error(`[tickets] toUiTicket failed for ${t.id}`, { error: e }); return null; } }).filter(Boolean) as any[], total, page, limit, isPaginated));
+        res.json(paginatedResponse(enriched.map((t) => { try { return toUiTicket(pgTicket(t)); } catch (e) { orderLog.error(`[tickets] toUiTicket failed for ${t.id}`, { error: e }); return null; } }).filter(Boolean) as any[], total, page, limit, isPaginated));
         logTicketAccess(tickets.length);
       } catch (err) {
         logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'DATABASE', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'tickets/listTickets' } });

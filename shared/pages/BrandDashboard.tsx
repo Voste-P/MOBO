@@ -2156,6 +2156,7 @@ export const BrandDashboard: React.FC = () => {
   const [sheetsExporting, setSheetsExporting] = useState(false);
   const [ticketOpen, setTicketOpen] = useState(false);
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [ticketFilter, setTicketFilter] = useState<'All' | 'Open' | 'Resolved' | 'Rejected'>('All');
 
   const fetchData = async () => {
     if (!user) return;
@@ -2172,7 +2173,7 @@ export const BrandDashboard: React.FC = () => {
       setAgencies(asArray(ags));
       setOrders(asArray(ords));
       setTransactions(asArray(txns));
-      setTickets(asArray<Ticket>(tix));
+      setTickets(asArray<Ticket>(tix).filter((t: Ticket) => t.issueType !== 'Feedback'));
     } catch (e) {
       console.error('Dashboard data fetch failed', e);
       toast.error('Failed to load dashboard data');
@@ -2481,6 +2482,24 @@ export const BrandDashboard: React.FC = () => {
         {activeTab === 'tickets' && (
           <div className="max-w-3xl mx-auto animate-enter pb-12">
             <h2 className="text-2xl font-extrabold text-zinc-900 tracking-tight mb-6">Tickets</h2>
+            {/* Status filter tabs */}
+            {tickets && tickets.length > 0 && (
+              <div className="flex items-center gap-2 mb-4 flex-wrap">
+                {(['All', 'Open', 'Resolved', 'Rejected'] as const).map(f => {
+                  const count = f === 'All' ? tickets.length : tickets.filter(t => String(t.status) === f).length;
+                  return (
+                    <button key={f} type="button" onClick={() => setTicketFilter(f)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                        ticketFilter === f
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                          : 'bg-white text-zinc-600 border-zinc-200 hover:border-indigo-300'
+                      }`}>
+                      {f} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             {(!tickets || tickets.length === 0) ? (
               <EmptyState
                 title="No tickets"
@@ -2489,7 +2508,7 @@ export const BrandDashboard: React.FC = () => {
               />
             ) : (
               <div className="space-y-3 max-h-[65vh] overflow-y-auto scrollbar-styled">
-                {tickets.map((t: Ticket) => (
+                {tickets.filter(t => ticketFilter === 'All' || String(t.status) === ticketFilter).map((t: Ticket) => (
                   <div key={t.id} className="rounded-xl border border-zinc-100 bg-white px-3 py-3 shadow-sm space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0 flex-1">
@@ -2512,6 +2531,18 @@ export const BrandDashboard: React.FC = () => {
                     )}
                     {(t as any).userName && (
                       <div className="text-[10px] text-zinc-400">From: {String((t as any).userName)} ({String((t as any).userRole || '')})</div>
+                    )}
+                    {(t as any).resolutionNote && (
+                      <div className="text-[10px] text-green-700 bg-green-50 rounded-lg px-2 py-1.5">
+                        <span className="font-bold">Resolution:</span> {String((t as any).resolutionNote)}
+                      </div>
+                    )}
+                    {(String(t.status) === 'Resolved' || String(t.status) === 'Rejected') && ((t as any).resolvedByName || (t as any).resolvedAt) && (
+                      <div className="text-[10px] text-zinc-400">
+                        {String(t.status) === 'Resolved' ? 'Resolved' : 'Rejected'}
+                        {(t as any).resolvedByName ? ` by ${String((t as any).resolvedByName)}` : ''}
+                        {(t as any).resolvedAt ? ` on ${new Date(String((t as any).resolvedAt)).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
+                      </div>
                     )}
                     <div className="flex items-center gap-2 justify-end">
                       {String(t.status || '').toLowerCase() === 'open' && (

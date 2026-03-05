@@ -266,6 +266,8 @@ export interface Ticket {
   status: TicketStatus;
   targetRole?: string;
   priority?: 'low' | 'medium' | 'high' | 'urgent';
+  resolvedBy?: string;
+  resolvedByName?: string;
   resolvedAt?: string;
   resolutionNote?: string;
   createdAt: string;

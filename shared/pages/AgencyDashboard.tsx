@@ -3230,7 +3230,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
             </div>
 
             {/* Modal Content */}
-            <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden flex flex-col md:flex-row">
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-styled md:overflow-hidden flex flex-col md:flex-row">
               {/* Order List Side */}
               <div className="flex-1 overflow-visible md:overflow-y-auto p-6 scrollbar-styled border-r border-slate-100">
                 <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
@@ -3738,6 +3738,7 @@ export const AgencyDashboard: React.FC = () => {
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [ticketOpen, setTicketOpen] = useState(false);
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [ticketFilter, setTicketFilter] = useState<'All' | 'Open' | 'Resolved' | 'Rejected'>('All');
 
   const fetchData = async () => {
     if (!user?.mediatorCode) return;
@@ -3759,7 +3760,7 @@ export const AgencyDashboard: React.FC = () => {
       setCampaigns(safeCamps);
       setOrders(safeOrds);
       setPayouts(safeLedger);
-      setTickets(asArray<Ticket>(tix));
+      setTickets(asArray<Ticket>(tix).filter((t: Ticket) => t.issueType !== 'Feedback'));
 
       const revenue = safeOrds.reduce((sum: number, o: Order) => sum + (o.total || 0), 0);
 
@@ -4001,6 +4002,24 @@ export const AgencyDashboard: React.FC = () => {
       {activeTab === 'tickets' && (
         <div className="max-w-3xl mx-auto animate-enter pb-12">
           <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-6">Tickets</h2>
+          {/* Status filter tabs */}
+          {tickets && tickets.length > 0 && (
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              {(['All', 'Open', 'Resolved', 'Rejected'] as const).map(f => {
+                const count = f === 'All' ? tickets.length : tickets.filter(t => String(t.status) === f).length;
+                return (
+                  <button key={f} type="button" onClick={() => setTicketFilter(f)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                      ticketFilter === f
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+                    }`}>
+                    {f} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {(!tickets || tickets.length === 0) ? (
             <EmptyState
               title="No tickets"
@@ -4009,7 +4028,7 @@ export const AgencyDashboard: React.FC = () => {
             />
           ) : (
             <div className="space-y-3 max-h-[65vh] overflow-y-auto scrollbar-styled">
-              {tickets.map((t: Ticket) => (
+              {tickets.filter(t => ticketFilter === 'All' || String(t.status) === ticketFilter).map((t: Ticket) => (
                 <div key={t.id} className="rounded-xl border border-slate-100 bg-white px-3 py-3 shadow-sm space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1">
@@ -4032,6 +4051,18 @@ export const AgencyDashboard: React.FC = () => {
                   )}
                   {(t as any).userName && (
                     <div className="text-[10px] text-slate-400">From: {String((t as any).userName)} ({String((t as any).userRole || '')})</div>
+                  )}
+                  {(t as any).resolutionNote && (
+                    <div className="text-[10px] text-green-700 bg-green-50 rounded-lg px-2 py-1.5">
+                      <span className="font-bold">Resolution:</span> {String((t as any).resolutionNote)}
+                    </div>
+                  )}
+                  {(String(t.status) === 'Resolved' || String(t.status) === 'Rejected') && ((t as any).resolvedByName || (t as any).resolvedAt) && (
+                    <div className="text-[10px] text-slate-400">
+                      {String(t.status) === 'Resolved' ? 'Resolved' : 'Rejected'}
+                      {(t as any).resolvedByName ? ` by ${String((t as any).resolvedByName)}` : ''}
+                      {(t as any).resolvedAt ? ` on ${new Date(String((t as any).resolvedAt)).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
+                    </div>
                   )}
                   <div className="flex items-center gap-2 justify-end">
                     {String(t.status || '').toLowerCase() === 'open' && (

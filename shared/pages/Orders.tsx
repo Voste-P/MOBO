@@ -283,7 +283,9 @@ export const Orders: React.FC = () => {
     if (!user?.id) return;
     try {
       const data = await api.tickets.getAll();
-      const mine = Array.isArray(data) ? data.filter((t: Ticket) => t.userId === user.id) : [];
+      const mine = Array.isArray(data)
+        ? data.filter((t: Ticket) => t.userId === user.id && t.issueType !== 'Feedback')
+        : [];
       setMyTickets(mine.sort((a: Ticket, b: Ticket) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     } catch { /* silently degrade — tickets are secondary */ }
   };
@@ -1337,6 +1339,13 @@ export const Orders: React.FC = () => {
                     {t.resolutionNote && (
                       <p className="text-[10px] text-green-700 bg-green-50 p-1.5 rounded-lg">
                         <span className="font-bold">Resolution:</span> {t.resolutionNote}
+                      </p>
+                    )}
+                    {(t.status === 'Resolved' || t.status === 'Rejected') && (t.resolvedByName || t.resolvedAt) && (
+                      <p className="text-[9px] text-slate-500">
+                        {t.status === 'Resolved' ? 'Resolved' : 'Rejected'}
+                        {t.resolvedByName ? ` by ${t.resolvedByName}` : ''}
+                        {t.resolvedAt ? ` on ${new Date(t.resolvedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
                       </p>
                     )}
                     <div className="flex items-center justify-between">
