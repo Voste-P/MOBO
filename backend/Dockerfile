@@ -59,6 +59,9 @@ COPY --from=builder /app/shared shared/
 # Create logs directory
 RUN mkdir -p backend/logs && chown -R mobo:mobo backend/logs
 
+# Fix permissions for Prisma engines and other potential runtime writes
+RUN chown -R mobo:mobo /app
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD wget -qO- http://localhost:8080/api/health || exit 1

@@ -6,8 +6,6 @@ on:
       - main
       - master
       - develop
-      - 'beta/**'
-      - 'feature/**'
     tags:
       - 'v*'
   pull_request:
