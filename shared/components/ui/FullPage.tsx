@@ -67,7 +67,7 @@ export function FullPageError({
           <div className="text-lg font-extrabold text-slate-900">{title}</div>
           <div className="mt-1 text-sm font-medium text-slate-600">{description}</div>
           {safeDetails ? (
-            <pre className="mt-4 text-xs bg-slate-100 border border-slate-200 rounded-xl p-3 overflow-auto text-slate-700 max-h-40">
+            <pre className="mt-4 text-xs bg-slate-100 border border-slate-200 rounded-xl p-3 overflow-auto scrollbar-styled text-slate-700 max-h-40">
               {safeDetails}
             </pre>
           ) : null}

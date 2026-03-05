@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // Role-specific issue type options for the ticket system
 export const ROLE_ISSUE_TYPES: Record<string, readonly string[]> = {
-  shopper: ['Cashback Delay', 'Wrong Amount', 'Order Issue', 'Product Issue', 'Delivery Problem', 'Refund Request', 'Other'],
+  shopper: ['Cashback Delay', 'Wrong Amount', 'Order Issue', 'Product Issue', 'Delivery Problem', 'Refund Request', 'Feedback', 'Other'],
   mediator: ['Commission Delay', 'Team Issue', 'Campaign Problem', 'Payout Issue', 'Buyer Complaint', 'Other'],
   agency: ['Brand Campaign Issue', 'Mediator Performance', 'Payout Delay', 'Technical Issue', 'Campaign Setup', 'Other'],
   brand: ['Campaign Setup', 'Agency Connection', 'Order Dispute', 'Payment Issue', 'Quality Concern', 'Other'],
@@ -29,7 +29,15 @@ export const createTicketSchema = z.object({
   role: z.string().min(1).max(50).optional(),
 });
 
+// Escalation: the next tier above each target role
+export const ESCALATION_PATH: Record<string, string> = {
+  mediator: 'agency',    // mediator → agency
+  agency: 'brand',       // agency → brand
+  brand: 'admin',        // brand → admin
+} as const;
+
 export const updateTicketSchema = z.object({
   status: z.enum(['Open', 'Resolved', 'Rejected']),
   resolutionNote: z.string().max(1000).optional(),
+  escalate: z.boolean().optional(),
 });

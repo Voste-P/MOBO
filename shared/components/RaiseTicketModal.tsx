@@ -8,11 +8,13 @@ import { formatErrorMessage } from '../utils/errors';
 interface RaiseTicketModalProps {
   open: boolean;
   onClose: () => void;
+  /** Pre-fill with an order ID when raising ticket from an order context */
+  orderId?: string;
 }
 
 // Role-specific issue types (fallback if API fails)
 const ROLE_ISSUE_TYPES: Record<string, readonly string[]> = {
-  shopper: ['Cashback Delay', 'Wrong Amount', 'Order Issue', 'Product Issue', 'Delivery Problem', 'Refund Request', 'Other'],
+  shopper: ['Cashback Delay', 'Wrong Amount', 'Order Issue', 'Product Issue', 'Delivery Problem', 'Refund Request', 'Feedback', 'Other'],
   mediator: ['Commission Delay', 'Team Issue', 'Campaign Problem', 'Payout Issue', 'Buyer Complaint', 'Other'],
   agency: ['Brand Campaign Issue', 'Mediator Performance', 'Payout Delay', 'Technical Issue', 'Campaign Setup', 'Other'],
   brand: ['Campaign Setup', 'Agency Connection', 'Order Dispute', 'Payment Issue', 'Quality Concern', 'Other'],
@@ -25,7 +27,7 @@ const PRIORITY_OPTIONS = [
   { value: 'urgent', label: 'Urgent', color: 'text-red-600 bg-red-50 border-red-200' },
 ] as const;
 
-export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClose }) => {
+export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClose, orderId: prefilledOrderId }) => {
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -40,7 +42,14 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClos
   const [issueType, setIssueType] = useState<string>('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<string>('medium');
+  const [orderIdInput, setOrderIdInput] = useState(prefilledOrderId || '');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (open && prefilledOrderId) {
+      setOrderIdInput(prefilledOrderId);
+    }
+  }, [open, prefilledOrderId]);
 
   useEffect(() => {
     if (open && issueTypes.length > 0 && !issueType) {
@@ -52,8 +61,9 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClos
     setIssueType(issueTypes[0] || '');
     setDescription('');
     setPriority('medium');
+    setOrderIdInput(prefilledOrderId || '');
     setSubmitting(false);
-  }, [issueTypes]);
+  }, [issueTypes, prefilledOrderId]);
 
   const handleClose = useCallback(() => {
     if (submitting) return;
@@ -72,6 +82,7 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClos
         issueType,
         description: description.trim(),
         priority,
+        ...(orderIdInput.trim() ? { orderId: orderIdInput.trim() } : {}),
       });
       toast.success('Ticket submitted! Our team will review it shortly.');
       reset();
@@ -91,7 +102,7 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClos
       onClick={handleClose}
     >
       <div
-        className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl animate-slide-up relative max-h-[90vh] overflow-y-auto"
+        className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl animate-slide-up relative max-h-[90vh] overflow-y-auto scrollbar-styled"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -151,6 +162,23 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClos
               ))}
             </div>
           </div>
+
+          {/* Optional Order ID reference */}
+          {userRole === 'shopper' && (
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-2">
+                Order ID <span className="text-zinc-300">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={orderIdInput}
+                onChange={(e) => setOrderIdInput(e.target.value)}
+                maxLength={64}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-400"
+                placeholder="e.g. 404-1234567-8901234"
+              />
+            </div>
+          )}
 
           <div>
             <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-2">

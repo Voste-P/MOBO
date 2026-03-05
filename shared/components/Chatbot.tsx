@@ -263,7 +263,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
       );
 
       // Recommendation 1: Dynamic Navigation Handling with validation
-      const VALID_NAV_TARGETS: AiNavigateTo[] = ['home', 'explore', 'orders', 'profile'];
+      const VALID_NAV_TARGETS: AiNavigateTo[] = ['home', 'explore', 'orders', 'profile', 'tickets'];
       if (
         response.navigateTo &&
         response.intent === 'navigation' &&
@@ -271,7 +271,9 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
       ) {
         // Use ref-tracked timeout so it's cancelled if component unmounts
         const navTimer = setTimeout(() => {
-          onNavigate?.(response.navigateTo as AiNavigateTo);
+          // Map 'tickets' → 'orders' since tickets live on the Orders tab
+          const mappedTab = response.navigateTo === 'tickets' ? 'orders' : response.navigateTo;
+          onNavigate?.(mappedTab as 'home' | 'explore' | 'orders' | 'profile');
         }, 1500);
         // Store for cleanup (will be cleared if component unmounts via effect)
         navTimerRef.current = navTimer;
@@ -320,7 +322,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
         addMessage({
           id: makeMessageId(),
           role: 'model',
-          text: 'Opening **Tickets** for you.',
+          text: 'Opening **Tickets** for you. You can view your support tickets or raise a new one.',
           timestamp: Date.now(),
         });
         return;

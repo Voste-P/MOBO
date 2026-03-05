@@ -302,6 +302,7 @@ model User {
   wallets            Wallet[]
   payouts            Payout[]
   tickets            Ticket[]
+  ticketComments     TicketComment[]
   pushSubscriptions  PushSubscription[]
   suspensionsTarget  Suspension[]        @relation("SuspensionTarget")
   suspensionsAdmin   Suspension[]        @relation("SuspensionAdmin")
@@ -806,7 +807,8 @@ model Ticket {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user     User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  comments TicketComment[]
 
   @@index([status, createdAt(sort: Desc)])
   @@index([userId, isDeleted, createdAt(sort: Desc)]) // user-specific ticket listing
@@ -814,6 +816,24 @@ model Ticket {
   @@index([orderId])                                   // settlement dispute lookups
   @@index([targetRole, isDeleted, createdAt(sort: Desc)]) // cascade routing lookups
   @@map("tickets")
+}
+
+/// Thread-style comments on tickets for back-and-forth communication
+model TicketComment {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId  String   @map("ticket_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  userName  String   @map("user_name")
+  role      String
+  message   String   @db.VarChar(2000)
+  isDeleted Boolean  @default(false) @map("is_deleted")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, isDeleted, createdAt])
+  @@map("ticket_comments")
 }
 
 /// Push notification subscription (mirrors PushSubscription.ts)

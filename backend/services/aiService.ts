@@ -1749,7 +1749,7 @@ export async function extractOrderDetailsWithAi(
     // ─── REGEX PATTERNS ─── //
 
     const ORDER_KEYWORD_RE = /order\s*(id|no\.?|number|#|:)/i;
-    const EXCLUDED_LINE_RE = /\b(tracking\s*(id|no|number|#)|shipment\s*(id|no|number|#)|awb|invoice\s*(id|no|number|#)|transaction\s*(id|no|number|#)|utr|upi\s*(ref|id)|ref(erence)?\s*(id|no|number|#))\b/i;
+    const EXCLUDED_LINE_RE = /\b(tracking\s*(id|no|number|#)|shipment\s*(id|no|number|#)|awb|invoice\s*(id|no|number|#)|transaction\s*(id|no|number|#)|utr|upi\s*(ref|id)|ref(erence)?\s*(id|no|number|#)|refund\s*ref(erence)?\s*(number|no|id|#))\b/i;
     const ORDER_LABEL_PATTERN = 'order\\s*(?:id|no\\.?|number|#)\\s*[:\\-#]?\\s*([A-Z0-9\\-_/]{4,40})';
 
     // ── Platform-specific order ID patterns ──
@@ -1776,15 +1776,19 @@ export async function extractOrderDetailsWithAi(
     const GENERIC_ID_PATTERN       = '\\b[A-Z][A-Z0-9\\-]{7,}\\b';
 
     // ── Amount patterns (₹, Rs, INR, bare) ──
-    const AMOUNT_LABEL_RE = /(grand\s*total|amount\s*paid|paid\s*amount|you\s*paid|order\s*total|final\s*total|total\s*amount|net\s*amount|payable|item\s*total|subtotal|sub\s*total|bag\s*total|cart\s*value|deal\s*price|offer\s*price|sale\s*price|final\s*price|price|your\s*price|estimated\s*total|total|amount\s*to\s*pay|pay\s*amount|bill\s*total|order\s*value|net\s*pay|final\s*pay)/i;
+    // NOTE: Includes OCR-garbled variants: Tesseract commonly misreads l→1/!/i/|, o→0, a→@, t→+
+    // e.g. "Total" → "Tota!", "Totai", "T0tal", "Tota1"; "Price" → "Pr1ce", "Prlce"; "Paid" → "Pa1d"
+    const AMOUNT_LABEL_RE = /(grand\s*t[o0]t[a@][l1!i|]|am[o0]un[t+]\s*pa[i1!|][d0]|pa[i1!|][d0]\s*am[o0]un[t+]|you\s*pa[i1!|][d0]|[o0]rder\s*t[o0]t[a@][l1!i|]|f[i1!|]na[l1!|]\s*t[o0]t[a@][l1!i|]|t[o0]t[a@][l1!i|]\s*am[o0]un[t+]|net\s*am[o0]un[t+]|payab[l1!|]e|[i1!|]tem\s*t[o0]t[a@][l1!i|]|subt[o0]t[a@][l1!i|]|sub\s*t[o0]t[a@][l1!i|]|bag\s*t[o0]t[a@][l1!i|]|cart\s*va[l1!|]ue|dea[l1!|]\s*pr[i1!|]ce|[o0]ffer\s*pr[i1!|]ce|sa[l1!|]e\s*pr[i1!|]ce|f[i1!|]na[l1!|]\s*pr[i1!|]ce|pr[i1!|]ce|y[o0]ur\s*pr[i1!|]ce|est[i1!|]mated\s*t[o0]t[a@][l1!i|]|t[o0]t[a@][l1!i|]|am[o0]un[t+]\s*t[o0]\s*pay|pay\s*am[o0]un[t+]|b[i1!|][l1!|][l1!|]\s*t[o0]t[a@][l1!i|]|[o0]rder\s*va[l1!|]ue|net\s*pay|f[i1!|]na[l1!|]\s*pay|t[o0]t[a@][l1!i|]\s*refund|refund\s*t[o0]t[a@][l1!i|]|refund\s*am[o0]un[t+])/i;
     // Priority labels that indicate the FINAL price paid (not MRP)
-    const FINAL_AMOUNT_LABEL_RE = /(grand\s*total|amount\s*paid|paid\s*amount|you\s*paid|order\s*total|final\s*total|total\s*amount|net\s*amount|payable|estimated\s*total|amount\s*payable|total\s*payable|bill\s*amount|invoice\s*total|checkout\s*total|payment\s*total|you\s*pay|to\s*pay|your\s*total|final\s*amount|due\s*amount|total\s*due|total\s*paid|amount\s*due|total\s*price|final\s*price|order\s*amount|purchase\s*total|amount\s*to\s*pay|pay\s*amount|bill\s*total|order\s*value|net\s*pay|final\s*pay|paid\s*via|paid\s*using|paid\s*by|payment\s*of|deducted|charged|debited)/i;
-    // Labels to EXCLUDE — MRP/savings/discount lines should NOT be treated as amounts
-    const EXCLUDED_AMOUNT_LABEL_RE = /(m\.?r\.?p|mrp|maximum\s*retail|retail\s*price|original\s*price|was\s*₹|was\s*rs|savings?|discount|you\s*sav|coupon|cashback|refund|promo|crossed\s*out|list\s*price|compare\s*at|earlier\s*price|regular\s*price|marked?\s*price|cut\s*price|reward\s*points?|loyalty\s*points?|coins?\s*earned|super\s*coins?|delivery\s*charge|shipping\s*fee|convenience\s*fee|handling\s*fee|gst|tax\s*amount|cgst|sgst|igst|platform\s*fee|packing\s*charge|tip|donation|round\s*off)/i;
+    const FINAL_AMOUNT_LABEL_RE = /(grand\s*t[o0]t[a@][l1!i|]|am[o0]un[t+]\s*pa[i1!|][d0]|pa[i1!|][d0]\s*am[o0]un[t+]|you\s*pa[i1!|][d0]|[o0]rder\s*t[o0]t[a@][l1!i|]|f[i1!|]na[l1!|]\s*t[o0]t[a@][l1!i|]|t[o0]t[a@][l1!i|]\s*am[o0]un[t+]|net\s*am[o0]un[t+]|payab[l1!|]e|est[i1!|]mated\s*t[o0]t[a@][l1!i|]|am[o0]un[t+]\s*payab[l1!|]e|t[o0]t[a@][l1!i|]\s*payab[l1!|]e|b[i1!|][l1!|][l1!|]\s*am[o0]un[t+]|[i1!|]nv[o0][i1!|]ce\s*t[o0]t[a@][l1!i|]|check[o0]ut\s*t[o0]t[a@][l1!i|]|payment\s*t[o0]t[a@][l1!i|]|you\s*pay|t[o0]\s*pay|y[o0]ur\s*t[o0]t[a@][l1!i|]|f[i1!|]na[l1!|]\s*am[o0]un[t+]|due\s*am[o0]un[t+]|t[o0]t[a@][l1!i|]\s*due|t[o0]t[a@][l1!i|]\s*pa[i1!|][d0]|am[o0]un[t+]\s*due|t[o0]t[a@][l1!i|]\s*pr[i1!|]ce|f[i1!|]na[l1!|]\s*pr[i1!|]ce|[o0]rder\s*am[o0]un[t+]|purchase\s*t[o0]t[a@][l1!i|]|am[o0]un[t+]\s*t[o0]\s*pay|pay\s*am[o0]un[t+]|b[i1!|][l1!|][l1!|]\s*t[o0]t[a@][l1!i|]|[o0]rder\s*va[l1!|]ue|net\s*pay|f[i1!|]na[l1!|]\s*pay|pa[i1!|][d0]\s*v[i1!|]a|pa[i1!|][d0]\s*us[i1!|]ng|pa[i1!|][d0]\s*by|payment\s*[o0]f|deducted|charged|deb[i1!|]ted|t[o0]t[a@][l1!i|]\s*refund|refund\s*t[o0]t[a@][l1!i|]|refund\s*am[o0]un[t+])/i;
+    // Labels to EXCLUDE — MRP/savings/discount/fee lines should NOT be treated as amounts
+    const EXCLUDED_AMOUNT_LABEL_RE = /(m\.?r\.?p|mrp|maximum\s*retail|retail\s*price|original\s*price|was\s*₹|was\s*rs|savings?|discount|you\s*sav|coupon|cashback|refund|promo|crossed\s*out|list\s*price|listing\s*price|selling\s*price|special\s*price|compare\s*at|earlier\s*price|regular\s*price|marked?\s*price|cut\s*price|item\s*price|unit\s*price|per\s*unit|per\s*item|reward\s*points?|loyalty\s*points?|coins?\s*earned|super\s*coins?|delivery\s*charge|delivery\s*fee|shipping\s*fee|shipping\s*charge|convenience\s*fee|handling\s*fee|packaging\s*fee|packing\s*fee|gst|tax\s*amount|total\s*tax|cgst|sgst|igst|platform\s*fee|marketplace\s*fee|packing\s*charge|total\s*fees|total\s*charges|total\s*savings|eco\s*fee|tip|donation|round\s*off|protection\s*fee|insurance\s*fee|cash.*delivery\s*fee|cod\s*fee|pay\s*on\s*delivery\s*fee)/i;
     // Amount with optional ₹ prefix — captures "₹ 599", "₹599", "599.00" etc.
-    const AMOUNT_VALUE_PATTERN = '(?:₹|(?:rs|r[5s$])\\.?|inr)?\\s*\\.?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)';
-    // Indian currency explicit prefix: ₹, Rs, Rs., INR, plus Tesseract variants (R5, R$, Ri, RI)
-    const INR_VALUE_PATTERN = '(?:₹|(?:rs|r[5s$iI])\\.?|inr|(?:rupees?))\\s*\\.?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)(?:\\s*\\/-)?';
+    // Extended with Tesseract OCR confusions for ₹: commonly read as { < ¥ ¢ # 7 t z etc.
+    const AMOUNT_VALUE_PATTERN = '(?:₹|(?:rs|r[5s$iIzZ])\\.?|inr|[{<¥¢])?\\s*\\.?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)';
+    // Indian currency explicit prefix: ₹, Rs, Rs., INR, plus Tesseract misread variants
+    // (R5, R$, Ri, RI, Rz, RZ, r5) and other common ₹ OCR confusions ({, <, ¥, ¢, #, t, z)
+    const INR_VALUE_PATTERN = '(?:₹|(?:rs|r[5s$iIzZ])\\.?|inr|(?:rupees?)|[{<¥¢#])\\s*\\.?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)(?:\\s*\\/-)?';
     const BARE_AMOUNT_PATTERN = '\\b([0-9]{2,8}(?:\\.[0-9]{1,2})?)\\b';
 
     // ── Compiled regexes ──
@@ -1821,7 +1825,7 @@ export async function extractOrderDetailsWithAi(
 
     const sanitizeOrderId = (value: unknown) => {
       if (typeof value !== 'string') return null;
-      const raw = value.trim().replace(/[\s]+/g, '');
+      let raw = value.trim().replace(/[\s]+/g, '');
       if (!raw) return null;
       const upper = raw.toUpperCase();
       if (upper.startsWith('E2E-') || upper.startsWith('SYS') || upper.includes('MOBO') || upper.includes('BUZZMA')) {
@@ -1829,6 +1833,9 @@ export async function extractOrderDetailsWithAi(
       }
       if (/^[a-f0-9]{24}$/i.test(raw)) return null; // legacy hex ID
       if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) return null; // UUID
+      // Normalize Flipkart OD prefix: OCR often produces "0OD..." or "00D..." instead of "OD..."
+      if (/^[0o][Oo0][Dd]\d{10,}$/i.test(raw)) raw = 'OD' + raw.slice(3);
+      else if (/^[0o][Dd]\d{10,}$/i.test(raw)) raw = 'OD' + raw.slice(2);
       if (raw.length < 4 || raw.length > 64) return null;
       // Must contain at least one digit to be a valid order ID
       if (!/\d/.test(raw)) return null;
@@ -1854,6 +1861,16 @@ export async function extractOrderDetailsWithAi(
             .replace(/\u200c/g, '')       // zero-width non-joiner
             .replace(/\u200d/g, '')       // zero-width joiner
             .replace(/\ufeff/g, '')       // BOM
+            // ── Fix ₹ sign misread as a digit before amounts ──
+            // Tesseract commonly reads ₹ as 2, 7, t, z, %, #, { placed before digits
+            // Pattern: single char that is a known ₹ misread + space? + digits with commas
+            // e.g. "2 599" → "₹ 599", "7,599" where 7 is the ₹ sign → "₹599"
+            // We only do this after a price label (Total, Amount, etc.) context — handled at extraction time
+            // Here we normalize obvious patterns: single ₹-lookalike char directly attached to amounts
+            .replace(/(?<=\b(?:total|amount|paid|price|grand|payable|you\s*pay|bill)\s*:?\s*)[tTzZ%]\s*(?=\d{2,6}(?:[.,]\d{1,2})?\b)/gi, '₹')
+            // Note: digit-as-₹ correction (e.g. "2599" where 2 is ₹) is handled by the
+            // detectRupeeSignAsDigit post-processing check rather than text normalization,
+            // because we can't distinguish a real leading digit from a misread ₹ at this stage.
         : '';
 
     const normalizeLine = (line: string) => line.trim();
@@ -1919,44 +1936,88 @@ export async function extractOrderDetailsWithAi(
     const parseAmountString = (raw: string | undefined | null) => {
       if (!raw) return null;
       // Indian format: 1,23,456.00 → remove commas. Standard: 123,456.00 → remove commas.
-      const cleaned = raw.replace(/,/g, '');
+      let cleaned = raw.replace(/,/g, '');
+      // Strip leading zero that OCR sometimes adds (e.g., "0599" → "599")
+      cleaned = cleaned.replace(/^0+(?=\d)/, '');
       const value = Number(cleaned);
       if (!Number.isFinite(value) || value <= 0) return null;
       // Round to 2 decimals to avoid floating point noise
       return Math.round(value * 100) / 100;
     };
 
+    /**
+     * Detect if an extracted amount looks like it has a misread ₹ sign as its leading digit.
+     * Common OCR misreads: ₹ → 2, 7, t, z, %, {, <, #
+     * Heuristic: if the amount has a leading digit and the "true" amount (without leading digit)
+     * also appears on an amount-labeled line in the OCR text, the leading digit was likely ₹.
+     * Returns the corrected amount or null if no correction needed.
+     */
+    const detectRupeeSignAsDigit = (amount: number, ocrTextRef: string): number | null => {
+      const amtStr = String(Math.round(amount));
+      if (amtStr.length < 3) return null; // Too short to have a ₹ prefix digit
+      // Check if removing the first digit yields a plausible amount visible in OCR text
+      const withoutFirst = amtStr.slice(1);
+      const withoutFirstVal = Number(withoutFirst);
+      if (!withoutFirstVal || withoutFirstVal < 10) return null;
+      // The ratio between original and corrected should be roughly 10x (leading digit = ₹ misread)
+      const ratio = amount / withoutFirstVal;
+      if (ratio < 5 || ratio > 25) return null;
+      // Check if the corrected amount appears after a price label in OCR text
+      const labelRe = /(?:total|amount|paid|payable|grand|you\s*pay|bill|price)\s*:?\s*(?:₹|rs\.?|inr)?\s*/gi;
+      let match;
+      while ((match = labelRe.exec(ocrTextRef)) !== null) {
+        const afterLabel = ocrTextRef.slice(match.index + match[0].length, match.index + match[0].length + 20);
+        // Check if the corrected amount (with commas) appears right after the label
+        const withCommas = withoutFirstVal >= 1000
+          ? withoutFirstVal.toLocaleString('en-IN')
+          : String(withoutFirstVal);
+        if (afterLabel.includes(String(withoutFirstVal)) || afterLabel.includes(withCommas)) {
+          return withoutFirstVal;
+        }
+      }
+      return null;
+    };
+
     const extractAmounts = (text: string, detectedOrderId?: string | null) => {
       const lines = text.split('\n').map(normalizeLine).filter(Boolean);
       const finalAmounts: Array<{ value: number; weight: number }> = [];   // "grand total", "amount paid", etc.
-      const labeledAmounts: Array<{ value: number; weight: number }> = [];  // "total", "price", "subtotal", etc.
+      const labeledAmounts: Array<{ value: number; weight: number; index: number }> = [];  // "total", "price", "subtotal", etc.
 
-      // Build a set of numeric substrings from the order ID so we can
-      // filter them out when they appear as bare amounts.
-      // e.g. order ID "408-0258263-2409973" → segments ["408","0258263","2409973","4080258263","02582632409973","4080258263240997", full 17-digit]
-      const orderIdDigitSegments = new Set<string>();
+      // Build a set of EXACT segments from the order ID so we can
+      // filter out order-ID-derived numbers when they appear as bare amounts.
+      // e.g. order ID "408-0258263-2409973" → exact segments ["408","0258263","2409973", full "40802582632409973"]
+      // IMPORTANT: We do NOT generate all 4+ digit contiguous substrings because that
+      // falsely rejects MANY valid prices. A 17-digit Amazon order ID would generate
+      // 105+ substring patterns that overlap with common ₹1000-₹9999 prices.
+      const orderIdExactSegments = new Set<string>();
+      let orderIdFullDigits = '';
       if (detectedOrderId) {
-        const digitsOnly = detectedOrderId.replace(/[^0-9]/g, '');
-        // Add the full digits
-        if (digitsOnly.length >= 4) orderIdDigitSegments.add(digitsOnly);
-        // Add each hyphen-separated segment
+        orderIdFullDigits = detectedOrderId.replace(/[^0-9]/g, '');
+        // Add the full concatenated digits
+        if (orderIdFullDigits.length >= 4) orderIdExactSegments.add(orderIdFullDigits);
+        // Add each hyphen/space-separated segment (e.g. "404", "6759408", "9041956")
         for (const seg of detectedOrderId.split(/[\-\s]+/)) {
           const d = seg.replace(/[^0-9]/g, '');
-          if (d.length >= 3) orderIdDigitSegments.add(d);
-        }
-        // Add contiguous sub-runs of 4+ digits (lowered from 5 to catch more fragments)
-        for (let start = 0; start < digitsOnly.length; start++) {
-          for (let len = 4; len <= digitsOnly.length - start; len++) {
-            orderIdDigitSegments.add(digitsOnly.slice(start, start + len));
-          }
+          if (d.length >= 3) orderIdExactSegments.add(d);
         }
       }
 
-      /** Check if a raw numeric string is actually a sub-segment of the order ID */
+      /** Check if a raw numeric string is actually a sub-segment of the order ID.
+       *  Uses conservative matching to avoid rejecting valid prices:
+       *  - 3-4 digit amounts: only reject if they EXACTLY match a hyphen-separated segment
+       *  - 5+ digit amounts: reject if they appear as a contiguous substring of the full digit string
+       *  - Any length: reject if they exactly match a segment or the full digit string
+       */
       const isOrderIdFragment = (raw: string) => {
-        if (!detectedOrderId || orderIdDigitSegments.size === 0) return false;
+        if (!detectedOrderId || !orderIdFullDigits) return false;
         const cleaned = raw.replace(/,/g, '').replace(/\.\d{1,2}$/, '');
-        return orderIdDigitSegments.has(cleaned);
+        if (!cleaned) return false;
+        // Exact match against any hyphen-separated segment or full digit string
+        if (orderIdExactSegments.has(cleaned)) return true;
+        // For 5+ digit amounts, check if they appear as a contiguous substring of the full digit string
+        // (4-digit prices like ₹1408, ₹4089 are too common to reject based on substring matching)
+        if (cleaned.length >= 5 && orderIdFullDigits.includes(cleaned)) return true;
+        return false;
       };
 
       /** Weight final-amount labels by specificity to prefer "Grand Total" over just "Total" */
@@ -1972,15 +2033,80 @@ export async function extractOrderDetailsWithAi(
         return 5;
       };
 
-      const processAmountOnLine = (match: RegExpMatchArray, isFinalLabel: boolean, line: string) => {
+      /** Weight for non-final labeled amounts — prefer "subtotal"/"total" over bare "price" */
+      const getGenericLabelWeight = (line: string): number => {
+        if (/item\s*total|subtotal|sub\s*total|bag\s*total|cart\s*value/i.test(line)) return 4;
+        if (/total/i.test(line) && !/total\s*(fee|charge|tax|saving|discount)/i.test(line)) return 3;
+        if (/deal\s*price|offer\s*price|sale\s*price|your\s*price/i.test(line)) return 2;
+        return 1;
+      };
+
+      /** Check if a raw numeric string is likely a pincode (6-digit Indian pincode) */
+      const isLikelyPincode = (raw: string, value: number, lineCtx?: string): boolean => {
+        const cleaned = raw.replace(/,/g, '').replace(/\.\d{1,2}$/, '');
+        // Indian pincodes: 6 digits, first digit 1-9, value 100000-999999
+        if (/^\d{6}$/.test(cleaned) && value >= 100000 && value <= 999999) {
+          // Only flag as pincode if surrounding text has address/pincode context
+          // OR if the number falls in a known Indian pincode range (1xxxxx-8xxxxx)
+          if (lineCtx && isAddressOrContactLine(lineCtx)) return true;
+          // Known Indian pincode first-digit: 1-8 (9xxxxx is very rare)
+          const firstDigit = parseInt(cleaned[0], 10);
+          if (firstDigit >= 1 && firstDigit <= 8 && lineCtx && /\b(pin|zip|code|city|state|district|area|sector|colony|nagar|road|street|lane|near|opp|behind|floor|flat|apartment|house|bldg|block|plot|ward|village|taluk|mandal|tehsil)\b/i.test(lineCtx)) return true;
+          // If line contains a final label like "Total", "Amount", "Price" — NOT a pincode
+          if (lineCtx && FINAL_AMOUNT_LABEL_RE.test(lineCtx)) return false;
+          if (lineCtx && AMOUNT_LABEL_RE.test(lineCtx)) return false;
+          // If the line has an INR prefix (₹, Rs) before this number — NOT a pincode
+          if (lineCtx && /[₹]|\brs\.?\s/i.test(lineCtx)) return false;
+          // ── AGGRESSIVE PINCODE REJECTION ──
+          // If the value is exactly 6 digits with no decimal, first digit 1-8,
+          // and the line does NOT have any price/payment keyword, treat as pincode.
+          // This catches bare 6-digit numbers that OCR picks up from address sections.
+          if (firstDigit >= 1 && firstDigit <= 8 && lineCtx) {
+            const hasPriceContext = /\b(price|amount|total|paid|pay|charge|fee|cost|value|₹|rs|inr|rupee|bill|invoice|debit|credit)\b/i.test(lineCtx);
+            if (!hasPriceContext) return true;
+          }
+          // Default: treat standalone 6-digit numbers as possible pincodes only without any price context
+          return !lineCtx;
+        }
+        return false;
+      };
+
+      /** Check if a raw numeric string is likely a phone number */
+      const isLikelyPhoneNumber = (raw: string, value: number): boolean => {
+        const cleaned = raw.replace(/,/g, '').replace(/\.\d{1,2}$/, '');
+        // Indian phone: 10 digits starting with 6-9
+        if (/^[6-9]\d{9}$/.test(cleaned)) return true;
+        // With country code
+        if (/^91\d{10}$/.test(cleaned)) return true;
+        // 0-prefixed Indian number (11 digits)
+        if (/^0[6-9]\d{9}$/.test(cleaned)) return true;
+        // 10 digit number in general
+        if (/^\d{10}$/.test(cleaned) && value >= 1000000000) return true;
+        return false;
+      };
+
+      /** Check if the line context suggests this is an address/contact, not a price */
+      const isAddressOrContactLine = (line: string): boolean => {
+        return /\b(pincode|pin\s*code|zip|postal|address|deliver\s*to|ship\s*to|phone|mobile|contact|tel|fax)\b/i.test(line)
+          || /\b(maharashtra|karnataka|tamil\s*nadu|delhi|mumbai|bangalore|chennai|hyderabad|kolkata|pune|jaipur|lucknow|ahmedabad|india|mhasas|jalgaon|pachora|vakad|pimpri|chinchwad|hingne|budrukh|karve\s*nagar|ajmer|rajasthan|uttar\s*pradesh|madhya\s*pradesh|andhra\s*pradesh|telangana|kerala|gujarat|bihar|odisha|assam|west\s*bengal|chhattisgarh|jharkhand|uttarakhand|himachal|goa|chandigarh|noida|gurgaon|gurugram|faridabad|ghaziabad|indore|bhopal|nagpur|surat|vadodara|coimbatore|visakhapatnam|patna|ranchi|bhubaneswar|dehradun|thiruvananthapuram|kochi|mangalore|mysore|jodhpur|udaipur|agra|varanasi|allahabad|kanpur|meerut|ludhiana|amritsar|jammu|srinagar)\b/i.test(line)
+          || /\b\d{6}\b.*\b(india|in)\b/i.test(line);
+      };
+
+      const processAmountOnLine = (match: RegExpMatchArray, isFinalLabel: boolean, line: string, lineIndex: number) => {
         const value = parseAmountString(match[1]);
         if (!value) return false;
         if (isOrderIdFragment(match[1])) return false;
         // Reject amounts that are clearly too small to be an order total (< ₹1)
         if (value < 1) return false;
-        const weight = isFinalLabel ? getFinalLabelWeight(line) : 1;
+        // Reject values that look like 6-digit pincodes (unless line explicitly says "total"/"amount")
+        if (isLikelyPincode(match[1], value, line) && !isFinalLabel) return false;
+        // Reject values that look like phone numbers
+        if (isLikelyPhoneNumber(match[1], value)) return false;
+        // Reject if the line is clearly about addresses/contacts (not prices)
+        if (isAddressOrContactLine(line) && !isFinalLabel) return false;
+        const weight = isFinalLabel ? getFinalLabelWeight(line) : getGenericLabelWeight(line);
         if (isFinalLabel) finalAmounts.push({ value, weight });
-        else labeledAmounts.push({ value, weight });
+        else labeledAmounts.push({ value, weight, index: lineIndex });
         return true;
       };
 
@@ -2005,7 +2131,7 @@ export async function extractOrderDetailsWithAi(
           const value = parseAmountString(match[1]);
           if (value && !seenValues.has(value)) {
             seenValues.add(value);
-            if (processAmountOnLine(match, isFinalLabel, line)) foundOnLine = true;
+            if (processAmountOnLine(match, isFinalLabel, line, i)) foundOnLine = true;
           }
         }
 
@@ -2015,34 +2141,42 @@ export async function extractOrderDetailsWithAi(
           const value = parseAmountString(match[1]);
           if (value && !seenValues.has(value)) {
             seenValues.add(value);
-            if (processAmountOnLine(match, isFinalLabel, line)) foundOnLine = true;
+            if (processAmountOnLine(match, isFinalLabel, line, i)) foundOnLine = true;
           }
         }
 
-        // If no amount on this line, check the next 3 lines (label on one line, value below)
+        // If no amount on this line, check the next 5 lines (label on one line, value below)
+        // OCR sometimes splits labels and values across many lines
         if (!foundOnLine) {
-          for (let offset = 1; offset <= 3 && i + offset < lines.length; offset++) {
+          const lookaheadSeen = new Set<number>();
+          for (let offset = 1; offset <= 5 && i + offset < lines.length; offset++) {
             const nextLine = lines[i + offset];
             // Stop if the next line has its own label
             if (AMOUNT_LABEL_RE.test(nextLine)) break;
             const nextMatches = nextLine.matchAll(AMOUNT_VALUE_GLOBAL_RE);
             for (const match of nextMatches) {
               const value = parseAmountString(match[1]);
-              if (!value) continue;
+              if (!value || lookaheadSeen.has(value)) continue;
+              lookaheadSeen.add(value);
               if (isOrderIdFragment(match[1])) continue;
-              const w = isFinalLabel ? getFinalLabelWeight(lines[i]) : 1;
+              if (isLikelyPincode(match[1], value, nextLine) && !isFinalLabel) continue;
+              if (isLikelyPhoneNumber(match[1], value)) continue;
+              const w = isFinalLabel ? getFinalLabelWeight(lines[i]) : getGenericLabelWeight(lines[i]);
               if (isFinalLabel) finalAmounts.push({ value, weight: w });
-              else labeledAmounts.push({ value, weight: w });
+              else labeledAmounts.push({ value, weight: w, index: i });
             }
             INR_VALUE_GLOBAL_RE.lastIndex = 0;
             const nextInr = nextLine.matchAll(INR_VALUE_GLOBAL_RE);
             for (const match of nextInr) {
               const value = parseAmountString(match[1]);
-              if (!value) continue;
+              if (!value || lookaheadSeen.has(value)) continue;
+              lookaheadSeen.add(value);
               if (isOrderIdFragment(match[1])) continue;
-              const w = isFinalLabel ? getFinalLabelWeight(lines[i]) : 1;
+              if (isLikelyPincode(match[1], value, nextLine) && !isFinalLabel) continue;
+              if (isLikelyPhoneNumber(match[1], value)) continue;
+              const w = isFinalLabel ? getFinalLabelWeight(lines[i]) : getGenericLabelWeight(lines[i]);
               if (isFinalLabel) finalAmounts.push({ value, weight: w });
-              else labeledAmounts.push({ value, weight: w });
+              else labeledAmounts.push({ value, weight: w, index: i });
             }
           }
         }
@@ -2056,21 +2190,96 @@ export async function extractOrderDetailsWithAi(
         return sorted[0].value;
       }
       if (labeledAmounts.length) {
-        // Among labeled amounts, prefer the largest (usually the total, not a line item)
-        const sorted = [...labeledAmounts].sort((a, b) => b.value - a.value);
+        // Among labeled amounts, prefer highest weight (subtotal > price), then last occurrence (bottom of receipt)
+        const sorted = [...labeledAmounts].sort((a, b) => b.weight - a.weight || b.index - a.index);
         return sorted[0].value;
       }
 
-      // Fallback: any INR-prefixed value in the entire text
+      // ── REVERSE LOOKBEHIND: Check amounts on unlabeled lines that have a label ABOVE them ──
+      // OCR may place the label and amount on different lines with blank/noise lines between.
+      // Scan every line with an INR-prefixed amount and check if any of the previous 5 lines had a label.
+      const reverseLookbehind: Array<{ value: number; weight: number }> = [];
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (AMOUNT_LABEL_RE.test(line)) continue; // Already handled above
+        if (EXCLUDED_AMOUNT_LABEL_RE.test(line)) continue;
+        INR_VALUE_GLOBAL_RE.lastIndex = 0;
+        const inrOnLine = Array.from(line.matchAll(INR_VALUE_GLOBAL_RE));
+        if (!inrOnLine.length) continue;
+
+        // Check if any of the previous 5 lines had a final/general amount label
+        let bestLabelWeight = 0;
+        for (let back = 1; back <= 5 && i - back >= 0; back++) {
+          const prevLine = lines[i - back];
+          if (FINAL_AMOUNT_LABEL_RE.test(prevLine)) {
+            bestLabelWeight = Math.max(bestLabelWeight, getFinalLabelWeight(prevLine));
+            break;
+          }
+          if (AMOUNT_LABEL_RE.test(prevLine) && !EXCLUDED_AMOUNT_LABEL_RE.test(prevLine)) {
+            bestLabelWeight = Math.max(bestLabelWeight, getGenericLabelWeight(prevLine));
+            break;
+          }
+        }
+        if (!bestLabelWeight) continue;
+
+        for (const match of inrOnLine) {
+          const value = parseAmountString(match[1]);
+          if (!value) continue;
+          if (isOrderIdFragment(match[1])) continue;
+          if (isLikelyPincode(match[1], value, line)) continue;
+          if (isLikelyPhoneNumber(match[1], value)) continue;
+          if (isAddressOrContactLine(line)) continue;
+          reverseLookbehind.push({ value, weight: bestLabelWeight });
+        }
+      }
+      if (reverseLookbehind.length) {
+        const sorted = [...reverseLookbehind].sort((a, b) => b.weight - a.weight);
+        return sorted[0].value;
+      }
+
+      // ── "Recommended for you" / "Similar products" zone detection ──
+      // Find the character offset where a recommendation section starts so we
+      // can SKIP all amounts after that offset in the INR/bare fallbacks.
+      const RECO_SECTION_RE = /\b(recommended\s*for\s*you|people\s*also\s*(bought|viewed)|similar\s*products?|you\s*may\s*also|frequently\s*bought|inspired\s*by\s*your|customers?\s*(also|who)|keep\s*shopping|based\s*on\s*your)\b/i;
+      const recoMatch = RECO_SECTION_RE.exec(text);
+      const recoStartOffset = recoMatch ? (recoMatch.index ?? text.length) : text.length;
+
+      // Also detect Amazon bottom nav bar zone: "Home  You  Wallet  Cart  Menu  Rufus"
+      const NAV_BAR_RE = /\b(Home|You|Wallet|Cart|Menu|Rufus)\b.*\b(Home|You|Wallet|Cart|Menu|Rufus)\b/;
+      const navMatch = NAV_BAR_RE.exec(text);
+      const navStartOffset = navMatch ? (navMatch.index ?? text.length) : text.length;
+
+      // Use the EARLIER of the two as the "noise zone" cutoff
+      const noiseZoneStart = Math.min(recoStartOffset, navStartOffset);
+
+      // Fallback: any INR-prefixed value in the entire text (BEFORE noise zone)
       const inrMatches = text.matchAll(INR_VALUE_GLOBAL_RE);
       const inrValues: number[] = [];
       for (const match of inrMatches) {
         const value = parseAmountString(match[1]);
         if (!value) continue;
         if (isOrderIdFragment(match[1])) continue;
+        if (isLikelyPhoneNumber(match[1], value)) continue;
+        // Skip amounts after the "Recommended for you" / nav bar zone
+        if ((match.index ?? 0) >= noiseZoneStart) continue;
+        // Skip if the value's surrounding line is address/contact context
+        const lineIdx = text.lastIndexOf('\n', (match.index ?? 0));
+        const lineEnd = text.indexOf('\n', (match.index ?? 0) + match[0].length);
+        const surroundingLine = text.slice(Math.max(0, lineIdx), lineEnd > 0 ? lineEnd : undefined);
+        if (isAddressOrContactLine(surroundingLine) && !FINAL_AMOUNT_LABEL_RE.test(surroundingLine)) continue;
+        // Skip INR values on EXCLUDED lines (MRP, listing price, discount, fee lines)
+        if (EXCLUDED_AMOUNT_LABEL_RE.test(surroundingLine) && !FINAL_AMOUNT_LABEL_RE.test(surroundingLine)) continue;
+        // Skip values on "FREE Delivery" / rating / review count lines
+        if (/free\s*delivery|\brating|\breviews?\b|\bstars?\b|\d+\s*count\b/i.test(surroundingLine)) continue;
         inrValues.push(value);
       }
-      if (inrValues.length) return Math.max(...inrValues);
+      // For INR fallback: prefer the LAST value in the text (bottom of receipt is typically the total)
+      // If there are multiple, pick the one nearest to the end (most likely the final total)
+      if (inrValues.length) {
+        // If only 1 value, return it. Otherwise, prefer the last occurrence (bottom of receipt).
+        // Math.max was wrong here — MRP lines at the top are often the highest amount.
+        return inrValues[inrValues.length - 1];
+      }
 
       // Last resort: bare numbers that look like prices (₹10 – ₹9,99,999)
       const bareMatches = text.matchAll(BARE_AMOUNT_GLOBAL_RE);
@@ -2080,9 +2289,15 @@ export async function extractOrderDetailsWithAi(
         if (!value) continue;
         if (value < 1 || value > 9_999_999) continue;
         if (isOrderIdFragment(match[1])) continue; // Skip order ID digit fragments
+        // Skip amounts after the "Recommended for you" / nav bar zone
+        if ((match.index ?? 0) >= noiseZoneStart) continue;
         // Skip values that look like dates, years, phone numbers, pin codes
         if (/^\d{4}$/.test(match[1]) && value >= 1900 && value <= 2100) continue;
-        if (/^\d{6}$/.test(match[1]) && value >= 100000 && value <= 999999) continue; // 6-digit pincode
+        // Context-aware pincode check for bare numbers
+        const bl = text.lastIndexOf('\n', (match.index ?? 0));
+        const be = text.indexOf('\n', (match.index ?? 0) + match[0].length);
+        const bareLine = text.slice(Math.max(0, bl), be > 0 ? be : undefined);
+        if (isLikelyPincode(match[1], value, bareLine)) continue;
         if (/^\d{10}$/.test(match[1])) continue; // phone number
         if (/^\d{12}$/.test(match[1])) continue; // Aadhaar-like number
         // Unix timestamps (starts with 16/17, 10+ digits)
@@ -2091,7 +2306,47 @@ export async function extractOrderDetailsWithAi(
         if (/^\d{1}$/.test(match[1])) continue;
         bareValues.push(value);
       }
-      if (bareValues.length) return Math.max(...bareValues);
+      // For bare numbers: prefer the last value (nearest to bottom of receipt)
+      if (bareValues.length) return bareValues[bareValues.length - 1];
+
+      // ── STRUCTURAL BOTTOM-OF-TEXT FALLBACK ──
+      // When ALL previous methods fail, scan only the bottom 30% of lines
+      // for any INR-prefixed or bare number that could be a total.
+      // E-commerce receipts almost always show totals near the bottom.
+      const bottomStartLine = Math.max(0, lines.length - Math.ceil(lines.length * 0.35));
+      const bottomLines = lines.slice(bottomStartLine);
+      const bottomText = bottomLines.join('\n');
+      const bottomInrMatches = bottomText.matchAll(INR_VALUE_GLOBAL_RE);
+      const bottomValues: number[] = [];
+      for (const match of bottomInrMatches) {
+        const value = parseAmountString(match[1]);
+        if (!value || value < 10) continue;
+        if (isOrderIdFragment(match[1])) continue;
+        if (isLikelyPhoneNumber(match[1], value)) continue;
+        // Pincode check: locate the line context for this match
+        const bInrLine = bottomText.slice(
+          Math.max(0, bottomText.lastIndexOf('\n', match.index ?? 0)),
+          (bottomText.indexOf('\n', (match.index ?? 0) + match[0].length) + 1) || undefined,
+        );
+        if (isLikelyPincode(match[1], value, bInrLine)) continue;
+        bottomValues.push(value);
+      }
+      if (bottomValues.length) return bottomValues[bottomValues.length - 1];
+      // Bare number scan on bottom lines
+      const bottomBareMatches = bottomText.matchAll(BARE_AMOUNT_GLOBAL_RE);
+      for (const match of bottomBareMatches) {
+        const value = parseAmountString(match[1]);
+        if (!value || value < 10 || value > 999999) continue;
+        if (isOrderIdFragment(match[1])) continue;
+        if (/^\d{10}$/.test(match[1])) continue;
+        if (/^\d{1}$/.test(match[1])) continue;
+        const bLine = bottomText.slice(
+          Math.max(0, bottomText.lastIndexOf('\n', match.index ?? 0)),
+          (bottomText.indexOf('\n', (match.index ?? 0) + match[0].length) + 1) || undefined,
+        );
+        if (isLikelyPincode(match[1], value, bLine)) continue;
+        return value;
+      }
 
       return null;
     };
@@ -2101,8 +2356,10 @@ export async function extractOrderDetailsWithAi(
       const lines = text.split('\n').map(normalizeLine).filter(Boolean);
 
       // Look for lines containing date-related keywords
-      const dateKeywordRe = /\b(order\s*(placed|date)|placed\s*on|date|ordered\s*on|purchase\s*date|bought\s*on|order\s*created|placed\s*date|created\s*on|transaction\s*date|booking\s*date|purchased\s*on)\b/i;
-      // Date patterns: "7 February 2026", "07-02-2026", "07/02/2026", "Feb 7, 2026", "2026-02-07"
+      const dateKeywordRe = /\b(order\s*(placed|date|confirmed)|placed\s*on|date|ordered\s*on|purchase\s*date|bought\s*on|order\s*created|placed\s*date|created\s*on|transaction\s*date|booking\s*date|purchased\s*on|confirmed\s*on|delivered\s*on|delivered\s*,|return\s*(initiated|,)|shipped\s*on|dispatched\s*on|refund\s*(initiated|,))\b/i;
+      // Lines to SKIP for date extraction (not order dates)
+      const dateExcludeRe = /\b(return\s*window|return\s*or\s*replace|return\s*policy|refund\s*ref|how\s*do\s*i|bank\s*account|bank\s*statement)\b/i;
+      // Date patterns: "7 February 2026", "07-02-2026", "07/02/2026", "Feb 7, 2026", "2026-02-07", "18-Mar-2022"
       const datePatterns = [
         /(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})/i,
         /(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})/i,
@@ -2110,11 +2367,16 @@ export async function extractOrderDetailsWithAi(
         /(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/,
         /(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})/i,
         /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{1,2}),?\s+(\d{4})/i,
+        // dd-MMM-yyyy: "18-Mar-2022", "01/Jan/2026"
+        /(\d{1,2})\s*[-\/]\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*[-\/,]?\s*(\d{4})/i,
+        // "October 18, 2025" full month with comma
+        /(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})\s*,\s*(\d{4})/i,
       ];
 
       // First try lines with date keywords
       for (const line of lines) {
         if (!dateKeywordRe.test(line)) continue;
+        if (dateExcludeRe.test(line)) continue;
         for (const pattern of datePatterns) {
           const match = line.match(pattern);
           if (match) return match[0].trim();
@@ -2134,7 +2396,7 @@ export async function extractOrderDetailsWithAi(
     const extractSoldBy = (text: string): string | null => {
       const lines = text.split('\n').map(normalizeLine).filter(Boolean);
 
-      const soldByRe = /\b(sold\s*by|seller|shipped\s*by|fulfilled\s*by|dispatched\s*by|supplied\s*by|marketed\s*by|manufactured\s*by|packed\s*by|brand\s*store|authorized\s*seller)\s*[:\-]?\s*/i;
+      const soldByRe = /\b(sold\s*by|seller\s*[:\-]|shipped\s*by|fulfilled\s*by|dispatched\s*by|supplied\s*by|brand\s*store|authorized\s*seller)\s*[:\-]?\s*/i;
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -2237,18 +2499,67 @@ export async function extractOrderDetailsWithAi(
         /\b(city|state|district|taluk|tehsil|mandal|village|town|ward|locality|area|landmark)\s*[:\-]/i,
         // ── Payment / transaction labels ──
         /^(payment\s*(method|mode|type|via)|paid\s*(via|using|by|with)|upi|credit\s*card|debit\s*card|net\s*banking|wallet|emi)/i,
+        // ── Price breakdown / billing labels (should not be product names) ──
+        /^(marketplace\s*fee|promotion\s*applied|item.?\s*subtotal|shipping|delivery\s*charge|convenience\s*fee|handling\s*fee|packaging|platform\s*fee|gst|cgst|sgst|igst|tax\b|total\s*fee|eco\s*fee|protection\s*fee|insurance\s*fee|tip\b|round\s*off)/i,
+        /^(order\s*summary|price\s*details?|price\s*breakdown|billing\s*details?|payment\s*summary|invoice\s*details?)/i,
+        /^(listing\s*price|selling\s*price|special\s*price|other\s*discount|total\s*fees|total\s*amount|grand\s*total|amount\s*paid|net\s*amount)/i,
+        // ── COD / delivery fee lines (unanchored — catches OCR variants like "Cash/Pay on Delivery fee") ──
+        /\b(delivery\s*fee|cod\s*(fee|charge)|pay\s*on\s*delivery\s*(fee|charge))\b/i,
+        /\bcash.*delivery\s*fee/i,
+        // ── OCR-mangled billing lines (Tesseract may garble first char: "[tem(s) subtotal") ──
+        /\bsubtotal\s*[:\-]?\s*(rs|\u20b9|inr)/i,
         // ── Comma-separated category lists (not product names) ──
         /^[A-Z][a-z]+(\s*,\s*[A-Z][a-z]+){3,}/,  // "Tablets, Earbuds, Watch, Blue" pattern
         // ── Indian address patterns ──
-        /\b(maharashtra|karnataka|tamil\s*nadu|delhi|mumbai|bangalore|chennai|hyderabad|kolkata|pune|jaipur|lucknow|ahmedabad|india)\b/i,
+        /\b(maharashtra|karnataka|tamil\s*nadu|delhi|mumbai|bangalore|chennai|hyderabad|kolkata|pune|jaipur|lucknow|ahmedabad|india|ajmer|rajasthan|uttar\s*pradesh|madhya\s*pradesh|andhra\s*pradesh|telangana|kerala|gujarat|bihar|odisha|assam|noida|gurgaon|gurugram|faridabad|ghaziabad|indore|bhopal|nagpur|surat|vadodara|coimbatore|patna|ranchi|dehradun|jodhpur|udaipur|agra|varanasi|kanpur|ludhiana|amritsar)\b/i,
         /\b\d{6}\b.*\b(india|in)\b/i,   // pincode followed by "India"
-        // ── Order confirmation noise ──
+        // ── Order confirmation noise / UI chrome ──
         /^(thank\s*you|order\s*id|your\s*order|congratulations|order\s*confirmed|successfully)/i,
         /^(free\s*delivery|standard\s*delivery|express\s*delivery|same\s*day|next\s*day)/i,
+        // ── Standalone status words ──
+        /^(completed|pending|cancelled|processing|successful|approved|rejected|failed|accepted|verified|shipped|dispatched|confirmed|received)\s*$/i,
+        // ── Flipkart/Amazon UI chrome ──
+        /^(chat\s*with\s*us|see\s*all\s*updates?|download\s*invoice|rate\s*(your|the)\s*(experience|product)|how\s*do\s*i|return\s*window|payment\s*method|cash\s*on\s*delivery|paytm|upi\b|share\s*this)/i,
+        /shared\s*this\s*order/i,
+        /^(about|group\s*companies|consumer\s*policy|help|mail\s*us|registered\s*office)/i,
+        /\bending\s*(in|with)\s*\d{3,4}\b/i,
+        /^(meet\.google|stop\s*sharing|you,?\s*presenting)/i,
+        // ── Lines containing 10-digit phone numbers (address/contact info) ──
+        /\b[6-9]\d{9}\b/,
+        // ── Lines that are "Ship to" / "Deliver to" / "Delivery details" headers ──
+        /^(ship\s*to|deliver\s*to|delivery\s*details?|billing\s*address|shipping\s*address|contact\s*details?)/i,
+        // ── Short proper-case person names (2-4 words, < 30 chars, no product keywords) ──
+        // Matches: "Chetan Chaudhari", "Sagar Chaudhari", "Gaurav Chafle" etc.
         // ── App / store navigation ──
         /^(shop\s*(now|by|all)|view\s*(all|more|details)|see\s*(all|more)|browse|explore|discover)/i,
         /^(add\s*to\s*cart|buy\s*now|add\s*to\s*bag|go\s*to\s*cart|checkout|proceed|continue)/i,
         /^(similar\s*products?|you\s*may\s*also|frequently\s*bought|customers?\s*(also|who))/i,
+        /^(bargain\s*recommend|recommended\s*for\s*you|people\s*also\s*(bought|viewed)|inspired\s*by\s*your)/i,
+        // ── Flipkart/Amazon action buttons & UI chrome ──
+        /^(edit\s*(order|item|address)|change\s*(date|address|slot)|cancel\s*(order|item|$)|track\s*(order|package|shipment)|cancel\s*items?)/i,
+        /^(pay\s*(rs|\u20b9|inr)\s*\d|pay\s+\d)/i,
+        /\border\s*can\s*be\s*tracked|tracking\s*link\b/i,
+        /\bmanage\s*who\s*can\s*access/i,
+        /\b(help|assist)\s*(our\s*)?delivery\s*agent/i,
+        /\bshare\s*location/i,
+        /\bdrop.*(item|package).*doorstep|to\s*drop\s*the\s*item/i,
+        /\bhelp\s*india\s*make\s*good/i,
+        /\bdid\s*you\s*find.*helpful/i,
+        /^keep\s*shopping/i,
+        /^(ask\s*product\s*question|write\s*a\s*product\s*review|ask\s*a\s*product)/i,
+        /^(track\s*package|cancel\s*items?|write\s*a\s*product)/i,
+        // ── Flipkart delivery timeline lines ──
+        /^(delivery|shipped)\s*,?\s*(expected|tomorrow|today|mon|tue|wed|thu|fri|sat|sun|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i,
+        /^expected\s*by\s/i,
+        /^you\s*can\s*cancel/i,
+        // ── Flipkart breadcrumb navigation ──
+        /^home\s*>\s*(my\s*account|my\s*orders)/i,
+        // ── Platform domain names (standalone lines) ──
+        /^(amazon|flipkart|meesho|myntra|nykaa|ajio|blinkit|jiomart|snapdeal|shopsy|croma|tatacliq|lenskart|pharmeasy|purplle|swiggy|zepto|bigbasket)\s*\.?\s*(in|com)?\s*$/i,
+        // ── Seller prefix lines (should never be product name) ──
+        /^seller\s*[:\-]/i,
+        // ── Standalone offer count lines (Flipkart) ──
+        /^\d+\s*offers?\s*$/i,
         // ── Rating / review noise ──
         /^(\d+\s*(star|rating|review)|★|☆|\d+(\.\d)?\s*\/\s*5)/i,
         // ── Quantity / item count lines ──
@@ -2259,7 +2570,53 @@ export async function extractOrderDetailsWithAi(
         /^MYN\d{6,}$/i,
         /^MSH\d{6,}$/i,
         /^FN\d{6,}$/i,
+        // ── E-commerce domain / URL bar text that OCR might capture ──
+        /^(amazon|flipkart|myntra|meesho|nykaa|purplle|ajio|snapdeal|jiomart|blinkit|bigbasket|zepto|swiggy|shopsy|tatacliq|croma|reliance)\s*\.?\s*(in|com|co\.in|app)\s*$/i,
+        /^(www\.)?(amazon|flipkart|myntra|meesho|nykaa)\.(in|com)/i,
+        // ── Amazon/Flipkart bottom navigation bar text ──
+        /^(Home|You|Wallet|Cart|Menu|Rufus)\s*$/i,
+        // ── "FREE Delivery" / delivery info lines ──
+        /^free\s*delivery/i,
+        /^(delivery|shipping)\s*by\s/i,
+        // ── Star rating / review count lines that OCR can pick up ──
+        /^\d[\d,]*\s*(ratings?|reviews?)\s*$/i,
+        /^\d+(\.\d)?\s*out\s*of\s*5/i,
+        // ── "Buy it again" / "View your item" / action buttons ──
+        /^(buy\s*it\s*again|view\s*your\s*item|view\s*order|leave\s*(seller|delivery)\s*feedback)/i,
+        // ── Recommendation section product cards (after "Recommended" header) ──
+        // These may look like real products but belong to the suggestion section
+        /^\d+%\s*off$/i,  // "5% off" discount badges on recommended cards
+        /^M\.?R\.?P\.?\s*[:\-]?\s*₹/i,  // MRP lines in recommendation cards
+        // ── Person names (2-3 proper-case words, < 35 chars, no product keywords) ──
+        // Catches "Chetan Chaudhari", "Sagar Patil", "Gaurav Chafle", "Ashok Kumar Singh" etc.
+        // These often appear in address/delivery sections and OCR picks them up.
       ];
+
+      /** Check if a line looks like a person name (2-3 proper-case words, no product keywords) */
+      const isLikelyPersonName = (line: string): boolean => {
+        const trimmed = line.trim();
+        if (trimmed.length > 40 || trimmed.length < 4) return false;
+        const words = trimmed.split(/\s+/);
+        if (words.length < 2 || words.length > 4) return false;
+        // Each word should be proper case (first letter upper) or all-upper short (< 5 chars)
+        const allProperCase = words.every(w =>
+          (/^[A-Z][a-z]+$/.test(w)) || (/^[A-Z]{1,5}$/.test(w)) || (/^[A-Z][a-z]+'s?$/.test(w))
+        );
+        if (!allProperCase) return false;
+        // Must NOT contain product keywords
+        if (/\b(phone|laptop|tablet|watch|earbuds?|headphone|speaker|shirt|shoe|bag|cream|oil|powder|book|cable|charger|mouse|keyboard|camera|pack|set|kit|ml|gm|kg|combo|serum|lotion|perfume|brush|bottle|cover|case|stand|holder|adapter|usb|bluetooth|wireless|cotton|leather|steel|glass|plastic|wooden|bamboo|silicone)\b/i.test(trimmed)) return false;
+        // Common Indian first names as extra signal (optional — catch even more)
+        if (/\b(Chetan|Sagar|Gaurav|Ashok|Sumit|Abhilash|Rajesh|Suresh|Pramod|Anil|Vijay|Rahul|Amit|Deepak|Manoj|Ravi|Sunil|Vinod|Ajay|Sanjay|Priya|Pooja|Neha|Anita|Rekha|Sunita|Kavita|Meena|Geeta|Savita|Root|Admin|User|Guest|Customer|Buyer|Shopper)\b/i.test(trimmed)) return true;
+        return allProperCase;
+      };
+
+      // ── Detect "Recommended for you" section position ──
+      // Products listed AFTER this header should not be considered as the order's product.
+      const recoSectionHeaderIdx = lines.findIndex(l =>
+        /\b(recommended\s*for\s*you|people\s*also\s*(bought|viewed)|similar\s*products?|you\s*may\s*also|frequently\s*bought|inspired\s*by\s*your|customers?\s*(also|who)|keep\s*shopping|based\s*on\s*your)\b/i.test(l)
+      );
+      // Effective end-of-content: only scan lines BEFORE the recommendation section
+      const productScanEndIdx = recoSectionHeaderIdx >= 0 ? recoSectionHeaderIdx : lines.length;
 
       // ── PHASE 1: Platform-specific product name extraction ──
       // Platform-specific patterns locate product names more precisely by understanding page layout.
@@ -2267,53 +2624,108 @@ export async function extractOrderDetailsWithAi(
 
       if (platform === 'amazon') {
         // Amazon: product name appears AFTER "Order placed/Arriving/Delivered" and BEFORE "Sold by"
-        // Also appears after the order number line.
-        for (let i = 0; i < lines.length; i++) {
+        // Product names can span MULTIPLE LINES — we need to merge adjacent descriptive lines.
+        for (let i = 0; i < productScanEndIdx; i++) {
           const line = lines[i];
           // Look for product title lines between key markers
           const isAfterOrderInfo = i > 0 && lines.slice(Math.max(0, i - 5), i).some(
-            l => /order\s*(placed|number|#|\d{3}-\d{7})|arriving|delivered|shipped/i.test(l)
+            l => /order\s*(placed|number|#|\d{3}-\d{7})|arriving|delivered|shipped|package\s*was/i.test(l)
           );
-          const isBeforeSoldBy = i < lines.length - 1 && lines.slice(i + 1, Math.min(lines.length, i + 5)).some(
-            l => /sold\s*by|seller|fulfilled|₹|rs\.?|price|quantity/i.test(l)
+          const isBeforeSoldBy = i < lines.length - 1 && lines.slice(i + 1, Math.min(lines.length, i + 8)).some(
+            l => /sold\s*by|seller|fulfilled|quantity/i.test(l)
           );
           if (isAfterOrderInfo || isBeforeSoldBy) {
-            if (line.length >= 10 && line.length <= 250
-              && !excludePatterns.some(p => p.test(line))
-              && /[a-zA-Z]/.test(line)
-              && (line.match(/[a-zA-Z]/g) || []).length / line.length > 0.4) {
-              // Ensure it doesn't look like a date, status, or navigation line
-              if (!/^(order|arriving|delivered|shipped|tracking|payment|sold|seller|fulfilled|return|refund)/i.test(line)
-                && !/^\d{1,2}\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i.test(line)) {
-                platformCandidate = line.replace(/\s{2,}/g, ' ').trim();
-                break;
+            const isProductLine = (ln: string, idx: number) =>
+              ln.length >= 5 && ln.length <= 300
+              && !excludePatterns.some(p => p.test(ln))
+              && /[a-zA-Z]/.test(ln)
+              && (ln.match(/[a-zA-Z]/g) || []).length / ln.length > 0.35
+              && !/^(order|arriving|delivered|shipped|tracking|payment|sold|seller|fulfilled|return|refund|package\s*was|return\s*window)/i.test(ln)
+              && !/^\d{1,2}\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i.test(ln)
+              && !/^₹\s*\d/.test(ln)
+              && !/^\d+\.\d{2}$/.test(ln)
+              && !/^(buy\s*it\s*again|view\s*your\s*item|track\s*package|leave\s*(seller|delivery)\s*feedback|write\s*a\s*product\s*review)/i.test(ln)
+              // Skip lines in "Ship to" / address zone (within 5 lines after a "Ship to" / "Delivery details" header)
+              && !lines.slice(Math.max(0, idx - 5), idx).some(
+                prev => /^(ship\s*to|deliver\s*to|delivery\s*details?|billing|shipping\s*address)/i.test(prev)
+              );
+
+            if (isProductLine(line, i)) {
+              // Try to merge with subsequent lines that are continuation of the product name
+              let merged = line.trim();
+              for (let j = i + 1; j < Math.min(lines.length, i + 6); j++) {
+                const nextLine = lines[j];
+                // Stop merging if we hit a price, seller, status, or quantity line
+                if (/^₹|^rs\.?|sold\s*by|seller|quantity|qty|return\s*window|buy\s*it\s*again|view\s*your|leave\s*(seller|delivery)|write\s*a\s*product|track\s*package/i.test(nextLine)) break;
+                if (/^\d+\.\d{2}$/.test(nextLine)) break; // standalone price like "599.00"
+                if (excludePatterns.some(p => p.test(nextLine))) break;
+                // Break on standalone color names (not part of product title)
+                if (/^(black|white|blue|red|green|yellow|pink|purple|grey|gray|silver|gold|orange|brown|navy|maroon|beige|cream|jet\s*black|ivory|teal|coral|mint|lavender|rose|charcoal|graphite|midnight|champagne|bronze|copper|titanium|space\s*grey|space\s*gray|starlight|midnight\s*blue|pearl\s*white|matte\s*black)\s*$/i.test(nextLine)) break;
+                // If line looks like a continuation (contains letters, no excluded patterns)
+                if (nextLine.length >= 3 && /[a-zA-Z]/.test(nextLine) && (nextLine.match(/[a-zA-Z]/g) || []).length / nextLine.length > 0.3) {
+                  merged += ' ' + nextLine.trim();
+                } else {
+                  break;
+                }
               }
+              platformCandidate = merged.replace(/\s{2,}/g, ' ').trim();
+              break;
             }
           }
         }
       } else if (platform === 'flipkart' || platform === 'shopsy') {
-        // Flipkart: product name is often the FIRST long descriptive line after order status
-        for (let i = 0; i < lines.length; i++) {
+        // Flipkart: product name is often a LONG descriptive line after order status.
+        // It can span MULTIPLE LINES — merge adjacent descriptive continuation lines.
+        const isFlipkartProductLine = (ln: string, idx: number) =>
+          ln.length >= 8 && ln.length <= 300
+          && !excludePatterns.some(p => p.test(ln))
+          && /[a-zA-Z]/.test(ln)
+          && (ln.match(/[a-zA-Z]/g) || []).length / ln.length > 0.35
+          && !/^(order|delivered|shipped|tracking|payment|sold|seller|fulfilled|return|refund|exchange|rate\s*this|star)/i.test(ln)
+          && !/^₹\s*\d/.test(ln)
+          && !/^\d+\.\d{2}$/.test(ln)
+          && !/^(size|color|qty|quantity)\s*[:\-]/i.test(ln)
+          && !/^(explore\s*plus|my\s*account|my\s*orders?|help\s*centre|notification)/i.test(ln)
+          // Skip lines in "Delivery details" / address zone
+          && !lines.slice(Math.max(0, idx - 3), idx).some(
+            prev => /^(delivery\s*details?|ship\s*to|deliver\s*to|billing|shipping\s*address|contact\s*details?)/i.test(prev)
+          );
+
+        for (let i = 0; i < productScanEndIdx; i++) {
           const line = lines[i];
           if (line.length < 10) continue;
-          if (excludePatterns.some(p => p.test(line))) continue;
-          // Flipkart product names are typically long, descriptive, and mixed-case
-          const alphaRatio = (line.match(/[a-zA-Z]/g) || []).length / line.length;
-          if (alphaRatio < 0.4) continue;
+          if (!isFlipkartProductLine(line, i)) continue;
           // After order ID or delivery status
-          const prevLines = lines.slice(Math.max(0, i - 4), i).join(' ');
-          if (/OD\d+|order\s*id|delivered|shipped|your\s*order/i.test(prevLines)) {
+          const prevLines = lines.slice(Math.max(0, i - 5), i).join(' ');
+          if (/OD\d+|order\s*id|delivered|shipped|your\s*order|order\s*placed|arriving/i.test(prevLines)) {
             // Next lines should have price/seller info
-            const nextLines = lines.slice(i + 1, Math.min(lines.length, i + 4)).join(' ');
-            if (/₹|rs\.?|sold\s*by|seller|size|color|qty/i.test(nextLines)) {
-              platformCandidate = line.replace(/\s{2,}/g, ' ').trim();
+            const nextAreaLines = lines.slice(i + 1, Math.min(lines.length, i + 6)).join(' ');
+            if (/₹|rs\.?|sold\s*by|seller|size|color|qty/i.test(nextAreaLines)) {
+              // Try to merge continuation lines (Flipkart product titles can be multi-line)
+              let merged = line.trim();
+              for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
+                const nextLine = lines[j];
+                // Stop merging at price, seller, size, color, qty lines
+                if (/^₹|^rs\.?|sold\s*by|seller|^(size|color|qty|quantity)\s*[:\-]/i.test(nextLine)) break;
+                if (/^\d+\.\d{2}$/.test(nextLine)) break;
+                if (excludePatterns.some(p => p.test(nextLine))) break;
+                // Break on standalone color names (not part of product title)
+                if (/^(black|white|blue|red|green|yellow|pink|purple|grey|gray|silver|gold|orange|brown|navy|maroon|beige|cream|jet\s*black|ivory|teal|coral|mint|lavender|rose|charcoal|graphite|midnight|champagne|bronze|copper|titanium|space\s*grey|space\s*gray|starlight|midnight\s*blue|pearl\s*white|matte\s*black)\s*$/i.test(nextLine)) break;
+                // Continuation: short-ish text with letters
+                if (nextLine.length >= 3 && /[a-zA-Z]/.test(nextLine) && (nextLine.match(/[a-zA-Z]/g) || []).length / nextLine.length > 0.3) {
+                  merged += ' ' + nextLine.trim();
+                } else {
+                  break;
+                }
+              }
+              platformCandidate = merged.replace(/\s{2,}/g, ' ').trim();
               break;
             }
           }
         }
       } else if (platform === 'myntra') {
         // Myntra: Brand name on one line, then product type on the next
-        for (let i = 0; i < lines.length; i++) {
+        for (let i = 0; i < productScanEndIdx; i++) {
           const line = lines[i];
           if (line.length < 4) continue;
           if (excludePatterns.some(p => p.test(line))) continue;
@@ -2346,7 +2758,7 @@ export async function extractOrderDetailsWithAi(
         }
       } else if (platform === 'meesho') {
         // Meesho: product name is usually a descriptive line near the price
-        for (let i = 0; i < lines.length; i++) {
+        for (let i = 0; i < productScanEndIdx; i++) {
           const line = lines[i];
           if (line.length < 10) continue;
           if (excludePatterns.some(p => p.test(line))) continue;
@@ -2360,7 +2772,7 @@ export async function extractOrderDetailsWithAi(
         }
       } else if (platform === 'nykaa' || platform === 'purplle') {
         // Nykaa/Purplle: beauty product names, often with brand + product type + size
-        for (let i = 0; i < lines.length; i++) {
+        for (let i = 0; i < productScanEndIdx; i++) {
           const line = lines[i];
           if (line.length < 10) continue;
           if (excludePatterns.some(p => p.test(line))) continue;
@@ -2380,7 +2792,7 @@ export async function extractOrderDetailsWithAi(
         }
       } else if (platform === 'blinkit' || platform === 'zepto' || platform === 'bigbasket' || platform === 'swiggy') {
         // Grocery/quick commerce: product names include brand + item + weight
-        for (let i = 0; i < lines.length; i++) {
+        for (let i = 0; i < productScanEndIdx; i++) {
           const line = lines[i];
           if (line.length < 8) continue;
           if (excludePatterns.some(p => p.test(line))) continue;
@@ -2407,7 +2819,7 @@ export async function extractOrderDetailsWithAi(
         candidates.push({ name: platformCandidate, score: 15 }); // High priority for platform-detected names
       }
 
-      for (let i = 0; i < lines.length; i++) {
+      for (let i = 0; i < productScanEndIdx; i++) {
         const line = lines[i];
         if (line.length < 6 || line.length > 250) continue;
         if (excludePatterns.some(p => p.test(line))) continue;
@@ -2418,6 +2830,16 @@ export async function extractOrderDetailsWithAi(
         if (commaParts.length >= 3 && commaParts.every(p => p.trim().split(/\s+/).length <= 2)) continue;
         // Skip lines that look like addresses (contain house no + area/locality info)
         if (/\d{1,5}\s*[,\/]\s*[A-Za-z]+\s*(road|street|lane|nagar|colony|sector|market|plaza|tower|building|complex|layout|garden|enclave|residency|apartment|society|block|phase|extension)/i.test(line)) continue;
+        // Skip lines in address / delivery details zone (within 5 lines after "Ship to" / "Delivery details")
+        const nearbyPrevLines = lines.slice(Math.max(0, i - 5), i);
+        const isInAddressZone = nearbyPrevLines.some(
+          prev => /^(ship\s*to|deliver\s*to|delivery\s*details?|billing|shipping\s*address|contact\s*details?)/i.test(prev)
+        );
+        if (isInAddressZone) {
+          // Only allow lines in address zone if they have strong product keywords
+          const hasProductKeyword = /\b(phone|laptop|tablet|watch|earbuds?|headphone|speaker|shirt|shoe|bag|cream|oil|powder|book|cable|charger|earphone|keyboard|mouse|camera|sink|steel|kitchen|washing|microwave|fridge|AC)\b/i.test(line);
+          if (!hasProductKeyword) continue;
+        }
 
         let score = 0;
         // Longer descriptive lines score higher (likely product names)
@@ -2457,9 +2879,36 @@ export async function extractOrderDetailsWithAi(
         // Bonus: line near "product" or "item" keywords on prev/same line
         if (/\b(product|item)\s*(name|title|details?|description)?\s*[:\-]?\s*$/i.test(lines[i - 1] || '')) score += 4;
         if (/\b(product|item)\s*(name|title)\s*[:\-]\s*/i.test(line)) score += 3;
+        // ── PERSON NAME PENALTY ──
+        // Lines that look like person names (2-3 proper-case words) are NOT product names
+        if (isLikelyPersonName(line)) score -= 6;
+        // ── Additional address-line penalty ──
+        // Lines with "flat", "floor", "house", "bldg" etc. are address fragments
+        if (/\b(flat\s*no|floor|house\s*no|bldg|building|tower|wing|society|apartment|residency|enclave|layout|garden)\b/i.test(line)) score -= 4;
 
         if (score >= 3) {
-          candidates.push({ name: line.replace(/\s{2,}/g, ' ').trim(), score });
+          // ── MULTI-LINE MERGE for generic candidates ──
+          // If the current line scores well, check if adjacent lines can be merged
+          // to form a more complete product name (handles OCR splitting long titles)
+          let mergedName = line.trim();
+          for (let j = i + 1; j < Math.min(productScanEndIdx, i + 4); j++) {
+            const nextLine = lines[j];
+            if (!nextLine || nextLine.length < 3) break;
+            // Stop merging at price, seller, quantity, status, or excluded-pattern lines
+            if (/^₹|^rs\.?|sold\s*by|seller|^(size|color|qty|quantity)\s*[:\-]/i.test(nextLine)) break;
+            if (/^\d+\.\d{2}$/.test(nextLine)) break;
+            if (excludePatterns.some(p => p.test(nextLine))) break;
+            if (isLikelyPersonName(nextLine)) break;
+            // Don't merge standalone color names
+            if (/^(black|white|blue|red|green|yellow|pink|purple|grey|gray|silver|gold|orange|brown|navy|maroon|beige|cream)\s*$/i.test(nextLine)) break;
+            // Continuation: text with letters, reasonable length
+            if (/[a-zA-Z]/.test(nextLine) && (nextLine.match(/[a-zA-Z]/g) || []).length / nextLine.length > 0.3) {
+              mergedName += ' ' + nextLine.trim();
+            } else {
+              break;
+            }
+          }
+          candidates.push({ name: mergedName.replace(/\s{2,}/g, ' ').trim(), score });
         }
       }
 
@@ -2468,6 +2917,8 @@ export async function extractOrderDetailsWithAi(
       // If top candidate looks like a generic category list, skip it
       const top = candidates[0].name;
       if (/^[A-Z][a-z]+(,\s*[A-Z][a-z]+)+$/.test(top)) return candidates[1]?.name || null;
+      // If top candidate looks like a person name, skip it
+      if (isLikelyPersonName(top)) return candidates[1]?.name || null;
       return top;
     };
 
@@ -2500,45 +2951,67 @@ export async function extractOrderDetailsWithAi(
         candidates.push({ value: sanitized, score });
       };
 
+      // Detect platform once to gate Amazon extraction
+      const orderIdPlatform = detectPlatform(text);
+      const orderIdSkipAmazon = orderIdPlatform !== null && orderIdPlatform !== 'amazon';
+
       for (let i = 0; i < lines.length; i += 1) {
         const line = fixOcrPrefixes(lines[i]);
         if (hasExcludedKeyword(line)) continue;
         const hasKeyword = hasOrderKeyword(line);
 
+        // Detect if this line contains a Flipkart OD-prefix pattern to avoid
+        // extracting Amazon-style IDs from the same digit sequence
+        const hasFlipkartOD = FLIPKART_ORDER_RE.test(line);
+        const skipLineAmazon = hasFlipkartOD || orderIdSkipAmazon;
+
         if (hasKeyword) {
           const labeled = line.match(ORDER_LABEL_RE);
           if (labeled?.[1]) {
-            const coerced = coerceAmazonOrderId(labeled[1]);
-            pushCandidate(coerced ?? labeled[1], true);
+            // Don't coerce to Amazon format if line has Flipkart OD or non-Amazon platform detected
+            if (!skipLineAmazon) {
+              const coerced = coerceAmazonOrderId(labeled[1]);
+              pushCandidate(coerced ?? labeled[1], true);
+            } else {
+              pushCandidate(labeled[1], true);
+            }
           }
 
-          const spaced = line.match(new RegExp(AMAZON_SPACED_PATTERN));
-          if (spaced?.[0]) {
-            const coerced = coerceAmazonOrderId(spaced[0]);
-            if (coerced) pushCandidate(coerced, true);
+          if (!skipLineAmazon) {
+            const spaced = line.match(new RegExp(AMAZON_SPACED_PATTERN));
+            if (spaced?.[0]) {
+              const coerced = coerceAmazonOrderId(spaced[0]);
+              if (coerced) pushCandidate(coerced, true);
+            }
           }
 
           const nextLine = lines[i + 1];
           if (nextLine) {
-            const amazonNext = nextLine.match(AMAZON_ORDER_RE);
-            if (amazonNext?.[0]) {
-              const coerced = coerceAmazonOrderId(amazonNext[0]);
-              pushCandidate(coerced ?? amazonNext[0], true);
-            }
-            const spacedNext = nextLine.match(new RegExp(AMAZON_SPACED_PATTERN));
-            if (spacedNext?.[0]) {
-              const coerced = coerceAmazonOrderId(spacedNext[0]);
-              if (coerced) pushCandidate(coerced, true);
+            const nextHasFlipkartOD = FLIPKART_ORDER_RE.test(fixOcrPrefixes(nextLine));
+            if (!nextHasFlipkartOD && !orderIdSkipAmazon) {
+              const amazonNext = nextLine.match(AMAZON_ORDER_RE);
+              if (amazonNext?.[0]) {
+                const coerced = coerceAmazonOrderId(amazonNext[0]);
+                pushCandidate(coerced ?? amazonNext[0], true);
+              }
+              const spacedNext = nextLine.match(new RegExp(AMAZON_SPACED_PATTERN));
+              if (spacedNext?.[0]) {
+                const coerced = coerceAmazonOrderId(spacedNext[0]);
+                if (coerced) pushCandidate(coerced, true);
+              }
             }
             const genericNext = nextLine.match(GENERIC_ID_RE);
             if (genericNext?.[0]) pushCandidate(genericNext[0], true);
           }
         }
 
-        const amazon = line.match(AMAZON_ORDER_RE);
-        if (amazon?.[0]) {
-          const coerced = coerceAmazonOrderId(amazon[0]);
-          pushCandidate(coerced ?? amazon[0], hasKeyword);
+        // Only match Amazon pattern if line doesn't have Flipkart OD or non-Amazon platform detected
+        if (!skipLineAmazon) {
+          const amazon = line.match(AMAZON_ORDER_RE);
+          if (amazon?.[0]) {
+            const coerced = coerceAmazonOrderId(amazon[0]);
+            pushCandidate(coerced ?? amazon[0], hasKeyword);
+          }
         }
 
         // All platform-specific patterns (applied to each line)
@@ -2567,7 +3040,9 @@ export async function extractOrderDetailsWithAi(
           if (m?.[0]) {
             // Normalize Flipkart prefix to uppercase OD
             let val = m[0];
-            if (/^[0o][Dd]/i.test(val)) val = 'OD' + val.slice(2);
+            // OCR sometimes prepends garbage chars before OD: "0OD..." → "OD..."
+            if (/^[0o][Oo0][Dd]/i.test(val)) val = 'OD' + val.slice(3);
+            else if (/^[0o][Dd]/i.test(val)) val = 'OD' + val.slice(2);
             pushCandidate(val, hasKeyword);
           }
         }
@@ -2580,8 +3055,17 @@ export async function extractOrderDetailsWithAi(
 
       // ── Global scan (full text) with OCR prefix fixes ──
       const fixedText = fixOcrPrefixes(text);
+      // Check if text contains Flipkart OD patterns — if so, skip Amazon global scan
+      // to avoid extracting Amazon-style IDs from OD digit sequences
+      const textHasFlipkartOD = FLIPKART_ORDER_GLOBAL_RE.test(fixedText);
+      FLIPKART_ORDER_GLOBAL_RE.lastIndex = 0; // Reset after test
+      // Also detect platform from text content — if the text mentions "flipkart", "myntra" etc.,
+      // and doesn't mention "amazon", we should not force-create Amazon-style IDs from digit sequences
+      const detectedPlatformFromText = detectPlatform(text);
+      const isNonAmazonPlatform = detectedPlatformFromText && detectedPlatformFromText !== 'amazon';
+      const skipAmazonExtraction = textHasFlipkartOD || isNonAmazonPlatform;
       const globalPlatformRegexes: RegExp[] = [
-        AMAZON_ORDER_GLOBAL_RE,
+        ...(skipAmazonExtraction ? [] : [AMAZON_ORDER_GLOBAL_RE]),
         FLIPKART_ORDER_GLOBAL_RE,
         MYNTRA_ORDER_GLOBAL_RE,
         MEESHO_ORDER_GLOBAL_RE,
@@ -2596,16 +3080,19 @@ export async function extractOrderDetailsWithAi(
         }
       }
 
-      const spacedAmazon = Array.from(text.matchAll(AMAZON_SPACED_GLOBAL_RE)).map((m) => m[0]);
-      for (const chunk of spacedAmazon) {
-        const coerced = coerceAmazonOrderId(chunk);
-        if (coerced) pushCandidate(coerced, false);
-      }
+      // Only do Amazon spaced/digit extraction if no non-Amazon platform detected
+      if (!skipAmazonExtraction) {
+        const spacedAmazon = Array.from(text.matchAll(AMAZON_SPACED_GLOBAL_RE)).map((m) => m[0]);
+        for (const chunk of spacedAmazon) {
+          const coerced = coerceAmazonOrderId(chunk);
+          if (coerced) pushCandidate(coerced, false);
+        }
 
-      const globalDigits = normalizeDigits(text).match(/\d{17}/g) || [];
-      for (const digits of globalDigits) {
-        if (digits.length === 17) {
-          pushCandidate(`${digits.slice(0, 3)}-${digits.slice(3, 10)}-${digits.slice(10)}`, false);
+        const globalDigits = normalizeDigits(text).match(/\d{17}/g) || [];
+        for (const digits of globalDigits) {
+          if (digits.length === 17) {
+            pushCandidate(`${digits.slice(0, 3)}-${digits.slice(3, 10)}-${digits.slice(10)}`, false);
+          }
         }
       }
 
@@ -2721,8 +3208,9 @@ export async function extractOrderDetailsWithAi(
           pipeline = pipeline.extract({ left, top, width: cw, height: ch });
         }
 
-        // Upscale to help OCR with small fonts; keep aspect ratio. Don't enlarge small images unnecessarily.
-        pipeline = pipeline.resize({ width: 2400, withoutEnlargement: true });
+        // Upscale to help OCR with small fonts; keeps original size if already smaller to avoid
+        // double-preprocessing artifacts when runTesseractOcr applies its own resize+enhance.
+        pipeline = pipeline.resize({ width: 3000, withoutEnlargement: true });
 
         if (mode === 'inverted') {
           // Dark mode screenshots: invert BEFORE greyscale so dark backgrounds become white
@@ -2770,7 +3258,7 @@ export async function extractOrderDetailsWithAi(
         ],
         config: {
           temperature: 0,
-          maxOutputTokens: Math.min(env.AI_MAX_OUTPUT_TOKENS_EXTRACT, 2048),
+          maxOutputTokens: Math.min(env.AI_MAX_OUTPUT_TOKENS_EXTRACT, 8192),
           responseMimeType: 'text/plain',
         },
       }));
@@ -2795,8 +3283,8 @@ export async function extractOrderDetailsWithAi(
     };
 
     /** Tesseract.js fallback: local OCR that works without any external API. */
-    const TESSERACT_TIMEOUT_MS = 30_000; // 30 seconds max for all Tesseract attempts
-    const runTesseractOcr = async (imageBase64: string): Promise<string> => {
+    const TESSERACT_TIMEOUT_MS = 20_000; // 20 seconds max for all Tesseract attempts (reduced from 45s to stay within Render's 30s request limit)
+    const runTesseractOcr = async (imageBase64: string, preProcessed = false): Promise<string> => {
       let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
       const deadline = Date.now() + TESSERACT_TIMEOUT_MS;
       try {
@@ -2804,15 +3292,20 @@ export async function extractOrderDetailsWithAi(
         if (!isRecognizedImageBuffer(buf)) {
           return ''; // Not a valid image — skip Tesseract entirely
         }
-        // Enhance the image for better Tesseract accuracy
-        const enhanced = await sharp(buf)
-          .resize({ width: 2400, withoutEnlargement: false })
-          .grayscale()
-          .normalize()
-          .sharpen({ sigma: 1.5 })
-          .linear(1.2, -20) // Increase contrast
-          .jpeg({ quality: 95 })
-          .toBuffer();
+
+        // When input is already preprocessed by preprocessForOcr (grayscale,
+        // normalized, sharpened), skip re-enhancement to avoid double-processing
+        // artifacts that degrade OCR quality.
+        const enhanced = preProcessed
+          ? await sharp(buf).resize({ width: 2400, withoutEnlargement: true }).jpeg({ quality: 95 }).toBuffer()
+          : await sharp(buf)
+              .resize({ width: 2400, withoutEnlargement: false })
+              .grayscale()
+              .normalize()
+              .sharpen({ sigma: 1.5 })
+              .linear(1.2, -20) // Increase contrast
+              .jpeg({ quality: 95 })
+              .toBuffer();
 
         worker = await acquireOcrWorker();
         // Try default PSM first (automatic), then PSM 6 (uniform block of text)
@@ -2827,20 +3320,75 @@ export async function extractOrderDetailsWithAi(
           if (text6.length > text.length) text = text6;
         }
 
+        // Binary threshold: convert to pure black & white — dramatically helps
+        // with colored backgrounds, gradients, shadows in real screenshots.
+        // This is the #1 Tesseract improvement for e-commerce screenshot OCR.
+        if (Date.now() < deadline) {
+          const binaryImg = await sharp(buf)
+            .resize({ width: 2400, withoutEnlargement: false })
+            .grayscale()
+            .threshold(140) // Otsu-like binarization: anything < 140 → black, rest → white
+            .jpeg({ quality: 95 })
+            .toBuffer();
+          await worker.setParameters({ tessedit_pageseg_mode: '3' as any });
+          const { data: dataBin } = await worker.recognize(binaryImg);
+          const textBin = normalizeOcrText(dataBin.text || '');
+          if (textBin.length > text.length) text = textBin;
+        }
+
         // If still poor and within budget, try a high-contrast version
         if (Date.now() < deadline && (!text || text.length < 30)) {
           const highContrast = await sharp(buf)
             .resize({ width: 2400, withoutEnlargement: false })
             .grayscale()
             .normalize()
-            .linear(1.6, -40) // Aggressive contrast
-            .sharpen({ sigma: 2 })
+            .linear(1.5, -40) // Aggressive contrast
+            .sharpen({ sigma: 1.8 })
             .jpeg({ quality: 95 })
             .toBuffer();
           await worker.setParameters({ tessedit_pageseg_mode: '3' as any });
           const { data: dataHc } = await worker.recognize(highContrast);
           const textHc = normalizeOcrText(dataHc.text || '');
           if (textHc.length > text.length) text = textHc;
+        }
+
+        // Try PSM 4 (column text) for screenshots with side-by-side layouts
+        if (Date.now() < deadline && (!text || text.length < 40)) {
+          const columnEnhanced = await sharp(buf)
+            .resize({ width: 2400, withoutEnlargement: false })
+            .grayscale()
+            .normalize()
+            .sharpen({ sigma: 1.5 })
+            .linear(1.4, -30)
+            .jpeg({ quality: 95 })
+            .toBuffer();
+          await worker.setParameters({ tessedit_pageseg_mode: '4' as any });
+          const { data: data4 } = await worker.recognize(columnEnhanced);
+          const text4 = normalizeOcrText(data4.text || '');
+          if (text4.length > text.length) text = text4;
+        }
+
+        // Binary threshold with inverted colors — helps dark-mode screenshots
+        if (Date.now() < deadline && (!text || text.length < 40)) {
+          const invertedBin = await sharp(buf)
+            .resize({ width: 2400, withoutEnlargement: false })
+            .negate({ alpha: false })
+            .grayscale()
+            .threshold(140)
+            .jpeg({ quality: 95 })
+            .toBuffer();
+          await worker.setParameters({ tessedit_pageseg_mode: '3' as any });
+          const { data: dataInvBin } = await worker.recognize(invertedBin);
+          const textInvBin = normalizeOcrText(dataInvBin.text || '');
+          if (textInvBin.length > text.length) text = textInvBin;
+        }
+
+        // PSM 11 (sparse text) — good for screenshots with text scattered across the page
+        if (Date.now() < deadline && (!text || text.length < 30)) {
+          await worker.setParameters({ tessedit_pageseg_mode: '11' as any });
+          const { data: data11 } = await worker.recognize(enhanced);
+          const text11 = normalizeOcrText(data11.text || '');
+          if (text11.length > text.length) text = text11;
         }
 
         if (Date.now() >= deadline) {
@@ -2872,35 +3420,66 @@ export async function extractOrderDetailsWithAi(
           {
             text: [
               'TASK: EXTRACT E-COMMERCE ORDER DETAILS FROM OCR TEXT.',
-              'PRIORITY: GOD-LEVEL ACCURACY REQUIRED.',
-              '1. EXTRACT the Order ID exactly as it appears (Amazon 404-..., Flipkart OD..., Myntra, Jio, etc.).',
-              '2. EXTRACT the GRAND TOTAL / FINAL AMOUNT PAID. This is the amount the customer actually paid AFTER all discounts, coupons, and offers.',
-              '   - Look for labels like: "Grand Total", "Amount Paid", "You Paid", "Order Total", "Total Amount", "Payable", "Net Amount", "Your Total", "Final Amount", "Amount Due", "To Pay".',
-              '   - Do NOT use "MRP", "List Price", "Item Price", "Subtotal", or "Cart Value" unless no other total is available.',
-              '   - If multiple amounts are shown, pick the FINAL one (usually the largest labeled total at the bottom).',
-              '   - CRITICAL: The amount MUST NOT be digits from the Order ID. For example, if Order ID is 408-0258263-2409973, then "2409973" is NOT the amount.',
-              '   - The amount is typically a 2-5 digit number (₹10 to ₹99,999). Values > 100000 are very rare for individual orders.',
-              '   - If you see both "MRP ₹999" and "You Pay ₹599", the correct amount is ₹599.',
+              'PRIORITY: ABSOLUTE ACCURACY REQUIRED.',
+              '',
+              '1. EXTRACT the Order ID exactly as it appears:',
+              '   - Amazon: EXACTLY 3-7-7 digit format with dashes: "404-6759408-9041956". Found near "Order number" or "Order #".',
+              '   - Flipkart: Starts with "OD" + 14-20 digits, NO dashes: "OD224446047669586000". Found near "Order #" at bottom.',
+              '   - Myntra: "MYN-" or "ORD-" or "PP-" prefix + digits.',
+              '   - Meesho: "MSH-" prefix + digits or purely numeric 10-15 digit IDs.',
+              '   - Blinkit: "BLK-" prefix + digits or numeric.',
+              '   - AJIO: "FN-" prefix + digits.',
+              '   - Nykaa: "NYK-" prefix + digits.',
+              '   - JioMart: "JIO" or "OM" prefix + digits.',
+              '   - Snapdeal: "SD" prefix + digits.',
+              '   - Swiggy/Zepto/BigBasket: Numeric order IDs.',
+              '   - IGNORE: Tracking IDs, Shipment numbers, AWB, Invoice numbers, Transaction IDs, UTR, UPI Ref.',
+              '',
+              '2. EXTRACT the GRAND TOTAL / FINAL AMOUNT PAID:',
+              '   - Look for labels: "Grand Total", "Amount Paid", "You Paid", "Order Total", "Total Amount", "Total amount", "Payable", "Net Amount", "Amount Due", "To Pay".',
+              '   - AMAZON: Use ONLY "Grand Total" from Order Summary. IGNORE "Item(s) Subtotal", "Shipping", "Marketplace Fee", "Promotion Applied". Example: Grand Total ₹604.00 → 604.',
+              '   - FLIPKART: Use ONLY "Total amount" from Price details. IGNORE "Listing price" (MRP), "Special price", "Selling price", "Total fees", "Delivery charges". Example: Total amount ₹1,408 → 1408.',
+              '   - AJIO: "Order Total" or "Amount Payable".',
+              '   - Do NOT return Listing price, MRP, Selling price, Special price, Subtotal, delivery charges, shipping fees, or marketplace fees as the amount.',
+              '   - If you see "Selling price ₹9,999" and "Total amount ₹10,048" (with fees), use 10048 (the total).',
+              '   - If you see "Listing price ₹2,299" and "Total amount ₹1,408", use 1408 (ignore listing price entirely).',
+              '   - CRITICAL: The amount MUST NOT be digits from the Order ID. If Order ID is 404-6759408-9041956, then 404, 6759408, 9041956, 67594, 904195 are NOT the amount.',
+              '   - CRITICAL: The amount MUST NOT be a 6-digit Indian pincode (like 411027, 411052, 431203, 560034, 201301).',
+              '   - CRITICAL: The amount MUST NOT be a 10-digit phone number (like 7768014471, 9876543210).',
+              '   - CRITICAL: The amount MUST NOT be a date (like 20260213, 18032022).',
+              '   - Typical range: ₹1 to ₹500000. If you find a value outside this range, it is probably wrong.',
+              '   - Amount format: ₹1,408 → 1408, ₹41,990.00 → 41990, ₹6,003 → 6003. Return as plain number (no comma, no ₹).',
+              '',
               '3. EXTRACT the Order Date (when the order was placed).',
+              '   - Amazon: "Order placed 13 February 2026" at the top.',
+              '   - Flipkart: "Order Confirmed, Mar 18, 2022" in the timeline.',
+              '',
               '4. EXTRACT "Sold by" / Seller name.',
-              '5. EXTRACT the Product Name / Item title — the full product title as shown in the order.',
-              '   - This is CRITICAL for fraud detection. Extract the complete product name, not just a partial match.',
-              '   - Look near the product image, near the price, or at the top of the order details section.',
-              '   - The product name is typically a descriptive title like "Samsung Galaxy M12 (Blue, 64GB)" or "Avimee Herbal Hair Oil 200ml".',
-              '   - It usually appears as the LARGEST text near the product image, or as a link/heading in the order details.',
-              '   - NEVER return a URL, web address, or "amazon.in/..." as the product name. The product name is the item title, not the page URL.',
-              '   - NEVER return delivery status text like "Arriving", "Shipped", "Delivered" as the product name.',
-              '   - NEVER return comma-separated category words like "Tablets, Earbuds, Watch, Blue" — those are category/breadcrumb navigation, not the actual product name.',
-              '   - NEVER return an address, city name, or pincode as the product name.',
-              '   - NEVER return navigation text like "Shop Now", "View Details", "Add to Cart" as the product name.',
-              '   - If you cannot find the product name, return an empty string rather than a URL, status, or category text.',
-              '6. IGNORE ambiguous single/double digit numbers.',
-              '7. IGNORE system UUIDs or IDs that look like "SYS-..." or internal codes.',
-              '8. If a DETERMINISTIC value is provided and looks correct, confirm it.',
-              '9. If OCR text is messy but contains a likely Order ID, EXTRACT IT. Do not return null if a partial match exists.',
-              '10. Handle screenshots from ALL device types: mobile phones, desktop browsers, tablets, laptops. Layout may be vertical (phone) or horizontal (desktop).',
-              '11. VERIFY: suggestedAmount must NOT be a substring of suggestedOrderId digits. If it is, search harder for the real amount.',
-              '12. If you see multiple amounts, PREFER the one labeled "Grand Total", "Amount Paid", "You Paid", "Total", "Payable" over unlabeled amounts.',
+              '   - Amazon: "Sold by: Cocoblu Retail" or "Sold by: Avimee_Herbal".',
+              '   - Flipkart: "Seller: Flashstar Commerce" or "Seller: KSABOOK".',
+              '   - Return ONLY the merchant/company name, strip all button text ("Ask Product Question", "Visit Store", "Leave seller feedback", etc.).',
+              '',
+              '5. EXTRACT the Product Name / Item title:',
+              '   - This is the descriptive title of the physical item ordered.',
+              '   - Amazon: Blue clickable link text below delivery status, above "Sold by". If it spans multiple lines, concatenate ALL lines.',
+              '   - Flipkart: Main heading at the top of the order page.',
+              '   - Examples of CORRECT product names:',
+              '     "Lymio Cargo for Men || Cotton Cargo Pant || Drawstring Waist Pant (Available Also Plus Size) (Cargo-148-Grey-L)"',
+              '     "Avimee Herbal Keshpallav Hair Oil for Hair Growth | For Both Men & Women | Helps to reduce Hair Fall | With Rosemary, Castor, Amla, Coconut and Bhringraj Oil | Mineral Oil Free | 100 ml"',
+              '     "Infinix Hot 11 (Silver Wave, 64 GB)"',
+              '     "Arihant Pathfinder Nda/na English Version"',
+              '   - NEVER return these as product name: navigation text ("Deliver to", "Hello,", "Returns & Orders"), delivery status ("Delivered 16 February"), URLs, addresses (city/state/pincode), buttons ("Track package", "Write a review", "Buy it again"), price labels.',
+              '   - If DETERMINISTIC_PRODUCT_NAME contains "Deliver to", "Hello,", "Returns", addresses, or is < 5 chars, override it.',
+              '',
+              '6. IGNORE ambiguous single/double digit numbers, system UUIDs, internal codes.',
+              '7. If DETERMINISTIC values look correct, confirm them. If they look wrong, provide the correct values from OCR text.',
+              '8. VERIFY: suggestedAmount must NOT be a substring of suggestedOrderId digits.',
+              '9. VERIFY: suggestedAmount must NOT be a 6-digit pincode or 10-digit phone number.',
+              '10. If you see multiple amounts, PREFER "Grand Total" > "Amount Paid" > "Total amount" > "Total" > "Payable" over unlabeled amounts.',
+              '11. CRITICAL: The ₹ (rupee) symbol is NOT a digit. If OCR text shows "₹599", the amount is 599, NOT 8599 or 7599. Never include OCR misreads of ₹ as part of the number.',
+              '12. CRITICAL: Product name must NEVER be a person\'s name (e.g., "Chetan Chaudhari", "Sagar Patil"). Person names are from the delivery address section, NOT the product.',
+              '13. CRITICAL: If the product name spans MULTIPLE LINES in the screenshot, concatenate ALL lines into one continuous string. Do NOT return just the last line.',
+              '14. CRITICAL: Address text (city names, state names, pincodes, "India", road/street names) must NEVER appear as product name.',
               `OCR_TEXT (Start):\n${ocrText}\n(End OCR_TEXT)`,
               `DETERMINISTIC_ORDER_ID: ${deterministic.orderId ?? 'null'}`,
               `DETERMINISTIC_AMOUNT: ${deterministic.amount ?? 'null'}`,
@@ -2913,7 +3492,7 @@ export async function extractOrderDetailsWithAi(
         ],
         config: {
           temperature: 0,
-          maxOutputTokens: Math.min(env.AI_MAX_OUTPUT_TOKENS_EXTRACT, 512),
+          maxOutputTokens: Math.min(env.AI_MAX_OUTPUT_TOKENS_EXTRACT, 1024),
           responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,
@@ -2944,34 +3523,105 @@ export async function extractOrderDetailsWithAi(
           { inlineData: { mimeType: imgMimeType, data: imageBase64.split(',')[1] || imageBase64 } },
           { text: [
             'TASK: EXTRACT E-COMMERCE ORDER DETAILS FROM THIS SCREENSHOT.',
-            'PRIORITY: GOD-LEVEL ACCURACY REQUIRED.',
-            'This screenshot may be from ANY device: mobile, desktop, tablet, laptop.',
-            'Desktop screenshots have wide horizontal layouts. Mobile screenshots are narrow and vertical.',
+            'PRIORITY: ABSOLUTE ACCURACY REQUIRED. Every field must be 100% correct.',
+            'This screenshot may be from ANY device: mobile phone (narrow vertical), desktop browser (wide horizontal), tablet, laptop.',
             '',
-            'EXTRACT:',
-            '1. ORDER ID — The unique order identifier. Look for "Order ID", "Order No", "Order #".',
-            '   Platform patterns: Amazon (3-7-7 digits like 404-1234567-1234567), Flipkart (OD+digits), Myntra (MYN/ORD), Meesho (MSH), AJIO (FN), JIO, Nykaa (NYK), Tata (TCL), Snapdeal (SD), BigBasket (BB), etc.',
-            '   IGNORE: Tracking IDs, Shipment numbers, AWB, Invoice numbers, Transaction IDs, UTR, UPI references.',
-            '2. GRAND TOTAL / FINAL AMOUNT PAID — Amount ACTUALLY paid after all discounts.',
-            '   Look for: "Grand Total", "Amount Paid", "You Paid", "Order Total", "Payable", "Net Amount".',
-            '   IGNORE: MRP, List Price, Item Price, Subtotal unless no other total exists.',
-            '   CRITICAL: The amount MUST NOT be digits from the Order ID. Example: if Order ID is 408-0258263-2409973, then 2409973 is NOT the amount.',
-            '   Typical Indian e-commerce amounts: ₹50 to ₹50,000.',
-            '3. ORDER DATE — When the order was placed.',
-            '4. SOLD BY / SELLER NAME.',
-            '5. PRODUCT NAME — Full product title/name as shown in the order.',
-            '   NEVER return a URL, webpage address, or "amazon.in/..." as the product name.',
-            '   The product name is the descriptive title like "Samsung Galaxy M12" or "Avimee Herbal Oil".',
-            '   NEVER return category breadcrumbs like "Tablets, Earbuds, Watch" — find the actual item title.',
-            '   NEVER return delivery status, addresses, pincodes, or navigation text as the product name.',
-            '   Look for the item title near the product image or the price amount.',
+            'IMPORTANT CONTEXT:',
+            '- This is an Indian e-commerce order screenshot from platforms like Amazon.in, Flipkart, Myntra, Meesho, Blinkit, Nykaa, AJIO, JioMart, Swiggy Instamart, Zepto, BigBasket, Snapdeal, Tata CLiQ, Croma, Lenskart, PharmEasy, Purplle, Shopsy, etc.',
+            '- The screenshot is an ORDER DETAILS page showing a purchased product.',
+            '- Currency is Indian Rupees (₹ / Rs / INR).',
+            '- DO NOT confuse website header/navigation text with order data.',
+            '- The Amazon header shows "Deliver to [Name]", "Hello, [Name]", "Returns & Orders" — these are NOT product data.',
+            '- The Flipkart header shows "Explore Plus", account name, cart icon — these are NOT product data.',
             '',
-            'Return JSON. Set confidenceScore 0-100 based on clarity.',
+            'EXTRACT THESE 5 FIELDS:',
+            '',
+            '1. ORDER ID — The unique order identifier:',
+            '   PLATFORM-SPECIFIC FORMATS (match EXACTLY):',
+            '   - Amazon: EXACTLY 3 digits, dash, 7 digits, dash, 7 digits. Example: "404-6759408-9041956" or "403-6379089-0697917". Found near "Order number" or "Order #" label.',
+            '   - Flipkart: Starts with "OD" followed by 14-20 digits with NO dashes. Example: "OD224446047669586000" or "OD222370487245261000". Found near "Order #" at bottom of page.',
+            '   - Myntra: Starts with "MYN" or "ORD" or "PP" prefix + digits. Example: "MYN-123456789".',
+            '   - Meesho: Starts with "MSH" prefix + digits. Can also be purely numeric 10-15 digit IDs.',
+            '   - Blinkit: Starts with "BLK" prefix + digits, or purely numeric.',
+            '   - AJIO: Starts with "FN" prefix + digits.',
+            '   - Nykaa: Starts with "NYK" prefix + digits.',
+            '   - JioMart: Starts with "JIO" or "OM" prefix + digits.',
+            '   - Snapdeal: Starts with "SD" prefix + digits.',
+            '   - BigBasket: Starts with "BB" prefix + digits.',
+            '   - Swiggy: Numeric order IDs.',
+            '   - Zepto: Numeric order IDs.',
+            '   - CRITICAL: IGNORE Tracking IDs, Shipment numbers, AWB numbers, Invoice numbers, Transaction IDs, UTR numbers, UPI Ref IDs.',
+            '',
+            '2. AMOUNT (Grand Total / Final Amount Actually Paid by Customer):',
+            '   - This is the MOST IMPORTANT field to get right.',
+            '   - AMAZON SPECIFIC: Look in the "Order Summary" box on the RIGHT side. Find "Grand Total: ₹XXX.XX". This is the final amount. If you see Promotion Applied as negative, the Grand Total already includes that discount. IGNORE "Item(s) Subtotal", "Shipping", "Marketplace Fee", and "Total" (which is pre-promotion). Use ONLY "Grand Total".',
+            '   - FLIPKART SPECIFIC: Look in the "Price details" section on the RIGHT side. Find "Total amount" at the BOTTOM — that is the final paid amount. IGNORE "Listing price" (original MRP, often struck through), "Special price" (discounted unit price), "Selling price", and "Total fees" (fee breakdown). Use ONLY "Total amount".',
+            '   - MEESHO: Look for "Total Amount" or "You Paid".',
+            '   - BLINKIT/ZEPTO/SWIGGY: Look for "Bill Total" or "Grand Total" or "Amount Paid".',
+            '   - MYNTRA: Look for "Total" at the bottom of the price breakdown.',
+            '   - NYKAA: Look for "Amount Payable" or "Total".',
+            '   - AJIO: Look for "Order Total" or "Amount Payable".',
+            '   - The amount MUST be a monetary value, NOT digits from the Order ID.',
+            '   - CRITICAL VALIDATION: If the Order ID is e.g. "404-6759408-9041956", numbers like 404, 6759408, 9041956, 67594, 90419 etc. are NOT the amount — they are parts of the Order ID.',
+            '   - Typical range: ₹1 to ₹5,00,000 for individual orders.',
+            '   - DO NOT return "Listing price", "MRP", "Selling price", "Special price", or "Subtotal" — ALWAYS prefer "Grand Total", "Total amount", "Amount Paid", "You Paid", or "Payable".',
+            '   - DO NOT return 6-digit pincodes (like 411027, 411052, 560034) as amounts.',
+            '   - DO NOT return 10-digit phone numbers (like 7768014471) as amounts.',
+            '   - DO NOT return dates formatted as numbers as amounts.',
+            '   - DO NOT return delivery charges, shipping fees, marketplace fees, platform fees as the amount.',
+            '   - Return the amount as a plain number WITHOUT the ₹ symbol. Example: for ₹10,048 return 10048. For ₹604.00 return 604. For ₹1,408 return 1408.',
+            '',
+            '3. ORDER DATE — When the order was placed:',
+            '   - Amazon: Near "Order placed [date]" at the top. Example: "Order placed 13 February 2026".',
+            '   - Flipkart: Near "Order Confirmed, [date]" in the green timeline. Example: "Order Confirmed, Mar 18, 2022".',
+            '   - Return the full date string as displayed (e.g., "13 February 2026", "Mar 18, 2022", "6 February 2026").',
+            '   - If only "Delivered" date is visible and no order placed date, use the delivered date.',
+            '',
+            '4. SOLD BY / SELLER NAME:',
+            '   - Amazon: Labeled "Sold by: [Seller Name]" near the product. Example: "Sold by: Cocoblu Retail", "Sold by: Avimee_Herbal".',
+            '   - Flipkart: Labeled "Seller: [Name]" below the product name. Example: "Seller: Flashstar Commerce", "Seller: KSABOOK".',
+            '   - Return ONLY the seller/merchant company name — no extra text.',
+            '   - DO NOT include: "(Ask Product Question)", "(Visit Store)", "Leave seller feedback", "Leave delivery feedback", "Track package", "Write a product review", "Buy it again", "View your item", "Return or replace items".',
+            '',
+            '5. PRODUCT NAME — The full product title/name:',
+            '   - This is the main item that was ordered — the descriptive product title.',
+            '   - AMAZON: It appears as a BLUE clickable link in the order details, usually below delivery status ("Delivered 16 February") and above "Sold by". It is the main heading describing what was bought. If the title spans MULTIPLE LINES, include ALL lines as one continuous name.',
+            '     Example: "Lymio Cargo for Men || Cotton Cargo Pant || Drawstring Waist Pant (Available Also Plus Size) (Cargo-148-Grey-L)"',
+            '     Example: "Avimee Herbal Keshpallav Hair Oil for Hair Growth | For Both Men & Women | Helps to reduce Hair Fall | With Rosemary, Castor, Amla, Coconut and Bhringraj Oil | Mineral Oil Free | 100 ml"',
+            '   - FLIPKART: It appears at the VERY TOP of the order details page, as the main product heading. Multi-word descriptive title.',
+            '     Example: "Infinix Hot 11 (Silver Wave, 64 GB)"',
+            '     Example: "Arihant Pathfinder Nda/na English Version"',
+            '   - MYNTRA: Brand name line + product type line should be combined.',
+            '   - MEESHO: Product title near the product image.',
+            '   - BLINKIT/ZEPTO/BIGBASKET: Product name with weight/quantity (e.g., "Amul Butter 500g").',
+            '   - NYKAA/PURPLLE: Beauty product with brand + product + size (e.g., "Maybelline Fit Me Foundation 115 Ivory 30ml").',
+            '   - If the product name spans MULTIPLE LINES on screen, concatenate ALL lines into one string.',
+            '   - CRITICAL: NEVER return these as product name:',
+            '     * Navigation/header text: "Deliver to [Name]", "Hello, [Name]", "Returns & Orders", "Account & Lists", "Sign In", "Explore Plus", "Search for products"',
+            '     * Delivery status lines: "Arriving tomorrow", "Delivered 16 February", "Shipped", "Out for delivery", "Package was handed to resident"',
+            '     * URLs or web addresses',
+            '     * Addresses: city names, pincodes, "MAHARASHTRA", "Hingne Budrukh, Karve Nagar", "PUNE", "India"',
+            '     * Category breadcrumbs: "Electronics > Mobiles"',
+            '     * Action buttons: "Track package", "Cancel items", "Write a review", "Buy it again", "View your item"',
+            '     * Order labels: "Order #OD...", "Order placed..."',
+            '     * Price labels: "₹599", "Grand Total", "Listing price", "Selling price"',
+            '',
+            'VALIDATION RULES:',
+            '- Amount must be a plausible price (₹1 to ₹500000), NOT a pincode (6 digits like 411052), NOT a phone number (10 digits), NOT order ID digits.',
+            '- Product name must describe a physical item, NOT navigation chrome or addresses.',
+            '- Product name must NEVER be a person\'s name (e.g., "Chetan Chaudhari", "Sagar Patil", "Ashok Kumar"). Person names come from the delivery address section.',
+            '- If the product name spans MULTIPLE LINES, concatenate ALL lines into one string. Do NOT return only the last line.',
+            '- The ₹ (rupee) symbol is NOT a digit. If you see "₹599", amount is 599 — never add the ₹ symbol as a digit like "8599".',
+            '- Address text (city names, state names, pincodes, street names, "India") must NEVER be the product name.',
+            '- Order ID must follow the exact platform format described above.',
+            '',
+            'Return JSON with: orderId (string), amount (number), orderDate (string), soldBy (string), productName (string), confidenceScore (0-100 integer).',
+            'If a field is not found, return empty string for strings and 0 for amount.',
           ].join('\n') },
         ],
         config: {
           temperature: 0,
-          maxOutputTokens: 512,
+          maxOutputTokens: 1024,
           responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,
@@ -3009,9 +3659,14 @@ export async function extractOrderDetailsWithAi(
             continue;
           }
         }
+        // All Gemini models failed for this OCR pass — record failure for circuit breaker
+        recordGeminiFailure();
       }
       // Fallback: Tesseract.js local OCR (works without Gemini API key)
-      const tesseractText = await runTesseractOcr(imageBase64);
+      // Pass preProcessed=true for variants that already went through preprocessForOcr
+      // (everything except 'original') to avoid double-enhancement artifacts.
+      const isPreProcessed = label !== 'original';
+      const tesseractText = await runTesseractOcr(imageBase64, isPreProcessed);
       if (tesseractText) {
         aiLog.info('Order extract OCR pass (Tesseract)', { label, length: tesseractText.length });
       }
@@ -3128,8 +3783,18 @@ export async function extractOrderDetailsWithAi(
       );
     }
 
-    // When using Tesseract (no Gemini), limit variants — but try more than before
-    const ocrVariants = ai ? allOcrVariants : allOcrVariants.slice(0, 5);
+    // When using Tesseract (no Gemini), use more variants for better coverage
+    // Include all device-specific crops (phone: 7, base: 4 = 11 total; desktop/tablet: up to 12+)
+    // Limit to 6 for Tesseract-only to stay within request timeout budgets (Render 30s limit)
+    const ocrVariants = ai ? allOcrVariants : allOcrVariants.slice(0, 6);
+
+    // ── GLOBAL EXTRACTION DEADLINE ──
+    // Render free tier has a 30-second request timeout. We need to return PARTIAL results
+    // before hitting that limit, rather than getting a 502 Gateway Timeout with NO results.
+    // Budget: ~3s preprocessing already spent + 25s for OCR+AI = 28s total.
+    // The client sends a warm-up ping first, so the server should already be awake.
+    const EXTRACTION_DEADLINE = Date.now() + 25_000; // 25 seconds from now for OCR + AI work
+    const isTimeUp = () => Date.now() >= EXTRACTION_DEADLINE;
 
     let ocrText = '';
     let ocrLabel = 'none';
@@ -3159,7 +3824,144 @@ export async function extractOrderDetailsWithAi(
       });
     }
 
+    // ── FAST PATH: Gemini direct vision extraction ──
+    // When Gemini is available, try direct image-to-structured-data extraction FIRST.
+    // This is a SINGLE API call that extracts all 5 fields from the raw image.
+    // It avoids the expensive multi-variant OCR loop entirely for successful cases.
+    // This is the #1 latency optimization — takes ~2-5s vs 20-60s for multi-crop OCR.
+    let fastPathSuccess = false;
+    if (ai && !isGeminiCircuitOpen()) {
+      for (const model of GEMINI_MODEL_FALLBACKS.slice(0, 2)) {
+        try {
+          const directResult = await extractDirectFromImage(model, payload.imageBase64);
+          if (!directResult) continue;
+          const directOrderId = sanitizeOrderId(directResult.orderId);
+          let directAmount = typeof directResult.amount === 'number' && Number.isFinite(directResult.amount) && directResult.amount > 0
+            ? directResult.amount : null;
+          const directConfidence = typeof directResult.confidenceScore === 'number'
+            ? Math.max(0, Math.min(100, directResult.confidenceScore)) : 0;
+
+          // ── FAST PATH AMOUNT VALIDATION ──
+          // Even Gemini can return wrong numbers (pincodes, phone digits, order ID fragments).
+          // Apply the same sanity checks here that the OCR path uses.
+          if (directAmount && directOrderId) {
+            const fpOrderDigits = directOrderId.replace(/[^0-9]/g, '');
+            const fpAmtStr = String(Math.round(directAmount));
+            // Reject if amount exactly matches an order ID segment
+            const fpSegments = new Set<string>();
+            if (fpOrderDigits.length >= 4) fpSegments.add(fpOrderDigits);
+            for (const seg of directOrderId.split(/[\-\s]+/)) {
+              const d = seg.replace(/[^0-9]/g, '');
+              if (d.length >= 3) fpSegments.add(d);
+            }
+            if (fpSegments.has(fpAmtStr)) {
+              aiLog.warn('Fast path amount matches order ID segment — rejected', { amount: directAmount, orderId: directOrderId });
+              directAmount = null;
+            }
+            // 5+ digit substring of order ID
+            else if (fpAmtStr.length >= 5 && fpOrderDigits.length >= 8 && fpOrderDigits.includes(fpAmtStr)) {
+              aiLog.warn('Fast path amount is substring of order ID — rejected', { amount: directAmount });
+              directAmount = null;
+            }
+          }
+          if (directAmount) {
+            const fpAmtStr = String(Math.round(directAmount));
+            // Reject 6-digit pincodes (100000-999999, first digit 1-8)
+            if (/^\d{6}$/.test(fpAmtStr) && directAmount >= 100000 && directAmount <= 999999) {
+              const fd = parseInt(fpAmtStr[0], 10);
+              if (fd >= 1 && fd <= 8 && directConfidence < 90) {
+                aiLog.warn('Fast path amount looks like pincode — rejected', { amount: directAmount });
+                directAmount = null;
+              }
+            }
+            // Reject 10-digit phone numbers
+            if (/^[6-9]\d{9}$/.test(fpAmtStr)) {
+              aiLog.warn('Fast path amount is phone number — rejected', { amount: directAmount });
+              directAmount = null;
+            }
+            // Reject unreasonably large (>500000)
+            if (directAmount && directAmount > 500000) {
+              aiLog.warn('Fast path amount > 500000 — rejected', { amount: directAmount });
+              directAmount = null;
+            }
+          }
+
+          // Accept fast path result if we got at least orderId AND amount with decent confidence
+          if (directOrderId && directAmount && directConfidence >= 60) {
+            accumulatedOrderId = directOrderId;
+            accumulatedAmount = directAmount;
+            accumulatedOrderDate = directResult.orderDate || null;
+            // Clean sold-by from vision
+            if (directResult.soldBy) {
+              accumulatedSoldBy = directResult.soldBy
+                .replace(/\s*\(\s*(Ask\s*Product\s*Question|Visit\s*(the\s*)?Store)[^)]*\)/gi, '')
+                .replace(/\s*Ask\s*Product\s*Question\s*/gi, '')
+                .replace(/\s*Visit\s*(the\s*)?Store\s*/gi, '')
+                .replace(/\s{2,}/g, ' ').trim() || null;
+            }
+            if (directResult.productName && directResult.productName.length >= 5
+              && !/https?:\/\/|Deliver\s*to|Hello[,\s]|Returns?\s/i.test(directResult.productName)) {
+              accumulatedProductName = directResult.productName;
+            }
+            deterministic = {
+              orderId: directOrderId,
+              amount: directAmount,
+              orderDate: accumulatedOrderDate,
+              soldBy: accumulatedSoldBy,
+              productName: accumulatedProductName,
+              notes: ['Fast path: extracted via Gemini Vision direct.'],
+            };
+            bestScore = 2;
+            ocrText = '[Gemini Vision direct extraction — no OCR text]';
+            ocrLabel = 'gemini-vision-fast';
+            fastPathSuccess = true;
+            recordGeminiSuccess();
+            aiLog.info('Order extract FAST PATH success', {
+              model, orderId: directOrderId, amount: directAmount,
+              confidence: directConfidence, productName: accumulatedProductName,
+            });
+            break;
+          }
+          // Partial result — save it but continue to OCR loop for more
+          if (directOrderId) {
+            accumulatedOrderId = directOrderId;
+            accumulatedOrderIdScore = 15; // Vision-sourced, high trust
+          }
+          if (directAmount) accumulatedAmount = directAmount;
+          if (directResult.orderDate) accumulatedOrderDate = directResult.orderDate;
+          if (directResult.soldBy) {
+            accumulatedSoldBy = directResult.soldBy
+              .replace(/\s*\(\s*(Ask\s*Product\s*Question|Visit\s*(the\s*)?Store)[^)]*\)/gi, '')
+              .replace(/\s{2,}/g, ' ').trim() || null;
+          }
+          if (directResult.productName && directResult.productName.length >= 5
+            && !/https?:\/\/|Deliver\s*to|Hello[,\s]|Returns?\s/i.test(directResult.productName)) {
+            accumulatedProductName = directResult.productName;
+          }
+          recordGeminiSuccess();
+          aiLog.info('Order extract fast path partial', { model, orderId: directOrderId, amount: directAmount });
+          break;
+        } catch (err) {
+          aiLog.warn('[Extract] Fast path model error', { model, error: err instanceof Error ? err.message : err });
+          _lastError = err;
+          continue;
+        }
+      }
+    }
+
+    // ── OCR VARIANT LOOP: Only needed when fast path didn't get both orderId + amount ──
+    if (!fastPathSuccess) {
     for (const variant of ocrVariants) {
+      // ── Global deadline check: stop processing more variants if time is running out ──
+      if (isTimeUp()) {
+        aiLog.warn('Global extraction deadline reached — stopping OCR variant loop.', {
+          processedVariants: allOcrTexts.length,
+          totalVariants: ocrVariants.length,
+          hasOrderId: Boolean(accumulatedOrderId),
+          hasAmount: Boolean(accumulatedAmount),
+        });
+        break;
+      }
       const candidateText = await runOcrPass(variant.image, variant.label);
       if (!candidateText) continue;
       allOcrTexts.push(candidateText);
@@ -3239,11 +4041,16 @@ export async function extractOrderDetailsWithAi(
         ocrLabel = variant.label;
         deterministic = candidateDeterministic;
       }
-      // Early exit if we have both from the same pass
-      if (score === 2) break;
-      // Also exit early if accumulated results from different passes give us both
-      if (accumulatedOrderId && accumulatedAmount) break;
+      // Early exit if we have both from the same pass — only for Gemini (reliable OCR)
+      // For Tesseract-only, continue scanning more variants for better quality results
+      if (ai && score === 2) break;
+      if (ai && accumulatedOrderId && accumulatedAmount) break;
+      // Tesseract-only: still break if we found both AND have good text length
+      if (!ai && accumulatedOrderId && accumulatedAmount && (ocrText?.length ?? 0) > 200) break;
+      // Deadline-based early exit: if we have at least one field and time is running low, stop
+      if (isTimeUp() && (accumulatedOrderId || accumulatedAmount)) break;
     }
+    } // end if (!fastPathSuccess)
 
     // If individual passes found different pieces, merge them
     if (!deterministic.orderId && accumulatedOrderId) {
@@ -3338,9 +4145,10 @@ export async function extractOrderDetailsWithAi(
     let aiUsed = false;
 
     // ALWAYS run AI when available and circuit breaker is closed — for validation, gap-filling, and cross-checking
-    if (ai && !isGeminiCircuitOpen()) {
+    if (ai && !isGeminiCircuitOpen() && !isTimeUp()) {
       // Step 1: Text-based refinement (cheap — sends OCR text only)
       for (const model of GEMINI_MODEL_FALLBACKS.slice(0, 3)) {
+        if (isTimeUp()) break;
         try {
           // eslint-disable-next-line no-await-in-loop
           const aiResult = await refineWithAi(model, ocrText, deterministic);
@@ -3378,9 +4186,11 @@ export async function extractOrderDetailsWithAi(
               })()
             : false;
 
-          // Guard: reject AI product name if it looks like a URL
+          // Guard: reject AI product name if it looks like a URL or navigation garbage
           const isProductNameUrl = aiResult.suggestedProductName
             && /https?:\/\/|www\.|\.com\/|\.in\/|orderID=|order-details|ref=/i.test(aiResult.suggestedProductName);
+          const isProductNameNavGarbage = aiResult.suggestedProductName
+            && /^\s*(Deliver\s*to|Hello[,\s]|Returns?\s|Account|Sign\s*in|Cart|Buy\s*Again)/i.test(aiResult.suggestedProductName);
 
           if (!finalOrderId && aiSuggestedOrderId && (orderIdVisible || aiConfidence >= 75)) {
             finalOrderId = aiSuggestedOrderId;
@@ -3400,18 +4210,65 @@ export async function extractOrderDetailsWithAi(
             }
           }
 
+          // AI can correct a wrong deterministic amount (e.g., ₹ misread as digit 7)
+          if (finalAmount && aiSuggestedAmount && !isAmountFromOrderId && finalAmount !== aiSuggestedAmount && aiConfidence >= 75) {
+            const aiAmtStr = String(aiSuggestedAmount);
+            const detAmtStr = String(finalAmount);
+            // Case 1: Deterministic is ~10x AI value (₹ sign misread as leading digit)
+            const ratio = finalAmount / aiSuggestedAmount;
+            const isRupeeSignMisread = ratio >= 5 && ratio <= 20 && amountVisible;
+            // Case 2: Deterministic value is a pincode (6-digit, starts 1-8)
+            const detIsPincode = /^\d{6}$/.test(detAmtStr) && finalAmount >= 100000 && finalAmount <= 999999 && parseInt(detAmtStr[0]) >= 1 && parseInt(detAmtStr[0]) <= 8;
+            // Case 3: Deterministic value is a phone number (10 digits starting 6-9)
+            const detIsPhone = /^[6-9]\d{9}$/.test(detAmtStr) && finalAmount >= 6000000000;
+            // Case 4: AI amount is visible in OCR text but deterministic is inflated
+            const aiAmtInOcr = ocrNorm.includes(aiAmtStr) || ocrNorm.includes(aiAmtStr.replace('.', ''));
+            if ((isRupeeSignMisread && aiAmtInOcr) || detIsPincode || detIsPhone) {
+              finalAmount = aiSuggestedAmount;
+              notes.push(`AI corrected amount: ₹${detAmtStr} → ₹${aiAmtStr} (${isRupeeSignMisread ? '₹ sign misread' : detIsPincode ? 'was pincode' : 'was phone'}).`);
+            }
+          }
+
           // Fill metadata from AI: orderDate, soldBy, productName
           if (!finalOrderDate && aiResult.suggestedOrderDate) {
             finalOrderDate = aiResult.suggestedOrderDate;
             notes.push('Order date from AI.');
           }
-          if (!finalSoldBy && aiResult.suggestedSoldBy) {
-            finalSoldBy = aiResult.suggestedSoldBy;
-            notes.push('Seller from AI.');
+          if (aiResult.suggestedSoldBy) {
+            // Clean up soldBy from AI
+            const cleanedAiSoldBy = aiResult.suggestedSoldBy
+              .replace(/\s*\(\s*(Ask\s*Product\s*Question|Visit\s*(the\s*)?Store|See\s*All|View\s*More|Follow|Contact|Report|Share)[^)]*\)/gi, '')
+              .replace(/\s*Ask\s*Product\s*Question\s*/gi, '')
+              .replace(/\s*Visit\s*(the\s*)?Store\s*/gi, '')
+              .replace(/\s{2,}/g, ' ')
+              .trim();
+            if (!finalSoldBy && cleanedAiSoldBy.length >= 2) {
+              finalSoldBy = cleanedAiSoldBy;
+              notes.push('Seller from AI.');
+            } else if (finalSoldBy && cleanedAiSoldBy.length >= 2 && aiConfidence >= 75) {
+              // AI can correct OCR-garbled seller names
+              const currentHasGarbage = /\b(Ask\s*Product|Visit\s*Store|Leave\s*seller|Track\s*package|Cancel\s*items|Write\s*a\s*review|Return\s*or\s*replace)\b/i.test(finalSoldBy);
+              if (currentHasGarbage) {
+                finalSoldBy = cleanedAiSoldBy;
+                notes.push('AI corrected seller name (removed button text).');
+              }
+            }
           }
-          if (!finalProductName && aiResult.suggestedProductName && !isProductNameUrl) {
+          if (!finalProductName && aiResult.suggestedProductName && !isProductNameUrl && !isProductNameNavGarbage) {
             finalProductName = aiResult.suggestedProductName;
             notes.push('Product name from AI.');
+          }
+          // AI can correct poor deterministic product name (expanded garbage detection)
+          if (finalProductName && aiResult.suggestedProductName && !isProductNameUrl && !isProductNameNavGarbage && aiConfidence >= 70) {
+            const currentIsGarbage = /\b(Deliver\s*to|Hello[,\s]|Returns?\s*(&|\d)|Account|Sign\s*in|Buy\s*Again|Explore\s*Plus|Search|Categories|Home|My\s*Orders?|Cart|Wishlist|Profile|Notifications?|Offers?)\b/i.test(finalProductName);
+            // Also detect: name is just a color/size/quantity, too short (< 10 chars with low alpha), or looks like UI chrome
+            const isTooShort = finalProductName.replace(/[^a-zA-Z]/g, '').length < 8;
+            const isColorOrSize = /^(\s*(black|white|blue|red|green|pink|grey|gray|silver|gold|beige|brown|navy|purple|orange|yellow|maroon|\d+\s*(gb|tb|mb|ml|l|kg|g|mm|cm|m|xl|xxl|xxxl|s|xs))\s*[,\/]?\s*){1,3}$/i.test(finalProductName);
+            const aiNameLonger = aiResult.suggestedProductName.length >= finalProductName.length * 1.5;
+            if ((currentIsGarbage || isColorOrSize || (isTooShort && aiNameLonger)) && aiResult.suggestedProductName.length >= 10) {
+              finalProductName = aiResult.suggestedProductName;
+              notes.push('AI corrected product name (deterministic was low quality).');
+            }
           }
 
           // Update confidence
@@ -3439,9 +4296,12 @@ export async function extractOrderDetailsWithAi(
         }
       }
 
-      // Step 2: Direct image extraction (fallback — sends image to Gemini vision)
-      if (!finalOrderId || !finalAmount) {
+      // Step 2: Direct image extraction — runs when ANY field is missing (not just ID/amount)
+      // Gemini Vision understands screenshot layout far better than OCR text parsing
+      // Skip if fast path already did direct vision extraction successfully
+      if (!fastPathSuccess && !isTimeUp() && (!finalOrderId || !finalAmount || !finalProductName || !finalSoldBy || !finalOrderDate)) {
         for (const model of GEMINI_MODEL_FALLBACKS.slice(0, 2)) {
+          if (isTimeUp()) break;
           try {
             // eslint-disable-next-line no-await-in-loop
             const directResult = await extractDirectFromImage(model, payload.imageBase64);
@@ -3477,20 +4337,83 @@ export async function extractOrderDetailsWithAi(
               notes.push('Amount from direct image AI.');
             }
             if (!finalOrderDate && directResult.orderDate) finalOrderDate = directResult.orderDate;
-            if (!finalSoldBy && directResult.soldBy) finalSoldBy = directResult.soldBy;
-            // Guard: reject direct AI product name if it looks like a URL
+            // For soldBy from vision: trust it even if OCR found something (vision is more accurate)
+            if (directResult.soldBy) {
+              const cleanedSoldBy = directResult.soldBy
+                .replace(/\s*\(\s*(Ask\s*Product\s*Question|Visit\s*(the\s*)?Store|See\s*All|View\s*More|Follow|Contact|Report|Share)[^)]*\)/gi, '')
+                .replace(/\s*Ask\s*Product\s*Question\s*/gi, '')
+                .replace(/\s*Visit\s*(the\s*)?Store\s*/gi, '')
+                .replace(/\s*Write\s*a\s*product\s*review\s*/gi, '')
+                .replace(/\s*Leave\s*(seller|delivery)\s*feedback\s*/gi, '')
+                .replace(/\s*Return\s*or\s*replace\s*items?\s*/gi, '')
+                .replace(/\s*Track\s*package\s*/gi, '')
+                .replace(/\s*Buy\s*it\s*again\s*/gi, '')
+                .replace(/\s*View\s*your\s*item\s*/gi, '')
+                .replace(/\s{2,}/g, ' ')
+                .trim();
+              if (cleanedSoldBy.length >= 2) {
+                if (!finalSoldBy) {
+                  finalSoldBy = cleanedSoldBy;
+                } else if (directConfidence >= 70) {
+                  finalSoldBy = cleanedSoldBy;
+                  notes.push('Seller updated from direct image AI (higher accuracy).');
+                }
+              }
+            }
+            // Guard: reject direct AI product name if it looks like a URL or navigation text
             const directProductIsUrl = directResult.productName
               && /https?:\/\/|www\.|\.com\/|\.in\/|orderID=|order-details|ref=/i.test(directResult.productName);
-            if (!finalProductName && directResult.productName && !directProductIsUrl) {
-              finalProductName = directResult.productName;
+            // Check for navigation chrome ANYWHERE in the string (not just start)
+            // Screenshots show: ". Deliver to Sumit ) i . Hello, Ashok Retuns 0" or "5 Deliver to ABHILASH N Hello, ROOT Returns 0"
+            const directProductIsNavCrap = directResult.productName && (() => {
+              const pn = directResult.productName!;
+              const navPatterns = [
+                /Deliver\s*to\s/i, /Hello[,\s]/i, /Returns?\s*(&|\b0\b|\bOrder)/i,
+                /Account\s*&/i, /Sign\s*in/i, /\bCart\b/i, /Buy\s*Again/i,
+                /Explore\s*Plus/i, /My\s*Account/i, /Your\s*Orders?/i,
+                /\bRetuns?\b/i,  // OCR misspelling of "Returns"
+              ];
+              const navHits = navPatterns.filter(p => p.test(pn)).length;
+              if (navHits >= 2) return true;
+              // Also catch leading garbage + nav pattern
+              if (/^[\s\d.,;:!?)>•·\-]*\s*(Deliver\s*to|Hello[,\s]|Returns?\s|Account|Sign\s*in|Cart|Buy\s*Again)/i.test(pn)) return true;
+              return false;
+            })();
+            if (directResult.productName && !directProductIsUrl && !directProductIsNavCrap) {
+              // Strip known navigation chrome fragments from the product name before evaluating
+              const cleanedProductName = directResult.productName
+                .replace(/\b(Deliver\s*to\s+\w+[^.]*)/gi, '')
+                .replace(/\b(Hello[,\s]+\w+[^.]*)/gi, '')
+                .replace(/\b(Returns?\s*(&\s*Orders?|\b\d))/gi, '')
+                .replace(/\b(Retuns?\s*\d)/gi, '')
+                .replace(/\b(Sign\s*in|Account\s*&\s*Lists?|Your\s*Orders?|Buy\s*Again|Explore\s*Plus)/gi, '')
+                .replace(/^[\s\-:•·|>).,;!?]+/, '')
+                .replace(/[\s\-:•·|).,;!?]+$/, '')
+                .replace(/\s{2,}/g, ' ')
+                .trim();
+              if (cleanedProductName.length >= 5) {
+                if (!finalProductName) {
+                  finalProductName = cleanedProductName;
+                } else if (directConfidence >= 70) {
+                  // Vision result: prefer if longer, or if current name is short/low-quality
+                  const currentAlpha = (finalProductName || '').replace(/[^a-zA-Z]/g, '').length;
+                  const visionAlpha = cleanedProductName.replace(/[^a-zA-Z]/g, '').length;
+                  if (cleanedProductName.length > (finalProductName?.length ?? 0) || (currentAlpha < 10 && visionAlpha >= 10)) {
+                    finalProductName = cleanedProductName;
+                    notes.push('Product name updated from direct image AI (higher accuracy).');
+                  }
+                }
+              }
             }
 
-            if (finalOrderId || finalAmount) {
+            if (finalOrderId || finalAmount || directResult.productName || directResult.soldBy) {
               confidenceScore = Math.max(confidenceScore, directConfidence);
               aiUsed = true;
               aiLog.info('Order extract direct AI', {
                 orderId: directOrderId,
                 amount: directAmount,
+                productName: directResult.productName,
+                soldBy: directResult.soldBy,
                 confidence: directConfidence,
               });
             }
@@ -3513,14 +4436,35 @@ export async function extractOrderDetailsWithAi(
 
     // ─── POST-PROCESSING SANITY CHECKS ─── //
 
-    // 1. If the amount is actually a substring of the order ID digits, reject it
-    //    Lowered threshold from 5 to 3 digits to catch more false positives like "408" from "408-0258263-..."
+    // 1. If the amount EXACTLY matches a hyphen-separated segment of the order ID, reject it.
+    //    For 5+ digit amounts, also reject if it's a contiguous substring of the full digit string.
+    //    But do NOT reject 3-4 digit amounts merely because they appear somewhere in a 17-digit order ID
+    //    — that would falsely reject common ₹1000-₹9999 prices.
     if (finalAmount && finalOrderId) {
       const orderDigits = finalOrderId.replace(/[^0-9]/g, '');
       const amountStr = String(Math.round(finalAmount));
-      // Check: full amount string is a contiguous substring of order ID digits
-      if (orderDigits.length >= 8 && amountStr.length >= 3 && orderDigits.includes(amountStr)) {
+      // Build exact segments (same logic as extractAmounts)
+      const postSegments = new Set<string>();
+      if (orderDigits.length >= 4) postSegments.add(orderDigits);
+      for (const seg of finalOrderId.split(/[\-\s]+/)) {
+        const d = seg.replace(/[^0-9]/g, '');
+        if (d.length >= 3) postSegments.add(d);
+      }
+      // Exact segment match — always reject
+      if (postSegments.has(amountStr)) {
+        notes.push(`Amount ₹${finalAmount} exactly matches an Order ID segment — rejected.`);
+        finalAmount = null;
+        confidenceScore = Math.max(30, confidenceScore - 20);
+      }
+      // 5+ digit amounts that appear as substring of full order ID digits — reject
+      else if (amountStr.length >= 5 && orderDigits.length >= 8 && orderDigits.includes(amountStr)) {
         notes.push(`Amount ₹${finalAmount} appears to be digits from Order ID — rejected.`);
+        finalAmount = null;
+        confidenceScore = Math.max(30, confidenceScore - 20);
+      }
+      // 3-digit amounts at the START of order ID (e.g. "408" from "408-xxx") — reject
+      else if (amountStr.length === 3 && orderDigits.startsWith(amountStr)) {
+        notes.push(`Amount ₹${finalAmount} matches start of Order ID — rejected.`);
         finalAmount = null;
         confidenceScore = Math.max(30, confidenceScore - 20);
       }
@@ -3556,6 +4500,39 @@ export async function extractOrderDetailsWithAi(
     if (finalProductName && /^(arriving|shipped|delivered|dispatched|out\s*for|in\s*transit|order\s*(placed|confirmed|completed)|packed|picked\s*up)/i.test(finalProductName)) {
       notes.push('Product name was a delivery status — rejected.');
       finalProductName = null;
+    }
+
+    // 5b. Reject product name if it's a standalone status word
+    if (finalProductName && /^(completed|pending|cancelled|processing|successful|approved|rejected|failed|accepted|verified)\s*$/i.test(finalProductName.trim())) {
+      notes.push('Product name was a standalone status word — rejected.');
+      finalProductName = null;
+    }
+
+    // 5c. Reject product name if it contains "shared this order" (Flipkart share feature)
+    if (finalProductName && /shared\s*this\s*order/i.test(finalProductName)) {
+      notes.push('Product name was a share notification — rejected.');
+      finalProductName = null;
+    }
+
+    // 5d. Reject product name if it's UI chrome (chat, download, rate, etc.)
+    if (finalProductName && /^(chat\s*with\s*us|see\s*all\s*updates?|download\s*invoice|rate\s*(your|the)\s*(experience|product)|how\s*do\s*i|return\s*window|payment\s*method|cash\s*on\s*delivery|stop\s*sharing)/i.test(finalProductName)) {
+      notes.push('Product name was UI chrome — rejected.');
+      finalProductName = null;
+    }
+
+    // 5e. Reject product name if it looks like a person name (2-4 proper-case words, < 40 chars)
+    if (finalProductName) {
+      const trimmedPN = finalProductName.trim();
+      const pnWords = trimmedPN.split(/\s+/);
+      if (pnWords.length >= 2 && pnWords.length <= 4 && trimmedPN.length < 40) {
+        const allProperCase = pnWords.every(w =>
+          /^[A-Z][a-z]+$/.test(w) || /^[A-Z]{1,5}$/.test(w) || /^[A-Z][a-z]+'s?$/.test(w)
+        );
+        if (allProperCase && !/\b(phone|laptop|tablet|watch|earbuds?|headphone|speaker|shirt|shoe|bag|cream|oil|powder|book|cable|charger|mouse|keyboard|camera|pack|set|kit|ml|gm|kg|combo|serum|lotion|perfume|brush|bottle|cover|case|stand|holder|adapter|usb|bluetooth|wireless|cotton|leather|steel|glass|trimmer|mixer|blender|cooker)\b/i.test(trimmedPN)) {
+          notes.push('Product name looked like a person name — rejected.');
+          finalProductName = null;
+        }
+      }
     }
 
     // 6. Reject product name if it's just generic text / navigation chrome
@@ -3628,6 +4605,108 @@ export async function extractOrderDetailsWithAi(
       }
     }
 
+    // 6j. Reject product name if it contains navigation chrome from Amazon/Flipkart header
+    if (finalProductName) {
+      const pn = finalProductName;
+      const navPatterns = [
+        /Deliver\s*to\s/i, /Hello[,\s]/i, /Returns?\s*(&|\b0\b|\bOrder)/i,
+        /My\s*Account/i, /Sign\s*In/i, /Your\s*Orders?/i,
+        /Explore\s*Plus/i, /Buy\s*Again/i, /\bRetuns?\b/i,
+        /Account\s*&\s*Lists?/i, /\bCart\b.*\b\d/i,
+      ];
+      const navHits = navPatterns.filter(p => p.test(pn)).length;
+      const hasProductKeyword = /\b(phone|laptop|tablet|watch|earbuds?|headphone|shirt|shoe|bag|cream|oil|gel|powder|serum|shampoo|charger|cable|cover|case|book|pack|ml|gm|kg|pcs|combo|set|kit|perfume|lotion|lipstick|foundation|vitamin|trimmer|bottle|brush|backpack|rucksack|sleeve|stand|mouse|keyboard|speaker|adapter|usb|hdmi|bluetooth|wireless|wired|cotton|polyester|denim|leather)\b/i.test(pn);
+      if (navHits >= 2 && !hasProductKeyword) {
+        notes.push('Product name contained multiple navigation chrome keywords — rejected.');
+        finalProductName = null;
+      } else if (navHits >= 1 && !hasProductKeyword) {
+        // Single nav keyword: check if the product name is mostly garbage (low alpha ratio)
+        const alphaChars = pn.replace(/[^a-zA-Z]/g, '').length;
+        const alphaRatio = alphaChars / Math.max(pn.length, 1);
+        if (alphaRatio < 0.6 || pn.length < 10) {
+          notes.push('Product name contained navigation chrome with low quality text — rejected.');
+          finalProductName = null;
+        }
+      }
+    }
+
+    // 6k. Reject product name if it looks like "Deliver to X" or "Hello, X" (even with leading garbage chars)
+    if (finalProductName && /^[\s\d.,;:!?)>•·\-]*\s*(Deliver\s*to\s|Hello[,\s])/i.test(finalProductName)) {
+      notes.push('Product name was address/greeting header — rejected.');
+      finalProductName = null;
+    }
+
+    // 6l. Reject product name that is concatenated navigation fragments (e.g. "5 Deliver to ABHILASH N Hello, ROOT Returns 0")
+    if (finalProductName) {
+      const upper = finalProductName.toUpperCase();
+      const hasDeliverTo = /DELIVER\s*TO/i.test(upper);
+      const hasHello = /HELLO/i.test(upper);
+      const hasReturns = /RETURN/i.test(upper);
+      if (hasDeliverTo && (hasHello || hasReturns)) {
+        notes.push('Product name was concatenated navigation fragments — rejected.');
+        finalProductName = null;
+      }
+    }
+
+    // 9. Clean up soldBy: strip common Amazon/Flipkart button text that OCR captured
+    if (finalSoldBy) {
+      finalSoldBy = finalSoldBy
+        .replace(/\s*\(\s*(Ask\s*Product\s*Question|Visit\s*(the\s*)?Store|See\s*All|View\s*More|Follow|Contact|Report|Share)[^)]*\)/gi, '')
+        .replace(/\s*Ask\s*Product\s*Question\s*/gi, '')
+        .replace(/\s*Visit\s*(the\s*)?Store\s*/gi, '')
+        .replace(/\s*Write\s*a\s*product\s*review\s*/gi, '')
+        .replace(/\s*Leave\s*seller\s*feedback\s*/gi, '')
+        .replace(/\s*Leave\s*delivery\s*feedback\s*/gi, '')
+        .replace(/\s*Return\s*or\s*replace\s*items?\s*/gi, '')
+        .replace(/\s*Track\s*package\s*/gi, '')
+        .replace(/\s*Cancel\s*items?\s*/gi, '')
+        .replace(/\s*Buy\s*it\s*again\s*/gi, '')
+        .replace(/\s*View\s*your\s*item\s*/gi, '')
+        .replace(/\s*Add\s*to\s*(Cart|Wish\s*List)\s*/gi, '')
+        .replace(/\s*Share\s*this\s*product\s*/gi, '')
+        .replace(/\s*Report\s*incorrect\s*product\s*info\w*\s*/gi, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+      if (finalSoldBy.length < 2) {
+        finalSoldBy = null;
+      }
+    }
+
+    // 6m. Reject amount if it matches common Indian pincode ranges (6-digit, 100000-999999)
+    // Only reject if the amount is an exact integer matching a pincode pattern
+    if (finalAmount && finalAmount >= 100000 && finalAmount <= 999999 && finalAmount === Math.round(finalAmount)) {
+      // Check if this value appears in the OCR text near address/delivery context
+      const amtStr = String(Math.round(finalAmount));
+      const allText = (ocrText || '').toLowerCase();
+      // If the exact number appears near address keywords, it's a pincode not an amount
+      const pincodeCtxPattern = new RegExp(`(deliver|address|pin|zip|city|state|locality|area|sector|colony|nagar|plot|flat|floor|road|street|lane|near|opp|behind|dist|tehsil|taluk|mandal|ward|india|maharashtra|karnataka|tamil|delhi|mumbai|bangalore|pune|hyderabad|chennai|kolkata|jaipur|lucknow|ahmedabad|thane|navi\\s*mumbai|gurgaon|noida|ghaziabad|faridabad|chandigarh|bhopal|indore|nagpur|visakhapatnam|patna|vadodara|surat|rajkot|coimbatore|kochi|thiruvananthapuram).{0,80}${amtStr}|${amtStr}.{0,80}(deliver|address|pin|zip|city|state|locality|area|india|maharashtra|karnataka|tamil|delhi|mumbai|bangalore|pune)`, 'i');
+      if (pincodeCtxPattern.test(allText)) {
+        notes.push(`Amount ₹${finalAmount} appears near address context — likely a pincode, rejected.`);
+        finalAmount = null;
+        confidenceScore = Math.max(30, confidenceScore - 20);
+      }
+      // Also reject if no explicit "total"/"amount"/"paid" keyword near the number
+      if (finalAmount) {
+        const amtNearTotalPattern = new RegExp(`(total|amount|paid|payable|grand|you\\s*paid|order\\s*total|price).{0,30}${amtStr}|${amtStr}.{0,30}(total|amount|paid|payable|grand)`, 'i');
+        if (!amtNearTotalPattern.test(allText) && /\b\d{6}\b/.test(allText)) {
+          // There are 6-digit numbers in text and the amount isn't near any total keyword — suspicious
+          // Check more aggressively: common Indian pincodes start with 1-8, and ranges like 110001-855117
+          const firstDigit = parseInt(amtStr[0]);
+          if (firstDigit >= 1 && firstDigit <= 8) {
+            notes.push(`Amount ₹${finalAmount} is 6-digit (possible pincode) with no "total"/"paid" context — flagged.`);
+            confidenceScore = Math.max(40, confidenceScore - 15);
+          }
+        }
+      }
+    }
+
+    // 6n. Reject amount if it matches a 10-digit Indian phone number
+    if (finalAmount && finalAmount >= 6000000000 && finalAmount <= 9999999999 && finalAmount === Math.round(finalAmount)) {
+      notes.push(`Amount ₹${finalAmount} looks like a phone number (10-digit starting 6-9) — rejected.`);
+      finalAmount = null;
+      confidenceScore = Math.max(25, confidenceScore - 20);
+    }
+
     // 7. If amount looks like a date (e.g. 20250206 = 2,02,50,206), reject
     if (finalAmount && finalAmount >= 10000000) {
       const amtStr = String(Math.round(finalAmount));
@@ -3641,6 +4720,57 @@ export async function extractOrderDetailsWithAi(
     // 8. Cross-validate: if amount is exactly 0 after rounding, clear it
     if (finalAmount !== null && finalAmount <= 0) {
       finalAmount = null;
+    }
+
+    // 8b. Reject suspiciously low amounts (₹1-₹9) — usually convenience fees or COD charges
+    if (finalAmount !== null && finalAmount > 0 && finalAmount < 10) {
+      notes.push(`Amount ₹${finalAmount} is suspiciously low (< ₹10) — rejected.`);
+      finalAmount = null;
+      confidenceScore = Math.max(30, confidenceScore - 15);
+    }
+
+    // 8c. Deterministic ₹-as-digit correction (conservative, OCR-only mode)
+    // Only apply when: (1) no AI was used, (2) the original amount does NOT appear near any
+    // price label in OCR text, AND (3) the corrected amount DOES appear near a label.
+    // This avoids false positives where "₹6,695" is a real price and gets wrongly corrected to 695.
+    if (finalAmount && ocrText && !aiUsed) {
+      const amtStr = String(Math.round(finalAmount));
+      // Check if the ORIGINAL amount is visible near a price label — if so, it's correct
+      const originalNearLabel = new RegExp(
+        `(?:total|amount|paid|payable|grand|you\\s*pay|bill|price)\\s*:?\\s*(?:₹|rs\\.?|inr)?\\s*${amtStr.replace(/(\d)/g, '$1[,.]?')}`,
+        'i'
+      ).test(ocrText);
+      if (!originalNearLabel) {
+        const corrected = detectRupeeSignAsDigit(finalAmount, ocrText);
+        if (corrected !== null) {
+          notes.push(`Deterministic ₹-as-digit correction: ₹${finalAmount} → ₹${corrected} (leading digit was misread ₹ sign).`);
+          finalAmount = corrected;
+          confidenceScore = Math.max(confidenceScore, 70);
+        }
+      }
+    }
+
+    // 9. Normalize order date to a consistent format (DD Month YYYY)
+    if (finalOrderDate) {
+      try {
+        const d = new Date(finalOrderDate);
+        if (!isNaN(d.getTime()) && d.getFullYear() >= 2015 && d.getFullYear() <= 2030) {
+          const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+          finalOrderDate = `${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
+        } else {
+          // Try manual dd/mm/yyyy parse
+          const ddmmyyyy = finalOrderDate.match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
+          if (ddmmyyyy) {
+            const day = parseInt(ddmmyyyy[1]);
+            const mon = parseInt(ddmmyyyy[2]);
+            const yr = parseInt(ddmmyyyy[3]);
+            if (day >= 1 && day <= 31 && mon >= 1 && mon <= 12 && yr >= 2015 && yr <= 2030) {
+              const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+              finalOrderDate = `${String(day).padStart(2, '0')} ${months[mon - 1]} ${yr}`;
+            }
+          }
+        }
+      } catch { /* keep original */ }
     }
 
     aiLog.info('Order extract final', {

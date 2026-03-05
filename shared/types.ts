@@ -266,6 +266,8 @@ export interface Ticket {
   status: TicketStatus;
   targetRole?: string;
   priority?: 'low' | 'medium' | 'high' | 'urgent';
+  resolvedBy?: string;
+  resolvedByName?: string;
   resolvedAt?: string;
   resolutionNote?: string;
   createdAt: string;
@@ -302,7 +304,7 @@ export type AiIntent =
   | 'navigation'
   | 'unknown';
 
-export type AiNavigateTo = 'home' | 'explore' | 'orders' | 'profile';
+export type AiNavigateTo = 'home' | 'explore' | 'orders' | 'profile' | 'tickets';
 
 export interface ChatResponse {
   text: string;

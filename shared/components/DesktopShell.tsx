@@ -54,7 +54,7 @@ export function DesktopShell({
       </aside>
 
       {/* Main */}
-      <main className={mainClassName || 'flex-1 min-w-0 min-h-0 overflow-y-auto'}>
+      <main className={mainClassName || 'flex-1 min-w-0 min-h-0 overflow-y-auto scrollbar-styled'}>
         {showMobileHeader ? (
           <div className="md:hidden flex items-center justify-between mb-6">
             <div className="min-w-0">{mobileHeader}</div>

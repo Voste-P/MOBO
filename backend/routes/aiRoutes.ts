@@ -469,14 +469,18 @@ export function aiRoutes(env: Env): Router {
 
       if (normalizedMessage.includes('ticket') || normalizedMessage.includes('support')) {
         if (hasTickets) {
-          const latest = (payload.tickets ?? [])[0] as any;
-          const status = normalizeStatus(latest?.status) || 'Open';
-          const issue = normalizeStatus(latest?.issueType) || 'Support';
-          res.json({
-            text: `Your latest ticket (**${issue}**) is **${status}**.`,
-            intent: 'check_ticket_status',
-          });
-          return;
+          // Filter out Feedback entries — only show actual support tickets
+          const supportTickets = (payload.tickets ?? []).filter((t: any) => t?.issueType !== 'Feedback');
+          const latest = supportTickets[0] as any;
+          if (latest) {
+            const status = normalizeStatus(latest?.status) || 'Open';
+            const issue = normalizeStatus(latest?.issueType) || 'Support';
+            res.json({
+              text: `Your latest ticket (**${issue}**) is **${status}**.`,
+              intent: 'check_ticket_status',
+            });
+            return;
+          }
         }
         res.json({
           text: 'No tickets found. You can create one from the Tickets tab.',
@@ -699,7 +703,8 @@ export function aiRoutes(env: Env): Router {
 
   router.post('/extract-order', requireAuth(env), limiterExtractOrder, async (req, res, next) => {
     try {
-      if (!ensureAiEnabled(res)) return;
+      // NOTE: Do NOT check ensureAiEnabled here — Tesseract.js works locally
+      // without Gemini API key, so extraction should always be available.
       const payload = extractOrderSchema.parse(req.body);
 
       if (!enforceDailyLimit(req, res)) return;
@@ -707,7 +712,28 @@ export function aiRoutes(env: Env): Router {
 
       // extractOrderDetailsWithAi now works without Gemini via Tesseract.js
       // fallback, so we no longer need to bypass in E2E or non-Gemini mode.
-      const result = await extractOrderDetailsWithAi(env, { imageBase64: payload.imageBase64 });
+      let result: any;
+      try {
+        result = await extractOrderDetailsWithAi(env, { imageBase64: payload.imageBase64 });
+      } catch (extractErr) {
+        // GRACEFUL DEGRADATION: Never return 500 for extraction failures.
+        // Return an empty result so the client-side can let user fill in details manually.
+        const errMsg = extractErr instanceof Error ? extractErr.message : String(extractErr);
+        businessLog.warn(`[AI] Extraction pipeline error for user ${req.auth?.userId}: ${errMsg}`, {
+          actorUserId: req.auth?.userId,
+          error: errMsg,
+          ip: req.ip,
+        });
+        result = {
+          orderId: null,
+          amount: null,
+          orderDate: null,
+          soldBy: null,
+          productName: null,
+          confidenceScore: 0,
+          notes: `Extraction encountered an issue: ${errMsg.slice(0, 200)}. Please enter details manually.`,
+        };
+      }
 
       // Audit trail: record AI order extraction for backtracking
       writeAuditLog({
@@ -736,9 +762,44 @@ export function aiRoutes(env: Env): Router {
 
       res.json(result);
     } catch (err) {
+      // Only ZodError (bad request) or rate limit errors will reach here.
+      // Extraction errors are caught above and returned as graceful empty results.
       logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'EXTERNAL_SERVICE', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'ai/extract-order' } });
-      if (!sendKnownError(err, res)) next(err);
+      if (!sendKnownError(err, res)) {
+        // Last resort: still return a graceful empty result instead of 500
+        res.json({
+          orderId: null,
+          amount: null,
+          orderDate: null,
+          soldBy: null,
+          productName: null,
+          confidenceScore: 0,
+          notes: 'An unexpected error occurred. Please enter your order details manually.',
+        });
+      }
     }
   });
+
+  // ── AI Health Check ──
+  // GET /api/ai/status — returns current AI subsystem status without requiring auth.
+  // Useful for diagnosing production issues (is Gemini key set? circuit breaker state? Tesseract ready?).
+  router.get('/status', async (_req, res) => {
+    try {
+      const geminiConfigured = isGeminiConfigured(env);
+      const geminiKeyCheck = geminiConfigured ? await checkGeminiApiKey(env).catch(() => ({ ok: false, model: '', error: 'check failed' })) : { ok: false, model: '', error: 'not configured' };
+      res.json({
+        aiEnabled: env.AI_ENABLED,
+        geminiConfigured,
+        geminiKeyValid: geminiKeyCheck.ok,
+        geminiModel: geminiKeyCheck.model || null,
+        geminiError: geminiKeyCheck.error || null,
+        tesseractAvailable: true,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'Health check failed', message: String(err) });
+    }
+  });
+
   return router;
 }

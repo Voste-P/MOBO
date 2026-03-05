@@ -92,6 +92,11 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
   // Orders can remain UNDER_REVIEW even after purchase verification if review/rating is still pending.
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
+  const [ticketFilter, setTicketFilter] = useState<'All' | 'Open' | 'Resolved' | 'Rejected'>('All');
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [ticketPriorityFilter, setTicketPriorityFilter] = useState<string>('All');
+  const [resolvingTicketId, setResolvingTicketId] = useState<string | null>(null);
+  const [resolutionNote, setResolutionNote] = useState('');
 
   const actionRequiredOrders = useMemo(() =>
     orders.filter((o: Order) => String(o.workflowStatus || '') === 'UNDER_REVIEW')
@@ -563,10 +568,73 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
       <section>
         <div className="flex items-center justify-between mb-3 px-1">
           <h3 className="font-bold text-base text-zinc-900 tracking-tight">Tickets</h3>
-          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600">
-            {Array.isArray(tickets) ? tickets.length : 0}
-          </span>
+          <div className="flex items-center gap-2">
+            {tickets && tickets.length > 0 && (
+              <button type="button" onClick={() => {
+                const supportTickets = tickets.filter((t: Ticket) => t.issueType !== 'Feedback');
+                if (!supportTickets.length) { toast.error('No tickets to export'); return; }
+                const headers = ['Ticket ID', 'Status', 'Priority', 'Issue Type', 'Description', 'User', 'Role', 'Order ID', 'Resolution Note', 'Resolved By', 'Resolved At', 'Created At'];
+                const rows = supportTickets.map((t: Ticket) => [
+                  t.id.slice(-8), String(t.status), String((t as any).priority || 'medium'), String(t.issueType), String(t.description || ''),
+                  String((t as any).userName || ''), String((t as any).role || ''), String(t.orderId || ''),
+                  String((t as any).resolutionNote || ''), String((t as any).resolvedByName || ''),
+                  (t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString() : '',
+                  t.createdAt ? new Date(t.createdAt).toLocaleDateString() : '',
+                ]);
+                downloadCsv(`mediator-tickets-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+                toast.success(`Exported ${supportTickets.length} tickets`);
+              }} className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100">
+                Export CSV
+              </button>
+            )}
+            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600">
+              {Array.isArray(tickets) ? tickets.length : 0}
+            </span>
+          </div>
         </div>
+        {/* Status filter tabs */}
+        {tickets && tickets.length > 0 && (
+          <>
+          {/* Search */}
+          <div className="mb-2">
+            <input type="text" placeholder="Search tickets..." value={ticketSearch} onChange={e => setTicketSearch(e.target.value)}
+              className="w-full px-3 py-1.5 text-[11px] rounded-lg border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+          </div>
+          <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+            {(['All', 'Open', 'Resolved', 'Rejected'] as const).map(f => {
+              const count = f === 'All' ? tickets.length : tickets.filter((t: Ticket) => String(t.status) === f).length;
+              return (
+                <button key={f} type="button" onClick={() => setTicketFilter(f)}
+                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all ${
+                    ticketFilter === f
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                      : 'bg-white text-zinc-600 border-zinc-200 hover:border-indigo-300'
+                  }`}>
+                  {f} ({count})
+                </button>
+              );
+            })}
+          </div>
+          {/* Priority filter */}
+          <div className="flex items-center gap-1 mb-3 flex-wrap">
+            <span className="text-[9px] font-bold text-zinc-400 mr-1">Priority:</span>
+            {['All', 'urgent', 'high', 'medium', 'low'].map(p => (
+              <button key={p} type="button" onClick={() => setTicketPriorityFilter(p)}
+                className={`px-2 py-0.5 rounded-full text-[9px] font-bold border transition-all ${
+                  ticketPriorityFilter === p
+                    ? p === 'urgent' ? 'bg-red-500 text-white border-red-500' :
+                      p === 'high' ? 'bg-orange-500 text-white border-orange-500' :
+                      p === 'medium' ? 'bg-blue-500 text-white border-blue-500' :
+                      p === 'low' ? 'bg-slate-500 text-white border-slate-500' :
+                      'bg-zinc-800 text-white border-zinc-800'
+                    : 'bg-white text-zinc-500 border-zinc-200'
+                }`}>
+                {p === 'All' ? 'All' : p.charAt(0).toUpperCase() + p.slice(1)}
+              </button>
+            ))}
+          </div>
+          </>
+        )}
         {(!tickets || tickets.length === 0) ? (
           <EmptyState
             title="No tickets"
@@ -574,39 +642,155 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
             icon={<HelpCircle size={22} className="text-zinc-400" />}
           />
         ) : (
-          <div className="space-y-2">
-            {tickets.slice(0, 10).map((t: Ticket) => (
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto scrollbar-styled">
+            {tickets.filter((t: Ticket) => {
+              if (ticketFilter !== 'All' && String(t.status) !== ticketFilter) return false;
+              if (ticketPriorityFilter !== 'All' && String(t.priority || 'medium') !== ticketPriorityFilter) return false;
+              if (ticketSearch.trim()) {
+                const q = ticketSearch.trim().toLowerCase();
+                return (String(t.issueType || '').toLowerCase().includes(q) ||
+                  String(t.description || '').toLowerCase().includes(q) ||
+                  String((t as any).userName || '').toLowerCase().includes(q) ||
+                  String(t.orderId || '').toLowerCase().includes(q) ||
+                  t.id.toLowerCase().includes(q));
+              }
+              return true;
+            }).map((t: Ticket) => (
               <div
                 key={t.id}
-                className="flex items-center justify-between gap-2 rounded-xl border border-zinc-100 bg-white px-3 py-2 shadow-sm"
+                className="rounded-xl border border-zinc-100 bg-white px-3 py-3 shadow-sm space-y-2"
               >
-                <div className="min-w-0">
-                  <div className="text-[11px] font-bold text-zinc-900 truncate">
-                    {String(t.issueType || 'Ticket')}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-zinc-900 truncate">{String(t.issueType || 'Ticket')}</span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                        String(t.status) === 'Resolved' ? 'bg-emerald-50 text-emerald-600' :
+                        String(t.status) === 'Rejected' ? 'bg-red-50 text-red-600' :
+                        'bg-amber-50 text-amber-600'
+                      }`}>{String(t.status || 'Open')}</span>
+                    </div>
+                    {t.priority && <div className="text-[9px] text-zinc-400 mt-0.5">Priority: {String(t.priority)}</div>}
                   </div>
-                  <div className="text-[10px] text-zinc-500 truncate">
-                    Status: {String(t.status || '')}
-                  </div>
+                  <span className="text-[9px] text-zinc-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      if (String(t.status || '').toLowerCase() === 'open') {
-                        toast.error('Ticket must be resolved or rejected before deletion.');
-                        return;
-                      }
-                      await api.tickets.delete(t.id);
-                      toast.success('Ticket deleted.');
-                      onRefresh();
-                    } catch (err: any) {
-                      toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
-                    }
-                  }}
-                  className="px-3 py-1 rounded-lg text-[10px] font-bold bg-zinc-50 border border-zinc-200 text-zinc-600 hover:text-red-600 hover:border-red-200"
-                >
-                  Delete
-                </button>
+                {t.description && (
+                  <div className="text-[10px] text-zinc-600 bg-zinc-50 rounded-lg px-2 py-1.5 line-clamp-3">
+                    &ldquo;{String(t.description)}&rdquo;
+                  </div>
+                )}
+                {(t as any).userName && (
+                  <div className="text-[9px] text-zinc-400">From: {String((t as any).userName)} ({String((t as any).userRole || '')})</div>
+                )}
+                {t.orderId && (
+                  <div className="text-[9px] text-zinc-400"><span className="font-bold">Order:</span> {String(t.orderId)}</div>
+                )}
+                {(t as any).resolutionNote && (
+                  <div className="text-[10px] text-green-700 bg-green-50 rounded-lg px-2 py-1.5">
+                    <span className="font-bold">Resolution:</span> {String((t as any).resolutionNote)}
+                  </div>
+                )}
+                {(String(t.status) === 'Resolved' || String(t.status) === 'Rejected') && ((t as any).resolvedByName || (t as any).resolvedAt) && (
+                  <div className="text-[9px] text-zinc-400">
+                    {String(t.status) === 'Resolved' ? 'Resolved' : 'Rejected'}
+                    {(t as any).resolvedByName ? ` by ${String((t as any).resolvedByName)}` : ''}
+                    {(t as any).resolvedAt ? ` on ${new Date(String((t as any).resolvedAt)).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
+                  </div>
+                )}
+                <div className="flex items-center gap-1.5 justify-end">
+                  {String(t.status || '').toLowerCase() === 'open' && (
+                    <>
+                      {resolvingTicketId === t.id ? (
+                        <div className="w-full space-y-1.5">
+                          <textarea
+                            value={resolutionNote}
+                            onChange={e => setResolutionNote(e.target.value)}
+                            placeholder="Add a resolution/rejection note (optional)..."
+                            className="w-full px-2 py-1.5 text-[10px] rounded-lg border border-zinc-200 bg-zinc-50 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none"
+                            rows={2}
+                            maxLength={2000}
+                          />
+                          <div className="flex items-center gap-1.5">
+                            <button type="button" onClick={async () => {
+                              try {
+                                await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined);
+                                toast.success('Ticket resolved.');
+                                setResolvingTicketId(null); setResolutionNote('');
+                                onRefresh();
+                              } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
+                            }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
+                              ✓ Resolve
+                            </button>
+                            <button type="button" onClick={async () => {
+                              try {
+                                await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined);
+                                toast.success('Ticket rejected.');
+                                setResolvingTicketId(null); setResolutionNote('');
+                                onRefresh();
+                              } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
+                            }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-50 border border-red-200 text-red-600 hover:bg-red-100">
+                              ✗ Reject
+                            </button>
+                            <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
+                              className="px-2 py-1 rounded-lg text-[10px] font-bold text-zinc-400 hover:text-zinc-600">
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <button type="button" onClick={() => { setResolvingTicketId(t.id); setResolutionNote(''); }}
+                            className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
+                            ✓ Resolve / Reject
+                          </button>
+                          <button type="button" onClick={async () => {
+                            try {
+                              await api.tickets.escalate(t.id);
+                              toast.success('Ticket escalated to agency.');
+                              onRefresh();
+                            } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to escalate.')); }
+                          }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100">
+                            ↑ Escalate
+                          </button>
+                        </>
+                      )}
+                    </>
+                  )}
+                  {String(t.status || '').toLowerCase() !== 'open' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await api.tickets.update(t.id, 'Open');
+                            toast.success('Ticket reopened.');
+                            onRefresh();
+                          } catch (err: any) {
+                            toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100"
+                      >
+                        Reopen
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await api.tickets.delete(t.id);
+                            toast.success('Ticket deleted.');
+                            onRefresh();
+                          } catch (err: any) {
+                            toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-zinc-50 border border-zinc-200 text-zinc-600 hover:text-red-600 hover:border-red-200"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -1448,7 +1632,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-3 scrollbar-hide">
+          <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-3 scrollbar-styled">
             {(viewMode === 'pending' ? pendingOrders : settledOrders).length === 0 ? (
               loading ? (
                 <EmptyState
@@ -1703,7 +1887,7 @@ export const MediatorDashboard: React.FC = () => {
       setDeals(safeDeals);
       setPendingUsers(safePend);
       setVerifiedUsers(safeVer);
-      setTickets(safeTix);
+      setTickets(safeTix.filter((t: Ticket) => t.issueType !== 'Feedback'));
 
       // Keep the open proof-verification modal in sync with realtime order updates
       // (e.g., buyer uploaded a new proof while the modal is open).
@@ -1867,7 +2051,7 @@ export const MediatorDashboard: React.FC = () => {
                     </button>
                   </div>
                 </div>
-                <div className="space-y-2 max-h-[250px] overflow-y-auto scrollbar-hide">
+                <div className="space-y-2 max-h-[250px] overflow-y-auto scrollbar-styled">
                   {inboxNotifications.length === 0 && (
                     <div className="text-center py-6">
                       <p className="text-zinc-300 font-bold text-xs">All caught up!</p>
@@ -1924,7 +2108,7 @@ export const MediatorDashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 scrollbar-hide pb-[calc(7.5rem+env(safe-area-inset-bottom))]">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 scrollbar-styled pb-[calc(7.5rem+env(safe-area-inset-bottom))]">
         {activeTab === 'inbox' && (
           <InboxView
             orders={orders}
@@ -2027,7 +2211,7 @@ export const MediatorDashboard: React.FC = () => {
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide pb-28">
+          <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-styled pb-28">
             {/* 1. ORDER MATCHING SECTION */}
             <div className="bg-zinc-900/50 rounded-2xl border border-zinc-800 p-4">
               <h4 className="text-xs font-bold text-zinc-500 uppercase mb-3 flex items-center gap-2">

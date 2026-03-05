@@ -526,19 +526,67 @@ export const api = {
     /** [FIX] Added missing extractDetails for Orders.tsx */
     extractDetails: async (file: File) => {
       const rawBase64 = await readFileAsDataUrl(file);
-      return fetchJson('/ai/extract-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ imageBase64: rawBase64 }),
-      });
+      // Compress before sending — phone screenshots can be 5-15 MB raw,
+      // exceeding the Vercel proxy 4.5 MB body limit.
+      // Use higher quality for extraction accuracy — OCR needs sharp text.
+      const compressed = await compressImage(rawBase64, { maxDimension: 2400, quality: 0.92 });
+
+      // --- SERVER WARM-UP ---
+      // Render free tier spins down after 15min idle; cold start takes 15-30s.
+      // Wake the server FIRST with a lightweight health check, so extraction
+      // doesn't waste its timeout budget waiting for the container to start.
+      try {
+        const warmupCtrl = new AbortController();
+        const warmupTimer = setTimeout(() => warmupCtrl.abort(), 40_000);
+        await fetch(`${API_URL}/health`, { signal: warmupCtrl.signal, method: 'GET' }).catch(() => {});
+        clearTimeout(warmupTimer);
+      } catch { /* ignore — extraction will retry anyway */ }
+
+      // --- EXTRACTION WITH AUTO-RETRY ---
+      // Attempt extraction up to 2 times. First attempt has generous 60s timeout.
+      // If it fails (cold start, network hiccup), retry once with 60s more.
+      const attemptExtraction = async (timeoutMs: number): Promise<any> => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          return await fetchJson('/ai/extract-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({ imageBase64: compressed }),
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      };
+
+      // First attempt: 60s timeout
+      try {
+        return await attemptExtraction(60_000);
+      } catch (err: any) {
+        const isTimeout = err?.name === 'AbortError' || /timed?\s*out|took too long/i.test(err?.message || '');
+        if (!isTimeout) throw err;
+        // Auto-retry once on timeout (server may have just finished cold-starting)
+        try {
+          return await attemptExtraction(60_000);
+        } catch (retryErr: any) {
+          const isRetryTimeout = retryErr?.name === 'AbortError' || /timed?\s*out|took too long/i.test(retryErr?.message || '');
+          if (isRetryTimeout) {
+            throw new Error('Screenshot analysis timed out after retrying. The server may be under heavy load — please try again in a minute.');
+          }
+          throw retryErr;
+        }
+      }
     },
     /** Pre-validate rating screenshot: checks account name + product name match */
     verifyRating: async (file: File, expectedBuyerName: string, expectedProductName: string, expectedReviewerName?: string) => {
       const rawBase64 = await readFileAsDataUrl(file);
+      // Compress before sending to stay under Vercel proxy body limit.
+      const compressed = await compressImage(rawBase64, { maxDimension: 1600, quality: 0.8 });
       return fetchJson('/ai/verify-rating', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ imageBase64: rawBase64, expectedBuyerName, expectedProductName, ...(expectedReviewerName ? { expectedReviewerName } : {}) }),
+        body: JSON.stringify({ imageBase64: compressed, expectedBuyerName, expectedProductName, ...(expectedReviewerName ? { expectedReviewerName } : {}) }),
       });
     },
   },
@@ -973,17 +1021,24 @@ export const api = {
         headers: { ...authHeaders() },
       }),
     create: async (data: any) => {
-      await fetchOk('/tickets', {
+      return fetchJson('/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify(data),
       });
     },
     update: async (id: string, status: string, resolutionNote?: string) => {
-      await fetchOk(`/tickets/${id}`, {
+      return fetchJson(`/tickets/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ status, ...(resolutionNote ? { resolutionNote } : {}) }),
+      });
+    },
+    escalate: async (id: string) => {
+      return fetchJson(`/tickets/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ status: 'Open', escalate: true }),
       });
     },
     delete: async (id: string) => {
@@ -992,6 +1047,20 @@ export const api = {
         headers: { ...authHeaders() },
       });
     },
+    getById: async (id: string) =>
+      fetchJson(`/tickets/${encodeURIComponent(id)}`, {
+        headers: { ...authHeaders() },
+      }),
+    getComments: async (ticketId: string) =>
+      fetchJson(`/tickets/${encodeURIComponent(ticketId)}/comments`, {
+        headers: { ...authHeaders() },
+      }),
+    addComment: async (ticketId: string, message: string) =>
+      fetchJson(`/tickets/${encodeURIComponent(ticketId)}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ message }),
+      }),
   },
   /** AI-powered features for chat and proof verification */
   ai: {

@@ -45,6 +45,7 @@ import {
   ExternalLink,
   AlertCircle,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -205,6 +206,12 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   // Filters
   const [userRoleFilter, setUserRoleFilter] = useState<string>('All');
   const [userSearch, setUserSearch] = useState('');
+  const [ticketRoleFilter, setTicketRoleFilter] = useState<string>('All');
+  const [ticketStatusFilter, setTicketStatusFilter] = useState<string>('All');
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [ticketPriorityFilter, setTicketPriorityFilter] = useState<string>('All');
+  const [resolvingTicketId, setResolvingTicketId] = useState<string | null>(null);
+  const [resolutionNote, setResolutionNote] = useState('');
   const [inviteRole, setInviteRole] = useState<'agency' | 'brand'>('agency');
   const [inviteLabel, setInviteLabel] = useState('');
 
@@ -530,11 +537,13 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     }
   };
 
-  const resolveTicket = async (id: string, status: 'Resolved' | 'Rejected') => {
+  const resolveTicket = async (id: string, status: 'Resolved' | 'Rejected', note?: string) => {
     try {
-      await api.tickets.update(id, status);
-      setTickets(tickets.map((t) => (t.id === id ? { ...t, status } : t)));
+      await api.tickets.update(id, status, note || undefined);
+      setTickets(tickets.map((t) => (t.id === id ? { ...t, status, resolutionNote: note || undefined } : t)));
       toast.success(`Ticket ${status.toLowerCase()} successfully`);
+      setResolvingTicketId(null);
+      setResolutionNote('');
     } catch (e: any) {
       toast.error(formatErrorMessage(e, `Failed to ${status.toLowerCase()} ticket`));
     }
@@ -556,6 +565,39 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     } catch (e: any) {
       toast.error(formatErrorMessage(e, 'Failed to delete ticket'));
     }
+  };
+
+  const reopenTicket = async (id: string) => {
+    try {
+      await api.tickets.update(id, 'Open');
+      setTickets(tickets.map((t) => (t.id === id ? { ...t, status: 'Open' as const } : t)));
+      toast.success('Ticket reopened');
+    } catch (e: any) {
+      toast.error(formatErrorMessage(e, 'Failed to reopen ticket'));
+    }
+  };
+
+  const exportTicketsCsv = () => {
+    const supportTickets = tickets.filter((t) => t.issueType !== 'Feedback');
+    if (supportTickets.length === 0) { toast.error('No tickets to export'); return; }
+    const header = ['Ticket ID', 'Status', 'Priority', 'Issue Type', 'Description', 'User', 'Role', 'Target Role', 'Order ID', 'Resolution Note', 'Resolved By', 'Resolved At', 'Created At'].map(csvSafe).join(',');
+    const rows = supportTickets.map((t) => [
+      csvSafe(t.id.slice(-8)),
+      csvSafe(t.status),
+      csvSafe((t as any).priority || 'medium'),
+      csvSafe(t.issueType),
+      csvSafe(t.description),
+      csvSafe(t.userName),
+      csvSafe(t.role || ''),
+      csvSafe((t as any).targetRole || ''),
+      csvSafe(t.orderId || ''),
+      csvSafe((t as any).resolutionNote || ''),
+      csvSafe((t as any).resolvedByName || ''),
+      csvSafe((t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString() : ''),
+      csvSafe(t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''),
+    ].join(','));
+    downloadCsv(`tickets_${new Date().toISOString().slice(0, 10)}.csv`, [header, ...rows].join('\n'));
+    toast.success(`Exported ${supportTickets.length} tickets`);
   };
 
   const deleteInvite = async (code: string) => {
@@ -1165,6 +1207,29 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
             {/* SUPPORT VIEW */}
             {view === 'support' && (() => {
               const supportTickets = tickets.filter((t) => t.issueType !== 'Feedback');
+              const filteredTickets = supportTickets.filter((t) => {
+                if (ticketRoleFilter !== 'All' && (t.role || '').toLowerCase() !== ticketRoleFilter.toLowerCase()) return false;
+                if (ticketStatusFilter !== 'All' && t.status !== ticketStatusFilter) return false;
+                if (ticketPriorityFilter !== 'All' && ((t as any).priority || 'medium') !== ticketPriorityFilter) return false;
+                if (ticketSearch.trim()) {
+                  const q = ticketSearch.trim().toLowerCase();
+                  if (
+                    !(t.issueType || '').toLowerCase().includes(q) &&
+                    !(t.description || '').toLowerCase().includes(q) &&
+                    !(t.userName || '').toLowerCase().includes(q) &&
+                    !(t.orderId || '').toLowerCase().includes(q) &&
+                    !t.id.toLowerCase().includes(q)
+                  ) return false;
+                }
+                return true;
+              });
+              const roleCounts = {
+                All: supportTickets.length,
+                Shopper: supportTickets.filter((t) => (t.role || '').toLowerCase() === 'shopper').length,
+                Mediator: supportTickets.filter((t) => (t.role || '').toLowerCase() === 'mediator').length,
+                Agency: supportTickets.filter((t) => (t.role || '').toLowerCase() === 'agency').length,
+                Brand: supportTickets.filter((t) => (t.role || '').toLowerCase() === 'brand').length,
+              };
               return (
               <div className="space-y-6 animate-enter">
                 <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between">
@@ -1179,12 +1244,81 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       </p>
                     </div>
                   </div>
-                  <div className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-xl text-xs font-bold">
-                    {supportTickets.filter((t) => t.status === 'Open').length} Pending
+                  <div className="flex items-center gap-2">
+                    <div className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-xl text-xs font-bold">
+                      {filteredTickets.filter((t) => t.status === 'Open').length} Pending
+                    </div>
+                    <button type="button" onClick={exportTicketsCsv} className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-all">
+                      Export CSV
+                    </button>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                {/* Search Bar */}
+                <input
+                  type="text"
+                  value={ticketSearch}
+                  onChange={(e) => setTicketSearch(e.target.value)}
+                  placeholder="Search tickets by name, issue, description, order ID..."
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 transition-all"
+                />
+
+                {/* Role Filter Tabs */}
+                <div className="flex flex-wrap gap-2">
+                  {(['All', 'Shopper', 'Mediator', 'Agency', 'Brand'] as const).map((role) => (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => setTicketRoleFilter(role)}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                        ticketRoleFilter === role
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'bg-white text-slate-500 border border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+                      }`}
+                    >
+                      {role} {roleCounts[role] > 0 ? `(${roleCounts[role]})` : ''}
+                    </button>
+                  ))}
+                  <div className="ml-auto flex gap-2">
+                    {(['All', 'Open', 'Resolved', 'Rejected'] as const).map((status) => (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() => setTicketStatusFilter(status)}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
+                          ticketStatusFilter === status
+                            ? status === 'Open' ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                              : status === 'Resolved' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                              : status === 'Rejected' ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                              : 'bg-slate-800 text-white'
+                            : 'bg-white text-slate-400 border border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Priority Filter */}
+                <div className="flex flex-wrap gap-1.5">
+                  {(['All', 'urgent', 'high', 'medium', 'low'] as const).map((p) => (
+                    <button key={p} type="button" onClick={() => setTicketPriorityFilter(p)}
+                      className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all border ${
+                        ticketPriorityFilter === p
+                          ? p === 'urgent' ? 'bg-red-500 text-white border-red-500' :
+                            p === 'high' ? 'bg-orange-500 text-white border-orange-500' :
+                            p === 'medium' ? 'bg-blue-500 text-white border-blue-500' :
+                            p === 'low' ? 'bg-slate-500 text-white border-slate-500' :
+                            'bg-slate-700 text-white border-slate-700'
+                          : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
+                      }`}>
+                      {p === 'All' ? 'All Priorities' : p.charAt(0).toUpperCase() + p.slice(1)}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 max-h-[70vh] overflow-y-auto scrollbar-styled">
                   {isLoading ? (
                     <div className="col-span-full">
                       <EmptyState
@@ -1194,16 +1328,16 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         className="border-slate-200"
                       />
                     </div>
-                  ) : supportTickets.length === 0 ? (
+                  ) : filteredTickets.length === 0 ? (
                     <div className="col-span-full">
                       <EmptyState
                         title="No tickets"
-                        description="When users raise disputes or issues, they'll appear here."
+                        description={ticketRoleFilter !== 'All' || ticketStatusFilter !== 'All' ? 'No tickets match the current filters.' : 'When users raise disputes or issues, they\'ll appear here.'}
                         className="border-slate-200"
                       />
                     </div>
                   ) : (
-                    supportTickets.map((t) => (
+                    filteredTickets.map((t) => (
                       <div
                         key={t.id}
                         className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col hover:shadow-md transition-all"
@@ -1215,6 +1349,15 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                                 #{t.id.slice(-6)}
                               </span>
                               <StatusBadge status={t.status} />
+                              {(t as any).priority && (t as any).priority !== 'medium' && (
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                  (t as any).priority === 'urgent' ? 'bg-red-100 text-red-600'
+                                  : (t as any).priority === 'high' ? 'bg-orange-100 text-orange-600'
+                                  : 'bg-slate-100 text-slate-500'
+                                }`}>
+                                  {(t as any).priority}
+                                </span>
+                              )}
                             </div>
                             <h4 className="font-bold text-slate-900 text-sm">{t.issueType}</h4>
                           </div>
@@ -1227,7 +1370,18 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                           <p className="text-xs text-slate-600 font-medium leading-relaxed">
                             "{t.description}"
                           </p>
+                          {t.orderId && (
+                            <p className="text-[10px] text-slate-400 mt-1.5"><span className="font-bold">Order:</span> {t.orderId}</p>
+                          )}
                         </div>
+
+                        {/* Resolution Note */}
+                        {t.status !== 'Open' && (t as any).resolutionNote && (
+                          <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-xl mb-4">
+                            <p className="text-[10px] font-bold text-emerald-700 uppercase mb-1">Resolution Note</p>
+                            <p className="text-xs text-emerald-600 font-medium">{(t as any).resolutionNote}</p>
+                          </div>
+                        )}
 
                         <div className="flex items-center justify-between mt-auto">
                           <div className="flex items-center gap-2">
@@ -1236,33 +1390,43 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                             </div>
                             <div className="text-[10px]">
                               <p className="font-bold text-slate-900">{t.userName}</p>
-                              <p className="text-slate-400 font-mono capitalize">{t.role || 'User'}</p>
+                              <p className="text-slate-400 font-mono capitalize">{t.role || 'User'} → {(t as any).targetRole || 'admin'}</p>
                             </div>
                           </div>
 
-                          {t.status === 'Open' && (
+                          {t.status === 'Open' && resolvingTicketId !== t.id && (
                             <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => resolveTicket(t.id, 'Resolved')}
-                                className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors"
-                                title="Resolve"
-                              >
+                              <button type="button" onClick={() => { setResolvingTicketId(t.id); setResolutionNote(''); }}
+                                className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors" title="Resolve / Reject">
                                 <CheckCircle2 size={16} />
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => resolveTicket(t.id, 'Rejected')}
-                                className="p-2 bg-slate-100 text-slate-400 rounded-lg hover:bg-rose-100 hover:text-rose-500 transition-colors"
-                                title="Reject"
-                              >
-                                <XCircle size={16} />
-                              </button>
+                            </div>
+                          )}
+                          {t.status === 'Open' && resolvingTicketId === t.id && (
+                            <div className="w-full mt-1 space-y-1.5">
+                              <textarea placeholder="Resolution / rejection note (optional)..." value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} rows={2}
+                                className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
+                              <div className="flex items-center gap-2">
+                                <button type="button" onClick={() => resolveTicket(t.id, 'Resolved', resolutionNote)}
+                                  className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✓ Resolve</button>
+                                <button type="button" onClick={() => resolveTicket(t.id, 'Rejected', resolutionNote)}
+                                  className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
+                                <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
+                                  className="px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 hover:bg-slate-200">Cancel</button>
+                              </div>
                             </div>
                           )}
 
                           {t.status !== 'Open' && (
                             <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => reopenTicket(t.id)}
+                                className="p-2 bg-amber-100 text-amber-600 rounded-lg hover:bg-amber-200 transition-colors"
+                                title="Reopen"
+                              >
+                                <RefreshCw size={16} />
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => deleteTicket(t.id)}
@@ -1448,7 +1612,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     )}
                   </div>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto max-h-[70vh] overflow-y-auto scrollbar-styled">
                   <table className="w-full text-left">
                     <thead className="bg-slate-50/80 text-xs font-extrabold uppercase text-slate-400 tracking-wider sticky top-0 z-10 backdrop-blur-sm">
                       <tr>
@@ -1699,7 +1863,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   </select>
                   <span className="text-xs text-slate-400 font-bold">{filteredOrders.length} orders</span>
                 </div>
-                <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                <div className="overflow-x-auto max-h-[600px] overflow-y-auto scrollbar-styled">
                   <table className="w-full text-left">
                     <thead className="bg-slate-50/80 text-xs font-extrabold uppercase text-slate-400 tracking-wider sticky top-0 z-10">
                       <tr>
@@ -1770,8 +1934,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     className="text-sm"
                   />
                 </div>
+                <div className="overflow-x-auto max-h-[70vh] overflow-y-auto scrollbar-styled">
                 <table className="w-full text-left">
-                  <thead className="bg-slate-50 text-xs font-extrabold uppercase text-slate-400 tracking-wider">
+                  <thead className="bg-slate-50 text-xs font-extrabold uppercase text-slate-400 tracking-wider sticky top-0 z-10">
                     <tr>
                       <th className="p-5">Product</th>
                       <th className="p-5">Category</th>
@@ -1825,6 +1990,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
 
@@ -1942,9 +2108,10 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   />
                 </div>
                 <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto max-h-[70vh] overflow-y-auto scrollbar-styled">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200">
+                      <tr className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
                         <th className="p-4 text-left text-[10px] font-bold text-slate-400 uppercase">Time</th>
                         <th className="p-4 text-left text-[10px] font-bold text-slate-400 uppercase">Action</th>
                         <th className="p-4 text-left text-[10px] font-bold text-slate-400 uppercase">Entity</th>
@@ -1995,6 +2162,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       )}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               </div>
             )}
@@ -2004,7 +2172,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       {/* Proof Viewer Modal */}
       {proofModal && (
         <div className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => { setProofModal(null); }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto scrollbar-styled" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
               <div>
                 <h3 className="font-extrabold text-lg text-slate-900">Order Proofs</h3>

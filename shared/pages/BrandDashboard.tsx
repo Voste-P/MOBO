@@ -50,12 +50,13 @@ import {
   Package,
   FileSpreadsheet,
   Sparkles,
+  HelpCircle,
 } from 'lucide-react';
 import { api, asArray } from '../services/api';
 import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
-import { User, Campaign, Order } from '../types';
+import { User, Campaign, Order, Ticket } from '../types';
 import { EmptyState, Spinner } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
@@ -79,7 +80,7 @@ import {
 } from '../components/LazyCharts';
 
 // --- TYPES ---
-type Tab = 'dashboard' | 'agencies' | 'campaigns' | 'requests' | 'orders' | 'profile';
+type Tab = 'dashboard' | 'agencies' | 'campaigns' | 'requests' | 'orders' | 'tickets' | 'profile';
 
 // formatCurrency, getPrimaryOrderId, csvSafe, downloadCsv imported from shared/utils
 
@@ -982,7 +983,7 @@ const OrdersView = ({ user }: any) => {
         </div>
 
         <div className="bg-white rounded-[2.5rem] border border-zinc-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto scrollbar-styled">
 
             {/* === ORDERS VIEW (default) === */}
             {orderViewMode === 'orders' && (
@@ -1246,7 +1247,7 @@ const OrdersView = ({ user }: any) => {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto scrollbar-hide space-y-6 pr-2">
+            <div className="flex-1 overflow-y-auto scrollbar-styled space-y-6 pr-2">
               {/* Product Summary */}
               <div className="flex gap-4 p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
                 <ProxiedImage
@@ -1644,7 +1645,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
           </h1>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1 overflow-y-auto scrollbar-hide">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1 overflow-y-auto scrollbar-styled">
           {/* FORM COLUMN */}
           <div className="lg:col-span-2 bg-white p-10 rounded-[2.5rem] shadow-xl border border-zinc-100">
             <form onSubmit={handleCreate} className="space-y-10">
@@ -2154,21 +2155,29 @@ export const BrandDashboard: React.FC = () => {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [sheetsExporting, setSheetsExporting] = useState(false);
   const [ticketOpen, setTicketOpen] = useState(false);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [ticketFilter, setTicketFilter] = useState<'All' | 'Open' | 'Resolved' | 'Rejected'>('All');
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [ticketPriorityFilter, setTicketPriorityFilter] = useState('All');
+  const [resolvingTicketId, setResolvingTicketId] = useState<string | null>(null);
+  const [resolutionNote, setResolutionNote] = useState('');
 
   const fetchData = async () => {
     if (!user) return;
     setIsDataLoading(true);
     try {
-      const [camps, ags, ords, txns] = await Promise.all([
+      const [camps, ags, ords, txns, tix] = await Promise.all([
         api.brand.getBrandCampaigns(user.id),
         api.brand.getConnectedAgencies(user.id),
         api.brand.getBrandOrders(user.name),
         api.brand.getTransactions(user.id),
+        api.tickets.getAll().catch(() => []),
       ]);
       setCampaigns(asArray(camps));
       setAgencies(asArray(ags));
       setOrders(asArray(ords));
       setTransactions(asArray(txns));
+      setTickets(asArray<Ticket>(tix).filter((t: Ticket) => t.issueType !== 'Feedback'));
     } catch (e) {
       console.error('Dashboard data fetch failed', e);
       toast.error('Failed to load dashboard data');
@@ -2401,6 +2410,16 @@ export const BrandDashboard: React.FC = () => {
                 }}
                 badge={pendingRequests}
               />
+              <SidebarItem
+                icon={<HelpCircle />}
+                label="Tickets"
+                active={activeTab === 'tickets'}
+                onClick={() => {
+                  setActiveTab('tickets');
+                  setIsSidebarOpen(false);
+                }}
+                badge={tickets.filter((t) => String(t.status || '').toLowerCase() === 'open').length}
+              />
             </nav>
             <button
               onClick={() => setTicketOpen(true)}
@@ -2464,6 +2483,210 @@ export const BrandDashboard: React.FC = () => {
         )}
         {activeTab === 'orders' && <OrdersView user={user} />}
         {activeTab === 'profile' && <BrandProfileView />}
+        {activeTab === 'tickets' && (
+          <div className="max-w-3xl mx-auto animate-enter pb-12">
+            <h2 className="text-2xl font-extrabold text-zinc-900 tracking-tight mb-6">Tickets</h2>
+            {/* Export CSV */}
+            {tickets && tickets.length > 0 && (
+              <button type="button" onClick={() => {
+                const supportTickets = tickets.filter(t => t.issueType !== 'Feedback');
+                if (!supportTickets.length) { toast.error('No tickets to export'); return; }
+                const header = ['Ticket ID','Status','Priority','Issue Type','Description','User','Role','Order ID','Resolution Note','Resolved By','Resolved At','Created At'].map(csvSafe).join(',');
+                const rows = supportTickets.map(t => [
+                  csvSafe(t.id.slice(-8)), csvSafe(String(t.status)), csvSafe(String((t as any).priority || 'medium')),
+                  csvSafe(String(t.issueType)), csvSafe(String(t.description || '')), csvSafe(String((t as any).userName || '')),
+                  csvSafe(String((t as any).role || '')), csvSafe(String(t.orderId || '')),
+                  csvSafe(String((t as any).resolutionNote || '')), csvSafe(String((t as any).resolvedByName || '')),
+                  csvSafe((t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString() : ''),
+                  csvSafe(t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''),
+                ].join(','));
+                downloadCsv(`brand-tickets-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...rows].join('\n'));
+                toast.success(`Exported ${supportTickets.length} tickets`);
+              }} className="mb-4 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-all">
+                Export Tickets CSV
+              </button>
+            )}
+            {/* Search + Status + Priority filter */}
+            {tickets && tickets.length > 0 && (
+              <>
+              <div className="mb-2">
+                <input type="text" placeholder="Search tickets..." value={ticketSearch} onChange={e => setTicketSearch(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs rounded-lg border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+              </div>
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                {(['All', 'Open', 'Resolved', 'Rejected'] as const).map(f => {
+                  const count = f === 'All' ? tickets.length : tickets.filter(t => String(t.status) === f).length;
+                  return (
+                    <button key={f} type="button" onClick={() => setTicketFilter(f)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                        ticketFilter === f
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                          : 'bg-white text-zinc-600 border-zinc-200 hover:border-indigo-300'
+                      }`}>
+                      {f} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-1.5 mb-4 flex-wrap">
+                <span className="text-[10px] font-bold text-zinc-400 mr-1">Priority:</span>
+                {['All', 'urgent', 'high', 'medium', 'low'].map(p => (
+                  <button key={p} type="button" onClick={() => setTicketPriorityFilter(p)}
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
+                      ticketPriorityFilter === p
+                        ? p === 'urgent' ? 'bg-red-500 text-white border-red-500' :
+                          p === 'high' ? 'bg-orange-500 text-white border-orange-500' :
+                          p === 'medium' ? 'bg-blue-500 text-white border-blue-500' :
+                          p === 'low' ? 'bg-slate-500 text-white border-slate-500' :
+                          'bg-zinc-800 text-white border-zinc-800'
+                        : 'bg-white text-zinc-500 border-zinc-200'
+                    }`}>
+                    {p === 'All' ? 'All' : p.charAt(0).toUpperCase() + p.slice(1)}
+                  </button>
+                ))}
+              </div>
+              </>
+            )}
+            {(!tickets || tickets.length === 0) ? (
+              <EmptyState
+                title="No tickets"
+                description="Support tickets assigned to your brand will appear here."
+                icon={<HelpCircle size={22} className="text-zinc-400" />}
+              />
+            ) : (
+              <div className="space-y-3 max-h-[65vh] overflow-y-auto scrollbar-styled">
+                {tickets.filter((t: Ticket) => {
+                  if (ticketFilter !== 'All' && String(t.status) !== ticketFilter) return false;
+                  if (ticketPriorityFilter !== 'All' && String(t.priority || 'medium') !== ticketPriorityFilter) return false;
+                  if (ticketSearch.trim()) {
+                    const q = ticketSearch.trim().toLowerCase();
+                    return (String(t.issueType || '').toLowerCase().includes(q) ||
+                      String(t.description || '').toLowerCase().includes(q) ||
+                      String((t as any).userName || '').toLowerCase().includes(q) ||
+                      String(t.orderId || '').toLowerCase().includes(q) ||
+                      t.id.toLowerCase().includes(q));
+                  }
+                  return true;
+                }).map((t: Ticket) => (
+                  <div key={t.id} className="rounded-xl border border-zinc-100 bg-white px-3 py-3 shadow-sm space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-zinc-900 truncate">{String(t.issueType || 'Ticket')}</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            String(t.status) === 'Resolved' ? 'bg-emerald-50 text-emerald-600' :
+                            String(t.status) === 'Rejected' ? 'bg-red-50 text-red-600' :
+                            'bg-amber-50 text-amber-600'
+                          }`}>{String(t.status || 'Open')}</span>
+                        </div>
+                        {t.priority && <div className="text-[10px] text-zinc-400 mt-0.5">Priority: {String(t.priority)}</div>}
+                      </div>
+                      <span className="text-[10px] text-zinc-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''}</span>
+                    </div>
+                    {t.description && (
+                      <div className="text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2 line-clamp-3">
+                        &ldquo;{String(t.description)}&rdquo;
+                      </div>
+                    )}
+                    {(t as any).userName && (
+                      <div className="text-[10px] text-zinc-400">From: {String((t as any).userName)} ({String((t as any).userRole || '')})</div>
+                    )}
+                    {t.orderId && (
+                      <div className="text-[10px] text-zinc-400"><span className="font-bold">Order:</span> {String(t.orderId)}</div>
+                    )}
+                    {(t as any).resolutionNote && (
+                      <div className="text-[10px] text-green-700 bg-green-50 rounded-lg px-2 py-1.5">
+                        <span className="font-bold">Resolution:</span> {String((t as any).resolutionNote)}
+                      </div>
+                    )}
+                    {(String(t.status) === 'Resolved' || String(t.status) === 'Rejected') && ((t as any).resolvedByName || (t as any).resolvedAt) && (
+                      <div className="text-[10px] text-zinc-400">
+                        {String(t.status) === 'Resolved' ? 'Resolved' : 'Rejected'}
+                        {(t as any).resolvedByName ? ` by ${String((t as any).resolvedByName)}` : ''}
+                        {(t as any).resolvedAt ? ` on ${new Date(String((t as any).resolvedAt)).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 justify-end flex-wrap">
+                      {String(t.status || '').toLowerCase() === 'open' && resolvingTicketId !== t.id && (
+                        <>
+                          <button type="button" onClick={() => { setResolvingTicketId(t.id); setResolutionNote(''); }}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
+                            ✓ Resolve / Reject
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await api.tickets.escalate(t.id);
+                                toast.success('Ticket escalated to admin.');
+                                fetchData();
+                              } catch (err: any) {
+                                toast.error(formatErrorMessage(err, 'Failed to escalate ticket.'));
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100"
+                          >
+                            ↑ Escalate
+                          </button>
+                        </>
+                      )}
+                      {String(t.status || '').toLowerCase() === 'open' && resolvingTicketId === t.id && (
+                        <div className="w-full mt-1 space-y-1.5">
+                          <textarea placeholder="Resolution / rejection note (optional)..." value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} rows={2}
+                            className="w-full px-2 py-1.5 text-xs rounded-lg border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
+                          <div className="flex items-center gap-2">
+                            <button type="button" onClick={async () => {
+                              try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData(); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
+                            }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✓ Resolve</button>
+                            <button type="button" onClick={async () => {
+                              try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData(); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
+                            }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
+                            <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
+                              className="px-3 py-1 rounded-lg text-xs font-bold bg-zinc-100 text-zinc-500 hover:bg-zinc-200">Cancel</button>
+                          </div>
+                        </div>
+                      )}
+                      {String(t.status || '').toLowerCase() !== 'open' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await api.tickets.update(t.id, 'Open');
+                                toast.success('Ticket reopened.');
+                                fetchData();
+                              } catch (err: any) {
+                                toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100"
+                          >
+                            Reopen
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await api.tickets.delete(t.id);
+                                toast.success('Ticket deleted.');
+                                fetchData();
+                              } catch (err: any) {
+                                toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-zinc-50 border border-zinc-200 text-zinc-600 hover:text-red-600 hover:border-red-200"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {activeTab === 'agencies' && (
           <div className="max-w-6xl mx-auto animate-enter pb-12">
@@ -2557,7 +2780,7 @@ export const BrandDashboard: React.FC = () => {
                 </div>
               </div>
               <div className="bg-white rounded-[2rem] border border-zinc-100 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto scrollbar-styled">
                   <table className="w-full text-left min-w-[600px]">
                     <thead className="bg-zinc-50 text-zinc-400 text-xs font-bold uppercase tracking-wider">
                       <tr>
@@ -2767,7 +2990,7 @@ export const BrandDashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto scrollbar-hide space-y-6">
+            <div className="flex-1 overflow-y-auto scrollbar-styled space-y-6">
               {/* Profile Info */}
               <div className="bg-zinc-50 p-5 rounded-2xl border border-zinc-100 space-y-3">
                 <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 flex items-center gap-2">

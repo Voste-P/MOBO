@@ -11,7 +11,7 @@ import { getApiBaseAbsolute } from '../utils/apiBaseUrl';
 import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
-import { User, Campaign, Order } from '../types';
+import { User, Campaign, Order, Ticket } from '../types';
 import { EmptyState, Spinner } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { DesktopShell } from '../components/DesktopShell';
@@ -64,6 +64,7 @@ import {
   FileSpreadsheet,
   Sparkles,
   Loader2,
+  HelpCircle,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -809,7 +810,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
           ))}
         </div>
 
-        <div className="flex-1 overflow-auto p-0 scrollbar-hide">
+        <div className="flex-1 overflow-auto p-0 scrollbar-styled">
           {/* === LEDGER VIEW === */}
           {financeViewMode === 'ledger' && (<>
           {ledger.length === 0 ? (
@@ -1310,7 +1311,7 @@ const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-0 scrollbar-hide">
+        <div className="flex-1 overflow-auto p-0 scrollbar-styled">
           {payouts.length === 0 ? (
             <div className="p-6">
               {loading ? (
@@ -2045,7 +2046,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
 
       {/* Content Area */}
       <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm flex-1">
-        <div className="overflow-x-auto h-full scrollbar-hide">
+        <div className="overflow-x-auto h-full scrollbar-styled">
           {subTab === 'inventory' ? (
             <table className="w-full text-left">
               <thead className="bg-slate-50 text-slate-400 text-[10px] font-extrabold uppercase tracking-wider sticky top-0 z-10 shadow-sm">
@@ -2352,7 +2353,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
           onClick={() => setCreateModal(false)}
         >
           <div
-            className="bg-white w-[95%] md:w-full max-w-lg rounded-[2rem] p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto scrollbar-hide animate-slide-up"
+            className="bg-white w-[95%] md:w-full max-w-lg rounded-[2rem] p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto scrollbar-styled animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-6">
@@ -2734,7 +2735,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
             </div>
 
             {/* Mediator List */}
-            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide space-y-2 pr-1 mb-2">
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-styled space-y-2 pr-1 mb-2">
               {activeMediatorsForAssign.length === 0 ? (
                 loading ? (
                   <EmptyState
@@ -3076,7 +3077,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
 
       {/* Main List */}
       <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm flex-1">
-        <div className="overflow-x-auto h-full">
+        <div className="overflow-x-auto h-full scrollbar-styled">
           <table className="w-full text-left">
             <thead className="bg-slate-50 text-slate-400 text-[10px] font-extrabold uppercase tracking-wider sticky top-0 z-10 shadow-sm">
               <tr>
@@ -3229,9 +3230,9 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
             </div>
 
             {/* Modal Content */}
-            <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden flex flex-col md:flex-row">
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-styled md:overflow-hidden flex flex-col md:flex-row">
               {/* Order List Side */}
-              <div className="flex-1 overflow-visible md:overflow-y-auto p-6 scrollbar-hide border-r border-slate-100">
+              <div className="flex-1 overflow-visible md:overflow-y-auto p-6 scrollbar-styled border-r border-slate-100">
                 <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                   <FileText size={18} /> Order History
                 </h3>
@@ -3295,7 +3296,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
 
               {/* Payout Action Side */}
               <div className="w-full md:w-[28rem] bg-white p-6 flex flex-col shadow-[inset_10px_0_20px_-15px_rgba(0,0,0,0.05)] min-h-0">
-                <div className="flex-1 min-h-0 overflow-y-auto">
+                <div className="flex-1 min-h-0 overflow-y-auto scrollbar-styled">
                   <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
                     <Wallet size={18} /> Quick Payout
                   </h3>
@@ -3460,7 +3461,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto scrollbar-hide space-y-6 pr-2">
+            <div className="flex-1 overflow-y-auto scrollbar-styled space-y-6 pr-2">
               {/* Product Summary */}
               <div className="flex gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
                 <ProxiedImage
@@ -3724,7 +3725,7 @@ export const AgencyDashboard: React.FC = () => {
   const { toast } = useToast();
   useRealtimeConnection();
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'team' | 'inventory' | 'finance' | 'payouts' | 'brands' | 'profile'
+    'dashboard' | 'team' | 'inventory' | 'finance' | 'payouts' | 'brands' | 'tickets' | 'profile'
   >('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -3736,16 +3737,23 @@ export const AgencyDashboard: React.FC = () => {
   const [payouts, setPayouts] = useState<any[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [ticketOpen, setTicketOpen] = useState(false);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [ticketFilter, setTicketFilter] = useState<'All' | 'Open' | 'Resolved' | 'Rejected'>('All');
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [ticketPriorityFilter, setTicketPriorityFilter] = useState<string>('All');
+  const [resolvingTicketId, setResolvingTicketId] = useState<string | null>(null);
+  const [resolutionNote, setResolutionNote] = useState('');
 
   const fetchData = async () => {
     if (!user?.mediatorCode) return;
     setIsDataLoading(true);
     try {
-      const [meds, camps, ords, ledger] = await Promise.all([
+      const [meds, camps, ords, ledger, tix] = await Promise.all([
         api.ops.getMediators(user.mediatorCode),
         api.ops.getCampaigns(user.mediatorCode),
         api.ops.getMediatorOrders(user.mediatorCode, 'agency'),
         api.ops.getAgencyLedger(),
+        api.tickets.getAll().catch(() => []),
       ]);
       const safeMeds = asArray<User>(meds);
       const safeCamps = asArray<Campaign>(camps);
@@ -3756,6 +3764,7 @@ export const AgencyDashboard: React.FC = () => {
       setCampaigns(safeCamps);
       setOrders(safeOrds);
       setPayouts(safeLedger);
+      setTickets(asArray<Ticket>(tix).filter((t: Ticket) => t.issueType !== 'Feedback'));
 
       const revenue = safeOrds.reduce((sum: number, o: Order) => sum + (o.total || 0), 0);
 
@@ -3908,6 +3917,16 @@ export const AgencyDashboard: React.FC = () => {
                   setIsSidebarOpen(false);
                 }}
               />
+              <SidebarItem
+                icon={<HelpCircle />}
+                label="Tickets"
+                active={activeTab === 'tickets'}
+                onClick={() => {
+                  setActiveTab('tickets');
+                  setIsSidebarOpen(false);
+                }}
+                badge={tickets.filter((t) => String(t.status || '').toLowerCase() === 'open').length}
+              />
             </nav>
           </div>
 
@@ -3984,6 +4003,210 @@ export const AgencyDashboard: React.FC = () => {
         />
       )}
       {activeTab === 'brands' && <BrandsView />}
+      {activeTab === 'tickets' && (
+        <div className="max-w-3xl mx-auto animate-enter pb-12">
+          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-6">Tickets</h2>
+          {/* Export CSV */}
+          {tickets && tickets.length > 0 && (
+            <button type="button" onClick={() => {
+              const supportTickets = tickets.filter(t => t.issueType !== 'Feedback');
+              if (!supportTickets.length) { toast.error('No tickets to export'); return; }
+              const header = ['Ticket ID','Status','Priority','Issue Type','Description','User','Role','Order ID','Resolution Note','Resolved By','Resolved At','Created At'].map(csvSafe).join(',');
+              const rows = supportTickets.map(t => [
+                csvSafe(t.id.slice(-8)), csvSafe(String(t.status)), csvSafe(String((t as any).priority || 'medium')),
+                csvSafe(String(t.issueType)), csvSafe(String(t.description || '')), csvSafe(String((t as any).userName || '')),
+                csvSafe(String((t as any).role || '')), csvSafe(String(t.orderId || '')),
+                csvSafe(String((t as any).resolutionNote || '')), csvSafe(String((t as any).resolvedByName || '')),
+                csvSafe((t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString() : ''),
+                csvSafe(t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''),
+              ].join(','));
+              downloadCsv(`agency-tickets-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...rows].join('\n'));
+              toast.success(`Exported ${supportTickets.length} tickets`);
+            }} className="mb-4 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-all">
+              Export Tickets CSV
+            </button>
+          )}
+          {/* Search + Status + Priority filter */}
+          {tickets && tickets.length > 0 && (
+            <>
+            <div className="mb-2">
+              <input type="text" placeholder="Search tickets..." value={ticketSearch} onChange={e => setTicketSearch(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+            </div>
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              {(['All', 'Open', 'Resolved', 'Rejected'] as const).map(f => {
+                const count = f === 'All' ? tickets.length : tickets.filter(t => String(t.status) === f).length;
+                return (
+                  <button key={f} type="button" onClick={() => setTicketFilter(f)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                      ticketFilter === f
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+                    }`}>
+                    {f} ({count})
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-1.5 mb-4 flex-wrap">
+              <span className="text-[10px] font-bold text-slate-400 mr-1">Priority:</span>
+              {['All', 'urgent', 'high', 'medium', 'low'].map(p => (
+                <button key={p} type="button" onClick={() => setTicketPriorityFilter(p)}
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
+                    ticketPriorityFilter === p
+                      ? p === 'urgent' ? 'bg-red-500 text-white border-red-500' :
+                        p === 'high' ? 'bg-orange-500 text-white border-orange-500' :
+                        p === 'medium' ? 'bg-blue-500 text-white border-blue-500' :
+                        p === 'low' ? 'bg-slate-500 text-white border-slate-500' :
+                        'bg-slate-800 text-white border-slate-800'
+                      : 'bg-white text-slate-500 border-slate-200'
+                  }`}>
+                  {p === 'All' ? 'All' : p.charAt(0).toUpperCase() + p.slice(1)}
+                </button>
+              ))}
+            </div>
+            </>
+          )}
+          {(!tickets || tickets.length === 0) ? (
+            <EmptyState
+              title="No tickets"
+              description="Support tickets assigned to your agency will appear here."
+              icon={<HelpCircle size={22} className="text-slate-400" />}
+            />
+          ) : (
+            <div className="space-y-3 max-h-[65vh] overflow-y-auto scrollbar-styled">
+              {tickets.filter((t: Ticket) => {
+                if (ticketFilter !== 'All' && String(t.status) !== ticketFilter) return false;
+                if (ticketPriorityFilter !== 'All' && String(t.priority || 'medium') !== ticketPriorityFilter) return false;
+                if (ticketSearch.trim()) {
+                  const q = ticketSearch.trim().toLowerCase();
+                  return (String(t.issueType || '').toLowerCase().includes(q) ||
+                    String(t.description || '').toLowerCase().includes(q) ||
+                    String((t as any).userName || '').toLowerCase().includes(q) ||
+                    String(t.orderId || '').toLowerCase().includes(q) ||
+                    t.id.toLowerCase().includes(q));
+                }
+                return true;
+              }).map((t: Ticket) => (
+                <div key={t.id} className="rounded-xl border border-slate-100 bg-white px-3 py-3 shadow-sm space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-slate-900 truncate">{String(t.issueType || 'Ticket')}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          String(t.status) === 'Resolved' ? 'bg-emerald-50 text-emerald-600' :
+                          String(t.status) === 'Rejected' ? 'bg-red-50 text-red-600' :
+                          'bg-amber-50 text-amber-600'
+                        }`}>{String(t.status || 'Open')}</span>
+                      </div>
+                      {t.priority && <div className="text-[10px] text-slate-400 mt-0.5">Priority: {String(t.priority)}</div>}
+                    </div>
+                    <span className="text-[10px] text-slate-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''}</span>
+                  </div>
+                  {t.description && (
+                    <div className="text-xs text-slate-600 bg-slate-50 rounded-lg px-3 py-2 line-clamp-3">
+                      &ldquo;{String(t.description)}&rdquo;
+                    </div>
+                  )}
+                  {(t as any).userName && (
+                    <div className="text-[10px] text-slate-400">From: {String((t as any).userName)} ({String((t as any).userRole || '')})</div>
+                  )}
+                  {t.orderId && (
+                    <div className="text-[10px] text-slate-400"><span className="font-bold">Order:</span> {String(t.orderId)}</div>
+                  )}
+                  {(t as any).resolutionNote && (
+                    <div className="text-[10px] text-green-700 bg-green-50 rounded-lg px-2 py-1.5">
+                      <span className="font-bold">Resolution:</span> {String((t as any).resolutionNote)}
+                    </div>
+                  )}
+                  {(String(t.status) === 'Resolved' || String(t.status) === 'Rejected') && ((t as any).resolvedByName || (t as any).resolvedAt) && (
+                    <div className="text-[10px] text-slate-400">
+                      {String(t.status) === 'Resolved' ? 'Resolved' : 'Rejected'}
+                      {(t as any).resolvedByName ? ` by ${String((t as any).resolvedByName)}` : ''}
+                      {(t as any).resolvedAt ? ` on ${new Date(String((t as any).resolvedAt)).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 justify-end flex-wrap">
+                    {String(t.status || '').toLowerCase() === 'open' && resolvingTicketId !== t.id && (
+                      <>
+                        <button type="button" onClick={() => { setResolvingTicketId(t.id); setResolutionNote(''); }}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
+                          ✓ Resolve / Reject
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await api.tickets.escalate(t.id);
+                              toast.success('Ticket escalated to brand.');
+                              fetchData();
+                            } catch (err: any) {
+                              toast.error(formatErrorMessage(err, 'Failed to escalate ticket.'));
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100"
+                        >
+                          ↑ Escalate
+                        </button>
+                      </>
+                    )}
+                    {String(t.status || '').toLowerCase() === 'open' && resolvingTicketId === t.id && (
+                      <div className="w-full mt-1 space-y-1.5">
+                        <textarea placeholder="Resolution / rejection note (optional)..." value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} rows={2}
+                          className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
+                        <div className="flex items-center gap-2">
+                          <button type="button" onClick={async () => {
+                            try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData(); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
+                          }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✓ Resolve</button>
+                          <button type="button" onClick={async () => {
+                            try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData(); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
+                          }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
+                          <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
+                            className="px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 hover:bg-slate-200">Cancel</button>
+                        </div>
+                      </div>
+                    )}
+                    {String(t.status || '').toLowerCase() !== 'open' && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await api.tickets.update(t.id, 'Open');
+                              toast.success('Ticket reopened.');
+                              fetchData();
+                            } catch (err: any) {
+                              toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100"
+                        >
+                          Reopen
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await api.tickets.delete(t.id);
+                              toast.success('Ticket deleted.');
+                              fetchData();
+                            } catch (err: any) {
+                              toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-50 border border-slate-200 text-slate-600 hover:text-red-600 hover:border-red-200"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {activeTab === 'profile' && <AgencyProfile user={user} />}
       <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />
     </DesktopShell>
