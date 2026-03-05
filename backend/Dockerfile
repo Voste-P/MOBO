@@ -39,35 +39,35 @@ RUN addgroup -g 1001 -S mobo && \
     adduser -S mobo -u 1001 -G mobo
 
 WORKDIR /app
+# Give the mobo user ownership of the workdir
+RUN chown mobo:mobo /app
+
+# Switch to non-root user early so npm installs are owned by mobo natively
+USER mobo
 
 # Copy workspace config
-COPY package.json package-lock.json ./
-COPY backend/package.json backend/package.json
-COPY shared/package.json shared/package.json
+COPY --chown=mobo:mobo package.json package-lock.json ./
+COPY --chown=mobo:mobo backend/package.json backend/package.json
+COPY --chown=mobo:mobo shared/package.json shared/package.json
 
 # Install production dependencies only
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 # Copy built artifacts
-COPY --from=builder /app/backend/dist backend/dist
-COPY --from=builder /app/backend/generated backend/generated
-COPY --from=builder /app/backend/prisma backend/prisma
-
-# Copy deploy-migrate script (direct SQL migration runner for production)
-COPY backend/scripts/deploy-migrate.cjs backend/scripts/deploy-migrate.cjs
+COPY --chown=mobo:mobo --from=builder /app/backend/dist backend/dist
+COPY --chown=mobo:mobo --from=builder /app/backend/generated backend/generated
+COPY --chown=mobo:mobo --from=builder /app/backend/prisma backend/prisma
+COPY --chown=mobo:mobo --from=builder /app/backend/prisma.config.ts backend/prisma.config.ts
 
 # Copy shared (needed at runtime for type imports resolved via dist)
-COPY --from=builder /app/shared shared/
+COPY --chown=mobo:mobo --from=builder /app/shared shared/
 
 # Create logs directory
-RUN mkdir -p backend/logs && chown -R mobo:mobo backend/logs
+RUN mkdir -p backend/logs
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD wget -qO- http://localhost:8080/api/health || exit 1
-
-# Switch to non-root user
-USER mobo
 
 # Expose port
 EXPOSE 8080
@@ -75,4 +75,4 @@ EXPOSE 8080
 # Start the server with tini for proper signal forwarding
 ENV NODE_ENV=production
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "cd backend && node scripts/deploy-migrate.cjs && node dist/index.js"]
+CMD ["sh", "-c", "cd backend && npx prisma migrate deploy && node dist/index.js"]
