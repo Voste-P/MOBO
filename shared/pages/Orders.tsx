@@ -1329,6 +1329,23 @@ export const Orders: React.FC = () => {
               >
                 <MessageSquare size={13} /> Raise a Ticket
               </button>
+              {/* Export tickets CSV */}
+              {myTickets.length > 0 && (
+                <button type="button" onClick={() => {
+                  const header = ['Ticket ID','Status','Priority','Issue Type','Description','Order ID','Resolution Note','Resolved By','Resolved At','Created At'].map(csvSafe).join(',');
+                  const rows = myTickets.map(t => [
+                    csvSafe(t.id.slice(-8)), csvSafe(String(t.status)), csvSafe(String(t.priority || 'medium')),
+                    csvSafe(String(t.issueType)), csvSafe(String(t.description || '')), csvSafe(String(t.orderId || '')),
+                    csvSafe(String(t.resolutionNote || '')), csvSafe(String(t.resolvedByName || '')),
+                    csvSafe(t.resolvedAt ? new Date(t.resolvedAt).toLocaleDateString() : ''),
+                    csvSafe(t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''),
+                  ].join(','));
+                  downloadCsv(`my-tickets-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...rows].join('\n'));
+                  toast.success(`Exported ${myTickets.length} tickets`);
+                }} className="w-full py-2 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-xl border border-emerald-200 hover:bg-emerald-100 transition-all flex items-center justify-center gap-1.5">
+                  Export Tickets CSV
+                </button>
+              )}
               {/* Status filter pills */}
               <div className="flex gap-1.5 flex-wrap">
                 {(['All', 'Open', 'Resolved', 'Rejected'] as const).map(st => {

@@ -132,35 +132,35 @@ export const Explore: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-[#F4F4F5]">
-      {/* Header */}
-      <div className="px-6 pt-16 pb-4 bg-white shadow-sm z-10 border-b border-gray-100 sticky top-0">
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-black tracking-widest text-lime-600 bg-lime-50 px-2 py-0.5 rounded-md border border-lime-200">BUZZMA</span>
-            <h1 className="text-2xl font-extrabold text-slate-900">Explore Deals</h1>
+      {/* Header — compact for maximum content visibility */}
+      <div className="px-4 pt-10 pb-2 bg-white shadow-sm z-10 border-b border-gray-100 sticky top-0">
+        <div className="flex justify-between items-center mb-2">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[9px] font-black tracking-widest text-lime-600 bg-lime-50 px-1.5 py-0.5 rounded border border-lime-200">BUZZMA</span>
+            <h1 className="text-lg font-extrabold text-slate-900">Explore Deals</h1>
           </div>
           <button
             onClick={() => setTicketOpen(true)}
-            className="w-9 h-9 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-500 hover:bg-red-100 transition-all active:scale-95"
+            className="w-8 h-8 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-500 hover:bg-red-100 transition-all active:scale-95"
             aria-label="Raise a ticket"
           >
-            <AlertTriangle size={16} />
+            <AlertTriangle size={14} />
           </button>
         </div>
 
         {/* Search Bar */}
-        <div className="mb-4">
+        <div className="mb-2">
           <Input
             placeholder="Search deals, brands, platforms..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            leftIcon={<Search size={18} />}
+            leftIcon={<Search size={16} />}
             aria-label="Search deals"
           />
         </div>
 
         {/* Deal Type Filter */}
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 mb-2">
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1 mb-1.5">
           {dealTypes.map((dt) => {
             const label = dt === 'Discount' ? 'Order Deal' : dt === 'All' ? 'All Types' : `${dt} Deal`;
             return (
@@ -169,9 +169,9 @@ export const Explore: React.FC = () => {
                 type="button"
                 onClick={() => setSelectedDealType(dt)}
                 aria-pressed={selectedDealType === dt}
-                className={`px-4 py-2 rounded-full text-xs font-bold transition-all border whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap ${
                   selectedDealType === dt
-                    ? 'bg-lime-500 text-white border-lime-500 shadow-lg'
+                    ? 'bg-lime-500 text-white border-lime-500 shadow'
                     : 'bg-white text-slate-600 border-slate-200 hover:border-lime-300'
                 }`}
               >
@@ -182,16 +182,16 @@ export const Explore: React.FC = () => {
         </div>
 
         {/* Categories */}
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1">
           {categories.map((cat) => (
             <button
               key={cat}
               type="button"
               onClick={() => setSelectedCategory(cat)}
               aria-pressed={selectedCategory === cat}
-              className={`px-5 py-2.5 rounded-full text-xs font-bold transition-all border whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap ${
                 selectedCategory === cat
-                  ? 'bg-black text-white border-black shadow-lg'
+                  ? 'bg-black text-white border-black shadow'
                   : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
               }`}
             >

@@ -210,6 +210,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   const [ticketStatusFilter, setTicketStatusFilter] = useState<string>('All');
   const [ticketSearch, setTicketSearch] = useState('');
   const [ticketPriorityFilter, setTicketPriorityFilter] = useState<string>('All');
+  const [resolvingTicketId, setResolvingTicketId] = useState<string | null>(null);
+  const [resolutionNote, setResolutionNote] = useState('');
   const [inviteRole, setInviteRole] = useState<'agency' | 'brand'>('agency');
   const [inviteLabel, setInviteLabel] = useState('');
 
@@ -535,12 +537,13 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     }
   };
 
-  const resolveTicket = async (id: string, status: 'Resolved' | 'Rejected') => {
+  const resolveTicket = async (id: string, status: 'Resolved' | 'Rejected', note?: string) => {
     try {
-      const note = window.prompt(`Add a resolution note (optional):`);
       await api.tickets.update(id, status, note || undefined);
       setTickets(tickets.map((t) => (t.id === id ? { ...t, status, resolutionNote: note || undefined } : t)));
       toast.success(`Ticket ${status.toLowerCase()} successfully`);
+      setResolvingTicketId(null);
+      setResolutionNote('');
     } catch (e: any) {
       toast.error(formatErrorMessage(e, `Failed to ${status.toLowerCase()} ticket`));
     }
@@ -1391,24 +1394,26 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                             </div>
                           </div>
 
-                          {t.status === 'Open' && (
+                          {t.status === 'Open' && resolvingTicketId !== t.id && (
                             <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => resolveTicket(t.id, 'Resolved')}
-                                className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors"
-                                title="Resolve"
-                              >
+                              <button type="button" onClick={() => { setResolvingTicketId(t.id); setResolutionNote(''); }}
+                                className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors" title="Resolve / Reject">
                                 <CheckCircle2 size={16} />
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => resolveTicket(t.id, 'Rejected')}
-                                className="p-2 bg-slate-100 text-slate-400 rounded-lg hover:bg-rose-100 hover:text-rose-500 transition-colors"
-                                title="Reject"
-                              >
-                                <XCircle size={16} />
-                              </button>
+                            </div>
+                          )}
+                          {t.status === 'Open' && resolvingTicketId === t.id && (
+                            <div className="w-full mt-1 space-y-1.5">
+                              <textarea placeholder="Resolution / rejection note (optional)..." value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} rows={2}
+                                className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
+                              <div className="flex items-center gap-2">
+                                <button type="button" onClick={() => resolveTicket(t.id, 'Resolved', resolutionNote)}
+                                  className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✓ Resolve</button>
+                                <button type="button" onClick={() => resolveTicket(t.id, 'Rejected', resolutionNote)}
+                                  className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
+                                <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
+                                  className="px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 hover:bg-slate-200">Cancel</button>
+                              </div>
                             </div>
                           )}
 

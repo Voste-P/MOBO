@@ -3739,6 +3739,10 @@ export const AgencyDashboard: React.FC = () => {
   const [ticketOpen, setTicketOpen] = useState(false);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [ticketFilter, setTicketFilter] = useState<'All' | 'Open' | 'Resolved' | 'Rejected'>('All');
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [ticketPriorityFilter, setTicketPriorityFilter] = useState<string>('All');
+  const [resolvingTicketId, setResolvingTicketId] = useState<string | null>(null);
+  const [resolutionNote, setResolutionNote] = useState('');
 
   const fetchData = async () => {
     if (!user?.mediatorCode) return;
@@ -4022,9 +4026,14 @@ export const AgencyDashboard: React.FC = () => {
               Export Tickets CSV
             </button>
           )}
-          {/* Status filter tabs */}
+          {/* Search + Status + Priority filter */}
           {tickets && tickets.length > 0 && (
-            <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <>
+            <div className="mb-2">
+              <input type="text" placeholder="Search tickets..." value={ticketSearch} onChange={e => setTicketSearch(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+            </div>
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
               {(['All', 'Open', 'Resolved', 'Rejected'] as const).map(f => {
                 const count = f === 'All' ? tickets.length : tickets.filter(t => String(t.status) === f).length;
                 return (
@@ -4039,6 +4048,24 @@ export const AgencyDashboard: React.FC = () => {
                 );
               })}
             </div>
+            <div className="flex items-center gap-1.5 mb-4 flex-wrap">
+              <span className="text-[10px] font-bold text-slate-400 mr-1">Priority:</span>
+              {['All', 'urgent', 'high', 'medium', 'low'].map(p => (
+                <button key={p} type="button" onClick={() => setTicketPriorityFilter(p)}
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
+                    ticketPriorityFilter === p
+                      ? p === 'urgent' ? 'bg-red-500 text-white border-red-500' :
+                        p === 'high' ? 'bg-orange-500 text-white border-orange-500' :
+                        p === 'medium' ? 'bg-blue-500 text-white border-blue-500' :
+                        p === 'low' ? 'bg-slate-500 text-white border-slate-500' :
+                        'bg-slate-800 text-white border-slate-800'
+                      : 'bg-white text-slate-500 border-slate-200'
+                  }`}>
+                  {p === 'All' ? 'All' : p.charAt(0).toUpperCase() + p.slice(1)}
+                </button>
+              ))}
+            </div>
+            </>
           )}
           {(!tickets || tickets.length === 0) ? (
             <EmptyState
@@ -4048,7 +4075,19 @@ export const AgencyDashboard: React.FC = () => {
             />
           ) : (
             <div className="space-y-3 max-h-[65vh] overflow-y-auto scrollbar-styled">
-              {tickets.filter(t => ticketFilter === 'All' || String(t.status) === ticketFilter).map((t: Ticket) => (
+              {tickets.filter((t: Ticket) => {
+                if (ticketFilter !== 'All' && String(t.status) !== ticketFilter) return false;
+                if (ticketPriorityFilter !== 'All' && String(t.priority || 'medium') !== ticketPriorityFilter) return false;
+                if (ticketSearch.trim()) {
+                  const q = ticketSearch.trim().toLowerCase();
+                  return (String(t.issueType || '').toLowerCase().includes(q) ||
+                    String(t.description || '').toLowerCase().includes(q) ||
+                    String((t as any).userName || '').toLowerCase().includes(q) ||
+                    String(t.orderId || '').toLowerCase().includes(q) ||
+                    t.id.toLowerCase().includes(q));
+                }
+                return true;
+              }).map((t: Ticket) => (
                 <div key={t.id} className="rounded-xl border border-slate-100 bg-white px-3 py-3 shadow-sm space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1">
@@ -4087,40 +4126,12 @@ export const AgencyDashboard: React.FC = () => {
                       {(t as any).resolvedAt ? ` on ${new Date(String((t as any).resolvedAt)).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
                     </div>
                   )}
-                  <div className="flex items-center gap-2 justify-end">
-                    {String(t.status || '').toLowerCase() === 'open' && (
+                  <div className="flex items-center gap-2 justify-end flex-wrap">
+                    {String(t.status || '').toLowerCase() === 'open' && resolvingTicketId !== t.id && (
                       <>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            try {
-                              const note = window.prompt('Resolution note (optional):');
-                              await api.tickets.update(t.id, 'Resolved', note || undefined);
-                              toast.success('Ticket resolved.');
-                              fetchData();
-                            } catch (err: any) {
-                              toast.error(formatErrorMessage(err, 'Failed to resolve ticket.'));
-                            }
-                          }}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100"
-                        >
-                          ✓ Resolve
-                        </button>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            try {
-                              const note = window.prompt('Rejection reason (optional):');
-                              await api.tickets.update(t.id, 'Rejected', note || undefined);
-                              toast.success('Ticket rejected.');
-                              fetchData();
-                            } catch (err: any) {
-                              toast.error(formatErrorMessage(err, 'Failed to reject ticket.'));
-                            }
-                          }}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-50 border border-red-200 text-red-600 hover:bg-red-100"
-                        >
-                          ✗ Reject
+                        <button type="button" onClick={() => { setResolvingTicketId(t.id); setResolutionNote(''); }}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
+                          ✓ Resolve / Reject
                         </button>
                         <button
                           type="button"
@@ -4138,6 +4149,22 @@ export const AgencyDashboard: React.FC = () => {
                           ↑ Escalate
                         </button>
                       </>
+                    )}
+                    {String(t.status || '').toLowerCase() === 'open' && resolvingTicketId === t.id && (
+                      <div className="w-full mt-1 space-y-1.5">
+                        <textarea placeholder="Resolution / rejection note (optional)..." value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} rows={2}
+                          className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
+                        <div className="flex items-center gap-2">
+                          <button type="button" onClick={async () => {
+                            try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData(); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
+                          }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✓ Resolve</button>
+                          <button type="button" onClick={async () => {
+                            try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData(); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
+                          }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
+                          <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
+                            className="px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 hover:bg-slate-200">Cancel</button>
+                        </div>
+                      </div>
                     )}
                     {String(t.status || '').toLowerCase() !== 'open' && (
                       <>

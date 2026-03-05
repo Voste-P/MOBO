@@ -93,6 +93,10 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [ticketFilter, setTicketFilter] = useState<'All' | 'Open' | 'Resolved' | 'Rejected'>('All');
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [ticketPriorityFilter, setTicketPriorityFilter] = useState<string>('All');
+  const [resolvingTicketId, setResolvingTicketId] = useState<string | null>(null);
+  const [resolutionNote, setResolutionNote] = useState('');
 
   const actionRequiredOrders = useMemo(() =>
     orders.filter((o: Order) => String(o.workflowStatus || '') === 'UNDER_REVIEW')
@@ -589,7 +593,13 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
         </div>
         {/* Status filter tabs */}
         {tickets && tickets.length > 0 && (
-          <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+          <>
+          {/* Search */}
+          <div className="mb-2">
+            <input type="text" placeholder="Search tickets..." value={ticketSearch} onChange={e => setTicketSearch(e.target.value)}
+              className="w-full px-3 py-1.5 text-[11px] rounded-lg border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+          </div>
+          <div className="flex items-center gap-1.5 mb-2 flex-wrap">
             {(['All', 'Open', 'Resolved', 'Rejected'] as const).map(f => {
               const count = f === 'All' ? tickets.length : tickets.filter((t: Ticket) => String(t.status) === f).length;
               return (
@@ -604,6 +614,25 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
               );
             })}
           </div>
+          {/* Priority filter */}
+          <div className="flex items-center gap-1 mb-3 flex-wrap">
+            <span className="text-[9px] font-bold text-zinc-400 mr-1">Priority:</span>
+            {['All', 'urgent', 'high', 'medium', 'low'].map(p => (
+              <button key={p} type="button" onClick={() => setTicketPriorityFilter(p)}
+                className={`px-2 py-0.5 rounded-full text-[9px] font-bold border transition-all ${
+                  ticketPriorityFilter === p
+                    ? p === 'urgent' ? 'bg-red-500 text-white border-red-500' :
+                      p === 'high' ? 'bg-orange-500 text-white border-orange-500' :
+                      p === 'medium' ? 'bg-blue-500 text-white border-blue-500' :
+                      p === 'low' ? 'bg-slate-500 text-white border-slate-500' :
+                      'bg-zinc-800 text-white border-zinc-800'
+                    : 'bg-white text-zinc-500 border-zinc-200'
+                }`}>
+                {p === 'All' ? 'All' : p.charAt(0).toUpperCase() + p.slice(1)}
+              </button>
+            ))}
+          </div>
+          </>
         )}
         {(!tickets || tickets.length === 0) ? (
           <EmptyState
@@ -613,7 +642,19 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
           />
         ) : (
           <div className="space-y-2 max-h-[60vh] overflow-y-auto scrollbar-styled">
-            {tickets.filter((t: Ticket) => ticketFilter === 'All' || String(t.status) === ticketFilter).map((t: Ticket) => (
+            {tickets.filter((t: Ticket) => {
+              if (ticketFilter !== 'All' && String(t.status) !== ticketFilter) return false;
+              if (ticketPriorityFilter !== 'All' && String(t.priority || 'medium') !== ticketPriorityFilter) return false;
+              if (ticketSearch.trim()) {
+                const q = ticketSearch.trim().toLowerCase();
+                return (String(t.issueType || '').toLowerCase().includes(q) ||
+                  String(t.description || '').toLowerCase().includes(q) ||
+                  String((t as any).userName || '').toLowerCase().includes(q) ||
+                  String(t.orderId || '').toLowerCase().includes(q) ||
+                  t.id.toLowerCase().includes(q));
+              }
+              return true;
+            }).map((t: Ticket) => (
               <div
                 key={t.id}
                 className="rounded-xl border border-zinc-100 bg-white px-3 py-3 shadow-sm space-y-2"
@@ -658,53 +699,60 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                 <div className="flex items-center gap-1.5 justify-end">
                   {String(t.status || '').toLowerCase() === 'open' && (
                     <>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            const note = window.prompt('Resolution note (optional):');
-                            await api.tickets.update(t.id, 'Resolved', note || undefined);
-                            toast.success('Ticket resolved.');
-                            onRefresh();
-                          } catch (err: any) {
-                            toast.error(formatErrorMessage(err, 'Failed to resolve ticket.'));
-                          }
-                        }}
-                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100"
-                      >
-                        ✓ Resolve
-                      </button>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            const note = window.prompt('Rejection reason (optional):');
-                            await api.tickets.update(t.id, 'Rejected', note || undefined);
-                            toast.success('Ticket rejected.');
-                            onRefresh();
-                          } catch (err: any) {
-                            toast.error(formatErrorMessage(err, 'Failed to reject ticket.'));
-                          }
-                        }}
-                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-50 border border-red-200 text-red-600 hover:bg-red-100"
-                      >
-                        ✗ Reject
-                      </button>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            await api.tickets.escalate(t.id);
-                            toast.success('Ticket escalated to agency.');
-                            onRefresh();
-                          } catch (err: any) {
-                            toast.error(formatErrorMessage(err, 'Failed to escalate ticket.'));
-                          }
-                        }}
-                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100"
-                      >
-                        ↑ Escalate
-                      </button>
+                      {resolvingTicketId === t.id ? (
+                        <div className="w-full space-y-1.5">
+                          <textarea
+                            value={resolutionNote}
+                            onChange={e => setResolutionNote(e.target.value)}
+                            placeholder="Add a resolution/rejection note (optional)..."
+                            className="w-full px-2 py-1.5 text-[10px] rounded-lg border border-zinc-200 bg-zinc-50 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none"
+                            rows={2}
+                            maxLength={2000}
+                          />
+                          <div className="flex items-center gap-1.5">
+                            <button type="button" onClick={async () => {
+                              try {
+                                await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined);
+                                toast.success('Ticket resolved.');
+                                setResolvingTicketId(null); setResolutionNote('');
+                                onRefresh();
+                              } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
+                            }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
+                              ✓ Resolve
+                            </button>
+                            <button type="button" onClick={async () => {
+                              try {
+                                await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined);
+                                toast.success('Ticket rejected.');
+                                setResolvingTicketId(null); setResolutionNote('');
+                                onRefresh();
+                              } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
+                            }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-50 border border-red-200 text-red-600 hover:bg-red-100">
+                              ✗ Reject
+                            </button>
+                            <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
+                              className="px-2 py-1 rounded-lg text-[10px] font-bold text-zinc-400 hover:text-zinc-600">
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <button type="button" onClick={() => { setResolvingTicketId(t.id); setResolutionNote(''); }}
+                            className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
+                            ✓ Resolve / Reject
+                          </button>
+                          <button type="button" onClick={async () => {
+                            try {
+                              await api.tickets.escalate(t.id);
+                              toast.success('Ticket escalated to agency.');
+                              onRefresh();
+                            } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to escalate.')); }
+                          }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100">
+                            ↑ Escalate
+                          </button>
+                        </>
+                      )}
                     </>
                   )}
                   {String(t.status || '').toLowerCase() !== 'open' && (

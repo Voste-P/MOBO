@@ -712,7 +712,28 @@ export function aiRoutes(env: Env): Router {
 
       // extractOrderDetailsWithAi now works without Gemini via Tesseract.js
       // fallback, so we no longer need to bypass in E2E or non-Gemini mode.
-      const result = await extractOrderDetailsWithAi(env, { imageBase64: payload.imageBase64 });
+      let result: any;
+      try {
+        result = await extractOrderDetailsWithAi(env, { imageBase64: payload.imageBase64 });
+      } catch (extractErr) {
+        // GRACEFUL DEGRADATION: Never return 500 for extraction failures.
+        // Return an empty result so the client-side can let user fill in details manually.
+        const errMsg = extractErr instanceof Error ? extractErr.message : String(extractErr);
+        businessLog.warn(`[AI] Extraction pipeline error for user ${req.auth?.userId}: ${errMsg}`, {
+          actorUserId: req.auth?.userId,
+          error: errMsg,
+          ip: req.ip,
+        });
+        result = {
+          orderId: null,
+          amount: null,
+          orderDate: null,
+          soldBy: null,
+          productName: null,
+          confidenceScore: 0,
+          notes: `Extraction encountered an issue: ${errMsg.slice(0, 200)}. Please enter details manually.`,
+        };
+      }
 
       // Audit trail: record AI order extraction for backtracking
       writeAuditLog({
@@ -741,8 +762,21 @@ export function aiRoutes(env: Env): Router {
 
       res.json(result);
     } catch (err) {
+      // Only ZodError (bad request) or rate limit errors will reach here.
+      // Extraction errors are caught above and returned as graceful empty results.
       logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'EXTERNAL_SERVICE', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'ai/extract-order' } });
-      if (!sendKnownError(err, res)) next(err);
+      if (!sendKnownError(err, res)) {
+        // Last resort: still return a graceful empty result instead of 500
+        res.json({
+          orderId: null,
+          amount: null,
+          orderDate: null,
+          soldBy: null,
+          productName: null,
+          confidenceScore: 0,
+          notes: 'An unexpected error occurred. Please enter your order details manually.',
+        });
+      }
     }
   });
 
