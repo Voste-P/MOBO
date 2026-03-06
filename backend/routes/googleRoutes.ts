@@ -43,14 +43,55 @@ function isGoogleOAuthConfigured(env: Env): boolean {
   );
 }
 
-// In-memory CSRF state store (short-lived, keyed by state string → userId)
-const pendingStates = new Map<string, { userId: string; createdAt: number }>();
+// ─── Signed-state helpers (survives server restarts) ───────────
+// Instead of in-memory Map, we encode { userId, createdAt, nonce } into the
+// OAuth state parameter itself, signed with HMAC-SHA256.  The callback verifies
+// the signature — no server-side storage needed.
 
-// Clean up stale states older than 10 minutes (runs lazily)
-function cleanupStaleStates() {
-  const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
-  for (const [key, val] of pendingStates) {
-    if (val.createdAt < tenMinutesAgo) pendingStates.delete(key);
+const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+let _oauthSigningKey = '';
+function getSigningKey(env: Env): string {
+  if (!_oauthSigningKey) {
+    _oauthSigningKey = (env as any).JWT_ACCESS_SECRET || 'fallback-oauth-signing-key';
+  }
+  return _oauthSigningKey;
+}
+
+function createSignedState(userId: string, env: Env): string {
+  const payload = JSON.stringify({
+    uid: userId,
+    ts: Date.now(),
+    nonce: crypto.randomBytes(12).toString('hex'),
+  });
+  const payloadB64 = Buffer.from(payload).toString('base64url');
+  const sig = crypto
+    .createHmac('sha256', getSigningKey(env))
+    .update(payloadB64)
+    .digest('base64url');
+  return `${payloadB64}.${sig}`;
+}
+
+function verifySignedState(state: string, env: Env): { userId: string; createdAt: number } | null {
+  const dotIdx = state.indexOf('.');
+  if (dotIdx < 0) return null;
+  const payloadB64 = state.slice(0, dotIdx);
+  const sig = state.slice(dotIdx + 1);
+  const expectedSig = crypto
+    .createHmac('sha256', getSigningKey(env))
+    .update(payloadB64)
+    .digest('base64url');
+  // Constant-time comparison to prevent timing attacks
+  if (sig.length !== expectedSig.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) {
+    return null;
+  }
+  try {
+    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());
+    if (!payload.uid || !payload.ts) return null;
+    if (Date.now() - payload.ts > STATE_TTL_MS) return null;
+    return { userId: String(payload.uid), createdAt: payload.ts };
+  } catch {
+    return null;
   }
 }
 
@@ -74,19 +115,11 @@ export function googleRoutes(env: Env): Router {
       });
     }
 
-    cleanupStaleStates();
-
-    // Prevent unbounded memory growth under high traffic
-    if (pendingStates.size >= 10_000) {
-      return res.status(429).json({ error: { code: 'RATE_LIMITED', message: 'Too many pending OAuth requests. Try again later.' } });
-    }
-
-    const state = crypto.randomBytes(24).toString('hex');
     const userId = (req as any).auth?.userId || (req as any).auth?.user?._id;
     if (!userId) {
       return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'Could not determine user identity.' } });
     }
-    pendingStates.set(state, { userId: String(userId), createdAt: Date.now() });
+    const state = createSignedState(String(userId), env);
 
     businessLog.info(`[Auth] User ${String(userId)} initiated Google OAuth`, { actorUserId: String(userId), ip: req.ip });
     logAccessEvent('RESOURCE_ACCESS', {
@@ -132,15 +165,9 @@ export function googleRoutes(env: Env): Router {
       return res.send(makeCallbackHtml(false, 'Missing authorization code or state parameter.'));
     }
 
-    const pending = pendingStates.get(state);
+    const pending = verifySignedState(state, env);
     if (!pending) {
       return res.send(makeCallbackHtml(false, 'Invalid or expired state. Please try again.'));
-    }
-    pendingStates.delete(state);
-
-    // The state could be stale (> 10 min old)
-    if (Date.now() - pending.createdAt > 10 * 60 * 1000) {
-      return res.send(makeCallbackHtml(false, 'Authorization expired. Please try again.'));
     }
 
     if (!isGoogleOAuthConfigured(env)) {

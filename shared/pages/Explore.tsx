@@ -222,8 +222,8 @@ export const Explore: React.FC = () => {
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState
-            title="No deals found"
-            description="Try a different search term or category."
+            title="No deals available"
+            description={searchTerm || selectedCategory !== 'All' ? 'Try a different search term or category.' : 'New deals will appear here — check back soon!'}
             icon={<Filter size={40} className="text-zinc-300" />}
           />
         ) : (

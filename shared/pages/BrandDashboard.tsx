@@ -1082,9 +1082,13 @@ const OrdersView = ({ user }: any) => {
             {/* === ORDER SHEET VIEW === */}
             {orderViewMode === 'orderSheet' && (
               filtered.length === 0 ? (
-                <div className="p-16 text-center">
-                  <ShoppingBag size={48} className="mx-auto mb-4 text-zinc-200" />
-                  <p className="text-sm text-zinc-400">No orders found</p>
+                <div className="p-8">
+                  <EmptyState
+                    title="No orders"
+                    description={search ? 'Try a different search term.' : 'Orders will appear here once customers place them.'}
+                    icon={<ShoppingBag size={22} className="text-zinc-400" />}
+                    className="bg-transparent"
+                  />
                 </div>
               ) : (
                 <table className="w-full text-left min-w-[800px]">
@@ -1143,9 +1147,13 @@ const OrdersView = ({ user }: any) => {
             {/* === FINANCE SHEET VIEW === */}
             {orderViewMode === 'financeSheet' && (
               filtered.length === 0 ? (
-                <div className="p-16 text-center">
-                  <Wallet size={48} className="mx-auto mb-4 text-zinc-200" />
-                  <p className="text-sm text-zinc-400">No finance records found</p>
+                <div className="p-8">
+                  <EmptyState
+                    title="No finance records"
+                    description={search ? 'Try a different search term.' : 'Finance records will appear here once orders are placed.'}
+                    icon={<Wallet size={22} className="text-zinc-400" />}
+                    className="bg-transparent"
+                  />
                 </div>
               ) : (
                 <table className="w-full text-left min-w-[900px]">

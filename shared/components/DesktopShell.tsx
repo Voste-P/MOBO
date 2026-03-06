@@ -45,7 +45,7 @@ export function DesktopShell({
       {/* Sidebar */}
       <aside
         className={
-          `fixed md:relative z-50 h-full ${sidebarWidthClassName} transition-transform duration-300 ` +
+          `fixed md:relative z-50 h-full ${sidebarWidthClassName} transition-transform duration-300 overflow-y-auto scrollbar-styled ` +
           `${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} ` +
           (asideClassName || '')
         }

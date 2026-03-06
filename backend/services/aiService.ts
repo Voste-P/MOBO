@@ -3482,7 +3482,7 @@ export async function extractOrderDetailsWithAi(
               '   - If DETERMINISTIC_PRODUCT_NAME contains "Deliver to", "Hello,", "Returns", addresses, or is < 5 chars, override it.',
               '',
               '6. IGNORE ambiguous single/double digit numbers, system UUIDs, internal codes.',
-              '7. If DETERMINISTIC values look correct, confirm them. If they look wrong, provide the correct values from OCR text.',
+              '7. IMPORTANT: The DETERMINISTIC values below may be WRONG. You must independently verify each field from the OCR text. Do NOT simply confirm the deterministic values — re-extract from the OCR text independently and only agree if your extraction matches.',
               '8. VERIFY: suggestedAmount must NOT be a substring of suggestedOrderId digits.',
               '9. VERIFY: suggestedAmount must NOT be a 6-digit pincode or 10-digit phone number.',
               '10. If you see multiple amounts, PREFER "Grand Total" > "Amount Paid" > "Total amount" > "Total" > "Payable" over unlabeled amounts.',
@@ -4181,8 +4181,8 @@ export async function extractOrderDetailsWithAi(
               ocrNorm.includes(aiSuggestedOrderId.replace(/[\s\-]/g, '').toLowerCase())
             : false;
           const amountVisible = aiSuggestedAmount
-            ? ocrText.includes(String(aiSuggestedAmount)) ||
-              ocrText.includes(aiSuggestedAmount.toFixed(2))
+            ? new RegExp(`(?:^|[^0-9])${String(aiSuggestedAmount).replace('.', '\\.')}(?:[^0-9]|$)`).test(ocrText) ||
+              new RegExp(`(?:^|[^0-9])${aiSuggestedAmount.toFixed(2).replace('.', '\\.')}(?:[^0-9]|$)`).test(ocrText)
             : false;
 
           // Fill missing fields from AI
@@ -4206,7 +4206,7 @@ export async function extractOrderDetailsWithAi(
             finalOrderId = aiSuggestedOrderId;
             notes.push(orderIdVisible ? 'AI order ID confirmed in OCR text.' : 'AI extracted order ID (high confidence).');
           }
-          if (!finalAmount && aiSuggestedAmount && !isAmountFromOrderId && (amountVisible || aiConfidence >= 75)) {
+          if (!finalAmount && aiSuggestedAmount && !isAmountFromOrderId && (amountVisible || (aiConfidence >= 75 && aiSuggestedAmount >= 10 && aiSuggestedAmount <= 500000))) {
             finalAmount = aiSuggestedAmount;
             notes.push(amountVisible ? 'AI amount confirmed in OCR text.' : 'AI extracted amount (high confidence).');
           }

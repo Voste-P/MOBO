@@ -849,7 +849,7 @@ export const api = {
       });
     },
     getBrandOrders: async (brandName: string) => {
-      return fetchJson(`/brand/orders?brandName=${encodeURIComponent(brandName)}`, {
+      return fetchJson(`/brand/orders?brandName=${encodeURIComponent(brandName)}&limit=500`, {
         headers: { ...authHeaders() },
       });
     },

@@ -1777,11 +1777,11 @@ export const Orders: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Reviewer name */}
-                  {formScreenshot && (selectedProduct?.dealType === 'Rating' || selectedProduct?.dealType === 'Review') && (
+                  {/* Reviewer name — shown for all deal types after screenshot upload */}
+                  {formScreenshot && (
                     <div className="space-y-1 animate-enter">
                       <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">
-                        Your Reviewer Name <span className="text-zinc-300">(optional)</span>
+                        Your Reviewer / Account Name <span className="text-zinc-300">(optional)</span>
                       </label>
                       <input
                         type="text"
@@ -1792,7 +1792,7 @@ export const Orders: React.FC = () => {
                         maxLength={200}
                       />
                       <p className="text-[9px] text-zinc-400 ml-1">
-                        Your reviewer name on the marketplace — helps verify your review/rating screenshots.
+                        Your name on the marketplace (Amazon, Flipkart, etc.) — helps verify your screenshots.
                       </p>
                     </div>
                   )}

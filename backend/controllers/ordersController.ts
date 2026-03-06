@@ -414,27 +414,9 @@ export function makeOrdersController(env: Env) {
           }
         }
 
-        // CRITICAL ANTI-FRAUD: Prevent duplicate orders for the same deal by the same buyer.
-        // Important: allow upgrading a redirect-tracked pre-order (preOrderId) into a real order.
-        const firstItem = body.items[0];
-        const duplicateWhere: any = {
-          userId: userPgId,
-          isDeleted: false,
-          workflowStatus: { notIn: ['FAILED', 'REJECTED'] },
-          items: { some: { productId: firstItem.productId } },
-        };
-        if (body.preOrderId) {
-          duplicateWhere.mongoId = { not: body.preOrderId };
-        }
-
-        const existingDealOrder = await db().order.findFirst({ where: duplicateWhere, select: { id: true } });
-        if (existingDealOrder) {
-          throw new AppError(
-            409,
-            'DUPLICATE_DEAL_ORDER',
-            'You already have an active order for this deal.'
-          );
-        }
+        // NOTE: We allow buyers to place multiple orders for the same deal/product.
+        // Real-world scenario: buyer orders from mom's Amazon, then brother's Amazon, etc.
+        // The externalOrderId uniqueness check above prevents true duplicates (same order ID).
 
         const upstreamMediatorCode = String(user.parentCode || '').trim();
         if (!upstreamMediatorCode) {
