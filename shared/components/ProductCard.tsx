@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { ExternalLink, Star, ShoppingBag, Camera, X, Loader2, CheckCircle, Upload } from 'lucide-react';
+import { ExternalLink, Star, ShoppingBag, Camera, X, Loader2, CheckCircle, Upload, AlertCircle, UserCircle } from 'lucide-react';
 import { Product } from '../types';
 import { ProxiedImage, placeholderImage } from './ProxiedImage';
 import { api } from '../services/api';
@@ -55,6 +55,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
     soldBy?: string;
     productName?: string;
   }>({ orderId: '', amount: '' });
+  const [reviewerName, setReviewerName] = useState('');
 
   const resetForm = useCallback(() => {
     setScreenshot(null);
@@ -63,6 +64,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
     setSubmitting(false);
     setSubmitted(false);
     setExtractedDetails({ orderId: '', amount: '' });
+    setReviewerName('');
     setFormOpen(false);
   }, []);
 
@@ -133,6 +135,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
           orderDate: extractedDetails.orderDate || undefined,
           soldBy: extractedDetails.soldBy || undefined,
           extractedProductName: extractedDetails.productName || undefined,
+          reviewerName: reviewerName.trim() || undefined,
         },
       );
 
@@ -293,60 +296,128 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
           )}
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
 
-          {/* AI Extracted Details */}
-          {(extractedDetails.orderId || extractedDetails.amount) && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 space-y-1.5">
-              <p className="text-[9px] font-bold text-emerald-700 flex items-center gap-1">
-                <CheckCircle size={10} /> AI Detected
-              </p>
-              <div className="grid grid-cols-2 gap-1.5">
-                {extractedDetails.orderId && (
+          {/* Order Details — ALWAYS shown after screenshot upload */}
+          {preview && !extracting && (
+            <div className="space-y-2 animate-in slide-in-from-bottom-2">
+              {/* AI status indicator */}
+              {(extractedDetails.orderId || extractedDetails.amount || extractedDetails.productName || extractedDetails.soldBy || extractedDetails.orderDate) ? (
+                <div className="flex items-center gap-1.5 px-2 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg">
+                  <CheckCircle size={10} className="text-emerald-600 flex-shrink-0" />
+                  <p className="text-[9px] font-bold text-emerald-700">AI extracted — verify &amp; correct if needed</p>
+                </div>
+              ) : (
+                <div className="flex items-start gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
+                  <AlertCircle size={11} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-[9px] text-amber-700">Could not auto-detect. Please fill in manually.</p>
+                </div>
+              )}
+
+              {/* All 5 editable fields — always visible */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-2 space-y-1.5">
+                <p className="text-[8px] font-extrabold text-slate-500 uppercase tracking-wider">Order Details</p>
+                <div className="grid grid-cols-2 gap-1.5">
                   <div>
-                    <label className="text-[8px] font-bold text-emerald-600 uppercase">Order ID</label>
+                    <label className="text-[8px] font-bold text-slate-500 uppercase">Order ID *</label>
                     <input
                       type="text"
                       value={extractedDetails.orderId}
                       onChange={(e) => setExtractedDetails((d) => ({ ...d, orderId: e.target.value }))}
-                      className="w-full mt-0.5 px-1.5 py-1 text-[10px] border border-emerald-200 rounded bg-white focus:ring-1 focus:ring-emerald-400 outline-none"
+                      placeholder="e.g. 408-1234567-8901234"
+                      className="w-full mt-0.5 px-1.5 py-1 text-[10px] font-medium border border-gray-300 rounded bg-white focus:ring-1 focus:ring-lime-300 focus:border-lime-400 outline-none transition-all"
                     />
                   </div>
-                )}
-                {extractedDetails.amount && (
                   <div>
-                    <label className="text-[8px] font-bold text-emerald-600 uppercase">Amount (₹)</label>
+                    <label className="text-[8px] font-bold text-slate-500 uppercase">Amount (₹) *</label>
                     <input
                       type="text"
+                      inputMode="decimal"
                       value={extractedDetails.amount}
                       onChange={(e) => setExtractedDetails((d) => ({ ...d, amount: e.target.value }))}
-                      className="w-full mt-0.5 px-1.5 py-1 text-[10px] border border-emerald-200 rounded bg-white focus:ring-1 focus:ring-emerald-400 outline-none"
+                      placeholder="e.g. 1044"
+                      className="w-full mt-0.5 px-1.5 py-1 text-[10px] font-medium border border-gray-300 rounded bg-white focus:ring-1 focus:ring-lime-300 focus:border-lime-400 outline-none transition-all"
                     />
                   </div>
-                )}
+                </div>
+
+                <div>
+                  <label className="text-[8px] font-bold text-slate-500 uppercase">Product Name</label>
+                  <input
+                    type="text"
+                    value={extractedDetails.productName || ''}
+                    onChange={(e) => setExtractedDetails((d) => ({ ...d, productName: e.target.value }))}
+                    placeholder="e.g. Samsung Galaxy M34 5G"
+                    className="w-full mt-0.5 px-1.5 py-1 text-[10px] font-medium border border-gray-300 rounded bg-white focus:ring-1 focus:ring-lime-300 focus:border-lime-400 outline-none transition-all"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5">
+                  <div>
+                    <label className="text-[8px] font-bold text-slate-500 uppercase">Seller / Sold By</label>
+                    <input
+                      type="text"
+                      value={extractedDetails.soldBy || ''}
+                      onChange={(e) => setExtractedDetails((d) => ({ ...d, soldBy: e.target.value }))}
+                      placeholder="e.g. Cloudtail India"
+                      className="w-full mt-0.5 px-1.5 py-1 text-[10px] font-medium border border-gray-300 rounded bg-white focus:ring-1 focus:ring-lime-300 focus:border-lime-400 outline-none transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[8px] font-bold text-slate-500 uppercase">Order Date</label>
+                    <input
+                      type="text"
+                      value={extractedDetails.orderDate || ''}
+                      onChange={(e) => setExtractedDetails((d) => ({ ...d, orderDate: e.target.value }))}
+                      placeholder="e.g. 15 Jan 2026"
+                      className="w-full mt-0.5 px-1.5 py-1 text-[10px] font-medium border border-gray-300 rounded bg-white focus:ring-1 focus:ring-lime-300 focus:border-lime-400 outline-none transition-all"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Reviewer Name */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-2 space-y-1">
+                <label className="text-[8px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                  <UserCircle size={10} /> Reviewer / Account Name
+                </label>
+                <input
+                  type="text"
+                  value={reviewerName}
+                  onChange={(e) => setReviewerName(e.target.value)}
+                  placeholder="e.g. Rahul S. on Amazon"
+                  maxLength={200}
+                  className="w-full px-1.5 py-1 text-[10px] font-medium border border-gray-300 rounded bg-white focus:ring-1 focus:ring-lime-300 focus:border-lime-400 outline-none transition-all"
+                />
+                <p className="text-[8px] text-zinc-400">Your marketplace profile name for review verification.</p>
               </div>
             </div>
           )}
 
           {/* Submit + Cancel */}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={resetForm}
-              className="flex-1 py-2.5 text-xs font-bold text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleInlineSubmit}
-              disabled={!screenshot || submitting || extracting}
-              className="flex-1 py-2.5 bg-black text-white font-extrabold rounded-xl text-xs uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition-all flex items-center justify-center gap-1.5"
-            >
-              {submitting ? (
-                <><Loader2 size={12} className="animate-spin" /> Submitting...</>
-              ) : (
-                <><Upload size={12} /> Submit</>
-              )}
-            </button>
+          <div className="space-y-1.5">
+            {screenshot && !extracting && !extractedDetails.orderId && (
+              <p className="text-[9px] text-red-500 font-semibold text-center">Order ID is required to submit</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={resetForm}
+                className="flex-1 py-2.5 text-xs font-bold text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleInlineSubmit}
+                disabled={!screenshot || submitting || extracting || !extractedDetails.orderId.trim()}
+                className="flex-1 py-2.5 bg-black text-white font-extrabold rounded-xl text-xs uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition-all flex items-center justify-center gap-1.5"
+              >
+                {submitting ? (
+                  <><Loader2 size={12} className="animate-spin" /> Submitting...</>
+                ) : (
+                  <><Upload size={12} /> Submit</>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
