@@ -3507,15 +3507,15 @@ export async function extractOrderDetailsWithAi(
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              suggestedOrderId: { type: Type.STRING, description: 'Corrected order ID from OCR text. Use exact platform format. Empty string if not found.' },
-              suggestedAmount: { type: Type.NUMBER, description: 'Corrected Grand Total / final amount paid as plain number (e.g. 1408). Return 0 if not found. Must NOT be order ID digits, pincode, or phone.' },
-              suggestedOrderDate: { type: Type.STRING, description: 'Order placed date from OCR text. Empty string if not found.' },
-              suggestedSoldBy: { type: Type.STRING, description: 'Seller company name from OCR text. No button text. Empty string if not found.' },
-              suggestedProductName: { type: Type.STRING, description: 'Full product title from OCR text. Must describe a physical item. Empty string if not found.' },
+              suggestedOrderId: { type: Type.STRING, description: 'Corrected order ID from OCR text. Use exact platform format. Null if not found.', nullable: true },
+              suggestedAmount: { type: Type.NUMBER, description: 'Corrected Grand Total / final amount paid as plain number (e.g. 1408). Null if not found. Must NOT be order ID digits, pincode, or phone.', nullable: true },
+              suggestedOrderDate: { type: Type.STRING, description: 'Order placed date from OCR text. Null if not found.', nullable: true },
+              suggestedSoldBy: { type: Type.STRING, description: 'Seller company name from OCR text. No button text. Null if not found.', nullable: true },
+              suggestedProductName: { type: Type.STRING, description: 'Full product title from OCR text. Must describe a physical item. Null if not found.', nullable: true },
               confidenceScore: { type: Type.INTEGER, description: 'Confidence 0-100 in correctness of all suggested fields.' },
-              notes: { type: Type.STRING, description: 'Brief explanation of extraction reasoning and any corrections made.' },
+              notes: { type: Type.STRING, description: 'Brief explanation of extraction reasoning and any corrections made.', nullable: true },
             },
-            required: ['suggestedOrderId', 'suggestedAmount', 'suggestedOrderDate', 'suggestedSoldBy', 'suggestedProductName', 'confidenceScore', 'notes'],
+            required: ['confidenceScore'],
           },
         },
       }));
@@ -3625,8 +3625,8 @@ export async function extractOrderDetailsWithAi(
             '- Address text (city names, state names, pincodes, street names, "India") must NEVER be the product name.',
             '- Order ID must follow the exact platform format described above.',
             '',
-            'Return JSON with: orderId (string), amount (number), orderDate (string), soldBy (string), productName (string), confidenceScore (0-100 integer).',
-            'If a field is not found, return empty string for strings and 0 for amount.',
+            'Return JSON with: orderId (string|null), amount (number|null), orderDate (string|null), soldBy (string|null), productName (string|null), confidenceScore (0-100 integer).',
+            'If a field is not found, return null for that field. Do NOT return 0 for amount or empty string — use null.',
           ].join('\n') },
         ],
         config: {
@@ -3636,14 +3636,14 @@ export async function extractOrderDetailsWithAi(
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              orderId: { type: Type.STRING, description: 'The e-commerce order ID in exact platform format (e.g. Amazon 3-7-7 with dashes, Flipkart OD+digits). Empty string if not found.' },
-              amount: { type: Type.NUMBER, description: 'Grand Total / final amount paid in INR as a plain number (e.g. 10048 for ₹10,048). Return 0 if not found. Must NOT be order ID digits, pincode, or phone number.' },
-              orderDate: { type: Type.STRING, description: 'Date the order was placed (e.g. "13 February 2026"). Empty string if not found.' },
-              soldBy: { type: Type.STRING, description: 'Seller/merchant company name only (e.g. "Cocoblu Retail"). No button text. Empty string if not found.' },
-              productName: { type: Type.STRING, description: 'Full product title/name of the item ordered. Concatenate all lines if multi-line. Must NOT be navigation text or addresses. Empty string if not found.' },
+              orderId: { type: Type.STRING, description: 'The e-commerce order ID in exact platform format (e.g. Amazon 3-7-7 with dashes, Flipkart OD+digits). Null if not found.', nullable: true },
+              amount: { type: Type.NUMBER, description: 'Grand Total / final amount paid in INR as a plain number (e.g. 10048 for ₹10,048). Null if not found. Must NOT be order ID digits, pincode, or phone number.', nullable: true },
+              orderDate: { type: Type.STRING, description: 'Date the order was placed (e.g. "13 February 2026"). Null if not found.', nullable: true },
+              soldBy: { type: Type.STRING, description: 'Seller/merchant company name only (e.g. "Cocoblu Retail"). No button text. Null if not found.', nullable: true },
+              productName: { type: Type.STRING, description: 'Full product title/name of the item ordered. Concatenate all lines if multi-line. Must NOT be navigation text or addresses. Null if not found.', nullable: true },
               confidenceScore: { type: Type.INTEGER, description: 'Confidence 0-100 in the extraction accuracy.' },
             },
-            required: ['orderId', 'amount', 'orderDate', 'soldBy', 'productName', 'confidenceScore'],
+            required: ['confidenceScore'],
           },
         },
       }));
@@ -3959,9 +3959,91 @@ export async function extractOrderDetailsWithAi(
       }
     }
 
+    // ── ACCELERATED RETRY: When fast path got orderId but missed amount, try model[1] immediately ──
+    // This is FAR faster than falling to 12-variant OCR loop (2-5s vs 20-25s).
+    // Also fills metadata gaps (productName, soldBy, orderDate) without OCR.
+    if (!fastPathSuccess && accumulatedOrderId && !isTimeUp() && ai && !isGeminiCircuitOpen()) {
+      const retryModels = GEMINI_MODEL_FALLBACKS.slice(1, 3); // model[1] and model[2]
+      for (const retryModel of retryModels) {
+        if (isTimeUp()) break;
+        try {
+          const retryResult = await extractDirectFromImage(retryModel, payload.imageBase64);
+          if (!retryResult) continue;
+          const retryOrderId = sanitizeOrderId(retryResult.orderId);
+          let retryAmount = typeof retryResult.amount === 'number' && Number.isFinite(retryResult.amount) && retryResult.amount > 0
+            ? retryResult.amount : null;
+          const retryConfidence = typeof retryResult.confidenceScore === 'number'
+            ? Math.max(0, Math.min(100, retryResult.confidenceScore)) : 0;
+
+          // Apply same amount validation
+          if (retryAmount && accumulatedOrderId) {
+            const rOD = accumulatedOrderId.replace(/[^0-9]/g, '');
+            const rAS = String(Math.round(retryAmount));
+            const rSegs = new Set<string>();
+            if (rOD.length >= 4) rSegs.add(rOD);
+            for (const seg of accumulatedOrderId.split(/[\-\s]+/)) { const d = seg.replace(/[^0-9]/g, ''); if (d.length >= 3) rSegs.add(d); }
+            if (rSegs.has(rAS)) retryAmount = null;
+            else if (rAS.length >= 5 && rOD.length >= 8 && rOD.includes(rAS)) retryAmount = null;
+          }
+          if (retryAmount) {
+            const rAS = String(Math.round(retryAmount));
+            if (/^\d{6}$/.test(rAS) && retryAmount >= 100000 && retryAmount <= 999999 && retryConfidence < 90) retryAmount = null;
+            if (retryAmount && /^[6-9]\d{9}$/.test(rAS)) retryAmount = null;
+            if (retryAmount && retryAmount > 500000) retryAmount = null;
+          }
+
+          // Merge retry results
+          if (!accumulatedAmount && retryAmount) accumulatedAmount = retryAmount;
+          if (retryOrderId && !accumulatedOrderId) accumulatedOrderId = retryOrderId;
+          if (retryResult.orderDate && !accumulatedOrderDate) accumulatedOrderDate = retryResult.orderDate;
+          if (retryResult.soldBy && !accumulatedSoldBy) {
+            accumulatedSoldBy = retryResult.soldBy
+              .replace(/\s*\(\s*(Ask\s*Product\s*Question|Visit\s*(the\s*)?Store)[^)]*\)/gi, '')
+              .replace(/\s{2,}/g, ' ').trim() || null;
+          }
+          if (retryResult.productName && retryResult.productName.length >= 5
+            && !/https?:\/\/|Deliver\s*to|Hello[,\s]|Returns?\s/i.test(retryResult.productName)
+            && !accumulatedProductName) {
+            accumulatedProductName = retryResult.productName;
+          }
+          recordGeminiSuccess();
+          aiLog.info('Order extract accelerated retry', { model: retryModel, orderId: retryOrderId, amount: retryAmount, confidence: retryConfidence });
+
+          // If we now have both orderId + amount, promote to fast path success
+          if (accumulatedOrderId && accumulatedAmount && retryConfidence >= 55) {
+            deterministic = {
+              orderId: accumulatedOrderId,
+              amount: accumulatedAmount,
+              orderDate: accumulatedOrderDate,
+              soldBy: accumulatedSoldBy,
+              productName: accumulatedProductName,
+              notes: ['Accelerated retry: extracted via Gemini Vision (model retry).'],
+            };
+            bestScore = 2;
+            ocrText = '[Gemini Vision accelerated retry — no OCR text]';
+            ocrLabel = 'gemini-vision-retry';
+            fastPathSuccess = true;
+            aiLog.info('Order extract ACCELERATED RETRY promoted to fast path success', {
+              orderId: accumulatedOrderId, amount: accumulatedAmount,
+            });
+            break;
+          }
+          // Even partial — one retry is enough, don't burn time
+          break;
+        } catch (err) {
+          aiLog.warn('[Extract] Accelerated retry error', { model: retryModel, error: err instanceof Error ? err.message : err });
+          continue;
+        }
+      }
+    }
+
     // ── OCR VARIANT LOOP: Only needed when fast path didn't get both orderId + amount ──
+    // When fast path found orderId, limit OCR variants to save time for Steps 1+2
+    const effectiveOcrVariants = (!fastPathSuccess && accumulatedOrderId)
+      ? ocrVariants.slice(0, 4)   // Already have orderId, just need amount — 4 variants enough
+      : ocrVariants;
     if (!fastPathSuccess) {
-    for (const variant of ocrVariants) {
+    for (const variant of effectiveOcrVariants) {
       // ── Global deadline check: stop processing more variants if time is running out ──
       if (isTimeUp()) {
         aiLog.warn('Global extraction deadline reached — stopping OCR variant loop.', {
@@ -4117,13 +4199,23 @@ export async function extractOrderDetailsWithAi(
     }
 
     if (!ocrText) {
-      aiLog.warn('Order extract OCR failed: empty OCR output.');
-      return {
-        orderId: null,
-        amount: null,
-        confidenceScore: 15,
-        notes: 'OCR failed to read text. Please upload a clearer screenshot.',
-      };
+      // If fast path already found results, don't bail out — use them
+      if (accumulatedOrderId || accumulatedAmount) {
+        ocrText = '[No OCR text — using accumulated results]';
+        if (!deterministic.orderId && accumulatedOrderId) deterministic.orderId = accumulatedOrderId;
+        if (!deterministic.amount && accumulatedAmount) deterministic.amount = accumulatedAmount;
+        if (!deterministic.orderDate && accumulatedOrderDate) deterministic.orderDate = accumulatedOrderDate;
+        if (!deterministic.soldBy && accumulatedSoldBy) deterministic.soldBy = accumulatedSoldBy;
+        if (!deterministic.productName && accumulatedProductName) deterministic.productName = accumulatedProductName;
+      } else {
+        aiLog.warn('Order extract OCR failed: empty OCR output.');
+        return {
+          orderId: null,
+          amount: null,
+          confidenceScore: 15,
+          notes: 'OCR failed to read text. Please upload a clearer screenshot.',
+        };
+      }
     }
 
     if (env.AI_DEBUG_OCR) {

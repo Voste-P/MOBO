@@ -196,7 +196,7 @@ export const AgencyAuthScreen: React.FC<AgencyAuthProps> = ({ onBack }) => {
 
           <form onSubmit={view === 'login' ? handleLogin : handleRegister} className="space-y-4">
             {error && (
-              <div className="p-4 bg-red-50 text-red-600 text-xs font-bold rounded-xl flex items-center gap-2 border border-red-100">
+              <div role="alert" className="p-4 bg-red-50 text-red-600 text-xs font-bold rounded-xl flex items-center gap-2 border border-red-100 animate-enter">
                 {error}
               </div>
             )}
@@ -238,6 +238,7 @@ export const AgencyAuthScreen: React.FC<AgencyAuthProps> = ({ onBack }) => {
               minLength={8}
               maxLength={200}
               autoComplete={view === 'login' ? 'current-password' : 'new-password'}
+              hint={view === 'register' ? '8+ chars: uppercase, lowercase, number & special' : undefined}
             />
 
             {view === 'register' && (
