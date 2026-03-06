@@ -4157,6 +4157,8 @@ export async function extractOrderDetailsWithAi(
     // ALWAYS run AI when available and circuit breaker is closed — for validation, gap-filling, and cross-checking
     if (ai && !isGeminiCircuitOpen() && !isTimeUp()) {
       // Step 1: Text-based refinement (cheap — sends OCR text only)
+      // Skip when fast path succeeded — ocrText is a placeholder string with no real OCR data
+      if (!fastPathSuccess)
       for (const model of GEMINI_MODEL_FALLBACKS.slice(0, 3)) {
         if (isTimeUp()) break;
         try {
@@ -4308,9 +4310,12 @@ export async function extractOrderDetailsWithAi(
 
       // Step 2: Direct image extraction — runs when ANY field is missing (not just ID/amount)
       // Gemini Vision understands screenshot layout far better than OCR text parsing
-      // Skip if fast path already did direct vision extraction successfully
-      if (!fastPathSuccess && !isTimeUp() && (!finalOrderId || !finalAmount || !finalProductName || !finalSoldBy || !finalOrderDate)) {
-        for (const model of GEMINI_MODEL_FALLBACKS.slice(0, 2)) {
+      // When fast path succeeded, model[0] already ran — try remaining models for metadata gap-filling
+      if (!isTimeUp() && (!finalOrderId || !finalAmount || !finalProductName || !finalSoldBy || !finalOrderDate)) {
+        const step2Models = fastPathSuccess
+          ? GEMINI_MODEL_FALLBACKS.slice(1, 3)   // Skip model[0] which fast path already used
+          : GEMINI_MODEL_FALLBACKS.slice(0, 2);
+        for (const model of step2Models) {
           if (isTimeUp()) break;
           try {
             // eslint-disable-next-line no-await-in-loop

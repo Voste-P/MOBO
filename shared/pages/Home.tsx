@@ -13,7 +13,11 @@ export const Home: React.FC<HomeProps> = ({ onVoiceNavigate }) => {
   // Notifications are server-backed; avoid seeded/mock toasts here.
   return (
     <div className="h-full w-full flex flex-col relative bg-[#F4F4F5]">
-      <Suspense fallback={null}>
+      <Suspense fallback={
+        <div className="flex-1 flex items-center justify-center">
+          <div className="w-8 h-8 border-3 border-lime-200 border-t-lime-500 rounded-full animate-spin" />
+        </div>
+      }>
         <Chatbot onNavigate={onVoiceNavigate} />
       </Suspense>
     </div>

@@ -513,7 +513,9 @@ export const Orders: React.FC = () => {
         if (productNameStatus === 'mismatch') {
           toast.error('Product name in screenshot may not match the selected deal. You can override if this is correct.');
         } else if (hasId && hasAmount) {
-          toast.success('Order ID and Amount detected successfully!');
+          const extras = [details.productName && 'Product', details.soldBy && 'Seller', details.orderDate && 'Date'].filter(Boolean);
+          const extraMsg = extras.length > 0 ? ` + ${extras.join(', ')}` : '';
+          toast.success(`Order ID and Amount detected${extraMsg}!`);
         } else if (hasId) {
           toast.success('Order ID detected! Amount field is ready to edit if needed.');
         } else if (hasAmount) {
@@ -698,7 +700,7 @@ export const Orders: React.FC = () => {
       loadOrders();
       toast.success('Order submitted successfully!');
     } catch (e: any) {
-      toast.error(String(e.message || 'Failed to submit order.'));
+      toast.error(formatErrorMessage(e, 'Failed to submit order.'));
     } finally {
       setIsUploading(false);
       submittingRef.current = false;
@@ -1625,13 +1627,16 @@ export const Orders: React.FC = () => {
                         onChange={handleNewOrderScreenshot}
                       />
                       {isAnalyzing && (
-                        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center">
+                        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center gap-2">
                           <Loader2
-                            size={24}
-                            className="animate-spin motion-reduce:animate-none text-lime-600 mb-2"
+                            size={28}
+                            className="animate-spin motion-reduce:animate-none text-lime-600"
                           />
                           <span className="text-xs font-bold text-lime-600 animate-pulse motion-reduce:animate-none">
-                            AI Checking Proof...
+                            AI Extracting Order Details...
+                          </span>
+                          <span className="text-[9px] text-slate-400 font-medium">
+                            Detecting Order ID, Amount, Product &amp; Seller
                           </span>
                         </div>
                       )}
@@ -1759,21 +1764,43 @@ export const Orders: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Show AI-extracted metadata */}
-                  {formScreenshot && !isAnalyzing && (extractedDetails.orderDate || extractedDetails.soldBy || extractedDetails.productName) && (
-                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 space-y-1.5 animate-enter">
+                  {/* Show AI-extracted metadata — editable so users can correct AI mistakes */}
+                  {/* Always show after extraction completes so users can manually fill missing fields */}
+                  {formScreenshot && !isAnalyzing && (extractedDetails.orderId || extractedDetails.amount) && (
+                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 space-y-2 animate-enter">
                       <p className="text-[10px] font-bold text-blue-500 uppercase flex items-center gap-1">
                         <ScanLine size={10} /> AI Extracted Details
                       </p>
-                      {extractedDetails.productName && (
-                        <p className="text-xs text-slate-700"><span className="font-bold text-slate-500">Product:</span> {extractedDetails.productName}</p>
-                      )}
-                      {extractedDetails.soldBy && (
-                        <p className="text-xs text-slate-700"><span className="font-bold text-slate-500">Sold By:</span> {extractedDetails.soldBy}</p>
-                      )}
-                      {extractedDetails.orderDate && (
-                        <p className="text-xs text-slate-700"><span className="font-bold text-slate-500">Order Date:</span> {extractedDetails.orderDate}</p>
-                      )}
+                      <div className="space-y-0.5">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase ml-0.5">Product</label>
+                        <input
+                          type="text"
+                          value={extractedDetails.productName || ''}
+                          onChange={(e) => setExtractedDetails({ ...extractedDetails, productName: e.target.value || undefined })}
+                          className="w-full p-2 rounded-lg bg-white border border-blue-100 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                          placeholder="Product name"
+                        />
+                      </div>
+                      <div className="space-y-0.5">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase ml-0.5">Sold By</label>
+                        <input
+                          type="text"
+                          value={extractedDetails.soldBy || ''}
+                          onChange={(e) => setExtractedDetails({ ...extractedDetails, soldBy: e.target.value || undefined })}
+                          className="w-full p-2 rounded-lg bg-white border border-blue-100 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                          placeholder="Seller name"
+                        />
+                      </div>
+                      <div className="space-y-0.5">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase ml-0.5">Order Date</label>
+                        <input
+                          type="text"
+                          value={extractedDetails.orderDate || ''}
+                          onChange={(e) => setExtractedDetails({ ...extractedDetails, orderDate: e.target.value || undefined })}
+                          className="w-full p-2 rounded-lg bg-white border border-blue-100 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                          placeholder="e.g. 15 January 2026"
+                        />
+                      </div>
                     </div>
                   )}
 
