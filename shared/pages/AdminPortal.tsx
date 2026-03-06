@@ -2336,7 +2336,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       open={!!selectedTicket}
       onClose={() => setSelectedTicket(null)}
       ticket={selectedTicket}
-      onRefresh={loadAll}
+      onRefresh={fetchAllData}
     />
     </>
   );
