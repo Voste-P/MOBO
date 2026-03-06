@@ -1965,7 +1965,7 @@ export async function extractOrderDetailsWithAi(
       // Check if the corrected amount appears after a price label in OCR text
       // IMPORTANT: Must match at START of the after-label text to avoid substring false positives
       // e.g. "Grand Total: Rs 445.02" — "45" is a substring of "445.02" but NOT the amount
-      const labelRe = /(?:total|amount|paid|payable|grand|you\s*pay|bill|price)\s*:?\s*(?:₹|rs\.?|inr)?\s*/gi;
+      const labelRe = /(?:total|amount|paid|payable|grand|you\s*pay|bill|price|net\s*payable|order\s*total|amount\s*due|cart\s*total)\s*:?\s*(?:₹|rs\.?|inr)?\s*/gi;
       let match;
       const candidateStr = String(withoutFirstVal);
       const withCommas = withoutFirstVal >= 1000
@@ -2663,7 +2663,7 @@ export async function extractOrderDetailsWithAi(
             if (isProductLine(line, i)) {
               // Try to merge with subsequent lines that are continuation of the product name
               let merged = line.trim();
-              for (let j = i + 1; j < Math.min(lines.length, i + 6); j++) {
+              for (let j = i + 1; j < Math.min(lines.length, i + 8); j++) {
                 const nextLine = lines[j];
                 // Stop merging if we hit a price, seller, status, or quantity line
                 if (/^₹|^rs\.?|sold\s*by|seller|quantity|qty|return\s*window|buy\s*it\s*again|view\s*your|leave\s*(seller|delivery)|write\s*a\s*product|track\s*package/i.test(nextLine)) break;
@@ -2713,7 +2713,7 @@ export async function extractOrderDetailsWithAi(
             if (/₹|rs\.?|sold\s*by|seller|size|color|qty/i.test(nextAreaLines)) {
               // Try to merge continuation lines (Flipkart product titles can be multi-line)
               let merged = line.trim();
-              for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
+              for (let j = i + 1; j < Math.min(lines.length, i + 7); j++) {
                 const nextLine = lines[j];
                 // Stop merging at price, seller, size, color, qty lines
                 if (/^₹|^rs\.?|sold\s*by|seller|^(size|color|qty|quantity)\s*[:\-]/i.test(nextLine)) break;
@@ -4672,7 +4672,7 @@ export async function extractOrderDetailsWithAi(
       }
     }
 
-    // 9. Clean up soldBy: strip common Amazon/Flipkart button text that OCR captured
+    // 9. Clean up soldBy: strip common Amazon/Flipkart/Myntra/Meesho button text that OCR captured
     if (finalSoldBy) {
       finalSoldBy = finalSoldBy
         .replace(/\s*\(\s*(Ask\s*Product\s*Question|Visit\s*(the\s*)?Store|See\s*All|View\s*More|Follow|Contact|Report|Share)[^)]*\)/gi, '')
@@ -4690,11 +4690,25 @@ export async function extractOrderDetailsWithAi(
         .replace(/\s*Add\s*to\s*(Cart|Wish\s*List)\s*/gi, '')
         .replace(/\s*Share\s*this\s*product\s*/gi, '')
         .replace(/\s*Report\s*incorrect\s*product\s*info\w*\s*/gi, '')
+        // Myntra/Nykaa/AJIO button text
+        .replace(/\s*Exchange\s*or\s*Return\s*/gi, '')
+        .replace(/\s*Rate\s*(this\s*)?(product|item)\s*/gi, '')
+        .replace(/\s*Need\s*Help\s*\??\s*/gi, '')
+        .replace(/\s*View\s*Similar\s*/gi, '')
+        .replace(/\s*Check\s*delivery\s*date\s*/gi, '')
+        .replace(/\s*Chat\s*with\s*us\s*/gi, '')
+        // Meesho/generic marketplace button text
+        .replace(/\s*View\s*Shop\s*/gi, '')
+        .replace(/\s*View\s*All\s*Products\s*/gi, '')
+        .replace(/\s*Supplier\s*Details?\s*/gi, '')
+        .replace(/\s*GST\s*:?\s*\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d][A-Z]\d\s*/gi, '') // GST numbers
         // Strip trailing OCR garbage: single/double chars, 'Pp 2', page numbers, etc.
         .replace(/\s+[A-Za-z]{1,2}\s+\d{1,2}\s*$/g, '')
         .replace(/\s+[Pp]p\s*\d+\s*$/g, '')
         // Strip trailing single lowercase letter (OCR noise like "Ltd h")
         .replace(/\s+[a-z]\s*$/g, '')
+        // Strip trailing digits-only fragments (OCR noise like "Pvt Ltd 42")
+        .replace(/\s+\d{1,3}\s*$/g, '')
         .replace(/\s{2,}/g, ' ')
         .trim();
       if (finalSoldBy.length < 2) {
@@ -4759,14 +4773,12 @@ export async function extractOrderDetailsWithAi(
       confidenceScore = Math.max(30, confidenceScore - 15);
     }
 
-    // 8c. Deterministic ₹-as-digit correction (conservative, OCR-only mode)
-    // Only apply when: (1) no AI was used, (2) the original amount does NOT appear near any
-    // price label in OCR text WITH an explicit ₹/Rs prefix, AND (3) the corrected amount
-    // DOES appear near a label.
+    // 8c. Deterministic ₹-as-digit correction (always applied)
     // Key insight: when ₹ is misread as a digit (e.g., ₹1,390 → 21,390), the OCR text
     // will show "21,390" near "Grand Total" — WITHOUT a ₹ prefix. So we require the
     // original amount to appear with an EXPLICIT rupee symbol to consider it valid.
-    if (finalAmount && ocrText && !aiUsed) {
+    // This runs AFTER AI validation so it can catch cases the AI also got wrong.
+    if (finalAmount && ocrText) {
       const amtStr = String(Math.round(finalAmount));
       const amtFlexible = amtStr.replace(/(\d)/g, '$1[,.]?');
       // Check if the ORIGINAL amount appears WITH an explicit ₹/Rs/INR prefix — only then it's reliably correct

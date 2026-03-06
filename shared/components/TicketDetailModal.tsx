@@ -83,6 +83,13 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
     }
   }, [open, ticket, loadComments]);
 
+  // Auto-poll comments every 10 seconds when modal is open
+  useEffect(() => {
+    if (!open || !ticket) return;
+    const interval = setInterval(loadComments, 10000);
+    return () => clearInterval(interval);
+  }, [open, ticket, loadComments]);
+
   useEffect(() => {
     commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [comments]);
@@ -222,6 +229,37 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
                 {ticket.resolvedAt ? ` on ${new Date(ticket.resolvedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
               </p>
             )}
+          </div>
+
+          {/* Ticket activity timeline */}
+          <div className="space-y-1.5">
+            <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Activity</h3>
+            <div className="relative pl-4 border-l-2 border-zinc-200 space-y-2">
+              <div className="relative">
+                <div className="absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full bg-blue-400 border-2 border-white" />
+                <p className="text-[10px] text-zinc-600">
+                  <strong className={roleColors[(ticket as any).userRole || ticket.role] || ''}>{ticket.userName}</strong> created this ticket
+                  <span className="text-zinc-400 ml-1">{new Date(ticket.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                </p>
+              </div>
+              {ticket.targetRole && ticket.targetRole !== ((ticket as any).userRole === 'shopper' ? 'mediator' : ESCALATION_PATH[(ticket as any).userRole || '']) && (
+                <div className="relative">
+                  <div className="absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full bg-violet-400 border-2 border-white" />
+                  <p className="text-[10px] text-zinc-600">
+                    Escalated to <strong>{ticket.targetRole}</strong>
+                  </p>
+                </div>
+              )}
+              {isClosed && (
+                <div className="relative">
+                  <div className={`absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${ticket.status === 'Resolved' ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                  <p className="text-[10px] text-zinc-600">
+                    <strong>{ticket.resolvedByName || 'System'}</strong> {ticket.status === 'Resolved' ? 'resolved' : 'rejected'} this ticket
+                    {ticket.resolvedAt && <span className="text-zinc-400 ml-1">{new Date(ticket.resolvedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Comments thread */}
