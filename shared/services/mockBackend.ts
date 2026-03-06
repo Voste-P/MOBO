@@ -353,13 +353,19 @@ export const ordersAPI = {
         addToReceiptRegistry(hash);
         order.screenshots = { ...order.screenshots, order: proof.data };
       }
-      if (order.affiliateStatus === 'Rejected' || order.affiliateStatus === 'Fraud_Alert')
+      if (order.affiliateStatus === 'Rejected')
         order.affiliateStatus = 'Unchecked';
       saveOrders(orders);
     }
   },
   extractDetails: async (_file: File) => {
-    return { orderId: 'MOCK-123', amount: 1000 };
+    return {
+      orderId: 'MOCK-123-4567890-1234567',
+      amount: 1000,
+      orderDate: '15 January 2026',
+      soldBy: 'Mock Seller Store',
+      productName: 'Mock Product — Premium Quality Item (Size M, Black)',
+    };
   },
 };
 

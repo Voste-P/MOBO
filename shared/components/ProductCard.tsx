@@ -95,7 +95,8 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
         });
       }
     } catch {
-      // Extraction is optional
+      // Extraction is optional — notify user gracefully
+      toast.info('Could not auto-extract details. You can enter them manually.');
     } finally {
       setExtracting(false);
     }
@@ -139,7 +140,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
       toast.success('Order submitted! Track it in the Orders tab.');
       setTimeout(resetForm, 1500);
     } catch (err: any) {
-      toast.error(String(err?.message || 'Failed to submit order. Try again.'));
+      toast.error(typeof err?.message === 'string' ? err.message : 'Failed to submit order. Try again.');
     } finally {
       setSubmitting(false);
     }

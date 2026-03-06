@@ -86,7 +86,8 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
         });
       }
     } catch {
-      // Extraction is optional — buyer can still submit
+      // Extraction is optional — notify user gracefully
+      toast.info('Could not auto-extract details. You can enter them manually.');
     } finally {
       setExtracting(false);
     }
@@ -131,7 +132,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
       onSuccess?.();
       setTimeout(handleClose, 1200);
     } catch (err: any) {
-      toast.error(String(err?.message || 'Failed to submit order. Please try again.'));
+      toast.error(typeof err?.message === 'string' ? err.message : 'Failed to submit order. Please try again.');
     } finally {
       setSubmitting(false);
     }
