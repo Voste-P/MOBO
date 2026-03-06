@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { X, Upload, Loader2, CheckCircle, ShoppingBag, Camera, AlertCircle } from 'lucide-react';
+import { X, Upload, Loader2, CheckCircle, ShoppingBag, Camera, AlertCircle, UserCircle } from 'lucide-react';
 import { Product } from '../types';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -41,6 +41,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
     soldBy?: string;
     productName?: string;
   }>({ orderId: '', amount: '' });
+  const [reviewerName, setReviewerName] = useState('');
 
   const reset = useCallback(() => {
     setScreenshot(null);
@@ -49,6 +50,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
     setSubmitting(false);
     setSubmitted(false);
     setExtractedDetails({ orderId: '', amount: '' });
+    setReviewerName('');
   }, []);
 
   const handleClose = () => {
@@ -124,6 +126,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
           orderDate: extractedDetails.orderDate || undefined,
           soldBy: extractedDetails.soldBy || undefined,
           extractedProductName: extractedDetails.productName || undefined,
+          reviewerName: reviewerName.trim() || undefined,
         },
       );
 
@@ -229,38 +232,65 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
           </div>
 
           {/* Extracted Details (auto-filled by AI) */}
-          {(extractedDetails.orderId || extractedDetails.amount) && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-2 animate-enter">
+          {(extractedDetails.orderId || extractedDetails.amount || extractedDetails.productName || extractedDetails.soldBy || extractedDetails.orderDate) && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-2.5 animate-enter">
               <p className="text-[10px] font-bold text-emerald-700 flex items-center gap-1">
                 <CheckCircle size={12} /> AI Detected Details
               </p>
               <div className="grid grid-cols-2 gap-2">
-                {extractedDetails.orderId && (
-                  <div>
-                    <label className="text-[9px] font-bold text-emerald-600 uppercase">Order ID</label>
-                    <input
-                      type="text"
-                      value={extractedDetails.orderId}
-                      onChange={(e) => setExtractedDetails((d) => ({ ...d, orderId: e.target.value }))}
-                      className="w-full mt-0.5 px-2 py-1.5 text-xs border border-emerald-200 rounded-lg bg-white focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 outline-none"
-                    />
-                  </div>
-                )}
-                {extractedDetails.amount && (
-                  <div>
-                    <label className="text-[9px] font-bold text-emerald-600 uppercase">Amount (₹)</label>
-                    <input
-                      type="text"
-                      value={extractedDetails.amount}
-                      onChange={(e) => setExtractedDetails((d) => ({ ...d, amount: e.target.value }))}
-                      className="w-full mt-0.5 px-2 py-1.5 text-xs border border-emerald-200 rounded-lg bg-white focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 outline-none"
-                    />
-                  </div>
-                )}
+                <div>
+                  <label className="text-[9px] font-bold text-emerald-600 uppercase">Order ID</label>
+                  <input
+                    type="text"
+                    value={extractedDetails.orderId}
+                    onChange={(e) => setExtractedDetails((d) => ({ ...d, orderId: e.target.value }))}
+                    placeholder="e.g. 408-1234567-8901234"
+                    className="w-full mt-0.5 px-2 py-1.5 text-xs border border-emerald-200 rounded-lg bg-white focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] font-bold text-emerald-600 uppercase">Amount (₹)</label>
+                  <input
+                    type="text"
+                    value={extractedDetails.amount}
+                    onChange={(e) => setExtractedDetails((d) => ({ ...d, amount: e.target.value }))}
+                    placeholder="e.g. 499"
+                    className="w-full mt-0.5 px-2 py-1.5 text-xs border border-emerald-200 rounded-lg bg-white focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 outline-none"
+                  />
+                </div>
               </div>
-              {extractedDetails.productName && (
-                <p className="text-[10px] text-emerald-600">Product: {extractedDetails.productName}</p>
-              )}
+              <div>
+                <label className="text-[9px] font-bold text-emerald-600 uppercase">Product Name</label>
+                <input
+                  type="text"
+                  value={extractedDetails.productName || ''}
+                  onChange={(e) => setExtractedDetails((d) => ({ ...d, productName: e.target.value }))}
+                  placeholder="e.g. Samsung Galaxy M34 5G"
+                  className="w-full mt-0.5 px-2 py-1.5 text-xs border border-emerald-200 rounded-lg bg-white focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 outline-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[9px] font-bold text-emerald-600 uppercase">Seller / Sold By</label>
+                  <input
+                    type="text"
+                    value={extractedDetails.soldBy || ''}
+                    onChange={(e) => setExtractedDetails((d) => ({ ...d, soldBy: e.target.value }))}
+                    placeholder="e.g. Cloudtail India"
+                    className="w-full mt-0.5 px-2 py-1.5 text-xs border border-emerald-200 rounded-lg bg-white focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] font-bold text-emerald-600 uppercase">Order Date</label>
+                  <input
+                    type="text"
+                    value={extractedDetails.orderDate || ''}
+                    onChange={(e) => setExtractedDetails((d) => ({ ...d, orderDate: e.target.value }))}
+                    placeholder="e.g. 15 Jan 2026"
+                    className="w-full mt-0.5 px-2 py-1.5 text-xs border border-emerald-200 rounded-lg bg-white focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 outline-none"
+                  />
+                </div>
+              </div>
             </div>
           )}
 
@@ -271,6 +301,26 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
               <p className="text-[11px] text-amber-700">
                 Could not auto-detect order details. Make sure the screenshot clearly shows the Order ID and amount.
                 You can still submit — the mediator will review manually.
+              </p>
+            </div>
+          )}
+
+          {/* Reviewer Name — always shown after screenshot upload */}
+          {preview && !extracting && (
+            <div className="space-y-1 animate-enter">
+              <label className="text-[10px] font-bold text-slate-500 uppercase ml-0.5 flex items-center gap-1">
+                <UserCircle size={12} /> Your Reviewer / Account Name
+              </label>
+              <input
+                type="text"
+                value={reviewerName}
+                onChange={(e) => setReviewerName(e.target.value)}
+                placeholder="e.g. Rahul S. on Amazon"
+                maxLength={200}
+                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-lime-200 focus:border-lime-300 outline-none transition-all font-medium"
+              />
+              <p className="text-[9px] text-zinc-400 ml-0.5">
+                Your name on the marketplace — helps verify your review/rating screenshots.
               </p>
             </div>
           )}

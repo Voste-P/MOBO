@@ -95,7 +95,7 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
 
   if (view === 'pending') {
     return (
-      <div className="flex-1 flex flex-col bg-white h-full relative px-8 pt-12">
+      <div className="flex-1 flex flex-col bg-white h-full relative px-8 pt-12 pb-[env(safe-area-inset-bottom)] overflow-y-auto scrollbar-styled">
         <Button
           type="button"
           variant="secondary"
@@ -215,7 +215,7 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-white h-full relative px-8 pt-12">
+    <div className="flex-1 flex flex-col bg-white h-full relative px-8 pt-12 pb-[env(safe-area-inset-bottom)] overflow-y-auto scrollbar-styled">
       <Button
         type="button"
         variant="secondary"
@@ -235,7 +235,7 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
 
       <form onSubmit={view === 'login' ? handleLogin : handleRegister} className="space-y-4">
         {error && (
-          <div className="p-3 bg-red-50 text-red-600 text-sm rounded-xl font-bold text-center">
+          <div role="alert" className="p-3 bg-red-50 text-red-600 text-sm rounded-xl font-bold text-center border border-red-100 animate-enter">
             {error}
           </div>
         )}
@@ -278,6 +278,7 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
           minLength={8}
           maxLength={200}
           autoComplete={view === 'login' ? 'current-password' : 'new-password'}
+          hint={view === 'register' ? '8+ chars: uppercase, lowercase, number & special' : undefined}
         />
 
         {view === 'register' && (

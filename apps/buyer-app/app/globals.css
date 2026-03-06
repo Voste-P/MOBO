@@ -161,3 +161,28 @@ input[type='number']::-webkit-inner-spin-button {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* ── Text selection ── */
+::selection {
+  background-color: rgba(163, 230, 53, 0.25);
+  color: inherit;
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Focus visible global ── */
+:focus-visible {
+  outline: none;
+}
+
+/* ── Fade in utility ── */
+.fade-in {
+  animation: fadeIn 0.3s ease forwards;
+}

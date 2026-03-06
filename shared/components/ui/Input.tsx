@@ -16,6 +16,7 @@ export const Input = React.forwardRef<HTMLInputElement, Props>(function Input(
   ref
 ) {
   const inputId = id || React.useId();
+  const hintId = `${inputId}-hint`;
   const isDark = tone === 'dark';
   const isPasswordType = type === 'password';
   const [showPassword, setShowPassword] = useState(false);
@@ -59,8 +60,10 @@ export const Input = React.forwardRef<HTMLInputElement, Props>(function Input(
           ref={ref}
           id={inputId}
           type={isPasswordType ? (showPassword ? 'text' : 'password') : type}
+          aria-describedby={(error || hint) ? hintId : undefined}
+          aria-invalid={error ? true : undefined}
           className={cn(
-            'w-full bg-transparent outline-none font-semibold',
+            'w-full bg-transparent outline-none font-semibold transition-colors',
             isDark ? 'text-white placeholder:text-slate-600' : 'text-zinc-900 placeholder:text-zinc-400',
             leftIcon ? 'pl-11' : 'px-4',
             isPasswordType ? 'pr-12' : 'pr-4',
@@ -91,11 +94,11 @@ export const Input = React.forwardRef<HTMLInputElement, Props>(function Input(
         )}
       </div>
       {error ? (
-        <div className={cn('mt-2 text-xs font-bold', isDark ? 'text-rose-400' : 'text-red-600')}>
+        <div id={hintId} role="alert" className={cn('mt-2 text-xs font-bold animate-enter', isDark ? 'text-rose-400' : 'text-red-600')}>
           {error}
         </div>
       ) : hint ? (
-        <div className={cn('mt-2 text-xs font-medium', isDark ? 'text-slate-400' : 'text-zinc-500')}>
+        <div id={hintId} className={cn('mt-2 text-xs font-medium', isDark ? 'text-slate-400' : 'text-zinc-500')}>
           {hint}
         </div>
       ) : null}
