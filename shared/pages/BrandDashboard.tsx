@@ -60,6 +60,7 @@ import { User, Campaign, Order, Ticket } from '../types';
 import { EmptyState, Spinner } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
+import TicketDetailModal from '../components/TicketDetailModal';
 import { FeedbackCard } from '../components/FeedbackCard';
 import { RatingVerificationBadge, ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
 import { formatCurrency } from '../utils/formatCurrency';
@@ -2161,6 +2162,7 @@ export const BrandDashboard: React.FC = () => {
   const [ticketPriorityFilter, setTicketPriorityFilter] = useState('All');
   const [resolvingTicketId, setResolvingTicketId] = useState<string | null>(null);
   const [resolutionNote, setResolutionNote] = useState('');
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
   const fetchData = async () => {
     if (!user) return;
@@ -2491,11 +2493,11 @@ export const BrandDashboard: React.FC = () => {
               <button type="button" onClick={() => {
                 const supportTickets = tickets.filter(t => t.issueType !== 'Feedback');
                 if (!supportTickets.length) { toast.error('No tickets to export'); return; }
-                const header = ['Ticket ID','Status','Priority','Issue Type','Description','User','Role','Order ID','Resolution Note','Resolved By','Resolved At','Created At'].map(csvSafe).join(',');
+                const header = ['Ticket ID','Status','Priority','Issue Type','Description','User','Role','Target Role','Order ID','Resolution Note','Resolved By','Resolved At','Created At'].map(csvSafe).join(',');
                 const rows = supportTickets.map(t => [
                   csvSafe(t.id.slice(-8)), csvSafe(String(t.status)), csvSafe(String((t as any).priority || 'medium')),
                   csvSafe(String(t.issueType)), csvSafe(String(t.description || '')), csvSafe(String((t as any).userName || '')),
-                  csvSafe(String((t as any).role || '')), csvSafe(String(t.orderId || '')),
+                  csvSafe(String((t as any).role || '')), csvSafe(String((t as any).targetRole || '')), csvSafe(String(t.orderId || '')),
                   csvSafe(String((t as any).resolutionNote || '')), csvSafe(String((t as any).resolvedByName || '')),
                   csvSafe((t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString() : ''),
                   csvSafe(t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''),
@@ -2568,7 +2570,7 @@ export const BrandDashboard: React.FC = () => {
                   }
                   return true;
                 }).map((t: Ticket) => (
-                  <div key={t.id} className="rounded-xl border border-zinc-100 bg-white px-3 py-3 shadow-sm space-y-2">
+                  <div key={t.id} className="rounded-xl border border-zinc-100 bg-white px-3 py-3 shadow-sm space-y-2 cursor-pointer hover:border-zinc-300 transition-colors" onClick={() => setSelectedTicket(t)}>
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
@@ -3103,6 +3105,12 @@ export const BrandDashboard: React.FC = () => {
       )}
     </DesktopShell>
     <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />
+    <TicketDetailModal
+      open={!!selectedTicket}
+      onClose={() => setSelectedTicket(null)}
+      ticket={selectedTicket}
+      onRefresh={fetchData}
+    />
     {BrandConfirmDialog}
     </>
   );

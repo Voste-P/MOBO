@@ -2207,4 +2207,145 @@ describe('order extraction (Tesseract fallback)', () => {
       expect(result.amount).toBe(24900);
     }
   });
+
+  // ── Screenshot 32: ₹ misread as 2 → 21390 should become 1390 ──
+  it('corrects ₹ misread as leading 2 in Grand Total (21390 → 1390)', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'amazon.in',
+      'Order Details',
+      'Order placed 21 February 2026',
+      'Order number 408-0748913-2283060',
+      '',
+      'Ship to',
+      'Gaurav Chafle',
+      '163',
+      'Vishal Nagar, Wakad Road',
+      'PIMPRI CHINCHWAD, MAHARASHTRA',
+      '411027',
+      'India',
+      '',
+      'Payment method',
+      'Amazon Pay ICICI Bank Credit Card ending in 7008',
+      '',
+      'Order Summary',
+      'Item(s) Subtotal: Rs 1,385.00',
+      'Shipping: Rs 40.00',
+      'Marketplace Fee: Rs 5.00',
+      'Total: Rs 1,430.00',
+      'Promotion Applied: -Rs 40.00',
+      'Grand Total: Rs 1,390.00',
+      '',
+      'Delivered 23 February',
+      'NICONI Tan Vanish Gluta-Kojic Skin Polish | Instant Tan Removal & Glow | Infused with Kojic Acid & Glutathione | Ideal for All Skin Types | Lightens Suntan | 180g',
+      'Sold by: FORMULATE BRAND PRIVATE LIMITED',
+      'Rs 1,385.00',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 32 (₹ as 2) result:', JSON.stringify(result, null, 2));
+
+    // Order ID must be extracted
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/408-0748913-2283060/);
+    }
+    // Amount MUST be 1390 (Grand Total), NOT 21390, NOT 411027 (pincode), NOT 1385 (subtotal)
+    if (result.amount) {
+      expect(result.amount).not.toBe(21390);
+      expect(result.amount).not.toBe(411027);
+      expect(result.amount).not.toBe(1385);
+      expect([1390, 1430]).toContain(result.amount); // 1390 ideal, 1430 acceptable (Total before promo)
+    }
+    // Product name should match the actual product
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/niconi|tan|vanish|kojic|skin|polish/i);
+      expect(result.productName).not.toMatch(/411027|pimpri|chinchwad|gaurav|maharashtra/i);
+    }
+    // Sold by should be clean
+    if (result.soldBy) {
+      expect(result.soldBy).toMatch(/FORMULATE/i);
+      expect(result.soldBy).not.toMatch(/Pp\s*\d/);
+    }
+  });
+
+  // ── Screenshot 33: Pincode 411027 must NOT be extracted as amount ──
+  it('rejects 6-digit pincode 411027 when no total label nearby', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'amazon.in',
+      'Order Details',
+      'Order placed 17 February 2026',
+      'Order number 408-2723032-2917965',
+      '',
+      'Ship to',
+      'Gaurav Chafle',
+      '163',
+      'Vishal Nagar, Wakad Road',
+      'PIMPRI CHINCHWAD, MAHARASHTRA',
+      '411027',
+      'India',
+      '',
+      'Order Summary',
+      'Item(s) Subtotal: Rs 5,998.00',
+      'Shipping: Rs 40.00',
+      'Marketplace Fee: Rs 5.00',
+      'Total: Rs 6,043.00',
+      'Promotion Applied: -Rs 40.00',
+      'Grand Total: Rs 6,003.00',
+      '',
+      'Lorazzo Lustr Kitchen Sink (SILVER) - 24X18 inches | CERTIFIED 304 Stainless Steel Sink for Kitchen | with SS-304 Coupling, Waste Pipe & Basket | 20-Year Lorazzo Limited Warranty',
+      'Sold by: Lorazzo',
+      'Rs 5,998.00',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 33 (pincode rejection) result:', JSON.stringify(result, null, 2));
+
+    // Amount MUST be 6003 (Grand Total), NOT 411027 (pincode), NOT 5998 (subtotal)
+    if (result.amount) {
+      expect(result.amount).not.toBe(411027);
+      expect(result.amount).not.toBe(5998);
+      expect([6003, 6043]).toContain(result.amount); // 6003 ideal
+    }
+    if (result.orderId) {
+      expect(result.orderId).toMatch(/408-2723032-2917965/);
+    }
+    if (result.productName) {
+      expect(result.productName.toLowerCase()).toMatch(/lorazzo|kitchen|sink|stainless|steel/i);
+    }
+  });
+
+  // ── Screenshot 34: Garbled product name with @® characters should be rejected ──
+  it('rejects garbled OCR product names with too many special characters', { timeout: 120_000 }, async () => {
+    const env = makeTestEnv();
+    const imageBase64 = await renderTextToImage([
+      'Order Details',
+      'Order placed 07 February 2026',
+      'Order number 403-4371079-3367891',
+      '',
+      '@® D-UN- | [@ Busine: @ Indian | @ 177037 | (© (12W a 0 x @ YouO | & MyBil | @ Ussge | @ BUZZ | @ BUZZW | @ BUZZM | (@) BUZZM | + - [um] x',
+      'Sold by: RK World Infocom Pvt Ltd h',
+      '',
+      'Ship to: Pune, Maharashtra 411027',
+      '',
+      'Grand Total: Rs 599.00',
+    ]);
+
+    const result = await extractOrderDetailsWithAi(env, { imageBase64 });
+    console.log('Screenshot 34 (garbled product) result:', JSON.stringify(result, null, 2));
+
+    // Product name should be rejected (too garbled) or at least not contain @ symbols
+    if (result.productName) {
+      const atCount = (result.productName.match(/@/g) || []).length;
+      expect(atCount).toBeLessThan(3);
+    }
+    // Amount should be 599, NOT 411027
+    if (result.amount) {
+      expect(result.amount).not.toBe(411027);
+    }
+    // soldBy should be clean without trailing garbage
+    if (result.soldBy) {
+      expect(result.soldBy).not.toMatch(/\s+h$/);
+    }
+  });
 });

@@ -53,6 +53,7 @@ import { ProofImage } from '../components/ProofImage';
 import { RatingVerificationBadge, ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
 import { MobileTabBar } from '../components/MobileTabBar';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
+import TicketDetailModal from '../components/TicketDetailModal';
 import { FeedbackCard } from '../components/FeedbackCard';
 
 // --- UTILS ---
@@ -97,6 +98,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
   const [ticketPriorityFilter, setTicketPriorityFilter] = useState<string>('All');
   const [resolvingTicketId, setResolvingTicketId] = useState<string | null>(null);
   const [resolutionNote, setResolutionNote] = useState('');
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
   const actionRequiredOrders = useMemo(() =>
     orders.filter((o: Order) => String(o.workflowStatus || '') === 'UNDER_REVIEW')
@@ -573,10 +575,10 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
               <button type="button" onClick={() => {
                 const supportTickets = tickets.filter((t: Ticket) => t.issueType !== 'Feedback');
                 if (!supportTickets.length) { toast.error('No tickets to export'); return; }
-                const headers = ['Ticket ID', 'Status', 'Priority', 'Issue Type', 'Description', 'User', 'Role', 'Order ID', 'Resolution Note', 'Resolved By', 'Resolved At', 'Created At'];
+                const headers = ['Ticket ID', 'Status', 'Priority', 'Issue Type', 'Description', 'User', 'Role', 'Target Role', 'Order ID', 'Resolution Note', 'Resolved By', 'Resolved At', 'Created At'];
                 const rows = supportTickets.map((t: Ticket) => [
                   t.id.slice(-8), String(t.status), String((t as any).priority || 'medium'), String(t.issueType), String(t.description || ''),
-                  String((t as any).userName || ''), String((t as any).role || ''), String(t.orderId || ''),
+                  String((t as any).userName || ''), String((t as any).role || ''), String((t as any).targetRole || ''), String(t.orderId || ''),
                   String((t as any).resolutionNote || ''), String((t as any).resolvedByName || ''),
                   (t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString() : '',
                   t.createdAt ? new Date(t.createdAt).toLocaleDateString() : '',
@@ -658,7 +660,8 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
             }).map((t: Ticket) => (
               <div
                 key={t.id}
-                className="rounded-xl border border-zinc-100 bg-white px-3 py-3 shadow-sm space-y-2"
+                className="rounded-xl border border-zinc-100 bg-white px-3 py-3 shadow-sm space-y-2 cursor-pointer hover:border-zinc-300 transition-colors"
+                onClick={() => setSelectedTicket(t)}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
@@ -796,6 +799,13 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
           </div>
         )}
       </section>
+
+      <TicketDetailModal
+        open={!!selectedTicket}
+        onClose={() => setSelectedTicket(null)}
+        ticket={selectedTicket}
+        onRefresh={onRefresh}
+      />
     </div>
   );
 };

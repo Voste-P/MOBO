@@ -1,0 +1,387 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { X, Loader2, Send, MessageCircle, ArrowUpCircle, RotateCcw, CheckCircle2, XCircle, Trash2 } from 'lucide-react';
+import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { formatErrorMessage } from '../utils/errors';
+import type { Ticket, TicketComment } from '../types';
+
+interface TicketDetailModalProps {
+  open: boolean;
+  onClose: () => void;
+  ticket: Ticket | null;
+  onRefresh: () => void;
+}
+
+const ESCALATION_PATH: Record<string, string> = {
+  mediator: 'agency',
+  agency: 'brand',
+  brand: 'admin',
+};
+
+const statusColors: Record<string, string> = {
+  Open: 'bg-amber-50 text-amber-600 border-amber-200',
+  Resolved: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+  Rejected: 'bg-red-50 text-red-600 border-red-200',
+};
+
+const priorityColors: Record<string, string> = {
+  urgent: 'bg-red-500 text-white',
+  high: 'bg-orange-500 text-white',
+  medium: 'bg-blue-500 text-white',
+  low: 'bg-slate-500 text-white',
+};
+
+const roleColors: Record<string, string> = {
+  shopper: 'text-blue-600',
+  user: 'text-blue-600',
+  mediator: 'text-violet-600',
+  agency: 'text-emerald-600',
+  brand: 'text-orange-600',
+  admin: 'text-red-600',
+};
+
+export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: TicketDetailModalProps) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [comments, setComments] = useState<TicketComment[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [newComment, setNewComment] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [resolutionNote, setResolutionNote] = useState('');
+  const [showResolveForm, setShowResolveForm] = useState(false);
+  const commentsEndRef = useRef<HTMLDivElement>(null);
+
+  const userRole = user?.role || 'user';
+  const isOpen = ticket?.status === 'Open';
+  const isClosed = ticket?.status === 'Resolved' || ticket?.status === 'Rejected';
+  const canEscalate = isOpen && ESCALATION_PATH[userRole] && userRole !== 'admin' && userRole !== 'user';
+  const canResolve = isOpen && userRole !== 'user';
+  const canReopen = isClosed;
+  const canDelete = isClosed && (userRole === 'admin' || ticket?.userId === user?.id);
+
+  const loadComments = useCallback(async () => {
+    if (!ticket) return;
+    setLoadingComments(true);
+    try {
+      const resp = await api.tickets.getComments(ticket.id);
+      setComments(resp.comments || []);
+    } catch {
+      // Silent — comments just won't show
+    } finally {
+      setLoadingComments(false);
+    }
+  }, [ticket]);
+
+  useEffect(() => {
+    if (open && ticket) {
+      loadComments();
+      setNewComment('');
+      setResolutionNote('');
+      setShowResolveForm(false);
+    }
+  }, [open, ticket, loadComments]);
+
+  useEffect(() => {
+    commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [comments]);
+
+  if (!open || !ticket) return null;
+
+  const handleAddComment = async () => {
+    const msg = newComment.trim();
+    if (!msg) return;
+    setSubmittingComment(true);
+    try {
+      await api.tickets.addComment(ticket.id, msg);
+      setNewComment('');
+      await loadComments();
+    } catch (err: any) {
+      toast.error(formatErrorMessage(err, 'Failed to add comment.'));
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const handleResolve = async (status: 'Resolved' | 'Rejected') => {
+    setActionLoading(status);
+    try {
+      await api.tickets.update(ticket.id, status, resolutionNote || undefined);
+      toast.success(`Ticket ${status.toLowerCase()}.`);
+      setShowResolveForm(false);
+      setResolutionNote('');
+      onRefresh();
+      onClose();
+    } catch (err: any) {
+      toast.error(formatErrorMessage(err, `Failed to ${status.toLowerCase()} ticket.`));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleEscalate = async () => {
+    setActionLoading('escalate');
+    try {
+      await api.tickets.escalate(ticket.id);
+      toast.success(`Ticket escalated to ${ESCALATION_PATH[userRole]}.`);
+      onRefresh();
+      onClose();
+    } catch (err: any) {
+      toast.error(formatErrorMessage(err, 'Failed to escalate ticket.'));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleReopen = async () => {
+    setActionLoading('reopen');
+    try {
+      await api.tickets.update(ticket.id, 'Open');
+      toast.success('Ticket reopened.');
+      onRefresh();
+      onClose();
+    } catch (err: any) {
+      toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    setActionLoading('delete');
+    try {
+      await api.tickets.delete(ticket.id);
+      toast.success('Ticket deleted.');
+      onRefresh();
+      onClose();
+    } catch (err: any) {
+      toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[85vh] animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between p-5 pb-3 border-b border-zinc-100">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-base font-extrabold text-slate-900 truncate">{ticket.issueType}</h2>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusColors[ticket.status] || statusColors.Open}`}>
+                {ticket.status}
+              </span>
+              {ticket.priority && (
+                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${priorityColors[ticket.priority] || priorityColors.medium}`}>
+                  {ticket.priority.toUpperCase()}
+                </span>
+              )}
+            </div>
+            <p className="text-[10px] text-zinc-400 mt-1">
+              Ticket #{ticket.id.slice(-8)} &middot; Created {new Date(ticket.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 shrink-0 ml-2"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 scrollbar-styled">
+          {/* Ticket info */}
+          <div className="space-y-2">
+            <div className="bg-zinc-50 rounded-xl p-3 text-xs text-zinc-700 leading-relaxed">
+              {ticket.description}
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-zinc-500">
+              <span>By: <strong className={roleColors[(ticket as any).userRole || ticket.role] || ''}>{ticket.userName}</strong> ({(ticket as any).userRole || ticket.role})</span>
+              {ticket.orderId && <span>Order: <strong>{ticket.orderId}</strong></span>}
+              {ticket.targetRole && <span>Assigned to: <strong>{ticket.targetRole}</strong></span>}
+            </div>
+            {ticket.resolutionNote && (
+              <div className="text-[11px] text-green-700 bg-green-50 rounded-lg px-3 py-2">
+                <span className="font-bold">Resolution: </span>{ticket.resolutionNote}
+              </div>
+            )}
+            {isClosed && (ticket.resolvedByName || ticket.resolvedAt) && (
+              <p className="text-[10px] text-zinc-400">
+                {ticket.status === 'Resolved' ? 'Resolved' : 'Rejected'}
+                {ticket.resolvedByName ? ` by ${ticket.resolvedByName}` : ''}
+                {ticket.resolvedAt ? ` on ${new Date(ticket.resolvedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
+              </p>
+            )}
+          </div>
+
+          {/* Comments thread */}
+          <div>
+            <div className="flex items-center gap-1.5 mb-2">
+              <MessageCircle size={14} className="text-zinc-400" />
+              <h3 className="text-xs font-bold text-zinc-700">Comments ({comments.length})</h3>
+            </div>
+            {loadingComments ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 size={18} className="animate-spin text-zinc-300" />
+              </div>
+            ) : comments.length === 0 ? (
+              <p className="text-[11px] text-zinc-400 text-center py-4">No comments yet. Start the conversation below.</p>
+            ) : (
+              <div className="space-y-2">
+                {comments.map((c) => {
+                  const isMe = c.userId === user?.id;
+                  return (
+                    <div key={c.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[80%] rounded-xl px-3 py-2 ${isMe ? 'bg-slate-900 text-white' : 'bg-zinc-100 text-zinc-800'}`}>
+                        <div className={`flex items-center gap-1.5 mb-0.5 ${isMe ? 'justify-end' : ''}`}>
+                          <span className={`text-[9px] font-bold ${isMe ? 'text-zinc-300' : (roleColors[c.role] || 'text-zinc-500')}`}>
+                            {c.userName}
+                          </span>
+                          <span className={`text-[8px] ${isMe ? 'text-zinc-400' : 'text-zinc-400'}`}>
+                            {c.role}
+                          </span>
+                        </div>
+                        <p className="text-[11px] leading-relaxed whitespace-pre-wrap break-words">{c.message}</p>
+                        <p className={`text-[8px] mt-1 ${isMe ? 'text-zinc-400 text-right' : 'text-zinc-400'}`}>
+                          {new Date(c.createdAt).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div ref={commentsEndRef} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Comment input + Actions footer */}
+        <div className="border-t border-zinc-100 p-4 space-y-3">
+          {/* Comment input */}
+          <div className="flex items-end gap-2">
+            <textarea
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Write a comment..."
+              className="flex-1 px-3 py-2 text-xs rounded-xl border border-zinc-200 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-slate-300 resize-none"
+              rows={2}
+              maxLength={2000}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleAddComment();
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleAddComment}
+              disabled={!newComment.trim() || submittingComment}
+              className="p-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              aria-label="Send comment"
+            >
+              {submittingComment ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+            </button>
+          </div>
+
+          {/* Resolve/Reject form */}
+          {showResolveForm && canResolve && (
+            <div className="space-y-2 p-3 bg-zinc-50 rounded-xl border border-zinc-200">
+              <textarea
+                value={resolutionNote}
+                onChange={(e) => setResolutionNote(e.target.value)}
+                placeholder="Add a resolution/rejection note (optional)..."
+                className="w-full px-3 py-2 text-xs rounded-lg border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none"
+                rows={2}
+                maxLength={2000}
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleResolve('Resolved')}
+                  disabled={!!actionLoading}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                >
+                  {actionLoading === 'Resolved' ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                  Resolve
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleResolve('Rejected')}
+                  disabled={!!actionLoading}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 disabled:opacity-50"
+                >
+                  {actionLoading === 'Rejected' ? <Loader2 size={12} className="animate-spin" /> : <XCircle size={12} />}
+                  Reject
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowResolveForm(false); setResolutionNote(''); }}
+                  className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-zinc-400 hover:text-zinc-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {canResolve && !showResolveForm && (
+              <button
+                type="button"
+                onClick={() => setShowResolveForm(true)}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+              >
+                <CheckCircle2 size={12} /> Resolve / Reject
+              </button>
+            )}
+            {canEscalate && (
+              <button
+                type="button"
+                onClick={handleEscalate}
+                disabled={!!actionLoading}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+              >
+                {actionLoading === 'escalate' ? <Loader2 size={12} className="animate-spin" /> : <ArrowUpCircle size={12} />}
+                Escalate to {ESCALATION_PATH[userRole]}
+              </button>
+            )}
+            {canReopen && (
+              <button
+                type="button"
+                onClick={handleReopen}
+                disabled={!!actionLoading}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+              >
+                {actionLoading === 'reopen' ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                Reopen
+              </button>
+            )}
+            {canDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={!!actionLoading}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-zinc-50 border border-zinc-200 text-zinc-600 hover:text-red-600 hover:border-red-200 disabled:opacity-50"
+              >
+                {actionLoading === 'delete' ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                Delete
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

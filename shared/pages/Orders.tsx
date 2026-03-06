@@ -14,6 +14,7 @@ import { Button, EmptyState, Spinner } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { ProxiedImage } from '../components/ProxiedImage';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
+import TicketDetailModal from '../components/TicketDetailModal';
 import { ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
 import {
   Clock,
@@ -217,6 +218,7 @@ export const Orders: React.FC = () => {
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
   const [ticketOrderId, setTicketOrderId] = useState<string | undefined>();
   const [ticketStatusFilter, setTicketStatusFilter] = useState<'All' | 'Open' | 'Resolved' | 'Rejected'>('All');
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
 
   // Rating screenshot pre-validation state
@@ -1376,7 +1378,7 @@ export const Orders: React.FC = () => {
                 return (
                 <div className="max-h-[50vh] overflow-y-auto scrollbar-styled space-y-2">
                 {filtered.map((t) => (
-                  <div key={t.id} className="bg-white rounded-xl border border-zinc-200 p-3 space-y-1.5">
+                  <div key={t.id} className="bg-white rounded-xl border border-zinc-200 p-3 space-y-1.5 cursor-pointer hover:border-zinc-400 transition-colors" onClick={() => setSelectedTicket(t)}>
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-800">{t.issueType}</span>
                       <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
@@ -1449,6 +1451,12 @@ export const Orders: React.FC = () => {
         open={ticketModalOpen}
         onClose={() => { setTicketModalOpen(false); loadMyTickets(); }}
         orderId={ticketOrderId}
+      />
+      <TicketDetailModal
+        open={!!selectedTicket}
+        onClose={() => { setSelectedTicket(null); loadMyTickets(); }}
+        ticket={selectedTicket}
+        onRefresh={loadMyTickets}
       />
 
       {/* SUBMIT PURCHASE MODAL (SMART UI) */}

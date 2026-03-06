@@ -1963,16 +1963,26 @@ export async function extractOrderDetailsWithAi(
       const ratio = amount / withoutFirstVal;
       if (ratio < 5 || ratio > 25) return null;
       // Check if the corrected amount appears after a price label in OCR text
+      // IMPORTANT: Must match at START of the after-label text to avoid substring false positives
+      // e.g. "Grand Total: Rs 445.02" — "45" is a substring of "445.02" but NOT the amount
       const labelRe = /(?:total|amount|paid|payable|grand|you\s*pay|bill|price)\s*:?\s*(?:₹|rs\.?|inr)?\s*/gi;
       let match;
+      const candidateStr = String(withoutFirstVal);
+      const withCommas = withoutFirstVal >= 1000
+        ? withoutFirstVal.toLocaleString('en-IN')
+        : candidateStr;
       while ((match = labelRe.exec(ocrTextRef)) !== null) {
-        const afterLabel = ocrTextRef.slice(match.index + match[0].length, match.index + match[0].length + 20);
-        // Check if the corrected amount (with commas) appears right after the label
-        const withCommas = withoutFirstVal >= 1000
-          ? withoutFirstVal.toLocaleString('en-IN')
-          : String(withoutFirstVal);
-        if (afterLabel.includes(String(withoutFirstVal)) || afterLabel.includes(withCommas)) {
-          return withoutFirstVal;
+        const afterLabel = ocrTextRef.slice(match.index + match[0].length, match.index + match[0].length + 25);
+        const stripped = afterLabel.replace(/^[\s,.]*/,'');
+        // The corrected amount must START the after-label text (not be a substring of a larger number)
+        if (stripped.startsWith(candidateStr) || stripped.startsWith(withCommas) || stripped.startsWith(withoutFirst)) {
+          // Ensure it's not a prefix of the ORIGINAL amount — e.g., don't match "445" when checking "45" from "445.02"
+          const afterCandidate = stripped.slice(candidateStr.length);
+          // Valid: ends with decimal (.xx), comma, space, newline, or end-of-string
+          // Invalid: continues with another digit (meaning the candidate is a substring of a bigger number)
+          if (!afterCandidate || /^[.,\s\n]/.test(afterCandidate)) {
+            return withoutFirstVal;
+          }
         }
       }
       return null;
@@ -4596,11 +4606,25 @@ export async function extractOrderDetailsWithAi(
     // 6i. Clean up product name: remove leading/trailing special chars, trim whitespace
     if (finalProductName) {
       finalProductName = finalProductName
-        .replace(/^[\s\-:•·|>]+/, '')  // Remove leading dashes, colons, bullets
-        .replace(/[\s\-:•·|]+$/, '')    // Remove trailing dashes, colons, bullets
-        .replace(/\s{2,}/g, ' ')         // Collapse multiple spaces
+        .replace(/^[\s\-:•·|>@®©™]+/, '')  // Remove leading special chars
+        .replace(/[\s\-:•·|@®©™]+$/, '')    // Remove trailing special chars
+        .replace(/\s*\|\s*/g, ' | ')         // Normalize pipe separators
+        .replace(/\s*[|]\s*$/g, '')           // Remove trailing pipes
+        .replace(/\s*\(\s*Ask\s*Product\s*Question\s*\)\s*/gi, '')  // Remove Amazon button text
+        .replace(/\s{2,}/g, ' ')             // Collapse multiple spaces
         .trim();
       if (finalProductName.length < 3) {
+        finalProductName = null;
+      }
+    }
+
+    // 6i-2. Reject product name if it's mostly garbled OCR (too many @, |, special chars)
+    if (finalProductName) {
+      const specialCount = (finalProductName.match(/[@|©®™\[\]{}<>\\^~`]/g) || []).length;
+      const alphaCount = (finalProductName.match(/[a-zA-Z]/g) || []).length;
+      const ratio = specialCount / Math.max(finalProductName.length, 1);
+      if (ratio > 0.15 || (specialCount > 5 && alphaCount < specialCount * 2)) {
+        notes.push('Product name contained too many garbled OCR characters — rejected.');
         finalProductName = null;
       }
     }
@@ -4658,6 +4682,7 @@ export async function extractOrderDetailsWithAi(
         .replace(/\s*Leave\s*seller\s*feedback\s*/gi, '')
         .replace(/\s*Leave\s*delivery\s*feedback\s*/gi, '')
         .replace(/\s*Return\s*or\s*replace\s*items?\s*/gi, '')
+        .replace(/\s*Get\s*product\s*support\s*/gi, '')
         .replace(/\s*Track\s*package\s*/gi, '')
         .replace(/\s*Cancel\s*items?\s*/gi, '')
         .replace(/\s*Buy\s*it\s*again\s*/gi, '')
@@ -4665,6 +4690,11 @@ export async function extractOrderDetailsWithAi(
         .replace(/\s*Add\s*to\s*(Cart|Wish\s*List)\s*/gi, '')
         .replace(/\s*Share\s*this\s*product\s*/gi, '')
         .replace(/\s*Report\s*incorrect\s*product\s*info\w*\s*/gi, '')
+        // Strip trailing OCR garbage: single/double chars, 'Pp 2', page numbers, etc.
+        .replace(/\s+[A-Za-z]{1,2}\s+\d{1,2}\s*$/g, '')
+        .replace(/\s+[Pp]p\s*\d+\s*$/g, '')
+        // Strip trailing single lowercase letter (OCR noise like "Ltd h")
+        .replace(/\s+[a-z]\s*$/g, '')
         .replace(/\s{2,}/g, ' ')
         .trim();
       if (finalSoldBy.length < 2) {
@@ -4688,13 +4718,13 @@ export async function extractOrderDetailsWithAi(
       // Also reject if no explicit "total"/"amount"/"paid" keyword near the number
       if (finalAmount) {
         const amtNearTotalPattern = new RegExp(`(total|amount|paid|payable|grand|you\\s*paid|order\\s*total|price).{0,30}${amtStr}|${amtStr}.{0,30}(total|amount|paid|payable|grand)`, 'i');
-        if (!amtNearTotalPattern.test(allText) && /\b\d{6}\b/.test(allText)) {
-          // There are 6-digit numbers in text and the amount isn't near any total keyword — suspicious
-          // Check more aggressively: common Indian pincodes start with 1-8, and ranges like 110001-855117
+        if (!amtNearTotalPattern.test(allText)) {
+          // 6-digit amount not near any total keyword — reject as probable pincode
           const firstDigit = parseInt(amtStr[0]);
           if (firstDigit >= 1 && firstDigit <= 8) {
-            notes.push(`Amount ₹${finalAmount} is 6-digit (possible pincode) with no "total"/"paid" context — flagged.`);
-            confidenceScore = Math.max(40, confidenceScore - 15);
+            notes.push(`Amount ₹${finalAmount} is 6-digit (possible pincode) with no "total"/"paid" context — rejected.`);
+            finalAmount = null;
+            confidenceScore = Math.max(30, confidenceScore - 20);
           }
         }
       }
@@ -4731,18 +4761,37 @@ export async function extractOrderDetailsWithAi(
 
     // 8c. Deterministic ₹-as-digit correction (conservative, OCR-only mode)
     // Only apply when: (1) no AI was used, (2) the original amount does NOT appear near any
-    // price label in OCR text, AND (3) the corrected amount DOES appear near a label.
-    // This avoids false positives where "₹6,695" is a real price and gets wrongly corrected to 695.
+    // price label in OCR text WITH an explicit ₹/Rs prefix, AND (3) the corrected amount
+    // DOES appear near a label.
+    // Key insight: when ₹ is misread as a digit (e.g., ₹1,390 → 21,390), the OCR text
+    // will show "21,390" near "Grand Total" — WITHOUT a ₹ prefix. So we require the
+    // original amount to appear with an EXPLICIT rupee symbol to consider it valid.
     if (finalAmount && ocrText && !aiUsed) {
       const amtStr = String(Math.round(finalAmount));
-      // Check if the ORIGINAL amount is visible near a price label — if so, it's correct
-      const originalNearLabel = new RegExp(
-        `(?:total|amount|paid|payable|grand|you\\s*pay|bill|price)\\s*:?\\s*(?:₹|rs\\.?|inr)?\\s*${amtStr.replace(/(\d)/g, '$1[,.]?')}`,
+      const amtFlexible = amtStr.replace(/(\d)/g, '$1[,.]?');
+      // Check if the ORIGINAL amount appears WITH an explicit ₹/Rs/INR prefix — only then it's reliably correct
+      const originalWithRupeePrefix = new RegExp(
+        `(?:₹|rs\\.?|inr)\\s*${amtFlexible}`,
         'i'
       ).test(ocrText);
-      if (!originalNearLabel) {
-        const corrected = detectRupeeSignAsDigit(finalAmount, ocrText);
-        if (corrected !== null) {
+      // Also check corrected amount appears with ₹ prefix (stronger signal)
+      const corrected = detectRupeeSignAsDigit(finalAmount, ocrText);
+      if (corrected !== null) {
+        const correctedStr = String(Math.round(corrected));
+        const correctedFlexible = correctedStr.replace(/(\d)/g, '$1[,.]?');
+        const correctedWithRupeePrefix = new RegExp(
+          `(?:₹|rs\\.?|inr)\\s*${correctedFlexible}`,
+          'i'
+        ).test(ocrText);
+        const correctedNearLabel = new RegExp(
+          `(?:total|amount|paid|payable|grand|you\\s*pay|bill|price)\\s*:?\\s*(?:₹|rs\\.?|inr)?\\s*${correctedFlexible}`,
+          'i'
+        ).test(ocrText);
+        // Apply correction if:
+        // - Original does NOT have explicit ₹ prefix, OR
+        // - Corrected DOES have explicit ₹ prefix, OR  
+        // - Corrected appears near a total/price label
+        if (!originalWithRupeePrefix || correctedWithRupeePrefix || correctedNearLabel) {
           notes.push(`Deterministic ₹-as-digit correction: ₹${finalAmount} → ₹${corrected} (leading digit was misread ₹ sign).`);
           finalAmount = corrected;
           confidenceScore = Math.max(confidenceScore, 70);

@@ -60,6 +60,7 @@ import {
 import { User, Order, Product, Invite, Ticket } from '../types';
 import { formatCurrency as formatCurrencyBase } from '../utils/formatCurrency';
 import { csvSafe, downloadCsv } from '../utils/csvHelpers';
+import TicketDetailModal from '../components/TicketDetailModal';
 
 // --- TYPES & CONSTANTS ---
 type ViewMode =
@@ -212,6 +213,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   const [ticketPriorityFilter, setTicketPriorityFilter] = useState<string>('All');
   const [resolvingTicketId, setResolvingTicketId] = useState<string | null>(null);
   const [resolutionNote, setResolutionNote] = useState('');
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [inviteRole, setInviteRole] = useState<'agency' | 'brand'>('agency');
   const [inviteLabel, setInviteLabel] = useState('');
 
@@ -1340,7 +1342,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     filteredTickets.map((t) => (
                       <div
                         key={t.id}
-                        className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col hover:shadow-md transition-all"
+                        className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col hover:shadow-md transition-all cursor-pointer"
+                        onClick={() => setSelectedTicket(t)}
                       >
                         <div className="flex justify-between items-start mb-4">
                           <div>
@@ -2329,6 +2332,12 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         </div>
       )}
     </DesktopShell>
+    <TicketDetailModal
+      open={!!selectedTicket}
+      onClose={() => setSelectedTicket(null)}
+      ticket={selectedTicket}
+      onRefresh={loadAll}
+    />
     </>
   );
 };

@@ -273,6 +273,15 @@ export interface Ticket {
   createdAt: string;
 }
 
+export interface TicketComment {
+  id: string;
+  userId: string;
+  userName: string;
+  role: string;
+  message: string;
+  createdAt: string;
+}
+
 export interface ExtractedValues {
   orderId?: string;
   amount?: string;
