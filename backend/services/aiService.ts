@@ -4317,13 +4317,26 @@ export async function extractOrderDetailsWithAi(
             : false;
 
           // Fill missing fields from AI
-          // Guard: reject AI amount if it's a substring of Order ID digits
+          // Guard: reject AI amount if it's an exact segment of Order ID
+          // Conservative: 3-4 digit amounts only rejected on EXACT hyphen-segment match;
+          // 5+ digit amounts rejected on contiguous substring match (same as deterministic path).
           const refOrderId = aiSuggestedOrderId || finalOrderId || deterministic.orderId;
           const isAmountFromOrderId = aiSuggestedAmount && refOrderId
             ? (() => {
                 const digits = refOrderId.replace(/[^0-9]/g, '');
                 const amtStr = String(Math.round(aiSuggestedAmount));
-                return digits.length >= 8 && amtStr.length >= 3 && digits.includes(amtStr);
+                if (!digits || digits.length < 6) return false;
+                // Exact match against hyphen-separated segments
+                const segments = new Set<string>();
+                if (digits.length >= 4) segments.add(digits);
+                for (const seg of refOrderId.split(/[\-\s]+/)) {
+                  const d = seg.replace(/[^0-9]/g, '');
+                  if (d.length >= 3) segments.add(d);
+                }
+                if (segments.has(amtStr)) return true;
+                // 5+ digit substring check (4-digit prices like ₹1408 are too common to reject)
+                if (amtStr.length >= 5 && digits.length >= 8 && digits.includes(amtStr)) return true;
+                return false;
               })()
             : false;
 
@@ -4337,7 +4350,7 @@ export async function extractOrderDetailsWithAi(
             finalOrderId = aiSuggestedOrderId;
             notes.push(orderIdVisible ? 'AI order ID confirmed in OCR text.' : 'AI extracted order ID (high confidence).');
           }
-          if (!finalAmount && aiSuggestedAmount && !isAmountFromOrderId && (amountVisible || (aiConfidence >= 75 && aiSuggestedAmount >= 10 && aiSuggestedAmount <= 500000))) {
+          if (!finalAmount && aiSuggestedAmount && !isAmountFromOrderId && (amountVisible || (aiConfidence >= 60 && aiSuggestedAmount >= 10 && aiSuggestedAmount <= 500000))) {
             finalAmount = aiSuggestedAmount;
             notes.push(amountVisible ? 'AI amount confirmed in OCR text.' : 'AI extracted amount (high confidence).');
           }
@@ -4466,13 +4479,24 @@ export async function extractOrderDetailsWithAi(
               notes.push('Order ID from direct image AI.');
             }
 
-            // Guard: reject direct AI amount if it's a substring of order ID digits
+            // Guard: reject direct AI amount if it's an exact segment of order ID
+            // Conservative: 3-4 digit amounts only rejected on EXACT hyphen-segment match;
+            // 5+ digit amounts rejected on contiguous substring match.
             const directRefId = directOrderId || finalOrderId;
             const directAmountIsOrderIdFragment = directAmount && directRefId
               ? (() => {
                   const d = directRefId.replace(/[^0-9]/g, '');
                   const a = String(Math.round(directAmount));
-                  return d.length >= 8 && a.length >= 3 && d.includes(a);
+                  if (!d || d.length < 6) return false;
+                  const segs = new Set<string>();
+                  if (d.length >= 4) segs.add(d);
+                  for (const seg of directRefId.split(/[\-\s]+/)) {
+                    const sd = seg.replace(/[^0-9]/g, '');
+                    if (sd.length >= 3) segs.add(sd);
+                  }
+                  if (segs.has(a)) return true;
+                  if (a.length >= 5 && d.length >= 8 && d.includes(a)) return true;
+                  return false;
                 })()
               : false;
 

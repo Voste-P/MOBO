@@ -33,6 +33,24 @@ input[type='number']::-webkit-inner-spin-button {
   margin: 0;
 }
 
+/* ── Prevent iOS auto-zoom on input focus (requires ≥ 16px) ── */
+input:not([type='checkbox']):not([type='radio']),
+textarea,
+select {
+  font-size: max(16px, 1em);
+}
+
+/* ── Disable double-tap zoom on interactive elements ── */
+a,
+button,
+input,
+textarea,
+select,
+label,
+[role='button'] {
+  touch-action: manipulation;
+}
+
 /* ── Scrollbar utils ── */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;

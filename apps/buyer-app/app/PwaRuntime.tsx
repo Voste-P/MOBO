@@ -82,7 +82,44 @@ async function ensurePushSubscription(app: 'buyer' | 'mediator') {
   });
 }
 
+function isStandalonePwa(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as any).standalone === true
+  );
+}
+
 export function PwaRuntime({ app }: { app: 'buyer' | 'mediator' }) {
+  /* ── Back-swipe / back-button trap (prevents PWA from closing) ── */
+  useEffect(() => {
+    if (!isStandalonePwa()) return;
+    const GUARD = 'mobo-pwa-guard';
+    if (history.state !== GUARD) {
+      history.replaceState(GUARD, '');
+      history.pushState(GUARD, '');
+    }
+    const onPopState = () => { history.pushState(GUARD, ''); };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  /* ── Prevent pinch-zoom on iOS (Safari ignores viewport meta) ── */
+  useEffect(() => {
+    const prevent = (e: Event) => e.preventDefault();
+    const preventMulti = (e: TouchEvent) => { if (e.touches.length > 1) e.preventDefault(); };
+    document.addEventListener('gesturestart', prevent, { passive: false });
+    document.addEventListener('gesturechange', prevent, { passive: false });
+    document.addEventListener('gestureend', prevent, { passive: false });
+    document.addEventListener('touchmove', preventMulti, { passive: false });
+    return () => {
+      document.removeEventListener('gesturestart', prevent);
+      document.removeEventListener('gesturechange', prevent);
+      document.removeEventListener('gestureend', prevent);
+      document.removeEventListener('touchmove', preventMulti);
+    };
+  }, []);
+
   useEffect(() => {
     (globalThis as any).__MOBO_ENABLE_PWA_GUARDS__ = true;
     (globalThis as any).__MOBO_PWA_APP__ = app;
