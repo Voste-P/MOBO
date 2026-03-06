@@ -91,13 +91,14 @@ function buildPoolConfig(url: string) {
 
   const poolConfig: Record<string, unknown> = {
     connectionString: cleanUrl,
-    // Pool sizing: production needs enough connections for burst traffic.
-    // For 100k concurrent users, most hosting (Neon/Render) supports 50-100 connections.
-    // With PgBouncer or Prisma Accelerate in front, this can be higher.
-    max: parseInt(process.env.PG_POOL_MAX || (isProd ? '30' : '10'), 10),
-    min: parseInt(process.env.PG_POOL_MIN || (isProd ? '5' : '2'), 10),
-    idleTimeoutMillis: parseInt(process.env.PG_IDLE_TIMEOUT || '30000', 10),
-    connectionTimeoutMillis: parseInt(process.env.PG_CONNECT_TIMEOUT || '5000', 10),
+    // Pool sizing: Render free/starter tier supports ~20 connections.
+    // Keep max conservative to avoid exhausting the DB connection limit.
+    max: parseInt(process.env.PG_POOL_MAX || (isProd ? '10' : '5'), 10),
+    min: parseInt(process.env.PG_POOL_MIN || (isProd ? '2' : '1'), 10),
+    // Reap idle connections quickly — Render/Neon kill idle connections after ~30s.
+    idleTimeoutMillis: parseInt(process.env.PG_IDLE_TIMEOUT || (isProd ? '10000' : '30000'), 10),
+    // Allow 15s for connection — Render free-tier DB cold-starts can take 5-10s.
+    connectionTimeoutMillis: parseInt(process.env.PG_CONNECT_TIMEOUT || (isProd ? '15000' : '5000'), 10),
     // Statement timeout prevents runaway queries from blocking the pool.
     statement_timeout: parseInt(process.env.PG_STATEMENT_TIMEOUT || '30000', 10),
     // Idle-in-transaction timeout prevents abandoned transactions from holding locks.
@@ -307,4 +308,55 @@ export async function disconnectPrisma(): Promise<void> {
     try { await _pool.end(); } catch { /* best-effort */ }
     _pool = null;
   }
+}
+
+/* ── Request-level retry for transient connection errors ───────── */
+
+const TRANSIENT_ERRORS = [
+  'Connection terminated',
+  'connection timeout',
+  'Client has encountered a connection error',
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'ETIMEDOUT',
+  'sorry, too many clients already',
+  'remaining connection slots are reserved',
+  'server closed the connection unexpectedly',
+  'Connection refused',
+];
+
+function isTransientDbError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return TRANSIENT_ERRORS.some(t => msg.includes(t));
+}
+
+/**
+ * Execute a database operation with automatic retry on transient connection errors.
+ * Use this for critical paths (login, auth) where a cold-start DB timeout shouldn't
+ * immediately fail the request.
+ *
+ * @param fn - async function performing the DB operation
+ * @param retries - number of retries (default 1)
+ */
+export async function withDbRetry<T>(fn: () => Promise<T>, retries = 1): Promise<T> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt < retries && isTransientDbError(err)) {
+        dbLog.warn(`Transient DB error on attempt ${attempt + 1}, retrying…`, {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        // Brief pause before retry — let pool recover
+        await new Promise(r => setTimeout(r, 500 + attempt * 500));
+        // Attempt reconnection if pool is dead
+        if (!_prisma) {
+          try { await connectPrisma(1); } catch { /* best-effort */ }
+        }
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('withDbRetry: unreachable');
 }

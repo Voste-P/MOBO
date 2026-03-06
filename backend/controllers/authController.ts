@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'node:crypto';
-import { prisma } from '../database/prisma.js';
+import { prisma, withDbRetry } from '../database/prisma.js';
 import { AppError } from '../middleware/errors.js';
 import { idWhere } from '../utils/idWhere.js';
 import { hashPassword, verifyPassword } from '../services/passwords.js';
@@ -39,10 +39,10 @@ export function makeAuthController(env: Env) {
           throw new AppError(401, 'UNAUTHENTICATED', 'Missing auth context');
         }
 
-        const user = await db().user.findFirst({
+        const user = await withDbRetry(() => db().user.findFirst({
           where: { ...idWhere(userId), isDeleted: false },
           include: { pendingConnections: true },
-        });
+        }));
         if (!user) {
           throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
         }
@@ -272,8 +272,8 @@ export function makeAuthController(env: Env) {
         } as const;
 
         const authUser = mobile
-          ? await db().user.findFirst({ where: { mobile, isDeleted: false }, select: authSelect })
-          : await db().user.findFirst({ where: { username, roles: { hasSome: ['admin', 'ops'] as any }, isDeleted: false }, select: authSelect });
+          ? await withDbRetry(() => db().user.findFirst({ where: { mobile, isDeleted: false }, select: authSelect }))
+          : await withDbRetry(() => db().user.findFirst({ where: { username, roles: { hasSome: ['admin', 'ops'] as any }, isDeleted: false }, select: authSelect }));
 
         if (!authUser) {
           businessLog.warn('Login failed — user not found', { identifier: mobile || username, ip: req.ip });

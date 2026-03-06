@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import type { Env } from '../config/env.js';
 import { AppError } from './errors.js';
-import { prisma } from '../database/prisma.js';
+import { prisma, withDbRetry } from '../database/prisma.js';
 import { idWhere } from '../utils/idWhere.js';
 import { authCacheGet, authCacheSet } from '../utils/authCache.js';
 import { logAuthEvent, logSecurityIncident, logAccessEvent } from '../config/appLogs.js';
@@ -65,14 +65,14 @@ async function resolveAuthFromToken(token: string, env: Env): Promise<AuthContex
 
   // Zero-trust: do not trust roles/status embedded in the JWT.
   // Fetch from DB so suspensions and role changes take effect immediately.
-  const user = await db.user.findFirst({
+  const user = await withDbRetry(() => db.user.findFirst({
     where: { ...idWhere(userId), isDeleted: false },
     select: {
       id: true, mongoId: true, status: true, roles: true, role: true,
       parentCode: true, mediatorCode: true, brandCode: true,
       isDeleted: true, mobile: true, name: true,
     },
-  });
+  }));
 
   if (!user || user.isDeleted) {
     logAuthEvent('SESSION_EXPIRED', {

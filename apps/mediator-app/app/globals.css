@@ -12,7 +12,7 @@ html,
 body {
   height: 100%;
   overflow: hidden;
-  touch-action: manipulation;
+  touch-action: pan-x pan-y;
   -webkit-tap-highlight-color: transparent;
   font-family: var(--font-jakarta), 'Plus Jakarta Sans', system-ui, sans-serif;
 }
@@ -121,4 +121,43 @@ input[type='number']::-webkit-inner-spin-button {
 
 .shadow-glow {
   box-shadow: 0 0 40px -10px rgba(163, 230, 53, 0.5);
+}
+
+/* ── Shimmer skeleton loading ── */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.75rem;
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Smooth page/tab transition ── */
+.page-transition {
+  animation: pageIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Press feedback (native app feel) ── */
+.press-feedback {
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.press-feedback:active {
+  transform: scale(0.97);
+  opacity: 0.85;
+}
+
+/* ── Modal backdrop ── */
+.modal-backdrop {
+  animation: fadeIn 0.2s ease forwards;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
