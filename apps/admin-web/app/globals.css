@@ -120,7 +120,7 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 .shadow-glow {
-  box-shadow: 0 0 40px -10px rgba(163, 230, 53, 0.5);
+  box-shadow: 0 0 40px -10px rgba(99, 102, 241, 0.5);
 }
 
 /* ── Shimmer skeleton loading ── */
@@ -131,8 +131,12 @@ input[type='number']::-webkit-inner-spin-button {
   border-radius: 0.75rem;
 }
 @keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* ── Smooth page/tab transition ── */
@@ -140,13 +144,21 @@ input[type='number']::-webkit-inner-spin-button {
   animation: pageIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 @keyframes pageIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ── Press feedback (native app feel) ── */
 .press-feedback {
-  transition: transform 0.15s ease, opacity 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease;
 }
 .press-feedback:active {
   transform: scale(0.97);
@@ -158,8 +170,12 @@ input[type='number']::-webkit-inner-spin-button {
   animation: fadeIn 0.2s ease forwards;
 }
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* ── Text selection ── */
@@ -170,7 +186,9 @@ input[type='number']::-webkit-inner-spin-button {
 
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -178,7 +196,27 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 :focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.5);
+  outline-offset: 2px;
+}
+
+/* Remove focus ring on mouse click, keep for keyboard */
+:focus:not(:focus-visible) {
   outline: none;
+}
+
+/* ── Autofill style override ── */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #111827;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* ── Smooth scroll for scrollable containers ── */
+.scroll-smooth {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 
 .fade-in {

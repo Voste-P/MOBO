@@ -231,123 +231,135 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
           </div>
 
-          {/* Extracted Details (auto-filled by AI) */}
-          {(extractedDetails.orderId || extractedDetails.amount || extractedDetails.productName || extractedDetails.soldBy || extractedDetails.orderDate) && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-2.5 animate-enter">
-              <p className="text-[10px] font-bold text-emerald-700 flex items-center gap-1">
-                <CheckCircle size={12} /> AI Detected Details
-              </p>
-              <div className="grid grid-cols-2 gap-2">
+          {/* Step 3: Order Details — ALWAYS shown after screenshot upload */}
+          {preview && !extracting && (
+            <div className="space-y-3 animate-enter">
+              {/* AI status indicator */}
+              {(extractedDetails.orderId || extractedDetails.amount || extractedDetails.productName || extractedDetails.soldBy || extractedDetails.orderDate) ? (
+                <div className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl">
+                  <CheckCircle size={13} className="text-emerald-600 flex-shrink-0" />
+                  <p className="text-[10px] font-bold text-emerald-700">AI extracted details below — please verify &amp; correct if needed</p>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                  <AlertCircle size={14} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-[11px] text-amber-700">
+                    Could not auto-detect details. Please fill in the fields below manually.
+                  </p>
+                </div>
+              )}
+
+              {/* All 5 editable fields — always visible */}
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2.5">
+                <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Order Details</p>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[9px] font-bold text-slate-500 uppercase">Order ID *</label>
+                    <input
+                      type="text"
+                      value={extractedDetails.orderId}
+                      onChange={(e) => setExtractedDetails((d) => ({ ...d, orderId: e.target.value }))}
+                      placeholder="e.g. 408-1234567-8901234"
+                      className="w-full mt-0.5 px-2.5 py-2 text-xs font-medium border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-lime-200 focus:border-lime-400 outline-none transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-bold text-slate-500 uppercase">Amount (₹) *</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={extractedDetails.amount}
+                      onChange={(e) => setExtractedDetails((d) => ({ ...d, amount: e.target.value }))}
+                      placeholder="e.g. 1044"
+                      className="w-full mt-0.5 px-2.5 py-2 text-xs font-medium border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-lime-200 focus:border-lime-400 outline-none transition-all"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="text-[9px] font-bold text-emerald-600 uppercase">Order ID</label>
+                  <label className="text-[9px] font-bold text-slate-500 uppercase">Product Name</label>
                   <input
                     type="text"
-                    value={extractedDetails.orderId}
-                    onChange={(e) => setExtractedDetails((d) => ({ ...d, orderId: e.target.value }))}
-                    placeholder="e.g. 408-1234567-8901234"
-                    className="w-full mt-0.5 px-2 py-1.5 text-xs border border-emerald-200 rounded-lg bg-white focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 outline-none"
+                    value={extractedDetails.productName || ''}
+                    onChange={(e) => setExtractedDetails((d) => ({ ...d, productName: e.target.value }))}
+                    placeholder="e.g. Samsung Galaxy M34 5G"
+                    className="w-full mt-0.5 px-2.5 py-2 text-xs font-medium border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-lime-200 focus:border-lime-400 outline-none transition-all"
                   />
                 </div>
-                <div>
-                  <label className="text-[9px] font-bold text-emerald-600 uppercase">Amount (₹)</label>
-                  <input
-                    type="text"
-                    value={extractedDetails.amount}
-                    onChange={(e) => setExtractedDetails((d) => ({ ...d, amount: e.target.value }))}
-                    placeholder="e.g. 499"
-                    className="w-full mt-0.5 px-2 py-1.5 text-xs border border-emerald-200 rounded-lg bg-white focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 outline-none"
-                  />
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[9px] font-bold text-slate-500 uppercase">Seller / Sold By</label>
+                    <input
+                      type="text"
+                      value={extractedDetails.soldBy || ''}
+                      onChange={(e) => setExtractedDetails((d) => ({ ...d, soldBy: e.target.value }))}
+                      placeholder="e.g. Cloudtail India"
+                      className="w-full mt-0.5 px-2.5 py-2 text-xs font-medium border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-lime-200 focus:border-lime-400 outline-none transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-bold text-slate-500 uppercase">Order Date</label>
+                    <input
+                      type="text"
+                      value={extractedDetails.orderDate || ''}
+                      onChange={(e) => setExtractedDetails((d) => ({ ...d, orderDate: e.target.value }))}
+                      placeholder="e.g. 15 Jan 2026"
+                      className="w-full mt-0.5 px-2.5 py-2 text-xs font-medium border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-lime-200 focus:border-lime-400 outline-none transition-all"
+                    />
+                  </div>
                 </div>
               </div>
-              <div>
-                <label className="text-[9px] font-bold text-emerald-600 uppercase">Product Name</label>
+
+              {/* Reviewer Name */}
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-1.5">
+                <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                  <UserCircle size={12} /> Reviewer / Account Name
+                </label>
                 <input
                   type="text"
-                  value={extractedDetails.productName || ''}
-                  onChange={(e) => setExtractedDetails((d) => ({ ...d, productName: e.target.value }))}
-                  placeholder="e.g. Samsung Galaxy M34 5G"
-                  className="w-full mt-0.5 px-2 py-1.5 text-xs border border-emerald-200 rounded-lg bg-white focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 outline-none"
+                  value={reviewerName}
+                  onChange={(e) => setReviewerName(e.target.value)}
+                  placeholder="e.g. Rahul S. on Amazon"
+                  maxLength={200}
+                  className="w-full px-2.5 py-2 text-xs font-medium border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-lime-200 focus:border-lime-400 outline-none transition-all"
                 />
+                <p className="text-[9px] text-zinc-400 ml-0.5">
+                  Your marketplace profile name — helps verify review &amp; rating screenshots later.
+                </p>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[9px] font-bold text-emerald-600 uppercase">Seller / Sold By</label>
-                  <input
-                    type="text"
-                    value={extractedDetails.soldBy || ''}
-                    onChange={(e) => setExtractedDetails((d) => ({ ...d, soldBy: e.target.value }))}
-                    placeholder="e.g. Cloudtail India"
-                    className="w-full mt-0.5 px-2 py-1.5 text-xs border border-emerald-200 rounded-lg bg-white focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[9px] font-bold text-emerald-600 uppercase">Order Date</label>
-                  <input
-                    type="text"
-                    value={extractedDetails.orderDate || ''}
-                    onChange={(e) => setExtractedDetails((d) => ({ ...d, orderDate: e.target.value }))}
-                    placeholder="e.g. 15 Jan 2026"
-                    className="w-full mt-0.5 px-2 py-1.5 text-xs border border-emerald-200 rounded-lg bg-white focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 outline-none"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Warning for no extraction */}
-          {preview && !extracting && !extractedDetails.orderId && !extractedDetails.amount && (
-            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3 animate-enter">
-              <AlertCircle size={14} className="text-amber-500 mt-0.5 flex-shrink-0" />
-              <p className="text-[11px] text-amber-700">
-                Could not auto-detect order details. Make sure the screenshot clearly shows the Order ID and amount.
-                You can still submit — the mediator will review manually.
-              </p>
-            </div>
-          )}
-
-          {/* Reviewer Name — always shown after screenshot upload */}
-          {preview && !extracting && (
-            <div className="space-y-1 animate-enter">
-              <label className="text-[10px] font-bold text-slate-500 uppercase ml-0.5 flex items-center gap-1">
-                <UserCircle size={12} /> Your Reviewer / Account Name
-              </label>
-              <input
-                type="text"
-                value={reviewerName}
-                onChange={(e) => setReviewerName(e.target.value)}
-                placeholder="e.g. Rahul S. on Amazon"
-                maxLength={200}
-                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-lime-200 focus:border-lime-300 outline-none transition-all font-medium"
-              />
-              <p className="text-[9px] text-zinc-400 ml-0.5">
-                Your name on the marketplace — helps verify your review/rating screenshots.
-              </p>
             </div>
           )}
 
           {/* Submit Button */}
           {submitted ? (
-            <div className="flex items-center justify-center gap-2 py-4 text-lime-600">
+            <div className="flex items-center justify-center gap-2 py-4 text-lime-600 animate-enter">
               <CheckCircle size={20} />
-              <span className="font-bold text-sm">Order Submitted!</span>
+              <span className="font-bold text-sm">Order Submitted Successfully!</span>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!screenshot || submitting || extracting}
-              className="w-full py-3.5 bg-black text-white font-extrabold rounded-xl text-xs uppercase tracking-wider shadow-lg disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition-all flex items-center justify-center gap-2"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" /> Submitting...
-                </>
-              ) : (
-                <>
-                  <Upload size={14} /> Submit Order
-                </>
+            <div className="space-y-2">
+              {screenshot && !extracting && !extractedDetails.orderId && (
+                <p className="text-[10px] text-red-500 font-semibold text-center">Order ID is required to submit</p>
               )}
-            </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!screenshot || submitting || extracting || !extractedDetails.orderId.trim()}
+                className="w-full py-3.5 bg-black text-white font-extrabold rounded-xl text-xs uppercase tracking-wider shadow-lg disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97] transition-all flex items-center justify-center gap-2"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" /> Submitting...
+                  </>
+                ) : (
+                  <>
+                    <Upload size={14} /> Submit Order
+                  </>
+                )}
+              </button>
+            </div>
           )}
         </div>
       </div>

@@ -3897,7 +3897,8 @@ export async function extractOrderDetailsWithAi(
           }
 
           // Accept fast path result if we got at least orderId AND amount with decent confidence
-          if (directOrderId && directAmount && directConfidence >= 60) {
+          // Lowered from 60 to 50 — Gemini Vision is accurate enough at 50+ for structured data
+          if (directOrderId && directAmount && directConfidence >= 50) {
             accumulatedOrderId = directOrderId;
             accumulatedAmount = directAmount;
             accumulatedOrderDate = directResult.orderDate || null;
@@ -3959,10 +3960,10 @@ export async function extractOrderDetailsWithAi(
       }
     }
 
-    // ── ACCELERATED RETRY: When fast path got orderId but missed amount, try model[1] immediately ──
+    // ── ACCELERATED RETRY: When fast path got partial data (orderId XOR amount), try again ──
     // This is FAR faster than falling to 12-variant OCR loop (2-5s vs 20-25s).
     // Also fills metadata gaps (productName, soldBy, orderDate) without OCR.
-    if (!fastPathSuccess && accumulatedOrderId && !isTimeUp() && ai && !isGeminiCircuitOpen()) {
+    if (!fastPathSuccess && (accumulatedOrderId || accumulatedAmount) && !isTimeUp() && ai && !isGeminiCircuitOpen()) {
       const retryModels = GEMINI_MODEL_FALLBACKS.slice(1, 3); // model[1] and model[2]
       for (const retryModel of retryModels) {
         if (isTimeUp()) break;
@@ -4010,7 +4011,7 @@ export async function extractOrderDetailsWithAi(
           aiLog.info('Order extract accelerated retry', { model: retryModel, orderId: retryOrderId, amount: retryAmount, confidence: retryConfidence });
 
           // If we now have both orderId + amount, promote to fast path success
-          if (accumulatedOrderId && accumulatedAmount && retryConfidence >= 55) {
+          if (accumulatedOrderId && accumulatedAmount && retryConfidence >= 45) {
             deterministic = {
               orderId: accumulatedOrderId,
               amount: accumulatedAmount,
@@ -4275,8 +4276,25 @@ export async function extractOrderDetailsWithAi(
               ocrNorm.includes(aiSuggestedOrderId.replace(/[\s\-]/g, '').toLowerCase())
             : false;
           const amountVisible = aiSuggestedAmount
-            ? new RegExp(`(?:^|[^0-9])${String(aiSuggestedAmount).replace('.', '\\.')}(?:[^0-9]|$)`).test(ocrText) ||
-              new RegExp(`(?:^|[^0-9])${aiSuggestedAmount.toFixed(2).replace('.', '\\.')}(?:[^0-9]|$)`).test(ocrText)
+            ? (() => {
+                const plain = String(aiSuggestedAmount);
+                const fixed = aiSuggestedAmount.toFixed(2);
+                const rounded = String(Math.round(aiSuggestedAmount));
+                // Also check with Indian comma format (e.g., 1,044 or 10,048 or 1,00,000)
+                const withIndianCommas = aiSuggestedAmount >= 1000
+                  ? aiSuggestedAmount.toLocaleString('en-IN')
+                  : plain;
+                const withWestCommas = aiSuggestedAmount >= 1000
+                  ? aiSuggestedAmount.toLocaleString('en-US')
+                  : plain;
+                const variants = [plain, fixed, rounded, withIndianCommas, withWestCommas];
+                // Check if any variant appears after removing commas or with commas in text
+                const ocrNoCommas = ocrText.replace(/,/g, '');
+                return variants.some(v => {
+                  const re = new RegExp(`(?:^|[^0-9])${v.replace(/[.,]/g, '[,.]?')}(?:[^0-9]|$)`);
+                  return re.test(ocrText) || re.test(ocrNoCommas);
+                });
+              })()
             : false;
 
           // Fill missing fields from AI
@@ -4424,7 +4442,7 @@ export async function extractOrderDetailsWithAi(
                 ? Math.max(0, Math.min(100, directResult.confidenceScore))
                 : 0;
 
-            if (!finalOrderId && directOrderId && directConfidence >= 60) {
+            if (!finalOrderId && directOrderId && directConfidence >= 50) {
               finalOrderId = directOrderId;
               notes.push('Order ID from direct image AI.');
             }
@@ -4439,7 +4457,7 @@ export async function extractOrderDetailsWithAi(
                 })()
               : false;
 
-            if (!finalAmount && directAmount && directAmount >= 10 && directConfidence >= 60 && !directAmountIsOrderIdFragment) {
+            if (!finalAmount && directAmount && directAmount >= 10 && directConfidence >= 50 && !directAmountIsOrderIdFragment) {
               finalAmount = directAmount;
               notes.push('Amount from direct image AI.');
             }
