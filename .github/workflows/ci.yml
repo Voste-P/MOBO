@@ -537,6 +537,7 @@ jobs:
                 console.log("   Table may be owned by a different database role.");
                 console.log("   Fix: GRANT ALL ON TABLE " + schema + "._prisma_migrations TO <deploy_user>;");
                 console.log("   Continuing — Apply Migrations step will attempt migration directly.");
+                process.exit(0);
               } else {
                 console.error("::error::Prepare migration state failed:", e.message);
                 process.exit(1);
