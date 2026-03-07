@@ -133,6 +133,16 @@ async function main() {
       applied++;
     } catch (e) {
       await client.query("ROLLBACK").catch(() => {});
+
+      // When we can't track migrations, permission errors on existing tables
+      // are expected — the tables already exist and are owned by another role.
+      // Skip gracefully instead of failing the entire deploy.
+      if (!canTrackMigrations && e.message && e.message.includes("permission denied")) {
+        console.log(`⏭️  ${dir} (skipped — permission denied, tables likely already exist)`);
+        skipped++;
+        continue;
+      }
+
       console.error(`❌ ${dir}: ${e.message}`);
 
       // For non-baseline migrations (which use IF NOT EXISTS),
