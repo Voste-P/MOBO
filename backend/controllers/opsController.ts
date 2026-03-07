@@ -43,6 +43,7 @@ import { publishRealtime } from '../services/realtimeHub.js';
 import { sendPushToUser } from '../services/pushNotifications.js';
 import { normalizeMediatorCode } from '../utils/mediatorCode.js';
 import { parsePagination, paginatedResponse } from '../utils/pagination.js';
+import { authCacheInvalidate } from '../utils/authCache.js';
 
 async function buildOrderAudience(order: any, agencyCode?: string) {
   const privilegedRoles: Role[] = ['admin', 'ops'];
@@ -832,6 +833,10 @@ export function makeOpsController(env: Env) {
           data: { kycStatus: 'rejected', status: 'suspended' },
         });
 
+        // Evict auth cache so the suspended mediator can't act on stale tokens
+        authCacheInvalidate(mediator.mongoId!);
+        authCacheInvalidate(mediator.id);
+
         await writeAuditLog({ req, action: 'MEDIATOR_REJECTED', entityType: 'User', entityId: mediator.mongoId! });
         businessLog.info('Mediator rejected', { mediatorId: mediator.mongoId, kycStatus: 'rejected', status: 'suspended' });
         logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'User', entityId: mediator.mongoId!, action: 'MEDIATOR_REJECTED', changedFields: ['kycStatus', 'status'], before: { kycStatus: mediator.kycStatus, status: mediator.status }, after: { kycStatus: 'rejected', status: 'suspended' } });
@@ -959,6 +964,10 @@ export function makeOpsController(env: Env) {
           where: { id: buyerBefore.id },
           data: { status: 'suspended' },
         });
+
+        // Evict auth cache so the rejected buyer can't act on stale tokens
+        authCacheInvalidate(buyerBefore.mongoId!);
+        authCacheInvalidate(buyerBefore.id);
 
         const userMongoId = user.mongoId ?? '';
         await writeAuditLog({ req, action: 'USER_REJECTED', entityType: 'User', entityId: userMongoId });

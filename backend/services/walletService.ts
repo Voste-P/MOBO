@@ -99,6 +99,19 @@ export async function applyWalletCredit(input: WalletMutationInput) {
       },
     });
 
+    // Pre-check: total wallet value (available + locked + pending) must not exceed ceiling.
+    // This prevents circumventing the limit by accumulating funds in locked/pending state.
+    const walletSnapshot = await tx.wallet.findUnique({ where: { ownerUserId: input.ownerUserId } });
+    if (!walletSnapshot || walletSnapshot.isDeleted) {
+      throw new AppError(404, 'WALLET_NOT_FOUND', 'Wallet not found');
+    }
+    const totalAfterCredit = walletSnapshot.availablePaise + walletSnapshot.lockedPaise
+                           + walletSnapshot.pendingPaise + input.amountPaise;
+    if (totalAfterCredit > MAX_BALANCE_PAISE) {
+      logErrorEvent({ category: 'BUSINESS_LOGIC', severity: 'medium', message: 'Wallet credit failed — total balance limit exceeded', operation: 'applyWalletCredit', userId: input.ownerUserId, metadata: { type: input.type, amountPaise: input.amountPaise, totalAfterCredit, MAX_BALANCE_PAISE } });
+      throw new AppError(409, 'BALANCE_LIMIT_EXCEEDED', 'Wallet balance limit exceeded');
+    }
+
     // Atomic credit with max-balance ceiling check via updateMany.
     // This prevents the race condition where two concurrent credits both pass
     // a read-then-write check and exceed the wallet limit.
@@ -217,6 +230,10 @@ export async function applyWalletDebit(input: WalletMutationInput) {
 
     // Re-read wallet to get the walletId for the transaction record
     const wallet = await tx.wallet.findUnique({ where: { ownerUserId: input.ownerUserId } });
+    if (!wallet) {
+      logErrorEvent({ category: 'BUSINESS_LOGIC', severity: 'critical', message: 'Wallet disappeared during debit', operation: 'applyWalletDebit', userId: input.ownerUserId, metadata: { type: input.type, amountPaise: input.amountPaise } });
+      throw new AppError(500, 'WALLET_NOT_FOUND', 'Wallet disappeared during debit');
+    }
 
     const txn = await tx.transaction.create({
       data: {
@@ -226,7 +243,7 @@ export async function applyWalletDebit(input: WalletMutationInput) {
         status: 'completed',
         amountPaise: input.amountPaise,
         currency: 'INR',
-        walletId: wallet?.id,
+        walletId: wallet.id,
         fromUserId: input.fromUserId,
         toUserId: input.toUserId,
         orderId: input.orderId,

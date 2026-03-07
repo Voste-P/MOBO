@@ -12,6 +12,9 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 const TERMINAL: ReadonlySet<OrderWorkflowStatus> = new Set(['COMPLETED', 'FAILED']);
 
+/** Maximum number of times a rejected order can be re-submitted for proof. */
+const MAX_REPROOF_ATTEMPTS = 5;
+
 const ALLOWED: Record<OrderWorkflowStatus, OrderWorkflowStatus[]> = {
   CREATED: ['REDIRECTED'],
   REDIRECTED: ['ORDERED'],
@@ -65,6 +68,17 @@ export async function transitionOrderWorkflow(params: {
   }
 
   const currentEvents = Array.isArray(current.events) ? (current.events as any[]) : [];
+
+  // Rate-limit re-proof submissions: count how many times this order was already REJECTED.
+  if (params.from === 'REJECTED' && params.to === 'PROOF_SUBMITTED') {
+    const rejectionCount = currentEvents.filter(
+      (e: any) => e?.metadata?.to === 'REJECTED' || e?.type === 'REJECTED'
+    ).length;
+    if (rejectionCount >= MAX_REPROOF_ATTEMPTS) {
+      throw new AppError(429, 'REPROOF_LIMIT_EXCEEDED', `Maximum re-proof attempts (${MAX_REPROOF_ATTEMPTS}) exceeded`);
+    }
+  }
+
   const newEvent = {
     type: 'WORKFLOW_TRANSITION',
     at: new Date().toISOString(),

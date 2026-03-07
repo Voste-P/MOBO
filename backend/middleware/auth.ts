@@ -208,29 +208,6 @@ export function requireAuth(env: Env) {
   };
 }
 
-/**
- * @deprecated Currently identical to requireAuth. Intended to support API-key or
- * link-token auth for proof viewing. Replace usages with requireAuth or implement
- * the alternative mechanism when needed.
- */
-export function requireAuthOrToken(env: Env) {
-  return async (req: Request, _res: Response, next: NextFunction) => {
-    const header = req.header('authorization') || '';
-    const token = header.toLowerCase().startsWith('bearer ') ? header.slice(7).trim() : '';
-
-    if (!token) {
-      return next(new AppError(401, 'UNAUTHENTICATED', 'Missing bearer token'));
-    }
-
-    try {
-      req.auth = await resolveAuthFromToken(token, env);
-      next();
-    } catch (err) {
-      next(err instanceof AppError ? err : new AppError(401, 'UNAUTHENTICATED', 'Invalid or expired token'));
-    }
-  };
-}
-
 // Like requireAuth(), but does not require a token.
 // - If token is missing: continues unauthenticated.
 // - If token is present and invalid: returns 401.

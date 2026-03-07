@@ -1,0 +1,4 @@
+rules:
+  aria-valid-attr-value: false
+  no-inline-styles: false
+  inline-style-property: false

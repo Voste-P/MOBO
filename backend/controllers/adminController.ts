@@ -16,6 +16,7 @@ import { updateSystemConfigSchema } from '../validations/systemConfig.js';
 import type { Role } from '../middleware/auth.js';
 import { publishRealtime } from '../services/realtimeHub.js';
 import { pgUser, pgWallet, pgOrder, pgDeal } from '../utils/pgMappers.js';
+import { authCacheInvalidate } from '../utils/authCache.js';
 
 function db() { return prisma(); }
 
@@ -566,6 +567,12 @@ export function makeAdminController() {
         });
 
         const statusChanged = before.status !== user.status;
+
+        // Immediately evict auth cache so suspended users can't act on stale tokens
+        if (statusChanged) {
+          authCacheInvalidate(before.mongoId!);
+          authCacheInvalidate(before.id);
+        }
         const adminMongoId = req.auth?.userId;
         const adminPgId = (req.auth as any)?.pgUserId as string | undefined;
 

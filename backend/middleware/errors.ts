@@ -112,7 +112,11 @@ export function errorHandler(
         code: 'BAD_REQUEST',
         message: 'Please check your input and try again.',
         details: isProd
-          ? err.issues.map((i) => ({ path: i.path.join('.'), message: i.message }))
+          ? err.issues.map((i) => ({
+              // Only expose the leaf field name — never the full path (e.g. "email" not "body.data.email")
+              field: i.path.length > 0 ? String(i.path[i.path.length - 1]) : undefined,
+              message: i.message,
+            }))
           : err.issues,
       },
     });
