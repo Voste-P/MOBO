@@ -4375,11 +4375,17 @@ export async function extractOrderDetailsWithAi(
             const detIsPincode = /^\d{6}$/.test(detAmtStr) && finalAmount >= 100000 && finalAmount <= 999999 && parseInt(detAmtStr[0]) >= 1 && parseInt(detAmtStr[0]) <= 8;
             // Case 3: Deterministic value is a phone number (10 digits starting 6-9)
             const detIsPhone = /^[6-9]\d{9}$/.test(detAmtStr) && finalAmount >= 6000000000;
+            // Case 5: Deterministic value looks like a date (YYYYMMDD or DDMMYYYY, 8 digits)
+            const detIsDate = /^\d{8}$/.test(detAmtStr) && (() => {
+              const y1 = parseInt(detAmtStr.substring(0, 4), 10);
+              const y2 = parseInt(detAmtStr.substring(4, 8), 10);
+              return (y1 >= 2018 && y1 <= 2035) || (y2 >= 2018 && y2 <= 2035);
+            })();
             // Case 4: AI amount is visible in OCR text but deterministic is inflated
             const aiAmtInOcr = ocrNorm.includes(aiAmtStr) || ocrNorm.includes(aiAmtStr.replace('.', ''));
-            if ((isRupeeSignMisread && aiAmtInOcr) || detIsPincode || detIsPhone) {
+            if ((isRupeeSignMisread && aiAmtInOcr) || detIsPincode || detIsPhone || detIsDate) {
               finalAmount = aiSuggestedAmount;
-              notes.push(`AI corrected amount: ₹${detAmtStr} → ₹${aiAmtStr} (${isRupeeSignMisread ? '₹ sign misread' : detIsPincode ? 'was pincode' : 'was phone'}).`);
+              notes.push(`AI corrected amount: ₹${detAmtStr} → ₹${aiAmtStr} (${isRupeeSignMisread ? '₹ sign misread' : detIsPincode ? 'was pincode' : detIsPhone ? 'was phone' : 'was date'}).`);
             }
           }
 

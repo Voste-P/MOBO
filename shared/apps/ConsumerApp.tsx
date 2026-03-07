@@ -1,4 +1,4 @@
-﻿import React, { useState, lazy, Suspense } from 'react';
+﻿import React, { useState, useRef, lazy, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { CartProvider } from '../context/CartContext';
 import { ChatProvider } from '../context/ChatContext';
@@ -10,6 +10,7 @@ import { MobileTabBar } from '../components/MobileTabBar';
 import { Button, Card, CardContent } from '../components/ui';
 import { PageSkeleton } from '../components/ui/PageSkeleton';
 import { AuthScreen } from '../pages/Auth';
+import { useSwipeTabs } from '../hooks/useSwipeTabs';
 import { Package, User, LogOut, Home as HomeIcon, Bot } from 'lucide-react';
 
 // Lazy-load heavy page components to reduce initial bundle size.
@@ -30,6 +31,24 @@ interface ConsumerAppProps {
 export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'home' | 'explore' | 'orders' | 'profile'>('explore');
+  const [slideDir, setSlideDir] = useState<'left' | 'right'>('right');
+  const prevTabIdx = useRef(0);
+
+  const TAB_ORDER = ['explore', 'home', 'orders', 'profile'] as const;
+
+  const handleTabChange = (tab: typeof activeTab) => {
+    const newIdx = TAB_ORDER.indexOf(tab);
+    const oldIdx = TAB_ORDER.indexOf(activeTab);
+    setSlideDir(newIdx > oldIdx ? 'left' : 'right');
+    prevTabIdx.current = oldIdx;
+    setActiveTab(tab);
+  };
+
+  const swipeHandlers = useSwipeTabs({
+    tabs: TAB_ORDER as unknown as string[],
+    activeTab,
+    onChangeTab: (t) => handleTabChange(t as typeof activeTab),
+  });
 
   if (!user) return <AuthScreen onBack={onBack} />;
 
@@ -95,12 +114,17 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
           <ChatProvider>
             <NotificationProvider>
             <div className="flex flex-col h-full bg-[#F2F2F7] relative overflow-hidden font-sans">
-              <div className="flex-1 overflow-hidden">
+              <div className="flex-1 overflow-hidden" {...swipeHandlers}>
                 <Suspense fallback={<TabSkeleton />}>
-                  {activeTab === 'home' && <Home onVoiceNavigate={setActiveTab} />}
-                  {activeTab === 'explore' && <Explore />}
-                  {activeTab === 'orders' && <Orders />}
-                  {activeTab === 'profile' && <Profile />}
+                  <div
+                    key={activeTab}
+                    className={`h-full animate-slide-tab ${slideDir === 'left' ? 'slide-from-right' : 'slide-from-left'}`}
+                  >
+                    {activeTab === 'home' && <Home onVoiceNavigate={handleTabChange} />}
+                    {activeTab === 'explore' && <Explore />}
+                    {activeTab === 'orders' && <Orders />}
+                    {activeTab === 'profile' && <Profile />}
+                  </div>
                 </Suspense>
               </div>
 
@@ -113,7 +137,7 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
                     { id: 'profile', label: 'Profile', ariaLabel: 'Profile', icon: <User size={22} strokeWidth={2.5} /> },
                   ]}
                   activeId={activeTab}
-                  onChange={(id) => setActiveTab(id as any)}
+                  onChange={(id) => handleTabChange(id as any)}
                   variant="glass"
                   showLabels={false}
                 />

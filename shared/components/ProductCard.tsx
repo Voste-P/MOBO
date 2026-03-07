@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { ExternalLink, Star, ShoppingBag, Camera, X, Loader2, CheckCircle, Upload, AlertCircle, UserCircle } from 'lucide-react';
+import { ExternalLink, Star, ShoppingBag, Camera, X, Loader2, CheckCircle, Upload, AlertCircle, UserCircle, Lock, Pencil } from 'lucide-react';
 import { Product } from '../types';
 import { ProxiedImage, placeholderImage } from './ProxiedImage';
 import { api } from '../services/api';
@@ -56,6 +56,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
     productName?: string;
   }>({ orderId: '', amount: '' });
   const [reviewerName, setReviewerName] = useState('');
+  const [fieldsLocked, setFieldsLocked] = useState(false);
 
   const resetForm = useCallback(() => {
     setScreenshot(null);
@@ -65,6 +66,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
     setSubmitted(false);
     setExtractedDetails({ orderId: '', amount: '' });
     setReviewerName('');
+    setFieldsLocked(false);
     setFormOpen(false);
   }, []);
 
@@ -95,6 +97,8 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
           soldBy: result.soldBy || undefined,
           productName: result.productName || undefined,
         });
+        // Lock fields after successful AI extraction
+        if (result.orderId || result.amount) setFieldsLocked(true);
       }
     } catch {
       // Extraction is optional — notify user gracefully
@@ -281,7 +285,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
               <img src={preview} alt="Order proof" loading="lazy" className="w-full max-h-32 object-contain bg-gray-50" />
               <button
                 type="button"
-                onClick={() => { setScreenshot(null); setPreview(null); setExtractedDetails({ orderId: '', amount: '' }); }}
+                onClick={() => { setScreenshot(null); setPreview(null); setExtractedDetails({ orderId: '', amount: '' }); setFieldsLocked(false); }}
                 className="absolute top-1.5 right-1.5 p-1 bg-white/90 rounded-full shadow hover:bg-red-50 transition"
               >
                 <X size={12} className="text-red-500" />
@@ -301,9 +305,14 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
             <div className="space-y-2 animate-in slide-in-from-bottom-2">
               {/* AI status indicator */}
               {(extractedDetails.orderId || extractedDetails.amount || extractedDetails.productName || extractedDetails.soldBy || extractedDetails.orderDate) ? (
-                <div className="flex items-center gap-1.5 px-2 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg">
-                  <CheckCircle size={10} className="text-emerald-600 flex-shrink-0" />
-                  <p className="text-[9px] font-bold text-emerald-700">AI extracted — verify &amp; correct if needed</p>
+                <div className="flex items-center justify-between px-2 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg">
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle size={10} className="text-emerald-600 flex-shrink-0" />
+                    <p className="text-[9px] font-bold text-emerald-700">{fieldsLocked ? 'AI extracted — tap edit to correct' : 'Editing — tap lock when done'}</p>
+                  </div>
+                  <button type="button" onClick={() => setFieldsLocked(!fieldsLocked)} className="p-1 rounded-md hover:bg-emerald-100 transition-colors" aria-label={fieldsLocked ? 'Edit fields' : 'Lock fields'}>
+                    {fieldsLocked ? <Pencil size={10} className="text-emerald-600" /> : <Lock size={10} className="text-emerald-600" />}
+                  </button>
                 </div>
               ) : (
                 <div className="flex items-start gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
@@ -322,8 +331,9 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                       type="text"
                       value={extractedDetails.orderId}
                       onChange={(e) => setExtractedDetails((d) => ({ ...d, orderId: e.target.value }))}
+                      disabled={fieldsLocked}
                       placeholder="e.g. 408-1234567-8901234"
-                      className="w-full mt-0.5 px-1.5 py-1 text-[10px] font-medium border border-gray-300 rounded bg-white focus:ring-1 focus:ring-lime-300 focus:border-lime-400 outline-none transition-all"
+                      className={`w-full mt-0.5 px-1.5 py-1 text-[10px] font-medium border rounded outline-none transition-all ${fieldsLocked ? 'bg-emerald-50 border-emerald-200 text-emerald-800 cursor-not-allowed' : 'bg-white border-gray-300 focus:ring-1 focus:ring-lime-300 focus:border-lime-400'}`}
                     />
                   </div>
                   <div>
@@ -333,8 +343,9 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                       inputMode="decimal"
                       value={extractedDetails.amount}
                       onChange={(e) => setExtractedDetails((d) => ({ ...d, amount: e.target.value }))}
+                      disabled={fieldsLocked}
                       placeholder="e.g. 1044"
-                      className="w-full mt-0.5 px-1.5 py-1 text-[10px] font-medium border border-gray-300 rounded bg-white focus:ring-1 focus:ring-lime-300 focus:border-lime-400 outline-none transition-all"
+                      className={`w-full mt-0.5 px-1.5 py-1 text-[10px] font-medium border rounded outline-none transition-all ${fieldsLocked ? 'bg-emerald-50 border-emerald-200 text-emerald-800 cursor-not-allowed' : 'bg-white border-gray-300 focus:ring-1 focus:ring-lime-300 focus:border-lime-400'}`}
                     />
                   </div>
                 </div>
@@ -345,8 +356,9 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                     type="text"
                     value={extractedDetails.productName || ''}
                     onChange={(e) => setExtractedDetails((d) => ({ ...d, productName: e.target.value }))}
+                    disabled={fieldsLocked}
                     placeholder="e.g. Samsung Galaxy M34 5G"
-                    className="w-full mt-0.5 px-1.5 py-1 text-[10px] font-medium border border-gray-300 rounded bg-white focus:ring-1 focus:ring-lime-300 focus:border-lime-400 outline-none transition-all"
+                    className={`w-full mt-0.5 px-1.5 py-1 text-[10px] font-medium border rounded outline-none transition-all ${fieldsLocked ? 'bg-emerald-50 border-emerald-200 text-emerald-800 cursor-not-allowed' : 'bg-white border-gray-300 focus:ring-1 focus:ring-lime-300 focus:border-lime-400'}`}
                   />
                 </div>
 
@@ -357,8 +369,9 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                       type="text"
                       value={extractedDetails.soldBy || ''}
                       onChange={(e) => setExtractedDetails((d) => ({ ...d, soldBy: e.target.value }))}
+                      disabled={fieldsLocked}
                       placeholder="e.g. Cloudtail India"
-                      className="w-full mt-0.5 px-1.5 py-1 text-[10px] font-medium border border-gray-300 rounded bg-white focus:ring-1 focus:ring-lime-300 focus:border-lime-400 outline-none transition-all"
+                      className={`w-full mt-0.5 px-1.5 py-1 text-[10px] font-medium border rounded outline-none transition-all ${fieldsLocked ? 'bg-emerald-50 border-emerald-200 text-emerald-800 cursor-not-allowed' : 'bg-white border-gray-300 focus:ring-1 focus:ring-lime-300 focus:border-lime-400'}`}
                     />
                   </div>
                   <div>
@@ -367,8 +380,9 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                       type="text"
                       value={extractedDetails.orderDate || ''}
                       onChange={(e) => setExtractedDetails((d) => ({ ...d, orderDate: e.target.value }))}
+                      disabled={fieldsLocked}
                       placeholder="e.g. 15 Jan 2026"
-                      className="w-full mt-0.5 px-1.5 py-1 text-[10px] font-medium border border-gray-300 rounded bg-white focus:ring-1 focus:ring-lime-300 focus:border-lime-400 outline-none transition-all"
+                      className={`w-full mt-0.5 px-1.5 py-1 text-[10px] font-medium border rounded outline-none transition-all ${fieldsLocked ? 'bg-emerald-50 border-emerald-200 text-emerald-800 cursor-not-allowed' : 'bg-white border-gray-300 focus:ring-1 focus:ring-lime-300 focus:border-lime-400'}`}
                     />
                   </div>
                 </div>
