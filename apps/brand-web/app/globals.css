@@ -19,7 +19,7 @@ body {
 
 body {
   background-color: #f8f9fa;
-  overscroll-behavior-y: none;
+  overscroll-behavior: none;
 }
 
 input[type='number'] {
@@ -69,15 +69,35 @@ label,
   background: transparent;
 }
 .scrollbar-styled::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.18);
   border-radius: 999px;
 }
 .scrollbar-styled::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.3);
 }
 .scrollbar-styled {
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+  scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
+}
+
+/* Scrollbar variant for dark backgrounds */
+.scrollbar-styled-dark::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.scrollbar-styled-dark::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-styled-dark::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+}
+.scrollbar-styled-dark::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+.scrollbar-styled-dark {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 
 /* ── Animations ── */

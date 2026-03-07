@@ -38,7 +38,7 @@ export const MediatorApp: React.FC<MediatorAppProps> = ({ onBack }) => {
     <ErrorBoundary>
       <ToastProvider>
         <NotificationProvider>
-          <div className="relative min-h-[100dvh] flex flex-col">
+          <div className="relative min-h-[100dvh] flex flex-col overscroll-none">
             <Suspense fallback={<PageSkeleton variant="dashboard" />}>
               <MediatorDashboard />
             </Suspense>

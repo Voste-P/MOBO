@@ -2118,7 +2118,7 @@ export const MediatorDashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 scrollbar-styled pb-[calc(7.5rem+env(safe-area-inset-bottom))]">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 scrollbar-styled overscroll-none pb-[calc(7.5rem+env(safe-area-inset-bottom))]">
         {activeTab === 'inbox' && (
           <InboxView
             orders={orders}

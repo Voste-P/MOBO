@@ -133,7 +133,7 @@ export const Explore: React.FC = () => {
   return (
     <div className="flex flex-col h-full min-h-0 bg-[#F4F4F5]">
       {/* Header — compact for maximum content visibility */}
-      <div className="px-4 pt-10 pb-2 bg-white shadow-sm z-10 border-b border-gray-100 sticky top-0">
+      <div className="px-4 pt-10 pb-2 bg-white/95 backdrop-blur-md shadow-sm z-10 border-b border-gray-100 sticky top-0">
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-1.5">
             <span className="text-[9px] font-black tracking-widest text-lime-600 bg-lime-50 px-1.5 py-0.5 rounded border border-lime-200">BUZZMA</span>
@@ -202,7 +202,7 @@ export const Explore: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6 pb-32 scrollbar-styled">
+      <div className="flex-1 overflow-y-auto p-6 pb-32 scrollbar-styled overscroll-none">
         {loading ? (
           <div className="flex flex-col items-center gap-6">
             {[0, 1, 2].map((i) => (

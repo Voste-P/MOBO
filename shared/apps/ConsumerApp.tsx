@@ -114,11 +114,11 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
           <ChatProvider>
             <NotificationProvider>
             <div className="flex flex-col h-full bg-[#F2F2F7] relative overflow-hidden font-sans">
-              <div className="flex-1 overflow-hidden" {...swipeHandlers}>
+              <div className="flex-1 overflow-hidden overscroll-none" {...swipeHandlers}>
                 <Suspense fallback={<TabSkeleton />}>
                   <div
                     key={activeTab}
-                    className={`h-full animate-slide-tab ${slideDir === 'left' ? 'slide-from-right' : 'slide-from-left'}`}
+                    className={`h-full overflow-y-auto scrollbar-styled animate-slide-tab ${slideDir === 'left' ? 'slide-from-right' : 'slide-from-left'}`}
                   >
                     {activeTab === 'home' && <Home onVoiceNavigate={handleTabChange} />}
                     {activeTab === 'explore' && <Explore />}

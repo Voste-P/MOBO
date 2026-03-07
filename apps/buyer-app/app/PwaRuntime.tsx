@@ -95,28 +95,59 @@ export function PwaRuntime({ app }: { app: 'buyer' | 'mediator' }) {
   useEffect(() => {
     if (!isStandalonePwa()) return;
     const GUARD = 'mobo-pwa-guard';
+
+    // Push two guard entries so single/double back-press can't escape
     if (history.state !== GUARD) {
       history.replaceState(GUARD, '');
       history.pushState(GUARD, '');
+      history.pushState(GUARD, '');
     }
-    const onPopState = () => { history.pushState(GUARD, ''); };
+
+    const onPopState = () => {
+      // Always push a fresh guard so the user can never exhaust the stack
+      history.pushState(GUARD, '');
+    };
+
     window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
+
+    // iOS/Android: prevent overscroll-based navigation gestures
+    document.documentElement.style.overscrollBehavior = 'none';
+    document.body.style.overscrollBehavior = 'none';
+
+    return () => {
+      window.removeEventListener('popstate', onPopState);
+      document.documentElement.style.overscrollBehavior = '';
+      document.body.style.overscrollBehavior = '';
+    };
   }, []);
 
-  /* ── Prevent pinch-zoom on iOS (Safari ignores viewport meta) ── */
+  /* ── Prevent pinch-zoom and double-tap zoom on iOS/Android ── */
   useEffect(() => {
     const prevent = (e: Event) => e.preventDefault();
     const preventMulti = (e: TouchEvent) => { if (e.touches.length > 1) e.preventDefault(); };
+
+    // Prevent iOS Safari gesture zoom
     document.addEventListener('gesturestart', prevent, { passive: false });
     document.addEventListener('gesturechange', prevent, { passive: false });
     document.addEventListener('gestureend', prevent, { passive: false });
+    // Prevent multi-touch zoom
     document.addEventListener('touchmove', preventMulti, { passive: false });
+
+    // Prevent double-tap zoom (track quick taps < 300ms apart)
+    let lastTap = 0;
+    const onTouchEnd = (e: TouchEvent) => {
+      const now = Date.now();
+      if (now - lastTap < 300) { e.preventDefault(); }
+      lastTap = now;
+    };
+    document.addEventListener('touchend', onTouchEnd, { passive: false });
+
     return () => {
       document.removeEventListener('gesturestart', prevent);
       document.removeEventListener('gesturechange', prevent);
       document.removeEventListener('gestureend', prevent);
       document.removeEventListener('touchmove', preventMulti);
+      document.removeEventListener('touchend', onTouchEnd);
     };
   }, []);
 

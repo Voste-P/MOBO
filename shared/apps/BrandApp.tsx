@@ -36,7 +36,7 @@ export const BrandApp: React.FC<BrandAppProps> = ({ onBack }) => {
   return (
     <ErrorBoundary>
       <ToastProvider>
-        <div className="relative">
+        <div className="relative min-h-[100dvh] flex flex-col">
           <Suspense fallback={<PageSkeleton variant="dashboard" />}>
             <BrandDashboard />
           </Suspense>
