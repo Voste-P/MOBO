@@ -1015,9 +1015,9 @@ export function makeOrdersController(env: Env) {
                 durationMs: Date.now() - aiStart,
                 metadata: { orderId: order.mongoId, confidenceScore: ratingAiResult?.confidenceScore },
               });
-              // Block submission if both name AND product mismatch with high confidence (≥70 for anti-fraud strength)
+              // Block submission if both name AND product mismatch with high confidence (≥80 for fraud prevention, allows OCR margin)
               if (ratingAiResult && !ratingAiResult.accountNameMatch && !ratingAiResult.productNameMatch
-                && ratingAiResult.confidenceScore >= 70) {
+                && ratingAiResult.confidenceScore >= 80) {
                 throw new AppError(422, 'RATING_VERIFICATION_FAILED',
                   'Rating screenshot does not match: the account name and product must match your order. ' +
                   (ratingAiResult.discrepancyNote || ''));

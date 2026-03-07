@@ -72,6 +72,22 @@ function recordGeminiFailure(): void {
   }
 }
 
+// ── Levenshtein edit distance for fuzzy OCR name matching ──
+function editDistance(a: string, b: string): number {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const matrix: number[][] = [];
+  for (let i = 0; i <= a.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j - 1] + cost);
+    }
+  }
+  return matrix[a.length][b.length];
+}
+
 // ── Confidence Score Constants ──
 // Named constants for AI confidence scoring thresholds used across all verification pipelines.
 const CONFIDENCE = {
@@ -1300,12 +1316,15 @@ async function verifyRatingWithOcr(
 
     const lower = ocrText.toLowerCase();
     // Common stop words that cause false positives when matching names/products in OCR text
-    const STOP_WORDS = new Set(['the','for','and','with','from','that','this','you','your','was','are','has','have','been','not','but','all','can','had','her','his','one','our','out','use','how','its','may','new','now','old','see','way','who','boy','did','get','him','let','say','she','too','any','per','set','top','end','off','big','own','put','run','two','via','pro','free','pack','item','best','good','great','nice','mini','max','size','pair','home','made','full','high','low','day','set','box','buy','kit']);
+    const STOP_WORDS = new Set(['the','for','and','with','from','that','this','you','your','was','are','has','have','been','not','but','all','can','had','her','his','one','our','out','use','how','its','may','new','now','old','see','way','who','boy','did','get','him','let','say','she','too','any','per','set','top','end','off','big','own','put','run','two','via','free','pack','item','best','good','great','nice','size','pair','home','made','full','high','low','day','box','buy','kit']);
 
     // Account name matching: fuzzy — lenient matching for OCR text
     // Split name parts, keep even short parts (min 2 chars) but exclude stop words
     const buyerLower = expectedBuyerName.toLowerCase().trim();
-    const buyerParts = buyerLower.split(/\s+/).filter(p => p.length >= 2 && !STOP_WORDS.has(p));
+    const allBuyerParts = buyerLower.split(/\s+/).filter(p => p.length >= 2);
+    // If stop-word filter removes ALL parts, fall back to using raw parts (prevents empty-match false negatives)
+    const filteredParts = allBuyerParts.filter(p => !STOP_WORDS.has(p));
+    const buyerParts = filteredParts.length > 0 ? filteredParts : allBuyerParts;
 
     // Strategy 1: check full name as substring
     let accountNameMatch = buyerLower.length >= 3 && lower.includes(buyerLower);
@@ -1324,7 +1343,9 @@ async function verifyRatingWithOcr(
       if (reviewerLower.length >= 3 && lower.includes(reviewerLower)) {
         accountNameMatch = true;
       } else {
-        const reviewerParts = reviewerLower.split(/\s+/).filter(p => p.length >= 2 && !STOP_WORDS.has(p));
+        const allReviewerParts = reviewerLower.split(/\s+/).filter(p => p.length >= 2);
+        const filteredReviewerParts = allReviewerParts.filter(p => !STOP_WORDS.has(p));
+        const reviewerParts = filteredReviewerParts.length > 0 ? filteredReviewerParts : allReviewerParts;
         if (reviewerParts.length > 0) {
           const reviewerMatches = reviewerParts.filter(p => lower.includes(p));
           const threshold = reviewerParts.length <= 2 ? 1 : Math.ceil(reviewerParts.length * 0.4);
@@ -1341,13 +1362,25 @@ async function verifyRatingWithOcr(
           (lastName.length >= 3 && lower.includes(lastName))) {
         accountNameMatch = true;
       }
+      // Strategy 4b: fuzzy match — allow 1-char edit distance for names ≥5 chars (handles OCR misreads)
+      if (!accountNameMatch) {
+        for (const part of allBuyerParts) {
+          if (part.length < 5) continue;
+          // Scan OCR text for words within 1-char edit distance
+          const ocrWords = lower.split(/\s+/);
+          const fuzzy = ocrWords.some(w => w.length >= part.length - 1 && w.length <= part.length + 1 && editDistance(w, part) <= 1);
+          if (fuzzy) { accountNameMatch = true; break; }
+        }
+      }
     }
 
     // Product name matching: check if significant keywords from product name appear
-    const productTokens = expectedProductName.toLowerCase()
+    const allProductTokens = expectedProductName.toLowerCase()
       .replace(/[^a-z0-9\s]/g, ' ')
       .split(/\s+/)
-      .filter(t => t.length >= 3 && !STOP_WORDS.has(t));
+      .filter(t => t.length >= 3);
+    const filteredProductTokens = allProductTokens.filter(t => !STOP_WORDS.has(t));
+    const productTokens = filteredProductTokens.length > 0 ? filteredProductTokens : allProductTokens;
     const matchedTokens = productTokens.filter(t => lower.includes(t));
     const productNameMatch = matchedTokens.length >= Math.max(1, Math.ceil(productTokens.length * 0.4));
 

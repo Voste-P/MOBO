@@ -176,8 +176,14 @@ async function canManageTicketByRole(params: {
   if (roles.includes('mediator') && targetRole === 'mediator') {
     const mediatorCode = String(user?.mediatorCode || '').trim();
     if (!mediatorCode) return false;
-    // Verify the ticket creator is a buyer managed by this mediator
     const db = prisma();
+    // Allow if the buyer is registered under this mediator (via parentCode)
+    const registeredBuyer = await db.user.findFirst({
+      where: { id: ticket.userId, parentCode: mediatorCode, isDeleted: false },
+      select: { id: true },
+    });
+    if (registeredBuyer) return true;
+    // Allow if the buyer has orders managed by this mediator
     const orderCount = await db.order.count({
       where: { managerName: mediatorCode, userId: ticket.userId, isDeleted: false },
     });
@@ -197,15 +203,22 @@ async function canManageTicketByRole(params: {
     const agencyCode = String(user?.mediatorCode || '').trim();
     if (!agencyCode) return false;
     const mediatorCodes = await listMediatorCodesForAgency(agencyCode);
-    if (!mediatorCodes.length) return false;
-    // Check if ticket creator is a mediator under this agency
     const db = prisma();
-    const creatorUser = await db.user.findFirst({
-      where: { id: ticket.userId, mediatorCode: { in: mediatorCodes }, isDeleted: false },
+    // Allow if ticket creator is a mediator registered under this agency
+    const registeredMediator = await db.user.findFirst({
+      where: { id: ticket.userId, parentCode: agencyCode, isDeleted: false },
+      select: { id: true },
     });
-    if (creatorUser) return true;
+    if (registeredMediator) return true;
+    // Allow if ticket creator has a mediatorCode in this agency's network
+    if (mediatorCodes.length > 0) {
+      const creatorUser = await db.user.findFirst({
+        where: { id: ticket.userId, mediatorCode: { in: mediatorCodes }, isDeleted: false },
+      });
+      if (creatorUser) return true;
+    }
     // Also allow via order linkage
-    if (ticket.orderId) {
+    if (ticket.orderId && mediatorCodes.length > 0) {
       const order = await db.order.findFirst({
         where: { ...idWhere(ticket.orderId), managerName: { in: mediatorCodes }, isDeleted: false },
       });
@@ -230,6 +243,12 @@ async function canManageTicketByRole(params: {
     });
     const agencyOwnerIds = connectedAgencies.map(a => a.ownerUserId).filter(Boolean);
     if (agencyOwnerIds.includes(ticket.userId)) return true;
+    // Also check if ticket creator is registered under any connected agency
+    const registeredUnderAgency = await db.user.findFirst({
+      where: { id: ticket.userId, parentCode: { in: connectedCodes }, isDeleted: false },
+      select: { id: true },
+    });
+    if (registeredUnderAgency) return true;
     // Also allow via order linkage
     if (ticket.orderId) {
       const order = await db.order.findFirst({
