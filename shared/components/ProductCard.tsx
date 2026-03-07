@@ -285,6 +285,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
               <img src={preview} alt="Order proof" loading="lazy" className="w-full max-h-32 object-contain bg-gray-50" />
               <button
                 type="button"
+                aria-label="Remove screenshot"
                 onClick={() => { setScreenshot(null); setPreview(null); setExtractedDetails({ orderId: '', amount: '' }); setFieldsLocked(false); }}
                 className="absolute top-1.5 right-1.5 p-1 bg-white/90 rounded-full shadow hover:bg-red-50 transition"
               >

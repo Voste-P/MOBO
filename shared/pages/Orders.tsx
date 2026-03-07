@@ -628,7 +628,8 @@ export const Orders: React.FC = () => {
         reader.onerror = () => reject(new Error('Failed to read file'));
         reader.readAsDataURL(ratingFile);
       });
-      await api.orders.submitClaim(selectedOrder.id, { type: uploadType, data });
+      const reviewerName = reviewerNameInput.trim() || (selectedOrder as any).reviewerName || '';
+      await api.orders.submitClaim(selectedOrder.id, { type: uploadType, data, ...(reviewerName ? { reviewerName } : {}) });
       toast.success('Proof uploaded!');
       setSelectedOrder(null);
       setRatingPreview(null);
@@ -870,6 +871,7 @@ export const Orders: React.FC = () => {
           <select
             value={orderListStatus}
             onChange={(e) => setOrderListStatus(e.target.value)}
+            aria-label="Filter orders by status"
             className="px-3 py-2.5 rounded-xl border border-zinc-200 bg-white text-xs font-bold"
           >
             <option value="All">All</option>

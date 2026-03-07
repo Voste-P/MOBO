@@ -53,7 +53,7 @@ export const MobileTabBar = React.memo(function MobileTabBar({
               key={item.id}
               onClick={() => handleTap(item.id)}
               aria-label={item.ariaLabel || item.label}
-              aria-selected={active}
+              aria-selected={active ? "true" : "false"}
               className={cn(
                 'flex flex-col items-center gap-1 min-w-[50px] transition-all duration-300 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#18181B] rounded-xl motion-reduce:transition-none motion-reduce:transform-none',
                 active ? '-translate-y-1' : 'hover:-translate-y-0.5'
@@ -95,7 +95,7 @@ export const MobileTabBar = React.memo(function MobileTabBar({
               role="tab"
               onClick={() => handleTap(item.id)}
               aria-label={item.ariaLabel || item.label}
-              aria-selected={active}
+              aria-selected={active ? "true" : "false"}
               className={cn(
                 'relative p-3 rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:transform-none',
                 ringOffsetClass,

@@ -100,8 +100,10 @@ function isAuthError(res: Response, payload: any): boolean {
 }
 
 function isForbiddenError(res: Response, payload: any): boolean {
+  // Only treat specific suspension/deactivation codes as session-ending 403s.
+  // Regular permission errors (e.g. "Not allowed" on a ticket) should NOT kill the session.
   const code = payload?.error?.code || payload?.code;
-  return res.status === 403 || code === 'FORBIDDEN' || code === 'USER_NOT_ACTIVE' || code === 'UPSTREAM_SUSPENDED';
+  return res.status === 403 && (code === 'USER_NOT_ACTIVE' || code === 'UPSTREAM_SUSPENDED');
 }
 
 /**
@@ -528,7 +530,7 @@ export const api = {
       });
     },
     /** [FIX] Added missing submitClaim for Orders.tsx */
-    submitClaim: async (orderId: string, proof: { type: string; data: string }) => {
+    submitClaim: async (orderId: string, proof: { type: string; data: string; reviewerName?: string }) => {
       return fetchJson('/orders/claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -1046,14 +1048,14 @@ export const api = {
       });
     },
     update: async (id: string, status: string, resolutionNote?: string) => {
-      return fetchJson(`/tickets/${id}`, {
+      return fetchJson(`/tickets/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ status, ...(resolutionNote ? { resolutionNote } : {}) }),
       });
     },
     escalate: async (id: string) => {
-      return fetchJson(`/tickets/${id}`, {
+      return fetchJson(`/tickets/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ status: 'Open', escalate: true }),

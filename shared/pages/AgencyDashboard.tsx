@@ -238,6 +238,7 @@ const AgencyProfile = ({ user }: any) => {
               ref={fileInputRef}
               className="hidden"
               accept="image/*"
+              aria-label="Upload profile photo"
               onChange={handleFile}
             />
           </div>
@@ -296,6 +297,7 @@ const AgencyProfile = ({ user }: any) => {
                 disabled={!isEditing}
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
+                aria-label="Agency Name"
                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:opacity-70 disabled:bg-slate-50/50 transition-all"
               />
             </div>
@@ -308,6 +310,7 @@ const AgencyProfile = ({ user }: any) => {
                 disabled={!isEditing}
                 value={form.mobile}
                 onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+                aria-label="Contact Number"
                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:opacity-70 disabled:bg-slate-50/50 transition-all"
               />
             </div>
@@ -381,6 +384,7 @@ const AgencyProfile = ({ user }: any) => {
                 disabled={!isEditing}
                 value={form.accountNumber}
                 onChange={(e) => setForm({ ...form, accountNumber: e.target.value })}
+                aria-label="Account Number"
                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-mono font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:opacity-70 disabled:bg-slate-50/50 transition-all"
               />
             </div>
@@ -394,6 +398,7 @@ const AgencyProfile = ({ user }: any) => {
                 disabled={!isEditing}
                 value={form.holderName}
                 onChange={(e) => setForm({ ...form, holderName: e.target.value })}
+                aria-label="Account Holder Name"
                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:opacity-70 disabled:bg-slate-50/50 transition-all"
               />
             </div>
@@ -753,9 +758,9 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
           <select
             value={financeStatusFilter}
             onChange={(e) => setFinanceStatusFilter(e.target.value)}
+            aria-label="Filter by status"
             className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white"
           >
-            <option value="All">All Statuses</option>
             <option value="Pending">Pending</option>
             <option value="Pending_Cooling">Cooling</option>
             <option value="Approved_Settled">Settled</option>
@@ -764,9 +769,9 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
           <select
             value={financeDealTypeFilter}
             onChange={(e) => setFinanceDealTypeFilter(e.target.value)}
+            aria-label="Filter by deal type"
             className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white"
           >
-            <option value="All">All Deal Types</option>
             <option value="Discount">Order Deal</option>
             <option value="Rating">Rating Deal</option>
             <option value="Review">Review Deal</option>
@@ -774,9 +779,9 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
           <select
             value={financeMediatorFilter}
             onChange={(e) => setFinanceMediatorFilter(e.target.value)}
+            aria-label="Filter by mediator"
             className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white max-w-[160px]"
           >
-            <option value="All">All Mediators</option>
             {mediatorOptions.map((m) => (
               <option key={m} value={m}>{m}</option>
             ))}
@@ -784,9 +789,9 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
           <select
             value={financeProductFilter}
             onChange={(e) => setFinanceProductFilter(e.target.value)}
+            aria-label="Filter by product"
             className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white max-w-[200px] truncate"
           >
-            <option value="All">All Products</option>
             {productOptions.map((p) => (
               <option key={p} value={p}>{p.length > 30 ? p.slice(0, 30) + '…' : p}</option>
             ))}
@@ -1520,6 +1525,7 @@ const DashboardView = ({ stats, allOrders }: any) => {
             <select
               value={range}
               onChange={(e) => setRange(e.target.value as any)}
+              aria-label="Date range"
               className="bg-slate-50 border border-slate-200 text-xs font-bold text-slate-600 rounded-lg px-3 py-2 outline-none hover:bg-slate-100 transition-colors cursor-pointer"
             >
               <option value="last30">Last 30 Days</option>
@@ -2004,9 +2010,9 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
         <select
           value={filterDealType}
           onChange={(e) => setFilterDealType(e.target.value)}
+          aria-label="Filter by deal type"
           className="px-3 py-3 rounded-xl border border-slate-200 text-xs font-bold bg-white"
         >
-          <option value="All">All Deal Types</option>
           <option value="Discount">Discount</option>
           <option value="Review">Review</option>
           <option value="Rating">Rating</option>
@@ -2014,9 +2020,9 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
         <select
           value={filterBrand}
           onChange={(e) => setFilterBrand(e.target.value)}
+          aria-label="Filter by brand"
           className="px-3 py-3 rounded-xl border border-slate-200 text-xs font-bold bg-white"
         >
-          <option value="All">All Brands</option>
           {brandOptions.map((b) => (
             <option key={b} value={b}>{b}</option>
           ))}
@@ -2427,6 +2433,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                     className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-sm outline-none focus:border-purple-200 focus:bg-white focus:ring-4 focus:ring-purple-50 transition-all appearance-none"
                     value={newCampaign.dealType}
                     onChange={(e) => setNewCampaign({ ...newCampaign, dealType: e.target.value })}
+                    aria-label="Deal type"
                   >
                     <option value="Discount">Order Deal</option>
                     <option value="Review">Review Deal</option>
@@ -2693,6 +2700,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                   </button>
                   <button
                     onClick={() => setAssignments({})}
+                    aria-label="Clear assignments"
                     className="p-2 bg-white border border-slate-200 text-slate-400 rounded-xl hover:text-red-500 hover:border-red-200 transition-colors shadow-sm hover:shadow-md h-9 w-9 flex items-center justify-center"
                   >
                     <Trash2 size={16} />
@@ -3060,6 +3068,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
               />
               <button
                 onClick={() => setInviteCode(null)}
+                aria-label="Dismiss invite code"
                 className="ml-2 p-1 hover:bg-purple-100 rounded-full"
               >
                 <X size={12} />
@@ -3169,12 +3178,14 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                         <div className="flex justify-end gap-2">
                           <button
                             onClick={(e) => handleApproval(e, m.id, 'approve')}
+                            aria-label="Approve request"
                             className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 border border-green-100 transition-colors cursor-pointer active:scale-90"
                           >
                             <Check size={16} />
                           </button>
                           <button
                             onClick={(e) => handleApproval(e, m.id, 'reject')}
+                            aria-label="Reject request"
                             className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 border border-red-100 transition-colors cursor-pointer active:scale-90"
                           >
                             <X size={16} />
@@ -3839,6 +3850,7 @@ export const AgencyDashboard: React.FC = () => {
       mobileMenuButton={
         <button
           onClick={() => setIsSidebarOpen(true)}
+          aria-label="Open menu"
           className="p-2 bg-white rounded-xl shadow-sm border border-slate-100"
         >
           <Menu size={20} />

@@ -1735,6 +1735,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       <select
                         value={inviteRole}
                         onChange={(e) => setInviteRole(e.target.value as any)}
+                        aria-label="Invite role"
                         className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                       >
                         <option value="agency">Agency Partner</option>
@@ -1855,6 +1856,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   <select
                     value={orderStatusFilter}
                     onChange={(e) => setOrderStatusFilter(e.target.value)}
+                    aria-label="Filter by order status"
                     className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white"
                   >
                     <option value="All">All Statuses</option>
@@ -2012,6 +2014,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       type="text"
                       readOnly
                       value="BUZZMA Ecosystem"
+                      aria-label="Platform Name"
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-700"
                     />
                   </div>
@@ -2023,6 +2026,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       type="text"
                       value={configEmail}
                       onChange={(e) => setConfigEmail(e.target.value)}
+                      aria-label="Admin Contact"
                       className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
                     />
                   </div>
@@ -2080,6 +2084,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   <select
                     value={auditActionFilter}
                     onChange={(e) => setAuditActionFilter(e.target.value)}
+                    aria-label="Filter by audit action"
                     className="px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-slate-300"
                   >
                     <option value="">All Actions</option>

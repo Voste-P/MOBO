@@ -152,6 +152,105 @@ async function assertCanReferenceOrder(params: { orderId: string; pgUserId: stri
   throw new AppError(403, 'FORBIDDEN', 'Insufficient role');
 }
 
+/**
+ * Check if the current user can manage (resolve/reject/escalate/comment) a ticket
+ * that is targeted to their role in the cascade routing system.
+ *
+ * Cascade routing: buyer→mediator, mediator→agency, agency→brand, brand→admin
+ * Each role can manage tickets targeted TO their role from their network scope.
+ */
+async function canManageTicketByRole(params: {
+  ticket: any;
+  roles: string[];
+  pgUserId: string;
+  user: any;
+}): Promise<boolean> {
+  const { ticket, roles, pgUserId, user } = params;
+
+  if (isPrivileged(roles)) return true;
+  if (ticket.userId === pgUserId) return true;
+
+  const targetRole = String(ticket.targetRole || '').trim();
+
+  // Mediator can manage tickets targeted to 'mediator' from their buyers
+  if (roles.includes('mediator') && targetRole === 'mediator') {
+    const mediatorCode = String(user?.mediatorCode || '').trim();
+    if (!mediatorCode) return false;
+    // Verify the ticket creator is a buyer managed by this mediator
+    const db = prisma();
+    const orderCount = await db.order.count({
+      where: { managerName: mediatorCode, userId: ticket.userId, isDeleted: false },
+    });
+    if (orderCount > 0) return true;
+    // Also allow if the ticket is linked to an order in the mediator's network
+    if (ticket.orderId) {
+      const order = await db.order.findFirst({
+        where: { ...idWhere(ticket.orderId), managerName: mediatorCode, isDeleted: false },
+      });
+      if (order) return true;
+    }
+    return false;
+  }
+
+  // Agency can manage tickets targeted to 'agency' from their mediators
+  if (roles.includes('agency') && targetRole === 'agency') {
+    const agencyCode = String(user?.mediatorCode || '').trim();
+    if (!agencyCode) return false;
+    const mediatorCodes = await listMediatorCodesForAgency(agencyCode);
+    if (!mediatorCodes.length) return false;
+    // Check if ticket creator is a mediator under this agency
+    const db = prisma();
+    const creatorUser = await db.user.findFirst({
+      where: { id: ticket.userId, mediatorCode: { in: mediatorCodes }, isDeleted: false },
+    });
+    if (creatorUser) return true;
+    // Also allow via order linkage
+    if (ticket.orderId) {
+      const order = await db.order.findFirst({
+        where: { ...idWhere(ticket.orderId), managerName: { in: mediatorCodes }, isDeleted: false },
+      });
+      if (order) return true;
+    }
+    return false;
+  }
+
+  // Brand can manage tickets targeted to 'brand' from connected agencies
+  if (roles.includes('brand') && targetRole === 'brand') {
+    const db = prisma();
+    const brand = await db.brand.findFirst({
+      where: { ownerUserId: pgUserId, isDeleted: false },
+      select: { connectedAgencyCodes: true },
+    });
+    const connectedCodes = brand?.connectedAgencyCodes ?? [];
+    if (!connectedCodes.length) return false;
+    // Check if ticket creator is an agency owner connected to this brand
+    const connectedAgencies = await db.agency.findMany({
+      where: { agencyCode: { in: connectedCodes }, isDeleted: false },
+      select: { ownerUserId: true },
+    });
+    const agencyOwnerIds = connectedAgencies.map(a => a.ownerUserId).filter(Boolean);
+    if (agencyOwnerIds.includes(ticket.userId)) return true;
+    // Also allow via order linkage
+    if (ticket.orderId) {
+      const order = await db.order.findFirst({
+        where: { ...idWhere(ticket.orderId), brandUserId: pgUserId, isDeleted: false },
+      });
+      if (order) return true;
+    }
+    return false;
+  }
+
+  // Fallback: try order reference
+  if (ticket.orderId) {
+    try {
+      await assertCanReferenceOrder({ orderId: ticket.orderId, pgUserId, roles, user });
+      return true;
+    } catch { return false; }
+  }
+
+  return false;
+}
+
 export function makeTicketsController(env: import('../config/env.js').Env) {
   return {
     getTicketById: async (req: Request, res: Response, next: NextFunction) => {
@@ -168,14 +267,9 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
         });
         if (!ticket) throw new AppError(404, 'TICKET_NOT_FOUND', 'Ticket not found');
 
-        // Only allow the ticket owner, referenced order participants, or privileged roles
-        if (!isPrivileged(roles) && ticket.userId !== pgUserId) {
-          if (ticket.orderId) {
-            await assertCanReferenceOrder({ orderId: ticket.orderId, pgUserId, roles, user });
-          } else {
-            throw new AppError(403, 'FORBIDDEN', 'Not allowed');
-          }
-        }
+        // Allow ticket owner, targeted role managers, or privileged roles
+        const canAccess = await canManageTicketByRole({ ticket, roles, pgUserId, user });
+        if (!canAccess) throw new AppError(403, 'FORBIDDEN', 'Not allowed');
 
         const mapped = pgTicket(ticket);
         const enriched = (await enrichTicketsWithResolverNames([mapped]))[0];
@@ -208,14 +302,9 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
         const ticket = await db.ticket.findFirst({ where: { ...idWhere(ticketId), isDeleted: false } });
         if (!ticket) throw new AppError(404, 'TICKET_NOT_FOUND', 'Ticket not found');
 
-        // Access check
-        if (!isPrivileged(roles) && ticket.userId !== pgUserId) {
-          if (ticket.orderId) {
-            await assertCanReferenceOrder({ orderId: ticket.orderId, pgUserId, roles, user });
-          } else {
-            throw new AppError(403, 'FORBIDDEN', 'Not allowed');
-          }
-        }
+        // Access check — allow targeted role managers
+        const canAccess = await canManageTicketByRole({ ticket, roles, pgUserId, user });
+        if (!canAccess) throw new AppError(403, 'FORBIDDEN', 'Not allowed');
 
         const comments = await db.ticketComment.findMany({
           where: { ticketId: ticket.id, isDeleted: false },
@@ -251,14 +340,9 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
         const ticket = await db.ticket.findFirst({ where: { ...idWhere(ticketId), isDeleted: false } });
         if (!ticket) throw new AppError(404, 'TICKET_NOT_FOUND', 'Ticket not found');
 
-        // Access check
-        if (!isPrivileged(roles) && ticket.userId !== pgUserId) {
-          if (ticket.orderId) {
-            await assertCanReferenceOrder({ orderId: ticket.orderId, pgUserId, roles, user });
-          } else {
-            throw new AppError(403, 'FORBIDDEN', 'Not allowed');
-          }
-        }
+        // Access check — allow targeted role managers
+        const canAccess = await canManageTicketByRole({ ticket, roles, pgUserId, user });
+        if (!canAccess) throw new AppError(403, 'FORBIDDEN', 'Not allowed');
 
         const userName = String(user?.name || 'User');
         const role = String(user?.role || roles[0] || 'shopper');
@@ -503,13 +587,8 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
         const existing = await db.ticket.findFirst({ where: { ...idWhere(id), isDeleted: false } });
         if (!existing) throw new AppError(404, 'TICKET_NOT_FOUND', 'Ticket not found');
 
-        if (!isPrivileged(roles) && existing.userId !== pgUserId) {
-          if (existing.orderId) {
-            await assertCanReferenceOrder({ orderId: existing.orderId, pgUserId, roles, user });
-          } else {
-            throw new AppError(403, 'FORBIDDEN', 'Not allowed');
-          }
-        }
+        const canManage = await canManageTicketByRole({ ticket: existing, roles, pgUserId, user });
+        if (!canManage) throw new AppError(403, 'FORBIDDEN', 'Not allowed');
 
         const previousStatus = String(existing.status || '');
         const updatePayload: any = { status: body.status, updatedBy: pgUserId };
@@ -597,13 +676,8 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
           throw new AppError(409, 'TICKET_NOT_CLOSED', 'Ticket must be resolved or rejected before deletion');
         }
 
-        if (!isPrivileged(roles) && existing.userId !== pgUserId) {
-          if (existing.orderId) {
-            await assertCanReferenceOrder({ orderId: existing.orderId, pgUserId, roles, user });
-          } else {
-            throw new AppError(403, 'FORBIDDEN', 'Not allowed');
-          }
-        }
+        const canManage = await canManageTicketByRole({ ticket: existing, roles, pgUserId, user });
+        if (!canManage) throw new AppError(403, 'FORBIDDEN', 'Not allowed');
 
         await db.ticket.update({ where: { id: existing.id }, data: { isDeleted: true, updatedBy: pgUserId } });
 

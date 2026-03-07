@@ -175,7 +175,7 @@ export const Explore: React.FC = () => {
                 key={dt}
                 type="button"
                 onClick={() => setSelectedDealType(dt)}
-                aria-pressed={selectedDealType === dt}
+                aria-pressed={selectedDealType === dt ? "true" : "false"}
                 className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap ${
                   selectedDealType === dt
                     ? 'bg-lime-500 text-white border-lime-500 shadow'
@@ -195,7 +195,7 @@ export const Explore: React.FC = () => {
               key={cat}
               type="button"
               onClick={() => setSelectedCategory(cat)}
-              aria-pressed={selectedCategory === cat}
+              aria-pressed={selectedCategory === cat ? "true" : "false"}
               className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap ${
                 selectedCategory === cat
                   ? 'bg-black text-white border-black shadow'

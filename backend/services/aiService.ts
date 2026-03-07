@@ -1302,15 +1302,45 @@ async function verifyRatingWithOcr(
     // Common stop words that cause false positives when matching names/products in OCR text
     const STOP_WORDS = new Set(['the','for','and','with','from','that','this','you','your','was','are','has','have','been','not','but','all','can','had','her','his','one','our','out','use','how','its','may','new','now','old','see','way','who','boy','did','get','him','let','say','she','too','any','per','set','top','end','off','big','own','put','run','two','via','pro','free','pack','item','best','good','great','nice','mini','max','size','pair','home','made','full','high','low','day','set','box','buy','kit']);
 
-    // Account name matching: fuzzy — check if any 2+ word segment of the buyer name or reviewer name appears
-    const buyerParts = expectedBuyerName.toLowerCase().split(/\s+/).filter(p => p.length >= 2 && !STOP_WORDS.has(p));
-    const nameMatches = buyerParts.filter(p => lower.includes(p));
-    let accountNameMatch = nameMatches.length >= Math.max(1, Math.ceil(buyerParts.length * 0.6));
-    // Also check reviewer / marketplace profile name if provided
+    // Account name matching: fuzzy — lenient matching for OCR text
+    // Split name parts, keep even short parts (min 2 chars) but exclude stop words
+    const buyerLower = expectedBuyerName.toLowerCase().trim();
+    const buyerParts = buyerLower.split(/\s+/).filter(p => p.length >= 2 && !STOP_WORDS.has(p));
+
+    // Strategy 1: check full name as substring
+    let accountNameMatch = buyerLower.length >= 3 && lower.includes(buyerLower);
+
+    // Strategy 2: check individual name parts — match at least 1 part (or 40% for longer names)
+    if (!accountNameMatch && buyerParts.length > 0) {
+      const nameMatches = buyerParts.filter(p => lower.includes(p));
+      const threshold = buyerParts.length <= 2 ? 1 : Math.ceil(buyerParts.length * 0.4);
+      accountNameMatch = nameMatches.length >= threshold;
+    }
+
+    // Strategy 3: check marketplace profile / reviewer name if provided
     if (!accountNameMatch && expectedReviewerName) {
-      const reviewerParts = expectedReviewerName.toLowerCase().split(/\s+/).filter(p => p.length >= 2 && !STOP_WORDS.has(p));
-      const reviewerMatches = reviewerParts.filter(p => lower.includes(p));
-      accountNameMatch = reviewerMatches.length >= Math.max(1, Math.ceil(reviewerParts.length * 0.6));
+      const reviewerLower = expectedReviewerName.toLowerCase().trim();
+      // Full reviewer name substring check
+      if (reviewerLower.length >= 3 && lower.includes(reviewerLower)) {
+        accountNameMatch = true;
+      } else {
+        const reviewerParts = reviewerLower.split(/\s+/).filter(p => p.length >= 2 && !STOP_WORDS.has(p));
+        if (reviewerParts.length > 0) {
+          const reviewerMatches = reviewerParts.filter(p => lower.includes(p));
+          const threshold = reviewerParts.length <= 2 ? 1 : Math.ceil(reviewerParts.length * 0.4);
+          accountNameMatch = reviewerMatches.length >= threshold;
+        }
+      }
+    }
+
+    // Strategy 4: handle very short names or nicknames — accept if first or last name matches
+    if (!accountNameMatch && buyerLower.length >= 2) {
+      const firstName = buyerParts[0] || '';
+      const lastName = buyerParts[buyerParts.length - 1] || '';
+      if ((firstName.length >= 3 && lower.includes(firstName)) ||
+          (lastName.length >= 3 && lower.includes(lastName))) {
+        accountNameMatch = true;
+      }
     }
 
     // Product name matching: check if significant keywords from product name appear
@@ -1324,8 +1354,8 @@ async function verifyRatingWithOcr(
     // Graduated confidence scoring — partial matches contribute proportionally
     let confidenceScore: number = CONFIDENCE.RATING_BASE;
     if (accountNameMatch) {
-      const nameRatio = buyerParts.length > 0 ? nameMatches.length / buyerParts.length : 0;
-      confidenceScore += Math.round(CONFIDENCE.RATING_FIELD_WEIGHT * nameRatio);
+      // Name matched — give full weight since we already validated with multiple strategies
+      confidenceScore += CONFIDENCE.RATING_FIELD_WEIGHT;
     }
     if (productNameMatch) {
       const productRatio = productTokens.length > 0 ? matchedTokens.length / productTokens.length : 0;

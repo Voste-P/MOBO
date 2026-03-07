@@ -420,7 +420,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
         <div className="flex gap-2 mb-4 bg-zinc-100 p-1 rounded-xl">
           <button
             type="button"
-            aria-pressed={viewMode === 'todo'}
+            aria-pressed={viewMode === 'todo' ? "true" : "false"}
             onClick={() => setViewMode('todo')}
             className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'todo' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
           >
@@ -428,7 +428,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
           </button>
           <button
             type="button"
-            aria-pressed={viewMode === 'cooling'}
+            aria-pressed={viewMode === 'cooling' ? "true" : "false"}
             onClick={() => setViewMode('cooling')}
             className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'cooling' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
           >
@@ -872,7 +872,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
         <div className="grid grid-cols-2 gap-1">
           <button
             type="button"
-            aria-pressed={mode === 'published'}
+            aria-pressed={mode === 'published' ? "true" : "false"}
             onClick={() => setMode('published')}
             className={`px-4 py-3 rounded-[1.2rem] font-black text-xs transition-all flex items-center justify-center gap-2 ${
               mode === 'published'
@@ -891,7 +891,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
           </button>
           <button
             type="button"
-            aria-pressed={mode === 'unpublished'}
+            aria-pressed={mode === 'unpublished' ? "true" : "false"}
             onClick={() => setMode('unpublished')}
             className={`px-4 py-3 rounded-[1.2rem] font-black text-xs transition-all flex items-center justify-center gap-2 ${
               mode === 'unpublished'
@@ -1346,6 +1346,7 @@ const MediatorProfileView = () => {
             ref={fileInputRef}
             className="hidden"
             accept="image/*"
+            aria-label="Upload profile photo"
             onChange={(e) => handleImageUpload(e, 'avatar')}
           />
         </div>
@@ -1378,6 +1379,7 @@ const MediatorProfileView = () => {
               disabled={!isEditing}
               value={name}
               onChange={(e) => setName(e.target.value)}
+              aria-label="Full Name"
               className="w-full p-3 bg-zinc-50 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-lime-400 disabled:opacity-70 disabled:bg-transparent disabled:border disabled:border-zinc-100"
             />
           </div>
@@ -1393,6 +1395,7 @@ const MediatorProfileView = () => {
               pattern="[0-9]{10}"
               value={mobile}
               onChange={(e) => setMobile(normalizeMobileTo10Digits(e.target.value))}
+              aria-label="Mobile Number"
               className="w-full p-3 bg-zinc-50 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-lime-400 disabled:opacity-70 disabled:bg-transparent disabled:border disabled:border-zinc-100"
             />
           </div>
@@ -1445,6 +1448,7 @@ const MediatorProfileView = () => {
               ref={qrInputRef}
               className="hidden"
               accept="image/*"
+              aria-label="Upload payment QR code"
               onChange={(e) => handleImageUpload(e, 'qr')}
             />
           </div>
@@ -1629,7 +1633,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
           <div className="px-5 mb-4 flex items-center gap-2">
             <button
               type="button"
-              aria-pressed={viewMode === 'pending'}
+              aria-pressed={viewMode === 'pending' ? "true" : "false"}
               onClick={() => setViewMode('pending')}
               className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${viewMode === 'pending' ? 'bg-black text-white shadow-md' : 'bg-white text-zinc-500 border border-zinc-200'}`}
             >
@@ -1637,7 +1641,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
             </button>
             <button
               type="button"
-              aria-pressed={viewMode === 'settled'}
+              aria-pressed={viewMode === 'settled' ? "true" : "false"}
               onClick={() => setViewMode('settled')}
               className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${viewMode === 'settled' ? 'bg-black text-white shadow-md' : 'bg-white text-zinc-500 border border-zinc-200'}`}
             >
@@ -2762,6 +2766,7 @@ export const MediatorDashboard: React.FC = () => {
             <select
               value={rejectType}
               onChange={(e) => setRejectType(e.target.value as 'order' | 'review' | 'rating' | 'returnWindow')}
+              aria-label="Proof type"
               className="mt-2 w-full rounded-xl bg-black/40 border border-white/10 p-3 text-sm font-bold"
             >
               <option value="order">Order Proof</option>
@@ -2901,6 +2906,7 @@ export const MediatorDashboard: React.FC = () => {
                 type="number"
                 autoFocus
                 value={commission}
+                aria-label="Commission amount"
                 onChange={(e) => {
                   const raw = e.target.value;
                   if (raw === '' || raw === '-') {

@@ -486,6 +486,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                           e.stopPropagation();
                           removeNotification(n.id);
                         }}
+                        aria-label="Dismiss notification"
                         className="absolute -top-1 -right-1 bg-white border border-gray-100 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-all"
                       >
                         <X size={10} />
