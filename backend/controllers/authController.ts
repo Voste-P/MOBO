@@ -468,7 +468,15 @@ export function makeAuthController(env: Env) {
         const userId = String(decoded.sub || '').trim();
         if (!userId) throw new AppError(401, 'UNAUTHENTICATED', 'Invalid refresh token');
 
-        const user = await db().user.findFirst({ where: { ...idWhere(userId), isDeleted: false } });
+        const user = await db().user.findFirst({
+          where: { ...idWhere(userId), isDeleted: false },
+          select: {
+            id: true, mongoId: true, name: true, email: true, mobile: true,
+            role: true, roles: true, status: true, mediatorCode: true,
+            parentCode: true, avatar: true, createdAt: true, updatedAt: true,
+            isDeleted: true,
+          },
+        });
         if (!user) {
           throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
         }

@@ -1,9 +1,10 @@
 import { Router } from 'express';
+import { z } from 'zod';
 
 import type { Env } from '../config/env.js';
 import { prisma, isPrismaAvailable, pingPg, getPoolMetrics } from '../database/prisma.js';
 import { isReady } from '../config/lifecycle.js';
-import { logAvailabilityEvent } from '../config/appLogs.js';
+import { logAvailabilityEvent, logErrorEvent } from '../config/appLogs.js';
 
 // Build-time metadata — injected via env or fallback to runtime values.
 const BUILD_SHA = process.env.GIT_SHA || 'unknown';
@@ -159,5 +160,45 @@ export function healthRoutes(env: Env): Router {
       res.status(503).json({ status: 'error', message: String(err) });
     }
   });
+
+  // ── Client error reporting ───────────────────────────────────────
+  // Frontend ErrorBoundary sends unhandled render errors here for monitoring.
+  const clientErrorSchema = z.object({
+    message: z.string().max(500).default('Unknown error'),
+    stack: z.string().max(1000).optional(),
+    componentStack: z.string().max(500).optional(),
+    url: z.string().max(500).optional(),
+    userAgent: z.string().max(300).optional(),
+    timestamp: z.string().max(50).optional(),
+  });
+
+  router.post('/health/client-error', (req, res) => {
+    try {
+      const parsed = clientErrorSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'Invalid payload' });
+        return;
+      }
+      const data = parsed.data;
+      logErrorEvent({
+        category: 'CLIENT',
+        severity: 'medium',
+        message: `Client error: ${data.message}`,
+        operation: 'ClientErrorBoundary',
+        userId: (req as any).auth?.userId,
+        metadata: {
+          url: data.url,
+          userAgent: data.userAgent,
+          stack: data.stack,
+          componentStack: data.componentStack,
+          clientTimestamp: data.timestamp,
+        },
+      });
+      res.status(204).end();
+    } catch {
+      res.status(204).end();
+    }
+  });
+
   return router;
 }

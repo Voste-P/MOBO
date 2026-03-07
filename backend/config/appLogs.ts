@@ -763,7 +763,8 @@ export type ErrorCategory =
   | 'BUSINESS_LOGIC'
   | 'EXTERNAL_SERVICE'
   | 'SYSTEM'
-  | 'CONFIGURATION';
+  | 'CONFIGURATION'
+  | 'CLIENT';
 
 export type ErrorSeverity = 'low' | 'medium' | 'high' | 'critical';
 
@@ -975,7 +976,8 @@ export type SecurityEventType =
   | 'IP_BLOCKED'
   | 'CORS_VIOLATION'
   | 'INJECTION_ATTEMPT'
-  | 'MALICIOUS_PAYLOAD';
+  | 'MALICIOUS_PAYLOAD'
+  | 'AUDIT_TRAIL_LOSS';
 
 export interface SecurityEventPayload {
   severity: 'low' | 'medium' | 'high' | 'critical';

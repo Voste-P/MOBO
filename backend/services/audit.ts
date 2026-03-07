@@ -1,7 +1,7 @@
 import type { Request } from 'express';
 import { prisma, isPrismaAvailable } from '../database/prisma.js';
 import logger from '../config/logger.js';
-import { logErrorEvent } from '../config/appLogs.js';
+import { logErrorEvent, logSecurityIncident } from '../config/appLogs.js';
 
 export type AuditParams = {
   req?: Request;
@@ -38,5 +38,16 @@ export async function writeAuditLog(params: AuditParams): Promise<void> {
     // so security-relevant events are not silently lost.
     logger.error('[audit] Failed to write audit log', { action: params.action, entityType: params.entityType, entityId: params.entityId, error: err });
     logErrorEvent({ category: 'DATABASE', severity: 'high', message: 'Audit log write failed', operation: 'writeAuditLog', error: err, metadata: { action: params.action, entityType: params.entityType, entityId: params.entityId } });
+    // Security-critical actions get an escalated incident so ops is alerted
+    const securityActions = ['WALLET_CREDIT', 'WALLET_DEBIT', 'SUSPENSION', 'USER_DELETE', 'ROLE_CHANGE', 'ORDER_SETTLE', 'ORDER_UNSETTLE'];
+    if (securityActions.some(a => params.action.toUpperCase().includes(a))) {
+      logSecurityIncident('AUDIT_TRAIL_LOSS', {
+        severity: 'critical',
+        ip: params.req?.ip,
+        route: params.req?.originalUrl,
+        method: params.req?.method,
+        metadata: { action: params.action, entityType: params.entityType, entityId: params.entityId },
+      });
+    }
   }
 }

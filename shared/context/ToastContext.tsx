@@ -109,7 +109,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={value}>
       {children}
 
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] w-[min(92vw,520px)] pointer-events-none">
+      <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[9999] w-[min(92vw,520px)] pointer-events-none">
         <div className="flex flex-col gap-3">
           {toasts.map((t) => (
             <div
@@ -119,9 +119,11 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 'px-4 py-3 backdrop-blur',
                 variantClasses(t.variant)
               )}
-              role={t.variant === 'error' || t.variant === 'warning' ? 'alert' : 'status'}
-              aria-live={t.variant === 'error' || t.variant === 'warning' ? 'assertive' : 'polite'}
+              role="alert"
+              aria-live="assertive"
+              tabIndex={0}
               onClick={() => dismiss(t.id)}
+              onKeyDown={(e) => { if (e.key === 'Escape' || e.key === 'Enter') dismiss(t.id); }}
             >
               {t.title ? <div className="text-xs font-extrabold uppercase tracking-widest opacity-80">{t.title}</div> : null}
               <div className="flex items-start gap-2.5">

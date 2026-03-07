@@ -26,6 +26,12 @@ export const MobileTabBar = React.memo(function MobileTabBar({
   showLabels?: boolean;
   className?: string;
 }) {
+  const handleTap = (id: TabId) => {
+    if (id !== activeId && typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(8);
+    }
+    onChange(id);
+  };
   const containerClass =
     variant === 'dark'
       ? 'bg-[#18181B] backdrop-blur-xl border border-white/5 px-5 py-2.5 rounded-[2rem] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.5)] flex items-center'
@@ -45,7 +51,7 @@ export const MobileTabBar = React.memo(function MobileTabBar({
             <button
               role="tab"
               key={item.id}
-              onClick={() => onChange(item.id)}
+              onClick={() => handleTap(item.id)}
               aria-label={item.ariaLabel || item.label}
               aria-selected={active}
               className={cn(
@@ -87,7 +93,7 @@ export const MobileTabBar = React.memo(function MobileTabBar({
           <div key={item.id} className="flex-1 flex justify-center">
             <button
               role="tab"
-              onClick={() => onChange(item.id)}
+              onClick={() => handleTap(item.id)}
               aria-label={item.ariaLabel || item.label}
               aria-selected={active}
               className={cn(

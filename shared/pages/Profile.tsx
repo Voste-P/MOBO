@@ -30,6 +30,7 @@ export const Profile: React.FC = () => {
   const [name, setName] = useState(user?.name || '');
   const [mobile, setMobile] = useState(user?.mobile || '');
   const [upiId, setUpiId] = useState(user?.upiId || '');
+  const [upiError, setUpiError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -41,6 +42,7 @@ export const Profile: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [totalSpent, setTotalSpent] = useState(0);
   const [isStatsLoading, setIsStatsLoading] = useState(false);
+  const statsLoadingRef = useRef(false);
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const qrInputRef = useRef<HTMLInputElement>(null);
@@ -66,6 +68,16 @@ export const Profile: React.FC = () => {
   function maskMobile(m: string): string {
     if (!m || m.length < 6) return m || '';
     return m.slice(0, 2) + '****' + m.slice(-4);
+  }
+
+  /** Validate UPI ID format: handle@provider, 3-50 chars */
+  function validateUpiId(value: string): string {
+    if (!value) return ''; // optional field
+    if (value.length > 50) return 'UPI ID is too long (max 50 characters)';
+    if (!/^[a-zA-Z0-9._-]+@[a-zA-Z0-9]+$/.test(value)) {
+      return 'Invalid format — use handle@provider (e.g. name@upi)';
+    }
+    return '';
   }
 
   useEffect(() => {
@@ -98,7 +110,8 @@ export const Profile: React.FC = () => {
 
   const refreshStats = async (opts?: { silent?: boolean }) => {
     if (!user) return;
-    if (isStatsLoading) return;
+    if (statsLoadingRef.current) return;
+    statsLoadingRef.current = true;
     setIsStatsLoading(true);
     try {
       const userOrders = await api.orders.getUserOrders(user.id);
@@ -113,6 +126,7 @@ export const Profile: React.FC = () => {
         toast.error(formatErrorMessage(e, 'Failed to refresh wallet stats.'));
       }
     } finally {
+      statsLoadingRef.current = false;
       setIsStatsLoading(false);
     }
   };
@@ -147,6 +161,20 @@ export const Profile: React.FC = () => {
   const handleSave = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (isSaving) return;
+
+    // Validate UPI before saving
+    const upiValidationError = validateUpiId(upiId);
+    if (upiValidationError) {
+      setUpiError(upiValidationError);
+      toast.error(upiValidationError);
+      return;
+    }
+
+    if (!name.trim()) {
+      toast.error('Name cannot be empty');
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -197,7 +225,11 @@ export const Profile: React.FC = () => {
             >
               <div className="w-24 h-24 rounded-[1.5rem] bg-zinc-100 flex items-center justify-center text-4xl font-black text-zinc-300 shadow-inner overflow-hidden border-4 border-white">
                 {avatar ? (
-                  <ProxiedImage src={avatar} alt="Avatar" className="w-full h-full object-cover" />
+                  <ProxiedImage
+                    src={avatar}
+                    alt="Avatar"
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
                   (name || '?').charAt(0)
                 )}
@@ -207,14 +239,15 @@ export const Profile: React.FC = () => {
                   <Camera className="text-white" />
                 </div>
               )}
-              <input
-                type="file"
-                ref={avatarInputRef}
-                className="hidden"
-                accept="image/*"
-                onChange={(e) => handleImageUpload(e, 'avatar')}
-              />
             </button>
+            <input
+              type="file"
+              ref={avatarInputRef}
+              className="hidden"
+              accept="image/jpeg,image/png,image/webp"
+              aria-label="Upload avatar image"
+              onChange={(e) => handleImageUpload(e, 'avatar')}
+            />
             <div className="flex-1 min-w-0">
               <h2 className="text-2xl font-black text-zinc-900 leading-tight truncate">{name}</h2>
               <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -232,10 +265,11 @@ export const Profile: React.FC = () => {
 
           <div className="space-y-5">
             <div className="group">
-              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1 mb-1.5 block">
+              <label htmlFor="profile-name" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1 mb-1.5 block">
                 Full Name
               </label>
               <input
+                id="profile-name"
                 type="text"
                 disabled={!isEditing}
                 value={name}
@@ -244,28 +278,34 @@ export const Profile: React.FC = () => {
               />
             </div>
             <div className="group">
-              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1 mb-1.5 block">
+              <label htmlFor="profile-mobile" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1 mb-1.5 block">
                 Mobile Number
               </label>
               <input
+                id="profile-mobile"
                 type="tel"
-                disabled
+                readOnly
                 value={maskMobile(mobile)}
-                onChange={() => {}}
-                className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-lime-400 disabled:bg-zinc-50/50 disabled:text-zinc-500 transition-all font-mono"
+                className="w-full p-4 bg-zinc-50/50 border-none rounded-2xl font-bold text-zinc-500 outline-none transition-all font-mono cursor-not-allowed"
               />
             </div>
             <div className="group">
-              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1 mb-1.5 block">
+              <label htmlFor="profile-upi" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1 mb-1.5 block">
                 UPI Address
               </label>
               <div className="relative">
                 <input
                   type="text"
+                  id="profile-upi"
                   disabled={!isEditing}
                   value={upiId}
-                  onChange={(e) => setUpiId(e.target.value)}
-                  className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-lime-400 disabled:bg-zinc-50/50 disabled:text-zinc-500 transition-all"
+                  maxLength={50}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setUpiId(val);
+                    setUpiError(validateUpiId(val));
+                  }}
+                  className={`w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none focus:ring-2 ${upiError ? 'focus:ring-red-400' : 'focus:ring-lime-400'} disabled:bg-zinc-50/50 disabled:text-zinc-500 transition-all`}
                   placeholder="user@upi"
                 />
                 {!isEditing && upiId && (
@@ -274,6 +314,9 @@ export const Profile: React.FC = () => {
                   </div>
                 )}
               </div>
+              {upiError && isEditing && (
+                <p className="text-xs text-red-500 font-medium mt-1.5 ml-1">{upiError}</p>
+              )}
             </div>
           </div>
         </div>
@@ -292,7 +335,7 @@ export const Profile: React.FC = () => {
             </p>
             <h2 className="text-5xl font-black text-zinc-900 tracking-tighter">
               {isStatsLoading ? (
-                <div className="w-8 h-8 border-2 border-zinc-200 border-t-zinc-600 rounded-full animate-spin motion-reduce:animate-none mx-auto" />
+                <div className="w-8 h-8 border-2 border-zinc-200 border-t-zinc-600 rounded-full animate-spin motion-reduce:animate-none mx-auto" role="status" aria-label="Loading wallet stats" />
               ) : (
                 `₹${totalSpent.toLocaleString('en-IN')}`
               )}
@@ -348,7 +391,8 @@ export const Profile: React.FC = () => {
               type="file"
               ref={qrInputRef}
               className="hidden"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
+              aria-label="Upload payment QR code"
               onChange={(e) => handleImageUpload(e, 'qr')}
             />
 
@@ -390,7 +434,7 @@ export const Profile: React.FC = () => {
           ) : (
             <div className="space-y-5">
               <div>
-                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1 mb-2 block">
+                <label htmlFor="feedback-stars" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1 mb-2 block">
                   Rate your experience
                 </label>
                 <div className="flex gap-2">
@@ -413,10 +457,11 @@ export const Profile: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1 mb-2 block">
+                <label htmlFor="feedback-text" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1 mb-2 block">
                   Tell us more
                 </label>
                 <textarea
+                  id="feedback-text"
                   value={feedbackText}
                   onChange={(e) => setFeedbackText(e.target.value)}
                   maxLength={2000}
@@ -464,7 +509,9 @@ export const Profile: React.FC = () => {
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-zinc-100 animate-slide-up">
           <button
             type="button"
-            onClick={logout}
+            onClick={() => {
+              if (window.confirm('Are you sure you want to sign out?')) logout();
+            }}
             className="w-full py-4 border-2 border-red-50 text-red-500 font-bold rounded-2xl text-sm hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
           >
             <LogOut size={16} /> Sign Out

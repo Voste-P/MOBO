@@ -196,9 +196,9 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
         allTickets = cache.tickets;
       } else {
         [allProducts, userOrders, allTickets] = await Promise.all([
-          api.products.getAll(user?.mediatorCode),
-          user?.id ? api.orders.getUserOrders(user.id) : Promise.resolve([]),
-          api.tickets.getAll(),
+          api.products.getAll(user?.mediatorCode).catch(() => []),
+          user?.id ? api.orders.getUserOrders(user.id).catch(() => []) : Promise.resolve([]),
+          api.tickets.getAll().catch(() => []),
         ]);
         contextCacheRef.current = {
           products: allProducts,

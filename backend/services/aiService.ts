@@ -325,10 +325,22 @@ function stripUnsafeContent(raw: string): string {
 /**
  * Detect adversarial prompt injection attempts.
  * Returns `true` if the input contains suspicious patterns that try to override system instructions.
+ * Also detects Unicode homoglyph attacks (e.g., "ɪɢɴᴏʀᴇ" instead of "ignore").
  */
 function containsPromptInjection(text: string): boolean {
   if (!text) return false;
-  const lower = text.toLowerCase();
+  // Normalize Unicode homoglyphs to ASCII equivalents before checking
+  const normalized = text
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '') // strip combining marks
+    .replace(/[\u0400-\u04ff]/g, (c) => { // Cyrillic lookalikes
+      const map: Record<string, string> = { '\u0410': 'A', '\u0412': 'B', '\u0415': 'E', '\u041A': 'K', '\u041C': 'M', '\u041D': 'H', '\u041E': 'O', '\u0420': 'P', '\u0421': 'C', '\u0422': 'T', '\u0425': 'X', '\u0430': 'a', '\u0435': 'e', '\u043E': 'o', '\u0440': 'p', '\u0441': 'c', '\u0443': 'y', '\u0445': 'x' };
+      return map[c] || c;
+    })
+    .replace(/[\u1D00-\u1D7F]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x1D00 + 0x61)) // small caps
+    .replace(/[\uFF01-\uFF5E]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)); // fullwidth
+
+  const lower = normalized.toLowerCase();
   const patterns = [
     /ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?)/i,
     /\byou\s+are\s+now\b/i,
@@ -339,6 +351,9 @@ function containsPromptInjection(text: string): boolean {
     /\bact\s+as\s+(if|though)\s+you\s+(are|were)\b/i,
     /\bjailbreak\b/i,
     /\bDAN\s*mode\b/i,
+    /\bnew\s+instructions?\b/i,
+    /\breset\s+(your|all)\s+(rules?|instructions?|context)\b/i,
+    /\bdisregard\s+(all|your|previous)\b/i,
   ];
   return patterns.some((p) => p.test(lower));
 }

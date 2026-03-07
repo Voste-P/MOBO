@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
 import { subscribeRealtime } from '../services/realtime';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
+import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 
 import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { formatCurrency } from '../utils/formatCurrency';
@@ -183,6 +185,7 @@ export const Orders: React.FC = () => {
 
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
+  const [productsLoadError, setProductsLoadError] = useState(false);
   const [dealTypeFilter, setDealTypeFilter] = useState<'Discount' | 'Rating' | 'Review'>(
     'Discount'
   );
@@ -273,14 +276,22 @@ export const Orders: React.FC = () => {
       loadMyTickets();
       api.products.getAll().then((data) => {
         setAvailableProducts(Array.isArray(data) ? data : []);
+        setProductsLoadError(false);
       }).catch((err) => {
         console.error('Failed to load products:', err);
         setAvailableProducts([]);
+        setProductsLoadError(true);
+        toast.error('Failed to load available deals. Pull down to retry.');
       });
     } else {
       setIsLoading(false);
     }
   }, [user]);
+
+  const handlePullRefresh = useCallback(async () => {
+    await loadOrders();
+  }, [user]);
+  const { handlers: pullHandlers, pullDistance, isRefreshing: isPullRefreshing } = usePullToRefresh({ onRefresh: handlePullRefresh });
 
   const loadMyTickets = async () => {
     if (!user?.id) return;
@@ -330,10 +341,11 @@ export const Orders: React.FC = () => {
         // Keep filters/product titles in sync (non-critical, but avoids stale UI).
         api.products
           .getAll()
-          .then((data) => setAvailableProducts(Array.isArray(data) ? data : []))
+          .then((data) => { setAvailableProducts(Array.isArray(data) ? data : []); setProductsLoadError(false); })
           .catch((err) => {
             console.error('Failed to load products:', err);
             setAvailableProducts([]);
+            setProductsLoadError(true);
           });
       }
     });
@@ -841,7 +853,8 @@ export const Orders: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-28 scrollbar-styled overscroll-none">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-28 scrollbar-styled overscroll-none" {...pullHandlers}>
+        <PullToRefreshIndicator distance={pullDistance} isRefreshing={isPullRefreshing} />
         {/* Search & Filter */}
         <div className="flex gap-2 items-center">
           <div className="flex-1 relative">
@@ -1536,7 +1549,30 @@ export const Orders: React.FC = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    {filteredProducts.map((p) => (
+                    {productsLoadError && filteredProducts.length === 0 ? (
+                      <div className="text-center py-8 space-y-3">
+                        <p className="text-sm font-bold text-red-500">Failed to load deals</p>
+                        <p className="text-xs text-slate-400">Check your connection and try again</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProductsLoadError(false);
+                            api.products.getAll().then((data) => {
+                              setAvailableProducts(Array.isArray(data) ? data : []);
+                              setProductsLoadError(false);
+                            }).catch(() => {
+                              setProductsLoadError(true);
+                              toast.error('Still unable to load deals.');
+                            });
+                          }}
+                          className="px-4 py-2 bg-black text-white text-xs font-bold rounded-xl active:scale-95"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    ) : filteredProducts.length === 0 ? (
+                      <p className="text-center text-xs text-slate-400 py-6">No {dealTypeFilter.toLowerCase()} deals available</p>
+                    ) : filteredProducts.map((p) => (
                       <div
                         key={p.id}
                         onClick={() => {

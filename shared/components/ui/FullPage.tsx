@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import { Card, CardContent } from './Card';
 import { Spinner } from './Spinner';
 import { Button } from './Button';
@@ -19,6 +20,8 @@ export function FullPageLoading({
         'min-h-screen w-full bg-slate-50 flex items-center justify-center p-6',
         className
       )}
+      role="status"
+      aria-live="polite"
     >
       <Card className="w-full max-w-md">
         <CardContent className="p-8">
@@ -61,6 +64,7 @@ export function FullPageError({
         'min-h-screen w-full bg-slate-50 flex items-center justify-center p-6',
         className
       )}
+      role="alert"
     >
       <Card className="w-full max-w-lg">
         <CardContent className="p-8">
@@ -116,12 +120,12 @@ export function FullPageNotFound({
           <div className="text-lg font-extrabold text-slate-900">{title}</div>
           <div className="mt-1 text-sm font-medium text-slate-600">{desc}</div>
           <div className="mt-6">
-            <a
+            <Link
               href={homeHref}
               className="inline-flex items-center justify-center h-12 px-5 rounded-2xl text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-400/60 focus-visible:ring-offset-white"
             >
               {homeLabel}
-            </a>
+            </Link>
           </div>
         </CardContent>
       </Card>

@@ -51,7 +51,7 @@ export async function transitionOrderWorkflow(params: {
     : { mongoId: params.orderId, isDeleted: false };
   const current = await client.order.findFirst({
     where: orderWhere as any,
-    select: { id: true, mongoId: true, events: true, frozen: true, workflowStatus: true },
+    select: { id: true, mongoId: true, events: true, frozen: true, workflowStatus: true, isDeleted: true },
   });
 
   if (!current || current.isDeleted) {

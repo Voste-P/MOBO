@@ -75,6 +75,13 @@ Required env vars:
 - `JWT_REFRESH_SECRET=...` (>= 32 chars)
 - `CORS_ORIGINS=https://www.buzzma.in,https://www.mediatorbuzzma.in,https://www.agencybuzzma.in,https://www.brandbuzzma.in,https://moboadmin.vercel.app`
 
+Optional env vars:
+
+- `LOG_LEVEL=debug` — Override log level (default: `info` in production, `debug` in development)
+- `LOG_FORMAT=pretty` — Use colorful dev-style console logs in production (default: `compact` single-line format for Docker/Render)
+
+> **Tip:** Set `LOG_FORMAT=pretty` on your production Render service to get the same colorful, readable logs you see locally on the `develop` branch.
+
 Health check:
 
 - `GET /api/health`

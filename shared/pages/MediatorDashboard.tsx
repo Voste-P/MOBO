@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../components/ui/ConfirmDialog';
+import { useSwipeTabs } from '../hooks/useSwipeTabs';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
+import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 import { api, asArray } from '../services/api';
 import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
@@ -1810,7 +1813,25 @@ export const MediatorDashboard: React.FC = () => {
     refresh: refreshNotifications,
   } = useNotification();
   const [activeTab, setActiveTab] = useState<'inbox' | 'market' | 'squad' | 'profile'>('inbox');
+  const [slideDir, setSlideDir] = useState<'left' | 'right'>('right');
+  const prevTabIdx = useRef(0);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  const TAB_ORDER = ['inbox', 'market', 'squad', 'profile'] as const;
+
+  const handleTabChange = (tab: typeof activeTab) => {
+    const newIdx = TAB_ORDER.indexOf(tab);
+    const oldIdx = TAB_ORDER.indexOf(activeTab);
+    setSlideDir(newIdx > oldIdx ? 'left' : 'right');
+    prevTabIdx.current = oldIdx;
+    setActiveTab(tab);
+  };
+
+  const swipeHandlers = useSwipeTabs({
+    tabs: TAB_ORDER as unknown as string[],
+    activeTab,
+    onChangeTab: (t) => handleTabChange(t as typeof activeTab),
+  });
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -1979,6 +2000,11 @@ export const MediatorDashboard: React.FC = () => {
 
   const hasNotifications = unreadCount > 0;
 
+  const handlePullRefresh = useCallback(async () => {
+    await loadData();
+  }, [user]);
+  const { handlers: pullHandlers, pullDistance, isRefreshing: isPullRefreshing } = usePullToRefresh({ onRefresh: handlePullRefresh });
+
   const unpublishedCount = useMemo(() => {
     const dealCampaignIds = new Set((deals || []).map((d: Product) => String(d.campaignId)));
     return (campaigns || []).filter((c: Campaign) => !dealCampaignIds.has(String(c.id))).length;
@@ -2118,7 +2144,18 @@ export const MediatorDashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 scrollbar-styled overscroll-none pb-[calc(7.5rem+env(safe-area-inset-bottom))]">
+      <div
+        className="flex-1 min-h-0 overflow-y-auto p-4 scrollbar-styled overscroll-none pb-[calc(7.5rem+env(safe-area-inset-bottom))]"
+        {...swipeHandlers}
+        onTouchStart={(e) => { swipeHandlers.onTouchStart(e); pullHandlers.onTouchStart(e); }}
+        onTouchMove={pullHandlers.onTouchMove}
+        onTouchEnd={(e) => { swipeHandlers.onTouchEnd(e); pullHandlers.onTouchEnd(); }}
+      >
+        <PullToRefreshIndicator distance={pullDistance} isRefreshing={isPullRefreshing} />
+        <div
+          key={activeTab}
+          className={`animate-slide-tab ${slideDir === 'left' ? 'slide-from-right' : 'slide-from-left'}`}
+        >
         {activeTab === 'inbox' && (
           <InboxView
             orders={orders}
@@ -2127,7 +2164,7 @@ export const MediatorDashboard: React.FC = () => {
             loading={loading}
             onRefresh={loadData}
             unpublishedCount={unpublishedCount}
-            onGoToUnpublished={() => setActiveTab('market')}
+            onGoToUnpublished={() => handleTabChange('market')}
             onViewProof={(order: Order) => {
               setProofModal(order);
             }}
@@ -2155,6 +2192,7 @@ export const MediatorDashboard: React.FC = () => {
           />
         )}
         {activeTab === 'profile' && <MediatorProfileView />}
+        </div>
       </div>
 
       <div className="fixed left-1/2 -translate-x-1/2 z-40 w-[92vw] max-w-[360px] bottom-[calc(0.75rem+env(safe-area-inset-bottom))]">
@@ -2188,7 +2226,7 @@ export const MediatorDashboard: React.FC = () => {
           ]}
           activeId={activeTab}
           onChange={(id) => {
-            setActiveTab(id as any);
+            handleTabChange(id as any);
             setShowNotifications(false);
           }}
           variant="darkGlass"

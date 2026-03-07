@@ -43,6 +43,8 @@ const LOG_DIR = process.env.LOG_DIR || path.resolve(__dirname, '..', 'logs');
 const nodeEnv = process.env.NODE_ENV || 'development';
 const isTest = nodeEnv === 'test';
 const isProd = nodeEnv === 'production';
+const logLevel = process.env.LOG_LEVEL || (isProd ? 'info' : 'debug');
+const logFormat = process.env.LOG_FORMAT || (isProd ? 'compact' : 'pretty');
 
 // Maximum payload size in log entries (prevents memory bombs)
 const MAX_PAYLOAD_SIZE = 4096;
@@ -358,9 +360,10 @@ const devConsoleFormat = combine(
 
 // ─── Transports ──────────────────────────────────────────────────────────────
 const transports: winston.transport[] = [
-  // Console: human-readable in prod (for Render/Docker), colorful in dev
+  // Console: compact in prod (for Render/Docker), colorful in dev.
+  // Override with LOG_FORMAT=pretty in production to get dev-style output.
   new winston.transports.Console({
-    format: isProd ? prodConsoleFormat : devConsoleFormat,
+    format: logFormat === 'pretty' ? devConsoleFormat : isProd ? prodConsoleFormat : devConsoleFormat,
   }),
 ];
 
@@ -468,7 +471,7 @@ if (isProd) {
 
 // ─── Logger Instance ─────────────────────────────────────────────────────────
 const logger = winston.createLogger({
-  level: isProd ? 'info' : 'debug',
+  level: isTest ? 'debug' : logLevel,
   silent: isTest,
   defaultMeta: { service: SERVICE_NAME, pid: process.pid },
   transports,

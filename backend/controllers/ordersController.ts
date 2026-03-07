@@ -70,7 +70,8 @@ export function makeOrdersController(env: Env) {
     if (!raw) throw new AppError(404, 'PROOF_NOT_FOUND', 'Proof not found');
 
     if (/^https?:\/\//i.test(raw)) {
-      res.redirect(raw);
+      // Return URL as JSON instead of redirecting (prevents open redirect via user-controlled data)
+      res.json({ url: raw });
       return;
     }
 
@@ -858,15 +859,15 @@ export function makeOrdersController(env: Env) {
           .status(201)
           .json(toUiOrder(pgOrder(finalOrder)));
 
-        // Notify UIs (buyer/mediator/brand/admin) that order-related views should refresh.
-        const privilegedRoles: Role[] = ['admin', 'ops'];
-        // Resolve brand user mongoId for realtime audience
-        let brandMongoId = '';
-        if (campaign.brandUserId) {
-          const brandUser = await db().user.findUnique({ where: { id: campaign.brandUserId }, select: { mongoId: true } });
-          brandMongoId = brandUser?.mongoId ?? '';
-        }
-        const audience = {
+        // Post-response: notify UIs (wrapped in try/catch since response already sent)
+        try {
+          const privilegedRoles: Role[] = ['admin', 'ops'];
+          let brandMongoId = '';
+          if (campaign.brandUserId) {
+            const brandUser = await db().user.findUnique({ where: { id: campaign.brandUserId }, select: { mongoId: true } });
+            brandMongoId = brandUser?.mongoId ?? '';
+          }
+          const audience = {
           roles: privilegedRoles,
           userIds: [userMongoId, brandMongoId].filter(Boolean),
           mediatorCodes: upstreamMediatorCode ? [upstreamMediatorCode] : undefined,
@@ -875,6 +876,9 @@ export function makeOrdersController(env: Env) {
 
         publishRealtime({ type: 'orders.changed', ts: new Date().toISOString(), audience });
         publishRealtime({ type: 'notifications.changed', ts: new Date().toISOString(), audience });
+        } catch (postErr) {
+          orderLog.warn('Post-response notification failed', { error: postErr instanceof Error ? postErr.message : String(postErr) });
+        }
       } catch (err) {
         logErrorEvent({
           message: 'createOrder failed',
@@ -974,6 +978,10 @@ export function makeOrdersController(env: Env) {
         let aiOrderVerification: any = null;
 
         if (body.type === 'review') {
+          // Validate review link is a proper URL
+          if (body.data && !/^https?:\/\//i.test(String(body.data).trim())) {
+            throw new AppError(400, 'INVALID_REVIEW_LINK', 'Review link must be a valid HTTP(S) URL');
+          }
           updateData.reviewLink = body.data;
           if (order.rejectionType === 'review') {
             updateData.rejectionType = null;
@@ -986,7 +994,7 @@ export function makeOrdersController(env: Env) {
 
           // AI verification: check account name matches buyer + product name matches
           let ratingAiResult: any = null;
-          if (env.NODE_ENV === 'production') {
+          if (isGeminiConfigured(env)) {
             const buyerUser = await db().user.findUnique({
               where: { id: order.userId },
               select: { name: true },
@@ -1055,7 +1063,7 @@ export function makeOrdersController(env: Env) {
 
           // AI verification: check order ID, product name, amount, sold by
           let returnWindowResult: any = null;
-          if (env.NODE_ENV === 'production') {
+          if (isGeminiConfigured(env)) {
             const expectedOrderId = String(order.externalOrderId || '').trim();
             const expectedProductName = String((order.items?.[0] as any)?.title || '').trim();
             const expectedAmount = (order.items ?? []).reduce(

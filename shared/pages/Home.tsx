@@ -1,9 +1,33 @@
-﻿import React, { lazy, Suspense } from 'react';
+﻿import React, { Component, lazy, Suspense } from 'react';
 
 // Chatbot is 37.6 KB — lazy-load so it doesn't block initial paint
 const Chatbot = lazy(() =>
   import('../components/Chatbot').then((mod) => ({ default: mod.Chatbot }))
 );
+
+class ChatbotErrorBoundary extends Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center">
+          <p className="text-sm font-bold text-zinc-700">Failed to load chat.</p>
+          <button
+            onClick={() => this.setState({ hasError: false })}
+            className="px-5 py-2.5 bg-black text-white text-sm font-bold rounded-2xl hover:bg-zinc-800 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 interface HomeProps {
   onVoiceNavigate?: (tab: 'home' | 'explore' | 'orders' | 'profile') => void;
@@ -13,13 +37,15 @@ export const Home: React.FC<HomeProps> = ({ onVoiceNavigate }) => {
   // Notifications are server-backed; avoid seeded/mock toasts here.
   return (
     <div className="h-full w-full flex flex-col relative bg-[#F4F4F5]">
-      <Suspense fallback={
-        <div className="flex-1 flex items-center justify-center">
-          <div className="w-8 h-8 border-3 border-lime-200 border-t-lime-500 rounded-full animate-spin" />
-        </div>
-      }>
-        <Chatbot onNavigate={onVoiceNavigate} />
-      </Suspense>
+      <ChatbotErrorBoundary>
+        <Suspense fallback={
+          <div className="flex-1 flex items-center justify-center" role="status" aria-label="Loading chat">
+            <div className="w-8 h-8 border-3 border-lime-200 border-t-lime-500 rounded-full animate-spin" />
+          </div>
+        }>
+          <Chatbot onNavigate={onVoiceNavigate} />
+        </Suspense>
+      </ChatbotErrorBoundary>
     </div>
   );
 };

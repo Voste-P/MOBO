@@ -99,6 +99,11 @@ function isAuthError(res: Response, payload: any): boolean {
   return res.status === 401 || code === 'UNAUTHENTICATED' || code === 'INVALID_TOKEN';
 }
 
+function isForbiddenError(res: Response, payload: any): boolean {
+  const code = payload?.error?.code || payload?.code;
+  return res.status === 403 || code === 'FORBIDDEN' || code === 'USER_NOT_ACTIVE' || code === 'UPSTREAM_SUSPENDED';
+}
+
 /**
  * Event listeners for auth session expiry.
  * When a 401 cannot be recovered (refresh token also expired/invalid),
@@ -293,6 +298,19 @@ async function fetchJson(path: string, init?: RequestInit): Promise<any> {
     // Refresh failed — session is dead. Notify listeners (AuthContext) for redirect.
     notifyAuthExpired();
     throw toErrorFromPayload(payload, 'Your session has expired. Please log in again.');
+  }
+
+  // 403 means user is suspended/blocked — clear tokens and redirect to login
+  if (!res.ok && isForbiddenError(res, payload)) {
+    clearTokens();
+    notifyAuthExpired();
+    const code = payload?.error?.code || payload?.code;
+    const msg = code === 'UPSTREAM_SUSPENDED'
+      ? 'Your account access has been suspended. Please contact your mediator or agency.'
+      : code === 'USER_NOT_ACTIVE'
+        ? 'Your account is not active. Please contact support.'
+        : 'Access denied. Please log in again.';
+    throw toErrorFromPayload(payload, msg);
   }
 
   if (!res.ok) throw toErrorFromPayload(payload, httpStatusToFriendlyMessage(res.status));

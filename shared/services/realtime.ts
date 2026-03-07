@@ -74,13 +74,18 @@ class RealtimeClient {
   private controller: AbortController | null = null;
   private running = false;
   private backoffMs = 1000;
+  private readonly maxBackoffMs = 30_000;
   private authFailures = 0;
   private readonly maxAuthFailures = 5;
   private storageListener: ((e: StorageEvent) => void) | null = null;
+  private _connected = false;
 
   // If the connection is open but we stop receiving bytes (proxy buffering/hanging),
   // force a reconnect so UI can recover.
   private readonly idleReconnectMs = 70_000;
+
+  /** Whether the SSE stream is currently connected and receiving data. */
+  get connected(): boolean { return this._connected; }
 
   subscribe(listener: Listener) {
     this.listeners.add(listener);
@@ -93,6 +98,7 @@ class RealtimeClient {
 
   stop() {
     this.running = false;
+    this._connected = false;
     this.backoffMs = 1000;
     if (this.controller) this.controller.abort();
     this.controller = null;
@@ -164,26 +170,29 @@ class RealtimeClient {
               this.dispatch({ type: 'auth.error', ts: new Date().toISOString(), payload: { status: res.status } });
               // Terminal backoff: stop reconnecting after repeated auth failures
               if (this.authFailures >= this.maxAuthFailures) {
+                this._connected = false;
                 this.running = false;
                 break;
               }
-              await this.sleep(Math.min(3000 * Math.pow(2, this.authFailures - 1), 60_000));
+              await this.sleep(Math.min(3000 * Math.pow(2, this.authFailures - 1), this.maxBackoffMs));
             } else {
+              // Refresh succeeded — reset auth failure counter so we don't give up prematurely
               this.authFailures = 0;
             }
           } else {
             await this.sleep(this.backoffMs);
           }
           // Add a little jitter to avoid reconnect stampedes.
-          this.backoffMs = Math.min(Math.floor(this.backoffMs * 1.8 + Math.random() * 250), 12_000);
+          this.backoffMs = Math.min(Math.floor(this.backoffMs * 1.8 + Math.random() * 250), this.maxBackoffMs);
           continue;
         }
 
         this.backoffMs = 1000;
-        this.authFailures = 0;        const reader = res.body?.getReader();
+        this.authFailures = 0;
+        this._connected = true;        const reader = res.body?.getReader();
         if (!reader) {
           await this.sleep(this.backoffMs);
-          this.backoffMs = Math.min(this.backoffMs * 2, 10_000);
+          this.backoffMs = Math.min(this.backoffMs * 2, this.maxBackoffMs);
           continue;
         }
 
@@ -269,9 +278,10 @@ class RealtimeClient {
           clearInterval(idleTimer);
         }
       } catch (e) {
+        this._connected = false;
         if ((e as any)?.name !== 'AbortError') {
           await this.sleep(this.backoffMs);
-          this.backoffMs = Math.min(Math.floor(this.backoffMs * 1.8 + Math.random() * 250), 12_000);
+          this.backoffMs = Math.min(Math.floor(this.backoffMs * 1.8 + Math.random() * 250), this.maxBackoffMs);
         }
       }
     }

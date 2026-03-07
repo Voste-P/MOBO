@@ -1,11 +1,13 @@
-﻿import React, { useMemo, useState, useEffect, useRef } from 'react';
+﻿import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../services/api';
 import { subscribeRealtime } from '../services/realtime';
 import { useToast } from '../context/ToastContext';
 import { Product } from '../types';
 import { ProductCard } from '../components/ProductCard';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
-import { Search, Filter, AlertTriangle, ShoppingBag } from 'lucide-react';
+import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
+import { Search, AlertTriangle, ShoppingBag } from 'lucide-react';
 import { EmptyState, Input } from '../components/ui';
 
 export const Explore: React.FC = () => {
@@ -18,6 +20,11 @@ export const Explore: React.FC = () => {
   const [fetchError, setFetchError] = useState(false);
   const silentSyncRef = useRef(false);
   const [ticketOpen, setTicketOpen] = useState(false);
+
+  const handlePullRefresh = useCallback(async () => {
+    await fetchDeals();
+  }, []);
+  const { handlers: pullHandlers, pullDistance, isRefreshing } = usePullToRefresh({ onRefresh: handlePullRefresh });
 
   const dealTypes = useMemo(() => {
     const seen = new Set<string>();
@@ -202,7 +209,8 @@ export const Explore: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6 pb-32 scrollbar-styled overscroll-none">
+      <div className="flex-1 overflow-y-auto p-6 pb-32 scrollbar-styled overscroll-none" {...pullHandlers}>
+        <PullToRefreshIndicator distance={pullDistance} isRefreshing={isRefreshing} />
         {loading ? (
           <div className="flex flex-col items-center gap-6">
             {[0, 1, 2].map((i) => (
@@ -220,22 +228,23 @@ export const Explore: React.FC = () => {
               </div>
             ))}
           </div>
-        ) : fetchError && filtered.length === 0 ? (
+        ) : fetchError && products.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <Filter size={40} className="text-zinc-300" />
-            <p className="text-sm font-bold text-zinc-500">Failed to load deals</p>
+            <AlertTriangle size={40} className="text-red-300" />
+            <p className="text-sm font-bold text-zinc-600">Could not load deals</p>
+            <p className="text-xs text-zinc-400 max-w-[240px] text-center">Please check your internet connection and try again.</p>
             <button
               type="button"
               onClick={() => fetchDeals()}
-              className="px-6 py-2.5 bg-black text-white rounded-full text-xs font-bold hover:bg-zinc-800 transition-colors"
+              className="px-6 py-2.5 bg-black text-white rounded-full text-xs font-bold hover:bg-zinc-800 transition-colors active:scale-95"
             >
-              Retry
+              Try Again
             </button>
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState
-            title="No deals available"
-            description={searchTerm || selectedCategory !== 'All' ? 'Try a different search term or category.' : 'New deals will appear here — check back soon!'}
+            title={searchTerm ? 'No matching deals' : 'No deals available'}
+            description={searchTerm || selectedCategory !== 'All' || selectedDealType !== 'All' ? 'Try a different search term, category, or deal type filter.' : 'New deals will appear here — check back soon!'}
             icon={searchTerm ? <Search size={40} className="text-zinc-300" /> : <ShoppingBag size={40} className="text-zinc-300" />}
           />
         ) : (

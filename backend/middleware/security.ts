@@ -20,6 +20,8 @@ const SUSPICIOUS_PATTERNS = [
   /(\.\.[/\\]){2,}/,                                                  // Path traversal
   /(union\s+select|insert\s+into|drop\s+table|delete\s+from)/i,      // SQL injection
   /(\x00|\x1a|\x7f)/,                                                 // Null bytes
+  /exec(\s|\+)+(s|x)p/i,                                              // MSSQL xp_ calls
+  /0x[0-9a-f]{8,}/i,                                                  // Hex-encoded payloads
 ];
 
 function containsSuspiciousPattern(value: string): string | null {
@@ -78,6 +80,9 @@ function checkObjectForSuspiciousPatterns(
 const BLOCK_PATTERNS = [
   /(\.\.[/\\]){2,}/,          // Path traversal (../../ etc.)
   /(\x00|\x1a|\x7f)/,         // Null bytes / control characters
+  /(union\s+select|insert\s+into|drop\s+table|delete\s+from|;\s*drop\s)/i, // SQL injection
+  /(<script[^>]*>|javascript:\s*[a-z]|on(error|load|click|mouse)\s*=)/i,     // High-confidence XSS
+  /(\$where|\$gt|\$lt|\$ne|\$regex)\s*:/i,                                   // NoSQL injection operators
 ];
 
 function containsBlockablePattern(value: string): string | null {

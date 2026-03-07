@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 type DesktopShellProps = {
   isSidebarOpen: boolean;
@@ -32,18 +32,33 @@ export function DesktopShell({
   asideClassName,
   mainClassName,
 }: DesktopShellProps) {
+  // Close sidebar on Escape key
+  useEffect(() => {
+    if (!isSidebarOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onSidebarOpenChange(false);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isSidebarOpen, onSidebarOpenChange]);
+
   return (
     <div className={containerClassName || 'flex h-[100dvh] min-h-0 overflow-hidden relative'}>
       {/* Sidebar Overlay */}
       {isSidebarOpen && (
         <div
           className={overlayClassName || 'fixed inset-0 bg-black/50 z-40 md:hidden'}
+          role="button"
+          tabIndex={0}
+          aria-label="Close sidebar"
           onClick={() => onSidebarOpenChange(false)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSidebarOpenChange(false); }}
         />
       )}
 
       {/* Sidebar */}
       <aside
+        aria-label="Main navigation sidebar"
         className={
           `fixed md:relative z-50 h-full ${sidebarWidthClassName} transition-transform duration-300 overflow-y-auto scrollbar-styled ` +
           `${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} ` +

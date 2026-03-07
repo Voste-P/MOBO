@@ -4,7 +4,7 @@ import { AppError } from '../middleware/errors.js';
 import { idWhere } from '../utils/idWhere.js';
 import { prisma } from '../database/prisma.js';
 import { orderLog, businessLog, securityLog } from '../config/logger.js';
-import { logChangeEvent, logAccessEvent, logErrorEvent, logSecurityIncident } from '../config/appLogs.js';
+import { logChangeEvent, logAccessEvent, logErrorEvent } from '../config/appLogs.js';
 import { adminUsersQuerySchema, adminFinancialsQuerySchema, adminProductsQuerySchema, adminAuditLogsQuerySchema, reactivateOrderSchema, updateUserStatusSchema } from '../validations/admin.js';
 import { toUiOrderSummary, toUiUser, toUiRole, toUiDeal } from '../utils/uiMappers.js';
 import { orderListSelectLite, getProofFlags, userAdminListSelect } from '../utils/querySelect.js';
@@ -113,7 +113,7 @@ export function makeAdminController() {
           ];
         }
 
-        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 200, maxLimit: 500 });
+        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
         const [users, total] = await Promise.all([
           db().user.findMany({
             where,
@@ -152,7 +152,7 @@ export function makeAdminController() {
           where.affiliateStatus = queryParams.status;
         }
 
-        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 200, maxLimit: 500 });
+        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
         const [orders, total] = await Promise.all([
           db().order.findMany({
             where,
@@ -300,7 +300,7 @@ export function makeAdminController() {
           ];
         }
 
-        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 200, maxLimit: 500 });
+        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
         const [deals, total] = await Promise.all([
           db().deal.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take: limit }),
           db().deal.count({ where }),
@@ -395,14 +395,7 @@ export function makeAdminController() {
 
         const mediatorCode = String(user.mediatorCode || '').trim();
 
-        const hasCampaigns = await db().campaign.findFirst({ where: { brandUserId: user.id, isDeleted: false }, select: { id: true } });
-        if (hasCampaigns) throw new AppError(409, 'USER_HAS_CAMPAIGNS', 'User has campaigns');
-
-        if (mediatorCode) {
-          const hasDeals = await db().deal.findFirst({ where: { mediatorCode, isDeleted: false }, select: { id: true } });
-          if (hasDeals) throw new AppError(409, 'USER_HAS_DEALS', 'User has deals');
-        }
-
+        // Build order OR conditions
         const orderOr: any[] = [{ userId: user.id }, { brandUserId: user.id }, { createdBy: user.id }];
         if (mediatorCode && roles.includes('mediator')) {
           orderOr.push({ managerName: mediatorCode });
@@ -412,16 +405,22 @@ export function makeAdminController() {
           if (mediatorCodes.length) orderOr.push({ managerName: { in: mediatorCodes } });
         }
 
-        const hasOrders = await db().order.findFirst({ where: { isDeleted: false, OR: orderOr }, select: { id: true } });
+        // Parallelize all safety-check queries for performance
+        const [hasCampaigns, hasDeals, hasOrders, hasPendingPayout, wallet] = await Promise.all([
+          db().campaign.findFirst({ where: { brandUserId: user.id, isDeleted: false }, select: { id: true } }),
+          mediatorCode ? db().deal.findFirst({ where: { mediatorCode, isDeleted: false }, select: { id: true } }) : null,
+          db().order.findFirst({ where: { isDeleted: false, OR: orderOr }, select: { id: true } }),
+          db().payout.findFirst({
+            where: { beneficiaryUserId: user.id, status: { in: ['requested', 'processing'] as any }, isDeleted: false },
+            select: { id: true },
+          }),
+          db().wallet.findFirst({ where: { ownerUserId: user.id, isDeleted: false } }),
+        ]);
+
+        if (hasCampaigns) throw new AppError(409, 'USER_HAS_CAMPAIGNS', 'User has campaigns');
+        if (hasDeals) throw new AppError(409, 'USER_HAS_DEALS', 'User has deals');
         if (hasOrders) throw new AppError(409, 'USER_HAS_ORDERS', 'User has orders');
-
-        const hasPendingPayout = await db().payout.findFirst({
-          where: { beneficiaryUserId: user.id, status: { in: ['requested', 'processing'] as any }, isDeleted: false },
-          select: { id: true },
-        });
         if (hasPendingPayout) throw new AppError(409, 'USER_HAS_PAYOUTS', 'User has pending payouts');
-
-        const wallet = await db().wallet.findFirst({ where: { ownerUserId: user.id, isDeleted: false } });
         const available = Number(wallet?.availablePaise ?? 0);
         const pending = Number(wallet?.pendingPaise ?? 0);
         const locked = Number(wallet?.lockedPaise ?? 0);
@@ -461,15 +460,6 @@ export function makeAdminController() {
           resource: `User#${user.mongoId}`,
           requestId: String(res.locals.requestId || ''),
           metadata: { action: 'USER_DELETED', targetRoles: roles, mediatorCode },
-        });
-        logSecurityIncident('PRIVILEGE_ESCALATION_ATTEMPT', {
-          severity: 'medium',
-          ip: req.ip,
-          userId: req.auth?.userId,
-          route: req.originalUrl,
-          method: req.method,
-          requestId: String(res.locals.requestId || ''),
-          metadata: { action: 'USER_DELETED', targetUserId: user.mongoId, note: 'Admin user deletion — audit trail' },
         });
 
         publishRealtime({

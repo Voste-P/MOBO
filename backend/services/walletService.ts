@@ -207,9 +207,11 @@ export async function applyWalletDebit(input: WalletMutationInput) {
       });
       if (!existing || existing.isDeleted) {
         logErrorEvent({ category: 'BUSINESS_LOGIC', severity: 'high', message: 'Wallet debit failed — wallet not found', operation: 'applyWalletDebit', userId: input.ownerUserId, metadata: { type: input.type, amountPaise: input.amountPaise } });
+        writeAuditLog({ action: 'WALLET_DEBIT_FAILED', entityType: 'Wallet', entityId: input.ownerUserId, metadata: { reason: 'WALLET_NOT_FOUND', type: input.type, amountPaise: input.amountPaise, idempotencyKey: input.idempotencyKey } });
         throw new AppError(404, 'WALLET_NOT_FOUND', 'Wallet not found');
       }
       logErrorEvent({ category: 'BUSINESS_LOGIC', severity: 'medium', message: 'Wallet debit failed — insufficient funds', operation: 'applyWalletDebit', userId: input.ownerUserId, metadata: { type: input.type, amountPaise: input.amountPaise, available: existing.availablePaise } });
+      writeAuditLog({ action: 'WALLET_DEBIT_FAILED', entityType: 'Wallet', entityId: input.ownerUserId, metadata: { reason: 'INSUFFICIENT_FUNDS', type: input.type, amountPaise: input.amountPaise, available: existing.availablePaise, idempotencyKey: input.idempotencyKey } });
       throw new AppError(409, 'INSUFFICIENT_FUNDS', 'Insufficient available balance');
     }
 

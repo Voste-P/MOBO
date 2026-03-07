@@ -253,6 +253,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
             onClick={() => {
               setView(view === 'login' ? 'register' : 'login');
               setError('');
+              setName('');
               setMobile('');
               setPassword('');
               setMediatorCode('');
