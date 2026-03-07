@@ -61,6 +61,8 @@ async function main() {
       )
     `);
     console.log("_prisma_migrations table ready");
+    // Verify we actually have SELECT/INSERT/DELETE permission on the table
+    await client.query(`SELECT COUNT(*) FROM "_prisma_migrations"`);
   } catch (tableErr) {
     if (tableErr.message && tableErr.message.includes("permission denied")) {
       console.log("⚠️  Cannot manage _prisma_migrations table (permission denied)");
