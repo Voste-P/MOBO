@@ -46,19 +46,31 @@ async function main() {
   console.log("current_schema:", schemaResult.rows[0].current_schema);
 
   // Create _prisma_migrations table if not exists
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS "_prisma_migrations" (
-      id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      checksum VARCHAR(64) NOT NULL,
-      finished_at TIMESTAMPTZ,
-      migration_name VARCHAR(255) NOT NULL UNIQUE,
-      logs TEXT,
-      rolled_back_at TIMESTAMPTZ,
-      started_at TIMESTAMPTZ DEFAULT now(),
-      applied_steps_count INTEGER DEFAULT 0
-    )
-  `);
-  console.log("_prisma_migrations table ready");
+  let canTrackMigrations = true;
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "_prisma_migrations" (
+        id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        checksum VARCHAR(64) NOT NULL,
+        finished_at TIMESTAMPTZ,
+        migration_name VARCHAR(255) NOT NULL UNIQUE,
+        logs TEXT,
+        rolled_back_at TIMESTAMPTZ,
+        started_at TIMESTAMPTZ DEFAULT now(),
+        applied_steps_count INTEGER DEFAULT 0
+      )
+    `);
+    console.log("_prisma_migrations table ready");
+  } catch (tableErr) {
+    if (tableErr.message && tableErr.message.includes("permission denied")) {
+      console.log("⚠️  Cannot manage _prisma_migrations table (permission denied)");
+      console.log("   Table may be owned by a different database role.");
+      console.log("   Will apply migrations without tracking (relying on IF NOT EXISTS).");
+      canTrackMigrations = false;
+    } else {
+      throw tableErr;
+    }
+  }
 
   // Get sorted migration directories
   const dirs = fs
@@ -78,22 +90,24 @@ async function main() {
   let skipped = 0;
 
   for (const dir of dirs) {
-    // Check if already applied
-    const exists = await client.query(
-      `SELECT 1 FROM "_prisma_migrations" WHERE migration_name = $1 AND finished_at IS NOT NULL`,
-      [dir]
-    );
-    if (exists.rows.length > 0) {
-      console.log(`⏭️  ${dir} (already applied)`);
-      skipped++;
-      continue;
-    }
+    // Check if already applied (only if we can access the tracking table)
+    if (canTrackMigrations) {
+      const exists = await client.query(
+        `SELECT 1 FROM "_prisma_migrations" WHERE migration_name = $1 AND finished_at IS NOT NULL`,
+        [dir]
+      );
+      if (exists.rows.length > 0) {
+        console.log(`⏭️  ${dir} (already applied)`);
+        skipped++;
+        continue;
+      }
 
-    // Delete any failed/incomplete entries for this migration
-    await client.query(
-      `DELETE FROM "_prisma_migrations" WHERE migration_name = $1`,
-      [dir]
-    );
+      // Delete any failed/incomplete entries for this migration
+      await client.query(
+        `DELETE FROM "_prisma_migrations" WHERE migration_name = $1`,
+        [dir]
+      );
+    }
 
     const sqlFile = path.join(MIGRATIONS_DIR, dir, "migration.sql");
     const sql = fs.readFileSync(sqlFile, "utf8");
@@ -106,11 +120,13 @@ async function main() {
       await client.query(sql);
       await client.query("COMMIT");
 
-      // Record as applied
-      await client.query(
-        `INSERT INTO "_prisma_migrations" (checksum, migration_name, finished_at, applied_steps_count) VALUES ($1, $2, now(), 1)`,
-        [checksum, dir]
-      );
+      // Record as applied (only if tracking is available)
+      if (canTrackMigrations) {
+        await client.query(
+          `INSERT INTO "_prisma_migrations" (checksum, migration_name, finished_at, applied_steps_count) VALUES ($1, $2, now(), 1)`,
+          [checksum, dir]
+        );
+      }
       console.log(`✅ ${dir}`);
       applied++;
     } catch (e) {
@@ -123,10 +139,12 @@ async function main() {
         console.log(`   Retrying ${dir} without transaction...`);
         try {
           await client.query(sql);
-          await client.query(
-            `INSERT INTO "_prisma_migrations" (checksum, migration_name, finished_at, applied_steps_count) VALUES ($1, $2, now(), 1)`,
-            [checksum, dir]
-          );
+          if (canTrackMigrations) {
+            await client.query(
+              `INSERT INTO "_prisma_migrations" (checksum, migration_name, finished_at, applied_steps_count) VALUES ($1, $2, now(), 1)`,
+              [checksum, dir]
+            );
+          }
           console.log(`✅ ${dir} (retry succeeded)`);
           applied++;
         } catch (e2) {

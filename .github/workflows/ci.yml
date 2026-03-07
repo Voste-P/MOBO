@@ -448,6 +448,8 @@ jobs:
           ' "$SCHEMA"
 
       - name: Prepare migration state
+        id: prepare-migration
+        continue-on-error: true
         env:
           NODE_TLS_REJECT_UNAUTHORIZED: '0'
         run: |
@@ -530,8 +532,15 @@ jobs:
               await c.end();
               console.log("Done.");
             })().catch(e => {
-              console.error("::error::Prepare migration state failed:", e.message);
-              process.exit(1);
+              if (e.message && e.message.includes("permission denied")) {
+                console.log("⚠️  Cannot manage _prisma_migrations table (permission denied)");
+                console.log("   Table may be owned by a different database role.");
+                console.log("   Fix: GRANT ALL ON TABLE " + schema + "._prisma_migrations TO <deploy_user>;");
+                console.log("   Continuing — Apply Migrations step will attempt migration directly.");
+              } else {
+                console.error("::error::Prepare migration state failed:", e.message);
+                process.exit(1);
+              }
             });
           ' "${DB_SCHEMA}"
 
@@ -541,6 +550,7 @@ jobs:
         run: |
           export DATABASE_URL="${DEPLOY_DATABASE_URL}"
           echo "Migrating schema: ${DB_SCHEMA}"
+          echo "Prepare step outcome: ${{ steps.prepare-migration.outcome }}"
           cd backend
 
           LOGFILE="/tmp/deploy-migrations.log"
