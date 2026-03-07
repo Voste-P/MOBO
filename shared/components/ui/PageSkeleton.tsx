@@ -106,7 +106,7 @@ export function PageSkeleton({ variant = 'cards' }: { variant?: 'cards' | 'dashb
       {/* Card skeletons */}
       <div className="flex-1 p-6 space-y-6 overflow-hidden">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="flex justify-center" style={{ opacity: 1 - i * 0.25 }}>
+          <div key={i} className={`flex justify-center ${i === 1 ? 'opacity-75' : i === 2 ? 'opacity-50' : ''}`}>
             <CardSkeleton />
           </div>
         ))}

@@ -248,6 +248,7 @@ const BrandProfileView = () => {
               className="hidden"
               accept="image/*"
               onChange={handleFile}
+              aria-label="Upload profile photo"
             />
           </div>
           <div className="flex-1 pb-2">
@@ -294,6 +295,7 @@ const BrandProfileView = () => {
                 disabled={!isEditing}
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
+                aria-label="Brand Name"
                 className="w-full p-4 bg-zinc-50 rounded-2xl font-bold text-zinc-900 outline-none focus:ring-4 focus:ring-lime-100 focus:bg-white transition-all disabled:opacity-70 disabled:bg-zinc-50/50"
               />
             </div>
@@ -330,6 +332,7 @@ const BrandProfileView = () => {
                   disabled
                   value={form.mobile}
                   onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+                  aria-label="Mobile number"
                   className="w-full pl-12 pr-4 py-4 bg-zinc-50 rounded-2xl font-bold text-zinc-900 outline-none focus:ring-4 focus:ring-lime-100 focus:bg-white transition-all disabled:opacity-70 disabled:bg-zinc-50/50"
                 />
               </div>
@@ -903,6 +906,7 @@ const OrdersView = ({ user }: any) => {
               {search && (
                 <button
                   onClick={() => setSearch('')}
+                  aria-label="Clear search"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-900 transition-colors"
                 >
                   <XCircle size={16} />
@@ -912,6 +916,7 @@ const OrdersView = ({ user }: any) => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
+              aria-label="Filter by order status"
               className="px-4 py-3.5 bg-white border border-zinc-200 rounded-2xl text-sm font-bold outline-none focus:border-zinc-900 focus:ring-4 focus:ring-zinc-100 transition-all shadow-sm text-zinc-900"
             >
               <option value="All">All Statuses</option>
@@ -923,6 +928,7 @@ const OrdersView = ({ user }: any) => {
             <select
               value={dealTypeFilter}
               onChange={(e) => setDealTypeFilter(e.target.value)}
+              aria-label="Filter by deal type"
               className="px-4 py-3.5 bg-white border border-zinc-200 rounded-2xl text-sm font-bold outline-none focus:border-zinc-900 focus:ring-4 focus:ring-zinc-100 transition-all shadow-sm text-zinc-900"
             >
               <option value="All">All Deal Types</option>
@@ -933,6 +939,7 @@ const OrdersView = ({ user }: any) => {
             <select
               value={mediatorFilter}
               onChange={(e) => setMediatorFilter(e.target.value)}
+              aria-label="Filter by mediator"
               className="px-4 py-3.5 bg-white border border-zinc-200 rounded-2xl text-sm font-bold outline-none focus:border-zinc-900 focus:ring-4 focus:ring-zinc-100 transition-all shadow-sm text-zinc-900 max-w-[160px]"
             >
               <option value="All">All Mediators</option>
@@ -943,6 +950,7 @@ const OrdersView = ({ user }: any) => {
             <select
               value={productFilter}
               onChange={(e) => setProductFilter(e.target.value)}
+              aria-label="Filter by product"
               className="px-4 py-3.5 bg-white border border-zinc-200 rounded-2xl text-sm font-bold outline-none focus:border-zinc-900 focus:ring-4 focus:ring-zinc-100 transition-all shadow-sm text-zinc-900 max-w-[200px] truncate"
             >
               <option value="All">All Products</option>
@@ -1064,6 +1072,7 @@ const OrdersView = ({ user }: any) => {
                         {o.screenshots?.payment || o.screenshots?.order ? (
                           <button
                             onClick={() => setViewProofOrder(o)}
+                            aria-label="View order proof"
                             className="w-8 h-8 bg-white border border-zinc-200 rounded-lg flex items-center justify-center text-zinc-400 hover:text-black hover:border-black transition-colors ml-auto"
                           >
                             <Eye size={14} />
@@ -1645,6 +1654,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
               setEditingId(null);
               setForm(initialForm);
             }}
+            aria-label="Back to campaigns"
             className="w-12 h-12 rounded-full bg-white border border-zinc-200 flex items-center justify-center hover:bg-zinc-50 transition-colors"
           >
             <ChevronRight className="rotate-180" size={20} />
@@ -1791,6 +1801,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
                       className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-500 focus:text-zinc-900 outline-none cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[right_1rem_center] bg-no-repeat"
                       value={form.dealType}
                       onChange={(e) => setForm({ ...form, dealType: e.target.value })}
+                      aria-label="Enforce deal type"
                     >
                       <option value="">Flexible (Agency Decide)</option>
                       <option value="Discount">Discount Only</option>
@@ -1950,6 +1961,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
         <select
           value={filterDealType}
           onChange={(e) => setFilterDealType(e.target.value)}
+          aria-label="Filter campaigns by deal type"
           className="px-3 py-3 rounded-xl border border-zinc-200 text-xs font-bold bg-white"
         >
           <option value="All">All Deal Types</option>
@@ -2340,6 +2352,7 @@ export const BrandDashboard: React.FC = () => {
       mobileMenuButton={
         <button
           onClick={() => setIsSidebarOpen(true)}
+          aria-label="Open menu"
           className="p-2 bg-white rounded-xl shadow-sm border border-zinc-200"
         >
           <Menu size={20} />
@@ -2758,6 +2771,7 @@ export const BrandDashboard: React.FC = () => {
                           api.brand.removeAgency(user.id, ag.mediatorCode!).then(fetchData).catch((err: any) => toast.error(formatErrorMessage(err, 'Failed to disconnect agency')));
                         }
                       }}
+                      aria-label="Disconnect agency"
                       className="w-10 h-10 rounded-full border border-zinc-100 flex items-center justify-center text-zinc-300 hover:text-red-500 hover:border-red-100 hover:bg-red-50 transition-colors absolute top-6 right-6"
                     >
                       <Trash2 size={18} />
@@ -3055,6 +3069,7 @@ export const BrandDashboard: React.FC = () => {
                           navigator.clipboard.writeText(selectedAgency.upiId || '');
                           toast.success('Copied');
                         }}
+                        aria-label="Copy UPI address"
                         className="text-zinc-400 hover:text-black"
                       >
                         <Copy size={12} />

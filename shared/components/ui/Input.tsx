@@ -61,7 +61,7 @@ export const Input = React.forwardRef<HTMLInputElement, Props>(function Input(
           id={inputId}
           type={isPasswordType ? (showPassword ? 'text' : 'password') : type}
           aria-describedby={(error || hint) ? hintId : undefined}
-          aria-invalid={error ? true : undefined}
+          aria-invalid={error ? "true" : undefined}
           className={cn(
             'w-full bg-transparent outline-none font-semibold transition-colors',
             isDark ? 'text-white placeholder:text-slate-600' : 'text-zinc-900 placeholder:text-zinc-400',

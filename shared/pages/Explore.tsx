@@ -214,7 +214,7 @@ export const Explore: React.FC = () => {
         {loading ? (
           <div className="flex flex-col items-center gap-6">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="w-[300px] bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-100 space-y-3 animate-pulse" style={{ animationDelay: `${i * 150}ms` }}>
+              <div key={i} className={`w-[300px] bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-100 space-y-3 animate-pulse ${i === 1 ? '[animation-delay:150ms]' : i === 2 ? '[animation-delay:300ms]' : ''}`}>
                 <div className="flex gap-4">
                   <div className="w-24 h-24 rounded-2xl bg-gray-200 flex-shrink-0" />
                   <div className="flex-1 space-y-2 py-1">
@@ -250,7 +250,7 @@ export const Explore: React.FC = () => {
         ) : (
           <div className="flex flex-col items-center gap-6">
             {filtered.map((p, i) => (
-              <div key={p.id} className="animate-enter w-full flex justify-center" style={{ animationDelay: `${Math.min(i, 8) * 60}ms`, animationFillMode: 'both' }}>
+              <div key={p.id} className="animate-enter w-full flex justify-center [animation-fill-mode:both]" style={{ animationDelay: `${Math.min(i, 8) * 60}ms` }}>
                 <ProductCard product={p} inlineOrder />
               </div>
             ))}

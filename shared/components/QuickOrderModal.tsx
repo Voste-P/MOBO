@@ -156,7 +156,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
             <ShoppingBag size={18} className="text-lime-600" />
             <h2 className="text-lg font-extrabold text-slate-900">Order Form</h2>
           </div>
-          <button type="button" onClick={handleClose} className="p-1.5 rounded-full hover:bg-gray-100 transition">
+          <button type="button" onClick={handleClose} aria-label="Close order form" className="p-1.5 rounded-full hover:bg-gray-100 transition">
             <X size={18} className="text-gray-500" />
           </button>
         </div>
@@ -215,6 +215,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
                 <img src={preview} alt="Order proof" loading="lazy" className="w-full max-h-48 object-contain bg-gray-50" />
                 <button
                   type="button"
+                  aria-label="Remove screenshot"
                   onClick={() => { setScreenshot(null); setPreview(null); setExtractedDetails({ orderId: '', amount: '' }); }}
                   className="absolute top-2 right-2 p-1 bg-white/90 rounded-full shadow hover:bg-red-50 transition"
                 >
@@ -228,7 +229,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
                 )}
               </div>
             )}
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} aria-label="Upload order screenshot" />
           </div>
 
           {/* Step 3: Order Details — ALWAYS shown after screenshot upload */}

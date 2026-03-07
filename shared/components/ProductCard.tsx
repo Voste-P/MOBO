@@ -299,7 +299,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
               )}
             </div>
           )}
-          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} aria-label="Upload order screenshot" />
 
           {/* Order Details — ALWAYS shown after screenshot upload */}
           {preview && !extracting && (
