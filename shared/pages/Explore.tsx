@@ -5,8 +5,8 @@ import { useToast } from '../context/ToastContext';
 import { Product } from '../types';
 import { ProductCard } from '../components/ProductCard';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
-import { Search, Filter, AlertTriangle } from 'lucide-react';
-import { EmptyState, Input, Spinner } from '../components/ui';
+import { Search, Filter, AlertTriangle, ShoppingBag } from 'lucide-react';
+import { EmptyState, Input } from '../components/ui';
 
 export const Explore: React.FC = () => {
   const { toast } = useToast();
@@ -204,9 +204,21 @@ export const Explore: React.FC = () => {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6 pb-32 scrollbar-styled">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-500 font-bold text-sm gap-3">
-            <Spinner className="w-7 h-7 text-lime-500" />
-            Loading inventory...
+          <div className="flex flex-col items-center gap-6">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="w-[300px] bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-100 space-y-3 animate-pulse" style={{ animationDelay: `${i * 150}ms` }}>
+                <div className="flex gap-4">
+                  <div className="w-24 h-24 rounded-2xl bg-gray-200 flex-shrink-0" />
+                  <div className="flex-1 space-y-2 py-1">
+                    <div className="h-4 w-3/4 rounded-lg bg-gray-200" />
+                    <div className="h-3 w-1/2 rounded-lg bg-gray-200" />
+                    <div className="h-6 w-20 rounded-lg bg-gray-200 mt-2" />
+                  </div>
+                </div>
+                <div className="h-16 rounded-xl bg-gray-200" />
+                <div className="h-12 rounded-xl bg-gray-200" />
+              </div>
+            ))}
           </div>
         ) : fetchError && filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -224,12 +236,12 @@ export const Explore: React.FC = () => {
           <EmptyState
             title="No deals available"
             description={searchTerm || selectedCategory !== 'All' ? 'Try a different search term or category.' : 'New deals will appear here — check back soon!'}
-            icon={<Filter size={40} className="text-zinc-300" />}
+            icon={searchTerm ? <Search size={40} className="text-zinc-300" /> : <ShoppingBag size={40} className="text-zinc-300" />}
           />
         ) : (
           <div className="flex flex-col items-center gap-6">
-            {filtered.map((p) => (
-              <div key={p.id} className="animate-enter w-full flex justify-center">
+            {filtered.map((p, i) => (
+              <div key={p.id} className="animate-enter w-full flex justify-center" style={{ animationDelay: `${Math.min(i, 8) * 60}ms`, animationFillMode: 'both' }}>
                 <ProductCard product={p} inlineOrder />
               </div>
             ))}

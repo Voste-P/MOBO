@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { ToastProvider } from '../context/ToastContext';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { PortalGuard } from '../components/PortalGuard';
+import { PageSkeleton } from '../components/ui/PageSkeleton';
 import { BrandAuthScreen } from '../pages/BrandAuth';
 
 // Lazy-load the 127KB BrandDashboard — only fetched after auth succeeds
@@ -36,7 +37,7 @@ export const BrandApp: React.FC<BrandAppProps> = ({ onBack }) => {
     <ErrorBoundary>
       <ToastProvider>
         <div className="relative">
-          <Suspense fallback={<div className="flex-1 flex items-center justify-center min-h-[100dvh]"><div className="w-8 h-8 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" /></div>}>
+          <Suspense fallback={<PageSkeleton variant="dashboard" />}>
             <BrandDashboard />
           </Suspense>
         </div>

@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
 
 type ToastVariant = 'success' | 'error' | 'info' | 'warning';
 
@@ -38,6 +39,16 @@ function variantClasses(variant: ToastVariant): string {
     case 'info':
     default:
       return 'border-sky-300/70 bg-zinc-950 text-white';
+  }
+}
+
+function VariantIcon({ variant }: { variant: ToastVariant }) {
+  const size = 16;
+  switch (variant) {
+    case 'success': return <CheckCircle size={size} className="text-lime-400 flex-shrink-0" />;
+    case 'error': return <XCircle size={size} className="text-red-400 flex-shrink-0" />;
+    case 'warning': return <AlertTriangle size={size} className="text-yellow-300 flex-shrink-0" />;
+    case 'info': default: return <Info size={size} className="text-sky-300 flex-shrink-0" />;
   }
 }
 
@@ -113,8 +124,13 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               onClick={() => dismiss(t.id)}
             >
               {t.title ? <div className="text-xs font-extrabold uppercase tracking-widest opacity-80">{t.title}</div> : null}
-              <div className="text-sm font-semibold leading-snug">{t.message}</div>
-              <div className="text-[10px] mt-1 opacity-60">Tap to dismiss</div>
+              <div className="flex items-start gap-2.5">
+                <VariantIcon variant={t.variant} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold leading-snug">{t.message}</div>
+                  <div className="text-[10px] mt-1 opacity-60">Tap to dismiss</div>
+                </div>
+              </div>
             </div>
           ))}
         </div>

@@ -44,55 +44,30 @@ export class ErrorBoundary extends Component<Props, State> {
       const exhausted = this.state.retryCount >= MAX_RETRIES - 1;
 
       return (
-        <div
-          style={{
-            minHeight: '100dvh',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '2rem',
-            fontFamily: 'system-ui, sans-serif',
-            textAlign: 'center',
-            background: '#f8fafc',
-          }}
-        >
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
-          <h1
-            style={{
-              fontSize: '1.25rem',
-              fontWeight: 700,
-              color: '#0f172a',
-              margin: '0 0 0.5rem',
-            }}
-          >
+        <div className="min-h-[100dvh] flex flex-col items-center justify-center p-8 font-sans text-center bg-slate-50">
+          <div className="text-5xl mb-4">⚠️</div>
+          <h1 className="text-xl font-bold text-slate-900 mb-2">
             Something went wrong
           </h1>
-          <p
-            style={{
-              color: '#64748b',
-              fontSize: '0.875rem',
-              margin: '0 0 1.5rem',
-              maxWidth: '24rem',
-            }}
-          >
+          <p className="text-sm text-slate-500 mb-6 max-w-sm">
             {exhausted
               ? 'This error keeps occurring. Please try refreshing the page or contact support if it persists.'
               : 'An unexpected error occurred. Please reload to continue.'}
           </p>
+          {this.state.error && (
+            <details className="mb-6 max-w-sm w-full text-left">
+              <summary className="text-xs font-bold text-slate-400 cursor-pointer hover:text-slate-600 transition-colors">
+                Error details
+              </summary>
+              <pre className="mt-2 p-3 bg-slate-100 rounded-xl text-[10px] text-slate-600 overflow-auto max-h-32 scrollbar-styled font-mono">
+                {this.state.error.message}
+              </pre>
+            </details>
+          )}
           <button
             type="button"
             onClick={this.handleReload}
-            style={{
-              padding: '0.75rem 2rem',
-              borderRadius: '0.75rem',
-              border: 'none',
-              background: '#a3e635',
-              color: '#1a2e05',
-              fontWeight: 700,
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-            }}
+            className="px-8 py-3 rounded-xl border-none bg-lime-400 text-lime-950 font-bold text-sm cursor-pointer hover:bg-lime-500 active:scale-95 transition-all"
           >
             {exhausted ? 'Force Reload' : 'Reload'}
           </button>

@@ -9,3 +9,4 @@ export * from './EmptyState';
 export * from './IconButton';
 export * from './RealtimeStatusBadge';
 export * from './FullPage';
+export * from './PageSkeleton';

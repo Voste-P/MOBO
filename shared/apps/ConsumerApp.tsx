@@ -8,6 +8,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { PortalGuard } from '../components/PortalGuard';
 import { MobileTabBar } from '../components/MobileTabBar';
 import { Button, Card, CardContent } from '../components/ui';
+import { PageSkeleton } from '../components/ui/PageSkeleton';
 import { AuthScreen } from '../pages/Auth';
 import { Package, User, LogOut, Home as HomeIcon, Bot } from 'lucide-react';
 
@@ -19,11 +20,7 @@ const Orders = lazy(() => import('../pages/Orders').then(m => ({ default: m.Orde
 const Profile = lazy(() => import('../pages/Profile').then(m => ({ default: m.Profile })));
 
 function TabSkeleton() {
-  return (
-    <div className="flex-1 flex items-center justify-center bg-[#F2F2F7]">
-      <div className="w-8 h-8 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
-    </div>
-  );
+  return <PageSkeleton variant="cards" />;
 }
 
 interface ConsumerAppProps {
