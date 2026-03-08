@@ -57,12 +57,16 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
   const isOpen = ticket?.status === 'Open';
   const isClosed = ticket?.status === 'Resolved' || ticket?.status === 'Rejected';
   const isOwner = ticket?.userId === user?.id;
-  // Permission: only the targeted role (or admin) can resolve/reject/escalate
+  // Role hierarchy: higher-tier roles can manage lower-tier tickets
+  const ROLE_LEVEL: Record<string, number> = { user: 0, mediator: 1, agency: 2, brand: 3, admin: 4 };
   const isTargetedRole = ticket?.targetRole === userRole;
+  const canManageTarget = (ROLE_LEVEL[userRole] ?? -1) >= (ROLE_LEVEL[ticket?.targetRole || ''] ?? 0);
   const isAdmin = userRole === 'admin';
+  // Escalate: only the exact targeted role can escalate (mediator→agency, agency→brand, etc.)
   const canEscalate = isOpen && !isOwner && (isTargetedRole || isAdmin) && !!ESCALATION_PATH[ticket?.targetRole || ''] && !isAdmin;
-  const canResolve = isOpen && (isTargetedRole || isAdmin) && userRole !== 'user';
-  const canReopen = isClosed && (isTargetedRole || isAdmin || isOwner);
+  // Resolve/reject: targeted role OR any higher role can resolve/reject
+  const canResolve = isOpen && (canManageTarget || isAdmin) && userRole !== 'user';
+  const canReopen = isClosed && (canManageTarget || isAdmin || isOwner);
   const canDelete = isClosed && (isAdmin || isOwner);
 
   const loadComments = useCallback(async () => {
