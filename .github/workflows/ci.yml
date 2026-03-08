@@ -510,7 +510,7 @@ jobs:
                 console.log("Found", r.rows.length, "tables:", r.rows.map(x => x.table_name).join(", "));
 
                 // Resolve migrations as applied ONLY if the tables they create already exist.
-                // This prevents marking NEW migrations as applied when their tables haven't been created yet.
+                // This prevents marking NEW migrations as applied when their tables do not exist yet.
                 const migrations = fs.readdirSync("prisma/migrations")
                   .filter(d => fs.existsSync(path.join("prisma/migrations", d, "migration.sql")))
                   .sort();
@@ -522,7 +522,7 @@ jobs:
                   const exists = await c.query("SELECT 1 FROM \"_prisma_migrations\" WHERE migration_name = $1 AND finished_at IS NOT NULL", [m]);
                   if (exists.rows.length > 0) { console.log("  Already resolved:", m); continue; }
 
-                  // Check if any CREATE TABLE in this migration references tables that don't exist yet
+                  // Check if any CREATE TABLE in this migration references tables that do not exist yet
                   const createMatches = sql.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+"?(\w+)"?/gi) || [];
                   const tablesInMigration = createMatches.map(s => {
                     const match = s.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+"?(\w+)"?/i);

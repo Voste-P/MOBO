@@ -101,7 +101,8 @@ async function main() {
       if (exists.rows.length > 0) {
         // Verify the migration's tables actually exist — a previous CI step may
         // have marked it applied without running the SQL (see prepare-migration).
-        const sqlContent = fs.readFileSync(sqlFile, "utf8");
+        const migSqlFile = path.join(MIGRATIONS_DIR, dir, "migration.sql");
+        const sqlContent = fs.readFileSync(migSqlFile, "utf8");
         const createMatches = sqlContent.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+"?(\w+)"?/gi) || [];
         const tableNames = createMatches.map(s => {
           const m = s.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+"?(\w+)"?/i);
