@@ -195,7 +195,25 @@ async function canManageTicketByRole(params: {
       });
       if (order) return true;
     }
+    // Allow if the buyer has ANY parentCode referencing this mediator (broader match)
+    const buyerByParent = await db.user.findFirst({
+      where: { id: ticket.userId, parentCode: mediatorCode, isDeleted: false },
+      select: { id: true },
+    });
+    if (buyerByParent) return true;
     return false;
+  }
+
+  // Mediator can also manage escalated tickets that were originally from their buyers
+  if (roles.includes('mediator') && targetRole !== 'mediator') {
+    const mediatorCode = String(user?.mediatorCode || '').trim();
+    if (mediatorCode && ticket.orderId) {
+      const db = prisma();
+      const order = await db.order.findFirst({
+        where: { ...idWhere(ticket.orderId), managerName: mediatorCode, isDeleted: false },
+      });
+      if (order) return true;
+    }
   }
 
   // Agency can manage tickets targeted to 'agency' from their mediators
@@ -473,8 +491,17 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
             select: { userId: true },
           });
           const buyerUserIds = [...new Set(mediatorOrders.map(o => o.userId).filter(Boolean))];
-          if (buyerUserIds.length) {
-            cascadeTargets.push({ targetRole: 'mediator', userId: { in: buyerUserIds } });
+
+          // Also include buyers registered under this mediator via parentCode
+          const registeredBuyers = await db.user.findMany({
+            where: { parentCode: mediatorCode, roles: { has: 'shopper' as any }, isDeleted: false },
+            select: { id: true },
+          });
+          const registeredBuyerIds = registeredBuyers.map(b => b.id);
+          const allBuyerIds = [...new Set([...buyerUserIds, ...registeredBuyerIds])];
+
+          if (allBuyerIds.length) {
+            cascadeTargets.push({ targetRole: 'mediator', userId: { in: allBuyerIds } });
           }
         }
 
@@ -628,9 +655,10 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
 
         const ticket = await db.ticket.update({ where: { id: existing.id }, data: updatePayload });
         const mapped = pgTicket(ticket);
+        const enriched = (await enrichTicketsWithResolverNames([mapped]))[0];
 
-        const audience = await buildTicketAudience(mapped);
-        publishRealtime({ type: 'tickets.changed', ts: new Date().toISOString(), payload: { ticketId: String(mapped._id), status: body.status }, audience });
+        const audience = await buildTicketAudience(enriched);
+        publishRealtime({ type: 'tickets.changed', ts: new Date().toISOString(), payload: { ticketId: String(enriched._id), status: body.status }, audience });
         publishRealtime({ type: 'notifications.changed', ts: new Date().toISOString(), audience });
 
         // ── Push notification to the ticket creator ──
@@ -673,7 +701,8 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
         logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Ticket', entityId: id, action: 'TICKET_STATUS_CHANGE', changedFields: ['status'], before: { status: previousStatus }, after: { status: body.status } });
         logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Ticket', requestId: String((res as any).locals?.requestId || ''), metadata: { action: auditAction, ticketId: id, previousStatus, newStatus: body.status } });
 
-        res.json(toUiTicket(mapped));
+        const uiTicket = roles.includes('brand') ? toUiTicketForBrand(enriched) : toUiTicket(enriched);
+        res.json(uiTicket);
       } catch (err) {
         logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'BUSINESS_LOGIC', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'updateTicket' } });
         next(err);

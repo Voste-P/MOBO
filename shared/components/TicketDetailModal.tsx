@@ -56,10 +56,14 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
   const userRole = user?.role || 'user';
   const isOpen = ticket?.status === 'Open';
   const isClosed = ticket?.status === 'Resolved' || ticket?.status === 'Rejected';
-  const canEscalate = isOpen && ESCALATION_PATH[userRole] && userRole !== 'admin' && userRole !== 'user';
-  const canResolve = isOpen && userRole !== 'user';
-  const canReopen = isClosed;
-  const canDelete = isClosed && (userRole === 'admin' || ticket?.userId === user?.id);
+  const isOwner = ticket?.userId === user?.id;
+  // Permission: only the targeted role (or admin) can resolve/reject/escalate
+  const isTargetedRole = ticket?.targetRole === userRole;
+  const isAdmin = userRole === 'admin';
+  const canEscalate = isOpen && !isOwner && (isTargetedRole || isAdmin) && !!ESCALATION_PATH[ticket?.targetRole || ''] && !isAdmin;
+  const canResolve = isOpen && (isTargetedRole || isAdmin) && userRole !== 'user';
+  const canReopen = isClosed && (isTargetedRole || isAdmin || isOwner);
+  const canDelete = isClosed && (isAdmin || isOwner);
 
   const loadComments = useCallback(async () => {
     if (!ticket) return;
@@ -131,7 +135,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
     setActionLoading('escalate');
     try {
       await api.tickets.escalate(ticket.id);
-      toast.success(`Ticket escalated to ${ESCALATION_PATH[userRole]}.`);
+      toast.success(`Ticket escalated to ${ESCALATION_PATH[ticket?.targetRole || ''] || 'higher authority'}.`);
       onRefresh();
       onClose();
     } catch (err: any) {
@@ -392,7 +396,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
                 className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100 disabled:opacity-50"
               >
                 {actionLoading === 'escalate' ? <Loader2 size={12} className="animate-spin" /> : <ArrowUpCircle size={12} />}
-                Escalate to {ESCALATION_PATH[userRole]}
+                Escalate to {ESCALATION_PATH[ticket?.targetRole || '']}
               </button>
             )}
             {canReopen && (

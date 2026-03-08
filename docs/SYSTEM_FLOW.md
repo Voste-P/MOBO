@@ -271,19 +271,47 @@ Admin suspends Buyer
 ### G. Support Ticket Lifecycle
 
 ```
-Any User                  Backend                  Admin/Ops
-  │                         │                         │
-  ├─ Create Ticket ────────▶│                         │
-  │  (subject, desc,        ├─ Record ticket          │
-  │   category, orderId?)   ├─ SSE → Admin ──────────▶│
-  │                         │                         ├─ View ticket
-  │                         │                         ├─ Respond
-  │  ◀── SSE notification ──┤◀── Reply ───────────────┤
-  │                         │                         ├─ Close/Resolve
-  │                         │                         │
+Buyer creates ticket          ──▶  targetRole = mediator
+  │                                     │
+  │                         Mediator manages ticket
+  │                         ├── Resolve ✅  (closes ticket)
+  │                         ├── Reject  ❌  (closes ticket)
+  │                         └── Escalate ↑  (→ targetRole = agency)
+  │                                     │
+  │                         Agency manages ticket
+  │                         ├── Resolve ✅
+  │                         ├── Reject  ❌
+  │                         └── Escalate ↑  (→ targetRole = brand)
+  │                                     │
+  │                         Brand manages ticket
+  │                         ├── Resolve ✅
+  │                         ├── Reject  ❌
+  │                         └── Escalate ↑  (→ targetRole = admin)
+  │                                     │
+  │                         Admin manages ticket (terminal)
+  │                         ├── Resolve ✅
+  │                         └── Reject  ❌
 ```
 
-**Ticket statuses:** `OPEN` → `IN_PROGRESS` → `RESOLVED` / `CLOSED`
+**Cascade Routing Rules:**
+
+| Ticket Creator | Initial Target | Escalation Path                    |
+| -------------- | -------------- | ---------------------------------- |
+| **Buyer**      | Mediator       | Mediator → Agency → Brand → Admin  |
+| **Mediator**   | Agency         | Agency → Brand → Admin             |
+| **Agency**     | Brand          | Brand → Admin                      |
+| **Brand**      | Admin          | (terminal — cannot escalate)       |
+
+**Network Scoping:**
+
+- Mediators only see/manage tickets from buyers in their network (via `parentCode` or order linkage)
+- Agencies only see/manage tickets from mediators in their squad
+- Brands only see/manage tickets from connected agencies
+- Admin/Ops can see and manage all tickets
+
+**Ticket statuses:** `Open` → `Resolved` / `Rejected` (reopenable)
+
+**Comments:** Thread-style comments on any ticket. Both the creator and the handler can comment. Real-time push notifications on new comments and status changes.
 
 ### H. Real-time Events
 
