@@ -36,7 +36,7 @@ export class ErrorBoundary extends Component<Props, State> {
         ? (window as any).__NEXT_DATA__?.runtimeConfig?.apiUrl || process.env.NEXT_PUBLIC_API_URL || ''
         : '';
       if (!apiUrl) return;
-      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+      const token = typeof localStorage !== 'undefined' ? (() => { try { const s = localStorage.getItem('mobo_tokens_v1'); return s ? JSON.parse(s)?.accessToken : null; } catch { return null; } })() : null;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       fetch(`${apiUrl}/api/health/client-error`, {

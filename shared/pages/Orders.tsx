@@ -587,9 +587,9 @@ export const Orders: React.FC = () => {
         setRatingVerification(result);
 
         if (!result.accountNameMatch && !result.productNameMatch) {
-          toast.error('Account name and product name do not match! Please upload the correct rating screenshot.');
+          toast.warning('Account name and product name do not match. If your marketplace profile name differs from your registered name, enter it in the "Reviewer Name" field and retry.');
         } else if (!result.accountNameMatch) {
-          toast.warning('Account name does not match your profile. Please check the screenshot.');
+          toast.warning('Account name does not match. If you use a different name on the marketplace, enter it as "Reviewer Name" above.');
         } else if (!result.productNameMatch) {
           toast.warning('Product name does not match this order. Please check the screenshot.');
         } else {
@@ -614,10 +614,10 @@ export const Orders: React.FC = () => {
   const submitRatingScreenshot = async () => {
     if (!ratingFile || !selectedOrder || isUploading) return;
 
-    // Block if EITHER account name or product name mismatches
-    if (ratingVerification && (!ratingVerification.accountNameMatch || !ratingVerification.productNameMatch)) {
-      toast.error('Cannot submit: rating screenshot does not match. Please upload the correct screenshot.');
-      return;
+    // Warn but don't block if account name mismatches — mediator will verify
+    if (ratingVerification && !ratingVerification.accountNameMatch && !ratingVerification.productNameMatch) {
+      // Both mismatch: still allow but warn clearly
+      toast.warning('Account name and product mismatch detected. Your mediator will verify this manually.');
     }
 
     setIsUploading(true);

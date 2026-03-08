@@ -302,6 +302,14 @@ Buyer creates ticket          ──▶  targetRole = mediator
 | **Agency**     | Brand          | Brand → Admin                      |
 | **Brand**      | Admin          | (terminal — cannot escalate)       |
 
+**Role-Level Gating (v2):**
+
+- Each role has a numeric level: Buyer(0) → Mediator(1) → Agency(2) → Brand(3) → Admin(4)
+- Only users at or above the ticket's `targetRole` level can resolve/reject
+- Ticket owners can always resolve/reject their own tickets regardless of level
+- Admin/Ops can manage any ticket (privileged bypass)
+- Escalation bumps `targetRole` up one level (mediator→agency→brand→admin)
+
 **Network Scoping:**
 
 - Mediators only see/manage tickets from buyers in their network (via `parentCode` or order linkage)

@@ -77,7 +77,8 @@ export function makeOrdersController(env: Env) {
 
     const dataMatch = raw.match(/^data:([^;]+);base64,(.+)$/i);
     if (dataMatch) {
-      const mime = dataMatch[1] || 'image/jpeg';
+      const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+      const mime = ALLOWED_MIME.includes(dataMatch[1]?.toLowerCase() || '') ? dataMatch[1] : 'image/jpeg';
       const payload = dataMatch[2] || '';
       const buffer = Buffer.from(payload, 'base64');
       res.setHeader('Content-Type', mime);
@@ -405,7 +406,7 @@ export function makeOrdersController(env: Env) {
         const resolvedExternalOrderId = body.externalOrderId || (allowE2eBypass ? `E2E-${Date.now()}` : undefined);
 
         if (resolvedExternalOrderId) {
-          const dup = await db().order.findFirst({ where: { externalOrderId: resolvedExternalOrderId, isDeleted: false }, select: { id: true } });
+          const dup = await db().order.findFirst({ where: { userId: userPgId, externalOrderId: resolvedExternalOrderId, isDeleted: false }, select: { id: true } });
           if (dup) {
             throw new AppError(
               409,
@@ -827,7 +828,7 @@ export function makeOrdersController(env: Env) {
             total: body.items.reduce((a: number, it: any) => a + (Number(it.priceAtPurchase) || 0) * (Number(it.quantity) || 1), 0),
             externalOrderId: resolvedExternalOrderId,
           },
-        }).catch(() => { });
+        }).catch((err: unknown) => { orderLog.warn('Audit log failed', { error: err instanceof Error ? err.message : String(err) }); });
 
         orderLog.info('Order created', { orderId: orderMongoId, userId: req.auth?.userId, campaignId: String(campaign.mongoId ?? campaign.id), externalOrderId: resolvedExternalOrderId, itemCount: body.items.length, ip: req.ip });
         logChangeEvent({
@@ -1001,7 +1002,7 @@ export function makeOrdersController(env: Env) {
             });
             const buyerName = String(buyerUser?.name || order.buyerName || '').trim();
             const productName = String((order.items?.[0] as any)?.title || order.extractedProductName || '').trim();
-            const reviewerName = String(order.reviewerName || '').trim();
+            const reviewerName = String(body.reviewerName || order.reviewerName || '').trim();
             if (buyerName && productName) {
               const aiStart = Date.now();
               ratingAiResult = await verifyRatingScreenshotWithAi(env, {
@@ -1290,7 +1291,7 @@ export function makeOrdersController(env: Env) {
           req, action: 'PROOF_SUBMITTED', entityType: 'Order',
           entityId: order.mongoId!,
           metadata: { proofType: body.type },
-        }).catch(() => { });
+        }).catch((err: unknown) => { orderLog.warn('Audit log failed', { error: err instanceof Error ? err.message : String(err) }); });
 
         businessLog.info('Proof submitted', { orderId: order.mongoId, proofType: body.type, userId: req.auth?.userId, ip: req.ip });
         logAccessEvent('RESOURCE_ACCESS', {

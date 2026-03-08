@@ -94,6 +94,7 @@ Thumbs.db
 .playwright-mcp/
 
 # Temporary debug/check files
+test-output.tmp
 git-check*.txt
 git-log-check*.txt
 gitcheck*.txt
