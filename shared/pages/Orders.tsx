@@ -583,7 +583,7 @@ export const Orders: React.FC = () => {
       const reviewerName = reviewerNameInput.trim() || selectedOrder.reviewerName || '';
 
       if (buyerName && productName) {
-        const result = await api.orders.verifyRating(file, buyerName, productName, reviewerName || undefined);
+        const result = await api.orders.verifyRating(file, buyerName, productName, reviewerName || undefined, selectedOrder.id);
         setRatingVerification(result);
 
         if (!result.accountNameMatch && !result.productNameMatch) {
@@ -2071,6 +2071,24 @@ export const Orders: React.FC = () => {
             ) : uploadType === 'rating' ? (
               /* Enhanced rating upload with AI pre-validation */
               <div className="space-y-4">
+                {/* Reviewer Name — ALWAYS visible, shown BEFORE screenshot upload */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">
+                    Marketplace Reviewer / Account Name
+                  </label>
+                  <input
+                    type="text"
+                    value={reviewerNameInput}
+                    onChange={(e) => setReviewerNameInput(e.target.value)}
+                    className="w-full p-2.5 rounded-xl bg-indigo-50 border border-indigo-100 font-bold text-sm text-indigo-700 outline-none focus:ring-2 focus:ring-indigo-200 transition-all"
+                    placeholder="e.g. Gaurav C. on Amazon"
+                    maxLength={200}
+                  />
+                  <p className="text-[9px] text-slate-400 ml-1">
+                    Name shown on the marketplace (Amazon, Flipkart, etc.) — must match the name in your rating screenshot.
+                  </p>
+                </div>
+
                 <label
                   className={`w-full aspect-[2/1] rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all group overflow-hidden relative ${ratingPreview ? 'border-lime-200' : 'border-gray-200'}`}
                 >
@@ -2112,7 +2130,7 @@ export const Orders: React.FC = () => {
                     <div className="grid grid-cols-2 gap-2">
                       <div className={`p-2.5 rounded-xl text-center ${ratingVerification.accountNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">
-                          {selectedOrder?.reviewerName ? 'Reviewer Name' : 'Account Name'}
+                          {(selectedOrder?.reviewerName || reviewerNameInput.trim()) ? 'Reviewer Name' : 'Account Name'}
                         </div>
                         <div className={`text-xs font-bold ${ratingVerification.accountNameMatch ? 'text-green-600' : 'text-red-600'}`}>
                           {ratingVerification.accountNameMatch ? '✓ Match' : '✗ Mismatch'}

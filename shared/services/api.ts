@@ -599,14 +599,14 @@ export const api = {
       }
     },
     /** Pre-validate rating screenshot: checks account name + product name match */
-    verifyRating: async (file: File, expectedBuyerName: string, expectedProductName: string, expectedReviewerName?: string) => {
+    verifyRating: async (file: File, expectedBuyerName: string, expectedProductName: string, expectedReviewerName?: string, orderId?: string) => {
       const rawBase64 = await readFileAsDataUrl(file);
       // Compress before sending to stay under Vercel proxy body limit.
       const compressed = await compressImage(rawBase64, { maxDimension: 1600, quality: 0.8 });
       return fetchJson('/ai/verify-rating', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ imageBase64: compressed, expectedBuyerName, expectedProductName, ...(expectedReviewerName ? { expectedReviewerName } : {}) }),
+        body: JSON.stringify({ imageBase64: compressed, expectedBuyerName, expectedProductName, ...(expectedReviewerName ? { expectedReviewerName } : {}), ...(orderId ? { orderId } : {}) }),
       });
     },
   },

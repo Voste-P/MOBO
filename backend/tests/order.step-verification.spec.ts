@@ -169,6 +169,14 @@ describe('order step verification (purchase vs review/rating)', () => {
       data: { isDeleted: true },
     });
 
+    // Reset campaign usedSlots so the campaign isn't full from prior test runs.
+    if (deal.campaignId || deal.campaign?.id || deal.campaign) {
+      await prisma().campaign.updateMany({
+        where: { id: String(deal.campaignId || deal.campaign?.id || deal.campaign) },
+        data: { usedSlots: 0 },
+      });
+    }
+
     const createOrderRes = await request(app)
       .post('/api/orders')
       .set('Authorization', `Bearer ${shopper.token}`)
