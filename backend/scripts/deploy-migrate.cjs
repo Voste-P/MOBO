@@ -99,9 +99,40 @@ async function main() {
         [dir]
       );
       if (exists.rows.length > 0) {
-        console.log(`⏭️  ${dir} (already applied)`);
-        skipped++;
-        continue;
+        // Verify the migration's tables actually exist — a previous CI step may
+        // have marked it applied without running the SQL (see prepare-migration).
+        const migSqlFile = path.join(MIGRATIONS_DIR, dir, "migration.sql");
+        const sqlContent = fs.readFileSync(migSqlFile, "utf8");
+        const createMatches = sqlContent.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+"?(\w+)"?/gi) || [];
+        const tableNames = createMatches.map(s => {
+          const m = s.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+"?(\w+)"?/i);
+          return m ? m[1] : null;
+        }).filter(Boolean);
+
+        if (tableNames.length > 0) {
+          let allExist = true;
+          for (const tbl of tableNames) {
+            const tblCheck = await client.query(
+              `SELECT 1 FROM information_schema.tables WHERE table_name = $1 AND table_type = 'BASE TABLE'`,
+              [tbl]
+            );
+            if (tblCheck.rows.length === 0) {
+              console.log(`⚠️  ${dir} marked applied but table "${tbl}" missing — will re-apply`);
+              await client.query(`DELETE FROM "_prisma_migrations" WHERE migration_name = $1`, [dir]);
+              allExist = false;
+              break;
+            }
+          }
+          if (allExist) {
+            console.log(`⏭️  ${dir} (already applied)`);
+            skipped++;
+            continue;
+          }
+        } else {
+          console.log(`⏭️  ${dir} (already applied)`);
+          skipped++;
+          continue;
+        }
       }
 
       // Delete any failed/incomplete entries for this migration

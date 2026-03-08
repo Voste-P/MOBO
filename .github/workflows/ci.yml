@@ -505,11 +505,12 @@ jobs:
               );
 
               const hasTables = r.rows.length > 0;
+              const existingTables = new Set(r.rows.map(x => x.table_name));
               if (hasTables) {
                 console.log("Found", r.rows.length, "tables:", r.rows.map(x => x.table_name).join(", "));
 
-                // Resolve all known migrations as applied (direct SQL, no Prisma CLI)
-                // Dynamically discover all migrations from prisma/migrations/ directory
+                // Resolve migrations as applied ONLY if the tables they create already exist.
+                // This prevents marking NEW migrations as applied when their tables do not exist yet.
                 const migrations = fs.readdirSync("prisma/migrations")
                   .filter(d => fs.existsSync(path.join("prisma/migrations", d, "migration.sql")))
                   .sort();
@@ -520,11 +521,26 @@ jobs:
                   const checksum = crypto.createHash("sha256").update(sql).digest("hex");
                   const exists = await c.query("SELECT 1 FROM \"_prisma_migrations\" WHERE migration_name = $1 AND finished_at IS NOT NULL", [m]);
                   if (exists.rows.length > 0) { console.log("  Already resolved:", m); continue; }
+
+                  // Check if any CREATE TABLE in this migration references tables that do not exist yet
+                  const createMatches = sql.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+"?(\w+)"?/gi) || [];
+                  const tablesInMigration = createMatches.map(s => {
+                    const match = s.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+"?(\w+)"?/i);
+                    return match ? match[1] : null;
+                  }).filter(Boolean);
+                  if (tablesInMigration.length > 0) {
+                    const missingTables = tablesInMigration.filter(t => !existingTables.has(t));
+                    if (missingTables.length > 0) {
+                      console.log("  Skip resolve (tables missing:", missingTables.join(", ") + "):", m);
+                      continue;
+                    }
+                  }
+
                   await c.query("DELETE FROM \"_prisma_migrations\" WHERE migration_name = $1", [m]);
                   await c.query("INSERT INTO \"_prisma_migrations\" (checksum, migration_name, finished_at, applied_steps_count) VALUES ($1, $2, now(), 1)", [checksum, m]);
                   console.log("  Resolved:", m);
                 }
-                console.log("✅ All existing migrations resolved");
+                console.log("✅ Existing migrations resolved (new table migrations left pending)");
               } else {
                 console.log("✅ Schema is empty — migrations will run fresh from baseline");
               }
