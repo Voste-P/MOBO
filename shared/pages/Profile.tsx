@@ -132,10 +132,16 @@ export const Profile: React.FC = () => {
   };
 
   const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB max
+  const VALID_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'qr') => {
     const file = e.target.files?.[0];
     if (file) {
+      if (!VALID_IMAGE_TYPES.has(file.type)) {
+        toast.error('Please upload a JPG, PNG, or WebP image.');
+        e.target.value = '';
+        return;
+      }
       if (file.size > MAX_IMAGE_BYTES) {
         toast.error('Image too large (max 5 MB). Please choose a smaller file.');
         e.target.value = '';

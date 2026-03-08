@@ -341,6 +341,19 @@ async function fetchOk(path: string, init?: RequestInit): Promise<void> {
     throw toErrorFromPayload(payload, 'Your session has expired. Please log in again.');
   }
 
+  // 403 with suspension/deactivation codes — clear tokens and redirect to login
+  if (!res.ok && isForbiddenError(res, payload)) {
+    clearTokens();
+    notifyAuthExpired();
+    const code = payload?.error?.code || payload?.code;
+    const msg = code === 'UPSTREAM_SUSPENDED'
+      ? 'Your account access has been suspended. Please contact your mediator or agency.'
+      : code === 'USER_NOT_ACTIVE'
+        ? 'Your account is not active. Please contact support.'
+        : 'Access denied. Please log in again.';
+    throw toErrorFromPayload(payload, msg);
+  }
+
   if (!res.ok) throw toErrorFromPayload(payload, httpStatusToFriendlyMessage(res.status));
 }
 

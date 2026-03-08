@@ -112,22 +112,21 @@ export async function applyWalletCredit(input: WalletMutationInput) {
       throw new AppError(409, 'BALANCE_LIMIT_EXCEEDED', 'Wallet balance limit exceeded');
     }
 
-    // Atomic credit with max-balance ceiling check via updateMany.
-    // This prevents the race condition where two concurrent credits both pass
-    // a read-then-write check and exceed the wallet limit.
-    const updated = await tx.wallet.updateMany({
-      where: {
-        ownerUserId: input.ownerUserId,
-        isDeleted: false,
-        availablePaise: { lte: MAX_BALANCE_PAISE - input.amountPaise },
-      },
-      data: {
-        availablePaise: { increment: input.amountPaise },
-        version: { increment: 1 },
-      },
-    });
+    // Atomic credit with max-balance ceiling check via raw SQL.
+    // The WHERE clause validates that the TOTAL balance (available + locked + pending)
+    // will not exceed the ceiling, preventing race conditions where two concurrent
+    // credits both pass a read-then-write check.
+    const updated = await tx.$executeRaw`
+      UPDATE "wallets"
+      SET "available_paise" = "available_paise" + ${input.amountPaise},
+          "version" = "version" + 1,
+          "updated_at" = NOW()
+      WHERE "owner_user_id" = ${input.ownerUserId}::uuid
+        AND "is_deleted" = false
+        AND ("available_paise" + "locked_paise" + "pending_paise" + ${input.amountPaise}) <= ${MAX_BALANCE_PAISE}
+    `;
 
-    if (updated.count === 0) {
+    if (updated === 0) {
       // Distinguish wallet-not-found from limit exceeded
       const existing = await tx.wallet.findUnique({ where: { ownerUserId: input.ownerUserId } });
       if (!existing || existing.isDeleted) {
