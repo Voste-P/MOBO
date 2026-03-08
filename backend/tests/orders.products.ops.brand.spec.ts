@@ -89,41 +89,38 @@ describe('core flows: products -> redirect -> order -> claim -> ops verify/settl
       data: { isDeleted: true },
     });
 
-    // Also identify old orders for this specific deal (for transaction cleanup below)
-    const dealMongoId = deal?.mongoId || dealId;
-    const oldOrders = await db.order.findMany({
-      where: {
-        userId: shopper.userId,
-        items: { some: { productId: { in: [dealId, dealMongoId] } } },
-      },
-      select: { id: true, mongoId: true },
-    });
-    if (oldOrders.length > 0) {
-      // Also clean up stale settlement transactions to avoid idempotency key collisions
-      const oldMongoIds = oldOrders.map((o) => o.mongoId).filter(Boolean) as string[];
-      if (oldMongoIds.length > 0) {
-        const staleKeys = oldMongoIds.flatMap((mid) => [
-          `order-settlement-debit-${mid}`,
-          `order-commission-${mid}`,
-          `order-margin-${mid}`,
-        ]);
-        try { await db.transaction.deleteMany({ where: { idempotencyKey: { in: staleKeys } } }); } catch { /* DB user may lack DELETE rights */ }
-      }
+    // Also soft-delete any settled orders for this campaign (from ANY user)
+    // to prevent isOverLimit from skipping wallet movements.
+    if (deal?.campaignId) {
+      await db.order.updateMany({
+        where: {
+          items: { some: { campaignId: deal.campaignId } },
+          isDeleted: false,
+        },
+        data: { isDeleted: true },
+      });
+      // Reset campaign usedSlots so repeated runs don't exhaust the campaign
+      await db.campaign.update({
+        where: { id: deal.campaignId },
+        data: { usedSlots: 0 },
+      });
     }
 
-    // Also cleanup any stale transactions for ALL this shopper's orders (belt and suspenders)
-    const allShopperOrders = await db.order.findMany({
-      where: { userId: shopper.userId },
+    // Clean up ALL stale settlement transactions for this campaign's orders
+    const allCampaignOrders = await db.order.findMany({
+      where: deal?.campaignId
+        ? { items: { some: { campaignId: deal.campaignId } } }
+        : { userId: shopper.userId },
       select: { mongoId: true },
     });
-    const allMongoIds = allShopperOrders.map((o) => o.mongoId).filter(Boolean) as string[];
+    const allMongoIds = allCampaignOrders.map((o) => o.mongoId).filter(Boolean) as string[];
     if (allMongoIds.length > 0) {
       const allStaleKeys = allMongoIds.flatMap((mid) => [
         `order-settlement-debit-${mid}`,
         `order-commission-${mid}`,
         `order-margin-${mid}`,
       ]);
-      try { await db.transaction.deleteMany({ where: { idempotencyKey: { in: allStaleKeys } } }); } catch { /* DB user may lack DELETE rights */ }
+      try { await db.transaction.deleteMany({ where: { idempotencyKey: { in: allStaleKeys } } }); } catch { /* ignore */ }
     }
 
     // Redirect tracking creates a pre-order
@@ -199,6 +196,10 @@ describe('core flows: products -> redirect -> order -> claim -> ops verify/settl
 
     expect(settleRes.status).toBe(200);
     expect(settleRes.body).toHaveProperty('ok', true);
+
+    // Verify the order was actually settled (not cap-exceeded)
+    const settledOrder = await db.order.findFirst({ where: { id: orderId, isDeleted: false } });
+    expect(String(settledOrder?.affiliateStatus)).toBe('Approved_Settled');
 
     const brandWalletAfter = await db.wallet.findFirst({ where: { ownerUserId: campaignBrandUserId, isDeleted: false } });
     expect(brandWalletAfter).toBeTruthy();

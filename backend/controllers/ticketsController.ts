@@ -193,6 +193,7 @@ async function canManageTicketByRole(params: {
     if (ticket.userId === pgUserId) return true;
 
     const db = prisma();
+    const ticketTargetRole = String(ticket.targetRole || '').trim();
 
     // ── Mediator: can manage tickets from buyers in their network ──
     if (roles.includes('mediator')) {
@@ -332,6 +333,72 @@ async function canManageTicketByRole(params: {
         await assertCanReferenceOrder({ orderId: ticket.orderId, pgUserId, roles, user });
         return true;
       } catch { /* not allowed via order */ }
+    }
+
+    // ── Broader network fallback for escalated tickets ──
+    // When a ticket has been escalated, the original creator may not be
+    // directly findable via the standard checks above. This fallback uses
+    // the ticket creator's entire chain to see if ANY link exists.
+    if (ticketTargetRole) {
+      const actorRole = String(user?.role || roles[0] || 'shopper');
+      const actorLevel = ROLE_LEVEL[actorRole] ?? 0;
+      const tgtLevel = ROLE_LEVEL[ticketTargetRole] ?? 0;
+
+      // Only apply this fallback when the actor is at the target level
+      if (actorLevel === tgtLevel && tgtLevel > 0) {
+        // Check if the ticket creator is anywhere in the actor's downstream hierarchy
+        const creator = await db.user.findFirst({
+          where: { id: ticket.userId, isDeleted: false },
+          select: { id: true, parentCode: true, mediatorCode: true, role: true },
+        });
+        if (creator) {
+          const creatorParent = String(creator.parentCode || '').trim();
+          const creatorMediator = String(creator.mediatorCode || '').trim();
+
+          if (roles.includes('mediator')) {
+            const mediatorCode = String(user?.mediatorCode || '').trim();
+            if (mediatorCode && (creatorParent === mediatorCode || creatorMediator === mediatorCode)) {
+              return true;
+            }
+          }
+          if (roles.includes('agency')) {
+            const agencyCode = await resolveAgencyCode(pgUserId, user);
+            if (agencyCode) {
+              // Check if creator's parentCode or mediatorCode links to this agency
+              if (creatorParent === agencyCode || creatorMediator === agencyCode) return true;
+              const mediatorCodes = await listMediatorCodesForAgency(agencyCode);
+              if (mediatorCodes.length > 0) {
+                if (mediatorCodes.includes(creatorParent) || mediatorCodes.includes(creatorMediator)) return true;
+                // Creator might be a buyer whose mediator's code maps back to this agency
+                if (creatorParent) {
+                  const parentUser = await db.user.findFirst({
+                    where: { mediatorCode: creatorParent, isDeleted: false },
+                    select: { parentCode: true },
+                  });
+                  if (parentUser && String(parentUser.parentCode || '') === agencyCode) return true;
+                }
+              }
+            }
+          }
+          if (roles.includes('brand')) {
+            const brand = await db.brand.findFirst({
+              where: { ownerUserId: pgUserId, isDeleted: false },
+              select: { connectedAgencyCodes: true },
+            });
+            const connectedCodes = brand?.connectedAgencyCodes ?? [];
+            if (connectedCodes.length > 0) {
+              if (connectedCodes.includes(creatorParent) || connectedCodes.includes(creatorMediator)) return true;
+              // Check if creator is under a mediator whose agency is connected
+              const allMediatorCodes: string[] = [];
+              for (const code of connectedCodes) {
+                const mCodes = await listMediatorCodesForAgency(code);
+                allMediatorCodes.push(...mCodes);
+              }
+              if (allMediatorCodes.includes(creatorParent) || allMediatorCodes.includes(creatorMediator)) return true;
+            }
+          }
+        }
+      }
     }
 
     return false;

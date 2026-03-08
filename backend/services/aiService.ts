@@ -1405,7 +1405,9 @@ async function verifyRatingWithOcr(
       detectedAccountName,
       detectedProductName: matchedTokens.length > 0 ? matchedTokens.join(' ') : undefined,
       discrepancyNote: [
-        !accountNameMatch ? `Buyer name "${expectedBuyerName}" not found in screenshot.` : '',
+        !accountNameMatch ? (expectedReviewerName
+          ? `Neither buyer name "${expectedBuyerName}" nor reviewer name "${expectedReviewerName}" found in screenshot.`
+          : `Buyer name "${expectedBuyerName}" not found in screenshot.`) : '',
         !productNameMatch ? `Product name not matching in screenshot.` : '',
         accountNameMatch && productNameMatch ? 'Account name and product matched via OCR.' : '',
       ].filter(Boolean).join(' '),
@@ -1481,6 +1483,32 @@ export async function verifyRatingScreenshotWithAi(
         const parsed = safeJsonParse<RatingVerificationResult>(response.text);
         if (!parsed) throw new Error('Failed to parse AI rating verification response');
         parsed.confidenceScore = Math.max(0, Math.min(100, parsed.confidenceScore ?? 0));
+
+        // Post-process: Gemini may ignore the OR instruction for reviewerName.
+        // If accountNameMatch is false but detectedAccountName matches expectedReviewerName, override.
+        if (!parsed.accountNameMatch && payload.expectedReviewerName) {
+          const detected = (parsed.detectedAccountName || '').toLowerCase().trim();
+          const reviewer = payload.expectedReviewerName.toLowerCase().trim();
+          if (detected && reviewer) {
+            // Full match
+            if (detected === reviewer || detected.includes(reviewer) || reviewer.includes(detected)) {
+              parsed.accountNameMatch = true;
+              parsed.discrepancyNote = 'Account name matched via marketplace reviewer name.';
+            } else {
+              // Fuzzy: check name parts
+              const revParts = reviewer.split(/\s+/).filter(p => p.length >= 2);
+              const detParts = detected.split(/\s+/).filter(p => p.length >= 2);
+              if (revParts.length > 0 && detParts.length > 0) {
+                const matchCount = revParts.filter(rp => detParts.some(dp => dp === rp || editDistance(dp, rp) <= 1)).length;
+                if (matchCount >= Math.max(1, Math.ceil(revParts.length * 0.5))) {
+                  parsed.accountNameMatch = true;
+                  parsed.discrepancyNote = 'Account name matched via marketplace reviewer name (fuzzy).';
+                }
+              }
+            }
+          }
+        }
+
         recordGeminiSuccess();
         logPerformance({
           operation: 'AI_VERIFY_RATING',

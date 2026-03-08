@@ -2138,14 +2138,22 @@ export const Orders: React.FC = () => {
                         <CheckCircle2 size={12} /> Rating screenshot verified. Ready to submit.
                       </p>
                     )}
-                    {(!ratingVerification.accountNameMatch || !ratingVerification.productNameMatch) && (
+                    {!ratingVerification.accountNameMatch && !ratingVerification.productNameMatch && (
                       <p className="text-[10px] text-red-600 font-bold bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
                         <AlertTriangle size={12} />
-                        {!ratingVerification.accountNameMatch && !ratingVerification.productNameMatch
-                          ? 'Account name & product do not match. Upload the correct rating screenshot.'
-                          : !ratingVerification.accountNameMatch
-                            ? 'Account name does not match your reviewer name.'
-                            : 'Product does not match this order\'s product.'}
+                        Account name & product do not match. Upload the correct rating screenshot.
+                      </p>
+                    )}
+                    {!ratingVerification.accountNameMatch && ratingVerification.productNameMatch && (
+                      <p className="text-[10px] text-amber-600 font-bold bg-amber-50 p-2 rounded-lg flex items-center gap-1.5">
+                        <AlertTriangle size={12} />
+                        Account name mismatch — if your marketplace profile uses a different name, enter it in the &quot;Reviewer Name&quot; field above and re-upload. You can still submit; your mediator will verify.
+                      </p>
+                    )}
+                    {ratingVerification.accountNameMatch && !ratingVerification.productNameMatch && (
+                      <p className="text-[10px] text-amber-600 font-bold bg-amber-50 p-2 rounded-lg flex items-center gap-1.5">
+                        <AlertTriangle size={12} />
+                        Product does not match this order. Please check the screenshot.
                       </p>
                     )}
                     {ratingVerification.discrepancyNote && (
@@ -2162,7 +2170,7 @@ export const Orders: React.FC = () => {
                     isUploading ||
                     ratingAnalyzing ||
                     !ratingFile ||
-                    (ratingVerification != null && (!ratingVerification.accountNameMatch || !ratingVerification.productNameMatch))
+                    (ratingVerification != null && !ratingVerification.accountNameMatch && !ratingVerification.productNameMatch)
                   }
                   className="w-full py-3.5 bg-black text-white font-bold rounded-2xl hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
