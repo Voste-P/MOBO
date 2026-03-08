@@ -105,12 +105,12 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
 
   const actionRequiredOrders = useMemo(() =>
     orders.filter((o: Order) => String(o.workflowStatus || '') === 'UNDER_REVIEW')
-      .filter((o: Order) => matchesSearch(searchQuery, o.items[0]?.title, o.buyerName, getPrimaryOrderId(o))),
+      .filter((o: Order) => matchesSearch(searchQuery, o.items[0]?.title, o.buyerName, o.reviewerName, getPrimaryOrderId(o))),
     [orders, searchQuery]
   );
   const coolingOrders = useMemo(() =>
     orders.filter((o: Order) => o.affiliateStatus === 'Pending_Cooling')
-      .filter((o: Order) => matchesSearch(searchQuery, o.items[0]?.title, o.buyerName, getPrimaryOrderId(o))),
+      .filter((o: Order) => matchesSearch(searchQuery, o.items[0]?.title, o.buyerName, o.reviewerName, getPrimaryOrderId(o))),
     [orders, searchQuery]
   );
 
@@ -335,11 +335,11 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                   String(item?.quantity || 1),
                   String(o.total || 0),
                   String(item?.commission || 0),
-                  (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString() : '',
+                  o.expectedSettlementDate ? new Date(o.expectedSettlementDate).toLocaleDateString() : '',
                   o.agencyName || 'Direct',
                   o.buyerName || '',
                   o.buyerMobile || '',
-                  (o as any).reviewerName || '',
+                  o.reviewerName || '',
                   o.workflowStatus || '',
                   o.affiliateStatus || '',
                   o.paymentStatus || '',
@@ -388,11 +388,11 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                   item?.quantity || 1,
                   o.total || 0,
                   item?.commission || 0,
-                  (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString() : '',
+                  o.expectedSettlementDate ? new Date(o.expectedSettlementDate).toLocaleDateString() : '',
                   o.agencyName || 'Direct',
                   o.buyerName || '',
                   o.buyerMobile || '',
-                  (o as any).reviewerName || '',
+                  o.reviewerName || '',
                   o.workflowStatus || '',
                   o.affiliateStatus || '',
                   o.paymentStatus || '',

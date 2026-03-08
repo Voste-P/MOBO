@@ -245,7 +245,7 @@ export const AgencyAuthScreen: React.FC<AgencyAuthProps> = ({ onBack }) => {
               <Input
                 label="Admin Invite Code"
                 type="text"
-                placeholder="ADMIN-XXXX"
+                placeholder="e.g. INV-XXXX"
                 value={adminCode}
                 onChange={(e) => setAdminCode(e.target.value.toUpperCase())}
                 leftIcon={<ShieldCheck size={18} />}
