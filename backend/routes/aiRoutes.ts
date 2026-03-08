@@ -80,6 +80,7 @@ export function aiRoutes(env: Env): Router {
     expectedBuyerName: z.string().min(1).max(200),
     expectedProductName: z.string().min(1).max(500),
     expectedReviewerName: z.string().max(200).optional(),
+    orderId: z.string().max(200).optional(),
   });
 
   // Optional auth so the UI can call AI routes without sending a token,
@@ -664,11 +665,21 @@ export function aiRoutes(env: Env): Router {
         return;
       }
 
+      // If expectedReviewerName not provided but orderId is, look up the stored reviewer name
+      let reviewerName = payload.expectedReviewerName;
+      if (!reviewerName && payload.orderId && isPrismaAvailable()) {
+        const order = await prisma().order.findFirst({
+          where: { OR: [{ id: payload.orderId }, { mongoId: payload.orderId }], isDeleted: false },
+          select: { reviewerName: true },
+        });
+        if (order?.reviewerName) reviewerName = order.reviewerName;
+      }
+
       const result = await verifyRatingScreenshotWithAi(env, {
         imageBase64: payload.imageBase64,
         expectedBuyerName: payload.expectedBuyerName,
         expectedProductName: payload.expectedProductName,
-        ...(payload.expectedReviewerName ? { expectedReviewerName: payload.expectedReviewerName } : {}),
+        ...(reviewerName ? { expectedReviewerName: reviewerName } : {}),
       });
 
       writeAuditLog({
