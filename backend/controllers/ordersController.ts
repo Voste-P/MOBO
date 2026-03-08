@@ -1248,7 +1248,7 @@ export function makeOrdersController(env: Env) {
               agencyCodes: upstreamAgencyCode ? [upstreamAgencyCode] : undefined,
             };
             publishRealtime({ type: 'orders.changed', ts: new Date().toISOString(), audience });
-            await writeAuditLog({ req, action: 'PROOF_SUBMITTED', entityType: 'Order', entityId: order.mongoId!, metadata: { proofType: body.type, reUpload: true } }).catch(() => {});
+            await writeAuditLog({ req, action: 'PROOF_SUBMITTED', entityType: 'Order', entityId: order.mongoId!, metadata: { proofType: body.type, reUpload: true } });
             logChangeEvent({ actorUserId: req.auth?.userId, actorRoles: req.auth?.roles, actorIp: req.ip, entityType: 'Order', entityId: order.mongoId!, action: 'STATUS_CHANGE', requestId: String((res as any).locals?.requestId || ''), metadata: { proofType: body.type, action: 'PROOF_RESUBMITTED' } });
           } catch (postErr) {
             orderLog.warn('Post-response notification failed (re-upload)', { error: postErr instanceof Error ? postErr.message : String(postErr) });
