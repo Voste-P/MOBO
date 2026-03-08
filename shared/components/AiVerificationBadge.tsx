@@ -10,6 +10,7 @@ export interface RatingAiVerification {
   detectedAccountName?: string;
   detectedProductName?: string;
   confidenceScore?: number;
+  discrepancyNote?: string;
 }
 
 export interface ReturnWindowAiVerification {

@@ -230,6 +230,7 @@ export function toUiOrderSummary(o: any) {
     managerName: o.managerName,
     agencyName: o.agencyName,
     buyerName: o.buyerName,
+    reviewerName: o.reviewerName || null,
     brandName: o.brandName,
     createdAt: safeIso(o.createdAt ?? o.createdAtIso) ?? new Date().toISOString(),
     expectedSettlementDate: safeIso(o.expectedSettlementDate),
@@ -402,6 +403,7 @@ export function toUiOrder(o: any) {
       detectedAccountName: o.ratingAiVerification.detectedAccountName,
       detectedProductName: o.ratingAiVerification.detectedProductName,
       confidenceScore: o.ratingAiVerification.confidenceScore,
+      discrepancyNote: o.ratingAiVerification.discrepancyNote,
     } : undefined,
     orderAiVerification: o.orderAiVerification ? {
       orderIdMatch: o.orderAiVerification.orderIdMatch,

@@ -1035,6 +1035,7 @@ export function makeOrdersController(env: Env) {
               detectedAccountName: ratingAiResult.detectedAccountName,
               detectedProductName: ratingAiResult.detectedProductName,
               confidenceScore: ratingAiResult.confidenceScore,
+              discrepancyNote: ratingAiResult.discrepancyNote,
             };
 
             // Audit trail: record AI rating verification for backtracking

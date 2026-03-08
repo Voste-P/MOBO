@@ -2195,7 +2195,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div><span className="text-slate-400 font-bold text-xs uppercase">Buyer</span><p className="font-bold text-slate-900">{proofModal.buyerName}</p></div>
                 <div><span className="text-slate-400 font-bold text-xs uppercase">Amount</span><p className="font-bold text-slate-900">{formatCurrency(proofModal.total)}</p></div>
-                {(proofModal as any).reviewerName && <div><span className="text-indigo-400 font-bold text-xs uppercase">Reviewer Name</span><p className="font-bold text-indigo-700">{(proofModal as any).reviewerName}</p></div>}
+                {proofModal.reviewerName && <div><span className="text-indigo-400 font-bold text-xs uppercase">Reviewer Name</span><p className="font-bold text-indigo-700">{proofModal.reviewerName}</p></div>}
                 <div><span className="text-slate-400 font-bold text-xs uppercase">Status</span><p><StatusBadge status={proofModal.affiliateStatus === 'Unchecked' ? proofModal.paymentStatus : proofModal.affiliateStatus} /></p></div>
                 <div><span className="text-slate-400 font-bold text-xs uppercase">Payment</span><p className="font-bold text-slate-900">{proofModal.paymentStatus}</p></div>
                 {proofModal.soldBy && <div><span className="text-slate-400 font-bold text-xs uppercase">Sold By</span><p className="font-bold text-slate-900">{proofModal.soldBy}</p></div>}

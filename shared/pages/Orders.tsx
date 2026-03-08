@@ -580,16 +580,16 @@ export const Orders: React.FC = () => {
       const buyerName = user.name || '';
       const productName = selectedOrder.items?.[0]?.title || '';
       // Use marketplace profile name if available for better matching
-      const reviewerName = reviewerNameInput.trim() || (selectedOrder as any).reviewerName || '';
+      const reviewerName = reviewerNameInput.trim() || selectedOrder.reviewerName || '';
 
       if (buyerName && productName) {
         const result = await api.orders.verifyRating(file, buyerName, productName, reviewerName || undefined);
         setRatingVerification(result);
 
         if (!result.accountNameMatch && !result.productNameMatch) {
-          toast.warning('Account name and product name do not match. If your marketplace profile name differs from your registered name, enter it in the "Reviewer Name" field and retry.');
+          toast.warning('Account name and product name do not match. Please ensure the correct rating screenshot is uploaded.');
         } else if (!result.accountNameMatch) {
-          toast.warning('Account name does not match. If you use a different name on the marketplace, enter it as "Reviewer Name" above.');
+          toast.warning('Account name does not match. Please check that this rating was posted from the correct account.');
         } else if (!result.productNameMatch) {
           toast.warning('Product name does not match this order. Please check the screenshot.');
         } else {
@@ -628,7 +628,7 @@ export const Orders: React.FC = () => {
         reader.onerror = () => reject(new Error('Failed to read file'));
         reader.readAsDataURL(ratingFile);
       });
-      const reviewerName = reviewerNameInput.trim() || (selectedOrder as any).reviewerName || '';
+      const reviewerName = reviewerNameInput.trim() || selectedOrder.reviewerName || '';
       await api.orders.submitClaim(selectedOrder.id, { type: uploadType, data, ...(reviewerName ? { reviewerName } : {}) });
       toast.success('Proof uploaded!');
       setSelectedOrder(null);
@@ -1284,6 +1284,7 @@ export const Orders: React.FC = () => {
                         onClick={() => {
                           setSelectedOrder(order);
                           setUploadType('rating');
+                          setReviewerNameInput(order.reviewerName || '');
                         }}
                         className="text-[10px] font-bold uppercase text-purple-600"
                       >
@@ -2110,7 +2111,9 @@ export const Orders: React.FC = () => {
                   <div className="space-y-2 animate-enter">
                     <div className="grid grid-cols-2 gap-2">
                       <div className={`p-2.5 rounded-xl text-center ${ratingVerification.accountNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-                        <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Account Name</div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">
+                          {selectedOrder?.reviewerName ? 'Reviewer Name' : 'Account Name'}
+                        </div>
                         <div className={`text-xs font-bold ${ratingVerification.accountNameMatch ? 'text-green-600' : 'text-red-600'}`}>
                           {ratingVerification.accountNameMatch ? '✓ Match' : '✗ Mismatch'}
                         </div>
@@ -2147,7 +2150,7 @@ export const Orders: React.FC = () => {
                     {!ratingVerification.accountNameMatch && ratingVerification.productNameMatch && (
                       <p className="text-[10px] text-amber-600 font-bold bg-amber-50 p-2 rounded-lg flex items-center gap-1.5">
                         <AlertTriangle size={12} />
-                        Account name mismatch — if your marketplace profile uses a different name, enter it in the &quot;Reviewer Name&quot; field above and re-upload. You can still submit; your mediator will verify.
+                        Account name mismatch — please ensure the rating was posted from the correct marketplace account. You can still submit; your mediator will verify.
                       </p>
                     )}
                     {ratingVerification.accountNameMatch && !ratingVerification.productNameMatch && (
