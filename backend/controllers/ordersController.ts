@@ -1223,6 +1223,36 @@ export function makeOrdersController(env: Env) {
           }
 
           res.json(toUiOrder(pgOrder(refreshed)));
+
+          // Post-response: notify UIs and write audit trail for re-upload
+          try {
+            const privilegedRoles: Role[] = ['admin', 'ops'];
+            const managerCode = String(order.managerName || '').trim();
+            const mediatorUser = managerCode
+              ? await db().user.findFirst({
+                where: { roles: { has: 'mediator' as any }, mediatorCode: managerCode, isDeleted: false },
+                select: { parentCode: true },
+              })
+              : null;
+            const upstreamAgencyCode = String(mediatorUser?.parentCode || '').trim();
+            const [orderUser, brandUser] = await Promise.all([
+              db().user.findUnique({ where: { id: order.userId }, select: { mongoId: true } }),
+              order.brandUserId
+                ? db().user.findUnique({ where: { id: order.brandUserId }, select: { mongoId: true } })
+                : null,
+            ]);
+            const audience = {
+              roles: privilegedRoles,
+              userIds: [orderUser?.mongoId ?? '', brandUser?.mongoId ?? ''].filter(Boolean),
+              mediatorCodes: managerCode ? [managerCode] : undefined,
+              agencyCodes: upstreamAgencyCode ? [upstreamAgencyCode] : undefined,
+            };
+            publishRealtime({ type: 'orders.changed', ts: new Date().toISOString(), audience });
+            await writeAuditLog({ req, action: 'PROOF_SUBMITTED', entityType: 'Order', entityId: order.mongoId!, metadata: { proofType: body.type, reUpload: true } }).catch(() => {});
+            logChangeEvent({ actorUserId: req.auth?.userId, actorRoles: req.auth?.roles, actorIp: req.ip, entityType: 'Order', entityId: order.mongoId!, action: 'STATUS_CHANGE', requestId: String((res as any).locals?.requestId || ''), metadata: { proofType: body.type, action: 'PROOF_RESUBMITTED' } });
+          } catch (postErr) {
+            orderLog.warn('Post-response notification failed (re-upload)', { error: postErr instanceof Error ? postErr.message : String(postErr) });
+          }
           return;
         }
 
@@ -1259,6 +1289,8 @@ export function makeOrdersController(env: Env) {
 
         res.json(toUiOrder(pgOrder(claimFinalOrder)));
 
+        // Post-response: notify UIs (wrapped in try/catch since response already sent)
+        try {
         const privilegedRoles: Role[] = ['admin', 'ops'];
         const managerCode = String(order.managerName || '').trim();
         const mediatorUser = managerCode
@@ -1314,6 +1346,9 @@ export function makeOrdersController(env: Env) {
           requestId: String((res as any).locals?.requestId || ''),
           metadata: { proofType: body.type, action: 'PROOF_SUBMITTED' },
         });
+        } catch (postErr) {
+          orderLog.warn('Post-response notification failed (submitClaim)', { error: postErr instanceof Error ? postErr.message : String(postErr) });
+        }
         return;
       } catch (err) {
         logErrorEvent({

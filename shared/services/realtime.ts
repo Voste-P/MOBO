@@ -276,6 +276,7 @@ class RealtimeClient {
           }
         } finally {
           clearInterval(idleTimer);
+          this._connected = false;
         }
       } catch (e) {
         this._connected = false;
