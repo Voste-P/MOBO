@@ -33,6 +33,7 @@ test-run*.txt
 backend/vitest-*.json
 backend/vitest-*.txt
 eslint-report.json
+*-build.txt
 
 node_modules
 .cache
