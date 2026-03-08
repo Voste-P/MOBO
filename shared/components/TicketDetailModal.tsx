@@ -39,6 +39,7 @@ const roleColors: Record<string, string> = {
   agency: 'text-emerald-600',
   brand: 'text-orange-600',
   admin: 'text-red-600',
+  ops: 'text-red-600',
 };
 
 export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: TicketDetailModalProps) {
@@ -58,14 +59,15 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
   const isClosed = ticket?.status === 'Resolved' || ticket?.status === 'Rejected';
   const isOwner = ticket?.userId === user?.id;
   // Role hierarchy: higher-tier roles can manage lower-tier tickets
-  const ROLE_LEVEL: Record<string, number> = { user: 0, mediator: 1, agency: 2, brand: 3, admin: 4 };
-  const isTargetedRole = ticket?.targetRole === userRole;
-  const canManageTarget = (ROLE_LEVEL[userRole] ?? -1) >= (ROLE_LEVEL[ticket?.targetRole || ''] ?? 0);
+  const ROLE_LEVEL: Record<string, number> = { user: 0, shopper: 0, mediator: 1, agency: 2, brand: 3, admin: 4, ops: 4 };
+  const userLevel = ROLE_LEVEL[userRole] ?? -1;
+  const targetLevel = ROLE_LEVEL[ticket?.targetRole || ''] ?? 0;
+  const canManageTarget = userLevel >= targetLevel;
   const isAdmin = userRole === 'admin';
-  // Escalate: only the exact targeted role can escalate (mediator→agency, agency→brand, etc.)
-  const canEscalate = isOpen && !isOwner && (isTargetedRole || isAdmin) && !!ESCALATION_PATH[ticket?.targetRole || ''] && !isAdmin;
-  // Resolve/reject: targeted role OR any higher role can resolve/reject
-  const canResolve = isOpen && (canManageTarget || isAdmin) && userRole !== 'user';
+  // Escalate: the targeted role can escalate, OR any higher-tier role can escalate (not admin, not owner)
+  const canEscalate = isOpen && !isOwner && canManageTarget && !!ESCALATION_PATH[ticket?.targetRole || ''] && !isAdmin;
+  // Resolve/reject: ticket owner can always resolve/reject their own, OR targeted role+ can for any in-network ticket
+  const canResolve = isOpen && (isOwner || canManageTarget || isAdmin) && !(userRole === 'user' && !isOwner);
   const canReopen = isClosed && (canManageTarget || isAdmin || isOwner);
   const canDelete = isClosed && (isAdmin || isOwner);
 
@@ -76,7 +78,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
       const resp = await api.tickets.getComments(ticket.id);
       setComments(resp.comments || []);
     } catch {
-      // Silent — comments just won't show
+      // Silently handle poll failures — comments stay as-is
     } finally {
       setLoadingComments(false);
     }
@@ -123,13 +125,14 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
     setActionLoading(status);
     try {
       await api.tickets.update(ticket.id, status, resolutionNote || undefined);
-      toast.success(`Ticket ${status.toLowerCase()}.`);
+      toast.success(`Ticket ${status === 'Resolved' ? 'resolved' : 'rejected'} successfully.`);
       setShowResolveForm(false);
       setResolutionNote('');
       onRefresh();
       onClose();
     } catch (err: any) {
-      toast.error(formatErrorMessage(err, `Failed to ${status.toLowerCase()} ticket.`));
+      const msg = formatErrorMessage(err, `Unable to ${status === 'Resolved' ? 'resolve' : 'reject'} this ticket. Please try again.`);
+      toast.error(msg);
     } finally {
       setActionLoading(null);
     }
@@ -139,11 +142,12 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
     setActionLoading('escalate');
     try {
       await api.tickets.escalate(ticket.id);
-      toast.success(`Ticket escalated to ${ESCALATION_PATH[ticket?.targetRole || ''] || 'higher authority'}.`);
+      toast.success(`Ticket escalated to ${ESCALATION_PATH[ticket?.targetRole || ''] || 'higher authority'} successfully.`);
       onRefresh();
       onClose();
     } catch (err: any) {
-      toast.error(formatErrorMessage(err, 'Failed to escalate ticket.'));
+      const msg = formatErrorMessage(err, 'Unable to escalate this ticket. Please try again.');
+      toast.error(msg);
     } finally {
       setActionLoading(null);
     }
@@ -153,11 +157,11 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
     setActionLoading('reopen');
     try {
       await api.tickets.update(ticket.id, 'Open');
-      toast.success('Ticket reopened.');
+      toast.success('Ticket reopened successfully.');
       onRefresh();
       onClose();
     } catch (err: any) {
-      toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
+      toast.error(formatErrorMessage(err, 'Unable to reopen this ticket. Please try again.'));
     } finally {
       setActionLoading(null);
     }
@@ -167,11 +171,11 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
     setActionLoading('delete');
     try {
       await api.tickets.delete(ticket.id);
-      toast.success('Ticket deleted.');
+      toast.success('Ticket deleted successfully.');
       onRefresh();
       onClose();
     } catch (err: any) {
-      toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
+      toast.error(formatErrorMessage(err, 'Unable to delete this ticket. Please try again.'));
     } finally {
       setActionLoading(null);
     }

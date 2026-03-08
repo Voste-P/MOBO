@@ -15,6 +15,7 @@ interface RaiseTicketModalProps {
 // Role-specific issue types (fallback if API fails)
 const ROLE_ISSUE_TYPES: Record<string, readonly string[]> = {
   shopper: ['Cashback Delay', 'Wrong Amount', 'Order Issue', 'Product Issue', 'Delivery Problem', 'Refund Request', 'Feedback', 'Other'],
+  user: ['Cashback Delay', 'Wrong Amount', 'Order Issue', 'Product Issue', 'Delivery Problem', 'Refund Request', 'Feedback', 'Other'],
   mediator: ['Commission Delay', 'Team Issue', 'Campaign Problem', 'Payout Issue', 'Buyer Complaint', 'Other'],
   agency: ['Brand Campaign Issue', 'Mediator Performance', 'Payout Delay', 'Technical Issue', 'Campaign Setup', 'Other'],
   brand: ['Campaign Setup', 'Agency Connection', 'Order Dispute', 'Payment Issue', 'Quality Concern', 'Other'],
@@ -164,7 +165,7 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClos
           </div>
 
           {/* Optional Order ID reference */}
-          {userRole === 'shopper' && (
+          {(userRole === 'shopper' || userRole === 'user') && (
             <div>
               <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-2">
                 Order ID <span className="text-zinc-300">(optional)</span>

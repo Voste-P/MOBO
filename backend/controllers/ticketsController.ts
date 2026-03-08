@@ -7,7 +7,7 @@ import { orderLog, businessLog } from '../config/logger.js';
 import { logChangeEvent, logAccessEvent, logErrorEvent } from '../config/appLogs.js';
 import { prisma } from '../database/prisma.js';
 import { sendPushToUser } from '../services/pushNotifications.js';
-import { createTicketSchema, updateTicketSchema, TICKET_TARGET_ROLE, ESCALATION_PATH, ROLE_ISSUE_TYPES } from '../validations/tickets.js';
+import { createTicketSchema, updateTicketSchema, TICKET_TARGET_ROLE, ESCALATION_PATH, ROLE_ISSUE_TYPES, ROLE_LEVEL } from '../validations/tickets.js';
 import { toUiTicket, toUiTicketForBrand } from '../utils/uiMappers.js';
 import { pgTicket } from '../utils/pgMappers.js';
 import { getRequester, isPrivileged } from '../services/authz.js';
@@ -102,7 +102,7 @@ async function getScopedOrderMongoIds(params: {
   }
 
   if (roles.includes('agency')) {
-    const agencyCode = String(requesterUser?.mediatorCode || '').trim();
+    const agencyCode = await resolveAgencyCode(pgUserId, requesterUser);
     if (!agencyCode) return [];
     const mediatorCodes = await listMediatorCodesForAgency(agencyCode);
     if (!mediatorCodes.length) return [];
@@ -144,12 +144,28 @@ async function assertCanReferenceOrder(params: { orderId: string; pgUserId: stri
     return;
   }
   if (roles.includes('agency')) {
-    const agencyCode = String(user?.mediatorCode || '').trim();
+    const agencyCode = await resolveAgencyCode(pgUserId, user);
     const mediatorCodes = agencyCode ? await listMediatorCodesForAgency(agencyCode) : [];
     if (!mediatorCodes.includes(order.managerName)) throw new AppError(403, 'FORBIDDEN', 'Cannot reference orders outside your network');
     return;
   }
   throw new AppError(403, 'FORBIDDEN', 'Insufficient role');
+}
+
+/**
+ * Resolve the agency code for an agency user.
+ * Tries user.mediatorCode first (fast path), then falls back to the Agency model.
+ */
+async function resolveAgencyCode(pgUserId: string, user: any): Promise<string> {
+  const fromUser = String(user?.mediatorCode || '').trim();
+  if (fromUser) return fromUser;
+  // Fallback: look up the Agency model by owner user ID
+  const db = prisma();
+  const agency = await db.agency.findFirst({
+    where: { ownerUserId: pgUserId, isDeleted: false },
+    select: { agencyCode: true },
+  });
+  return agency?.agencyCode || '';
 }
 
 /**
@@ -160,6 +176,9 @@ async function assertCanReferenceOrder(params: { orderId: string; pgUserId: stri
  * reject, escalate) to show based on the ticket's targetRole.
  *
  * Cascade routing: buyer→mediator→agency→brand→admin
+ *
+ * IMPORTANT: This function must never throw — always returns boolean.
+ * Unhandled exceptions would bubble up as 500 in the caller.
  */
 async function canManageTicketByRole(params: {
   ticket: any;
@@ -167,135 +186,160 @@ async function canManageTicketByRole(params: {
   pgUserId: string;
   user: any;
 }): Promise<boolean> {
-  const { ticket, roles, pgUserId, user } = params;
+  try {
+    const { ticket, roles, pgUserId, user } = params;
 
-  if (isPrivileged(roles)) return true;
-  if (ticket.userId === pgUserId) return true;
+    if (isPrivileged(roles)) return true;
+    if (ticket.userId === pgUserId) return true;
 
-  const db = prisma();
+    const db = prisma();
 
-  // ── Mediator: can manage tickets from buyers in their network ──
-  if (roles.includes('mediator')) {
-    const mediatorCode = String(user?.mediatorCode || '').trim();
-    if (mediatorCode) {
-      // Buyer registered under this mediator (parentCode)
-      const registered = await db.user.findFirst({
-        where: { id: ticket.userId, parentCode: mediatorCode, isDeleted: false },
-        select: { id: true },
-      });
-      if (registered) return true;
-
-      // Buyer has orders managed by this mediator
-      const hasOrders = await db.order.count({
-        where: { managerName: mediatorCode, userId: ticket.userId, isDeleted: false },
-      });
-      if (hasOrders > 0) return true;
-
-      // Ticket's specific order is managed by this mediator
-      if (ticket.orderId) {
-        const order = await db.order.findFirst({
-          where: { ...idWhere(ticket.orderId), managerName: mediatorCode, isDeleted: false },
-        });
-        if (order) return true;
-      }
-    }
-  }
-
-  // ── Agency: can manage tickets from mediators + buyers in their network ──
-  if (roles.includes('agency')) {
-    const agencyCode = String(user?.mediatorCode || '').trim();
-    if (agencyCode) {
-      const mediatorCodes = await listMediatorCodesForAgency(agencyCode);
-
-      // Creator is directly registered under this agency
-      const directReg = await db.user.findFirst({
-        where: { id: ticket.userId, parentCode: agencyCode, isDeleted: false },
-        select: { id: true },
-      });
-      if (directReg) return true;
-
-      if (mediatorCodes.length > 0) {
-        // Creator is a mediator in this agency's network
-        const mediatorUser = await db.user.findFirst({
-          where: { id: ticket.userId, mediatorCode: { in: mediatorCodes }, isDeleted: false },
+    // ── Mediator: can manage tickets from buyers in their network ──
+    if (roles.includes('mediator')) {
+      const mediatorCode = String(user?.mediatorCode || '').trim();
+      if (mediatorCode) {
+        // Buyer registered under this mediator (parentCode)
+        const registered = await db.user.findFirst({
+          where: { id: ticket.userId, parentCode: mediatorCode, isDeleted: false },
           select: { id: true },
         });
-        if (mediatorUser) return true;
+        if (registered) return true;
 
-        // Creator is a buyer under a mediator in this agency's network
-        const buyerUnderMediator = await db.user.findFirst({
-          where: { id: ticket.userId, parentCode: { in: mediatorCodes }, isDeleted: false },
-          select: { id: true },
+        // Buyer has orders managed by this mediator
+        const hasOrders = await db.order.count({
+          where: { managerName: mediatorCode, userId: ticket.userId, isDeleted: false },
         });
-        if (buyerUnderMediator) return true;
-      }
+        if (hasOrders > 0) return true;
 
-      // Via order linkage (order managed by this agency or any of its mediators)
-      if (ticket.orderId) {
-        const allCodes = [agencyCode, ...mediatorCodes];
-        const order = await db.order.findFirst({
-          where: { ...idWhere(ticket.orderId), managerName: { in: allCodes }, isDeleted: false },
-        });
-        if (order) return true;
+        // Ticket's specific order is managed by this mediator
+        if (ticket.orderId) {
+          const order = await db.order.findFirst({
+            where: { ...idWhere(ticket.orderId), managerName: mediatorCode, isDeleted: false },
+          });
+          if (order) return true;
+        }
       }
     }
-  }
 
-  // ── Brand: can manage tickets from connected agencies + their downstream ──
-  if (roles.includes('brand')) {
-    const brand = await db.brand.findFirst({
-      where: { ownerUserId: pgUserId, isDeleted: false },
-      select: { connectedAgencyCodes: true },
-    });
-    const connectedCodes = brand?.connectedAgencyCodes ?? [];
-    if (connectedCodes.length) {
-      // Creator is a connected agency owner
-      const connectedAgencies = await db.agency.findMany({
-        where: { agencyCode: { in: connectedCodes }, isDeleted: false },
-        select: { ownerUserId: true },
-      });
-      if (connectedAgencies.some(a => a.ownerUserId === ticket.userId)) return true;
+    // ── Agency: can manage tickets from mediators + buyers in their network ──
+    if (roles.includes('agency')) {
+      const agencyCode = await resolveAgencyCode(pgUserId, user);
+      if (agencyCode) {
+        const mediatorCodes = await listMediatorCodesForAgency(agencyCode);
 
-      // Creator is registered under any connected agency (or their mediators)
-      const regUnderAgency = await db.user.findFirst({
-        where: { id: ticket.userId, parentCode: { in: connectedCodes }, isDeleted: false },
-        select: { id: true },
-      });
-      if (regUnderAgency) return true;
-
-      // Resolve mediator codes under all connected agencies for deep lookup
-      const allMediatorCodes: string[] = [];
-      for (const code of connectedCodes) {
-        const mCodes = await listMediatorCodesForAgency(code);
-        allMediatorCodes.push(...mCodes);
-      }
-      if (allMediatorCodes.length) {
-        const deepReg = await db.user.findFirst({
-          where: { id: ticket.userId, parentCode: { in: allMediatorCodes }, isDeleted: false },
+        // Creator is directly registered under this agency (parentCode = agencyCode)
+        const directReg = await db.user.findFirst({
+          where: { id: ticket.userId, parentCode: agencyCode, isDeleted: false },
           select: { id: true },
         });
-        if (deepReg) return true;
-      }
+        if (directReg) return true;
 
-      // Via order linkage
-      if (ticket.orderId) {
-        const order = await db.order.findFirst({
-          where: { ...idWhere(ticket.orderId), brandUserId: pgUserId, isDeleted: false },
+        if (mediatorCodes.length > 0) {
+          // Creator is a mediator in this agency's network
+          const mediatorUser = await db.user.findFirst({
+            where: { id: ticket.userId, mediatorCode: { in: mediatorCodes }, isDeleted: false },
+            select: { id: true },
+          });
+          if (mediatorUser) return true;
+
+          // Creator is a buyer under a mediator in this agency's network
+          const buyerUnderMediator = await db.user.findFirst({
+            where: { id: ticket.userId, parentCode: { in: mediatorCodes }, isDeleted: false },
+            select: { id: true },
+          });
+          if (buyerUnderMediator) return true;
+        }
+
+        // Via order linkage — check ANY order managed by this agency or its mediators
+        // (covers cases where buyer ticket was escalated and has no orderId, or orderId format differs)
+        const allAgencyCodes = [agencyCode, ...mediatorCodes];
+        if (ticket.orderId) {
+          const order = await db.order.findFirst({
+            where: { ...idWhere(ticket.orderId), managerName: { in: allAgencyCodes }, isDeleted: false },
+          });
+          if (order) return true;
+        }
+        // Fallback: check if ticket creator has ANY orders managed by this agency's network
+        const hasAnyAgencyOrders = await db.order.count({
+          where: { managerName: { in: allAgencyCodes }, userId: ticket.userId, isDeleted: false },
         });
-        if (order) return true;
+        if (hasAnyAgencyOrders > 0) return true;
       }
     }
-  }
 
-  // ── Fallback: order reference check ──
-  if (ticket.orderId) {
-    try {
-      await assertCanReferenceOrder({ orderId: ticket.orderId, pgUserId, roles, user });
-      return true;
-    } catch { /* not allowed via order */ }
-  }
+    // ── Brand: can manage tickets from connected agencies + their downstream ──
+    if (roles.includes('brand')) {
+      const brand = await db.brand.findFirst({
+        where: { ownerUserId: pgUserId, isDeleted: false },
+        select: { connectedAgencyCodes: true },
+      });
+      const connectedCodes = brand?.connectedAgencyCodes ?? [];
+      if (connectedCodes.length) {
+        // Creator is a connected agency owner
+        const connectedAgencies = await db.agency.findMany({
+          where: { agencyCode: { in: connectedCodes }, isDeleted: false },
+          select: { ownerUserId: true },
+        });
+        if (connectedAgencies.some(a => a.ownerUserId === ticket.userId)) return true;
 
-  return false;
+        // Creator is registered under any connected agency (or their mediators)
+        const regUnderAgency = await db.user.findFirst({
+          where: { id: ticket.userId, parentCode: { in: connectedCodes }, isDeleted: false },
+          select: { id: true },
+        });
+        if (regUnderAgency) return true;
+
+        // Resolve mediator codes under all connected agencies for deep lookup
+        const allMediatorCodes: string[] = [];
+        for (const code of connectedCodes) {
+          const mCodes = await listMediatorCodesForAgency(code);
+          allMediatorCodes.push(...mCodes);
+        }
+        if (allMediatorCodes.length) {
+          // Creator is a mediator in a connected agency network
+          const mediatorInNetwork = await db.user.findFirst({
+            where: { id: ticket.userId, mediatorCode: { in: allMediatorCodes }, isDeleted: false },
+            select: { id: true },
+          });
+          if (mediatorInNetwork) return true;
+
+          // Creator is a buyer under mediators in connected agency networks
+          const deepReg = await db.user.findFirst({
+            where: { id: ticket.userId, parentCode: { in: allMediatorCodes }, isDeleted: false },
+            select: { id: true },
+          });
+          if (deepReg) return true;
+        }
+
+        // Via order linkage — specific order check
+        if (ticket.orderId) {
+          const order = await db.order.findFirst({
+            where: { ...idWhere(ticket.orderId), brandUserId: pgUserId, isDeleted: false },
+          });
+          if (order) return true;
+        }
+        // Fallback: check if ticket creator has ANY orders from this brand
+        const hasAnyBrandOrders = await db.order.count({
+          where: { brandUserId: pgUserId, userId: ticket.userId, isDeleted: false },
+        });
+        if (hasAnyBrandOrders > 0) return true;
+      }
+    }
+
+    // ── Fallback: order reference check ──
+    if (ticket.orderId) {
+      try {
+        await assertCanReferenceOrder({ orderId: ticket.orderId, pgUserId, roles, user });
+        return true;
+      } catch { /* not allowed via order */ }
+    }
+
+    return false;
+  } catch (err) {
+    // Never throw from canManageTicketByRole — log and deny
+    orderLog.error('[canManageTicketByRole] Unexpected error during permission check', { error: err, ticketId: params.ticket?.id, userId: params.pgUserId });
+    return false;
+  }
 }
 
 export function makeTicketsController(env: import('../config/env.js').Env) {
@@ -491,7 +535,7 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
 
         // Cascade routing: each role sees tickets created by them + tickets targeted TO their role
         const mediatorCode = String((user as any)?.mediatorCode || '').trim();
-        const agencyCode = roles.includes('agency') ? mediatorCode : '';
+        const agencyCode = roles.includes('agency') ? (await resolveAgencyCode(pgUserId, user)) : '';
         const cascadeTargets: any[] = [{ userId: pgUserId }];
 
         if (roles.includes('mediator') && mediatorCode) {
@@ -516,7 +560,7 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
         }
 
         if (roles.includes('agency') && agencyCode) {
-          // Agency sees mediator tickets targeted to 'agency' + buyer tickets under their mediators
+          // Agency sees tickets from mediators + buyers in their network at ALL relevant target levels
           const mediatorCodes = await listMediatorCodesForAgency(agencyCode);
           if (mediatorCodes.length) {
             const mediatorUsers = await db.user.findMany({
@@ -524,16 +568,21 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
               select: { id: true },
             });
             const mediatorUserIds = mediatorUsers.map(u => u.id);
-            if (mediatorUserIds.length) {
-              cascadeTargets.push({ targetRole: 'agency', userId: { in: mediatorUserIds } });
-            }
 
-            // Also include buyer tickets under these mediators for oversight
             const buyerUsers = await db.user.findMany({
               where: { parentCode: { in: mediatorCodes }, isDeleted: false },
               select: { id: true },
             });
             const buyerInMediatorNetwork = buyerUsers.map(b => b.id);
+
+            // All users in this agency's network (mediators + their buyers)
+            const allNetworkIds = [...new Set([...mediatorUserIds, ...buyerInMediatorNetwork])];
+
+            if (allNetworkIds.length) {
+              // Tickets targeted to agency from ANY user in the network (including escalated buyer tickets)
+              cascadeTargets.push({ targetRole: 'agency', userId: { in: allNetworkIds } });
+            }
+            // Buyer tickets still at mediator level (oversight)
             if (buyerInMediatorNetwork.length) {
               cascadeTargets.push({ targetRole: 'mediator', userId: { in: buyerInMediatorNetwork } });
             }
@@ -541,41 +590,54 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
         }
 
         if (roles.includes('brand')) {
-          // Brand sees agency tickets targeted to 'brand' — scoped to connected agencies only
+          // Brand sees tickets from connected agencies + their downstream at ALL relevant target levels
           const brand = await db.brand.findFirst({ where: { ownerUserId: pgUserId, isDeleted: false }, select: { connectedAgencyCodes: true } });
           const connectedCodes = brand?.connectedAgencyCodes ?? [];
           if (connectedCodes.length) {
             // Resolve agency owner user IDs from connected agency codes
             const connectedAgencies = await db.agency.findMany({ where: { agencyCode: { in: connectedCodes }, isDeleted: false }, select: { ownerUserId: true } });
             const agencyOwnerIds = connectedAgencies.map(a => a.ownerUserId).filter(Boolean);
-            if (agencyOwnerIds.length) {
-              cascadeTargets.push({ targetRole: 'brand', userId: { in: agencyOwnerIds } });
-            }
 
-            // Also include mediator+buyer tickets under connected agencies for oversight
+            // Resolve all mediators and buyers under connected agencies
             const allMediatorCodes: string[] = [];
             for (const code of connectedCodes) {
               const mCodes = await listMediatorCodesForAgency(code);
               allMediatorCodes.push(...mCodes);
             }
+
+            let mediatorUserIds: string[] = [];
+            let buyerUserIds: string[] = [];
             if (allMediatorCodes.length) {
               const mediatorUsers = await db.user.findMany({
                 where: { mediatorCode: { in: allMediatorCodes }, isDeleted: false },
                 select: { id: true },
               });
-              const mediatorUserIds = mediatorUsers.map(u => u.id);
-              if (mediatorUserIds.length) {
-                cascadeTargets.push({ targetRole: 'agency', userId: { in: mediatorUserIds } });
-              }
+              mediatorUserIds = mediatorUsers.map(u => u.id);
 
               const buyerUsers = await db.user.findMany({
                 where: { parentCode: { in: allMediatorCodes }, isDeleted: false },
                 select: { id: true },
               });
-              const buyerUserIds = buyerUsers.map(b => b.id);
-              if (buyerUserIds.length) {
-                cascadeTargets.push({ targetRole: 'mediator', userId: { in: buyerUserIds } });
-              }
+              buyerUserIds = buyerUsers.map(b => b.id);
+            }
+
+            // ALL users in this brand's connected network
+            const allBrandNetworkIds = [...new Set([...agencyOwnerIds, ...mediatorUserIds, ...buyerUserIds])];
+
+            if (allBrandNetworkIds.length) {
+              // Tickets targeted to brand from ANY user in the network (including escalated tickets)
+              cascadeTargets.push({ targetRole: 'brand', userId: { in: allBrandNetworkIds } });
+            }
+
+            // Oversight: tickets at agency level from mediators + buyers
+            const agencyLevelIds = [...new Set([...mediatorUserIds, ...buyerUserIds])];
+            if (agencyLevelIds.length) {
+              cascadeTargets.push({ targetRole: 'agency', userId: { in: agencyLevelIds } });
+            }
+
+            // Oversight: tickets at mediator level from buyers
+            if (buyerUserIds.length) {
+              cascadeTargets.push({ targetRole: 'mediator', userId: { in: buyerUserIds } });
             }
           }
         }
@@ -682,8 +744,29 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
         const canManage = await canManageTicketByRole({ ticket: existing, roles, pgUserId, user });
         if (!canManage) throw new AppError(403, 'FORBIDDEN', 'Not allowed');
 
+        // Determine the actor's effective role level
+        const actorRole = String(user?.role || roles[0] || 'shopper');
+        const actorLevel = ROLE_LEVEL[actorRole] ?? 0;
+        const targetLevel = ROLE_LEVEL[existing.targetRole || ''] ?? 0;
+        const isTicketOwner = existing.userId === pgUserId;
+
         const previousStatus = String(existing.status || '');
         const updatePayload: any = { status: body.status, updatedBy: pgUserId };
+
+        // For resolve/reject/escalate: actor role must be >= ticket's targetRole level
+        // Exception: ticket owner can always resolve/reject their own ticket
+        if (body.status === 'Resolved' || body.status === 'Rejected' || body.escalate) {
+          if (!isTicketOwner && !isPrivileged(roles) && actorLevel < targetLevel) {
+            throw new AppError(403, 'ROLE_LEVEL_INSUFFICIENT', `Only ${existing.targetRole} or higher can ${body.escalate ? 'escalate' : body.status === 'Resolved' ? 'resolve' : 'reject'} this ticket`);
+          }
+        }
+
+        // For reopening: allow owner OR anyone at/above target level
+        if (previousStatus !== 'Open' && body.status === 'Open' && !body.escalate) {
+          if (!isTicketOwner && !isPrivileged(roles) && actorLevel < targetLevel) {
+            throw new AppError(403, 'ROLE_LEVEL_INSUFFICIENT', 'Only the ticket owner or a higher role can reopen this ticket');
+          }
+        }
 
         // Handle escalation: advance targetRole to the next tier
         if (body.escalate && existing.targetRole) {

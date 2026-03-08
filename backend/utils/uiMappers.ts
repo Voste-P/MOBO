@@ -574,7 +574,7 @@ export function toUiTicketForBrand(t: any) {
     id: String(t._id ?? t.id),
     // Do not leak who the buyer is to brands.
     userName: 'User',
-    role: t.role,
+    role: toUiRole(t.role || 'shopper'),
     orderId: t.orderId,
     issueType: t.issueType,
     description: t.description,
@@ -591,7 +591,7 @@ export function toUiTicket(t: any) {
     id: String(t._id ?? t.id),
     userId: String(t.userId),
     userName: t.userName,
-    role: t.role,
+    role: toUiRole(t.role || 'shopper'),
     orderId: t.orderId,
     issueType: t.issueType,
     description: t.description,
