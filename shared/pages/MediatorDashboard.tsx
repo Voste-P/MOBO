@@ -322,8 +322,8 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                 const item = o.items?.[0];
                 return [
                   getPrimaryOrderId(o),
-                  d.toLocaleDateString(),
-                  d.toLocaleTimeString(),
+                  d.toLocaleDateString('en-GB'),
+                  d.toLocaleTimeString('en-GB'),
                   item?.title || '',
                   item?.platform || '',
                   item?.brandName || '',
@@ -332,7 +332,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                   String(item?.quantity || 1),
                   String(o.total || 0),
                   String(item?.commission || 0),
-                  o.expectedSettlementDate ? new Date(o.expectedSettlementDate).toLocaleDateString() : '',
+                  o.expectedSettlementDate ? new Date(o.expectedSettlementDate).toLocaleDateString('en-GB') : '',
                   o.agencyName || 'Direct',
                   o.buyerName || '',
                   o.buyerMobile || '',
@@ -341,7 +341,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                   o.affiliateStatus || '',
                   o.paymentStatus || '',
                   o.soldBy || '',
-                  o.orderDate ? new Date(o.orderDate).toLocaleDateString() : '',
+                  o.orderDate ? new Date(o.orderDate).toLocaleDateString('en-GB') : '',
                   o.extractedProductName || '',
                   o.settlementRef || '',
                   o.settlementMode || '',
@@ -525,8 +525,8 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                   t.id.slice(-8), String(t.status), String(t.issueType), String(t.description || ''),
                   String((t as any).userName || ''), String((t as any).role || ''), String((t as any).targetRole || ''), String(t.orderId || ''),
                   String((t as any).resolutionNote || ''), String((t as any).resolvedByName || ''),
-                  (t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString() : '',
-                  t.createdAt ? new Date(t.createdAt).toLocaleDateString() : '',
+                  (t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString('en-GB') : '',
+                  t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : '',
                 ]);
                 downloadCsv(`mediator-tickets-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
                 toast.success(`Exported ${supportTickets.length} tickets`);
@@ -600,7 +600,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                       }`}>{String(t.status || 'Open')}</span>
                     </div>
                   </div>
-                  <span className="text-[9px] text-zinc-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''}</span>
+                  <span className="text-[9px] text-zinc-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''}</span>
                 </div>
                 {t.description && (
                   <div className="text-[10px] text-zinc-600 bg-zinc-50 rounded-lg px-2 py-1.5 line-clamp-3">
@@ -622,7 +622,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                   <div className="text-[9px] text-zinc-400">
                     {String(t.status) === 'Resolved' ? 'Resolved' : 'Rejected'}
                     {(t as any).resolvedByName ? ` by ${String((t as any).resolvedByName)}` : ''}
-                    {(t as any).resolvedAt ? ` on ${new Date(String((t as any).resolvedAt)).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
+                    {(t as any).resolvedAt ? ` on ${new Date(String((t as any).resolvedAt)).toLocaleDateString('en-GB')}` : ''}
                   </div>
                 )}
                 <div className="flex items-center gap-1.5 justify-end">
@@ -1626,7 +1626,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
                     <div className="text-right">
                       <p className="text-lg font-black text-zinc-900">{formatCurrency(o.total)}</p>
                       <p className="text-[9px] font-bold text-zinc-400">
-                        {new Date(o.createdAt).toLocaleDateString()}
+                        {new Date(o.createdAt).toLocaleDateString('en-GB')}
                       </p>
                     </div>
                   </div>
@@ -2234,7 +2234,7 @@ export const MediatorDashboard: React.FC = () => {
                     return d && !isNaN(d.getTime()) && d.getFullYear() > 2020 ? (
                       <div className="bg-black/40 p-2.5 rounded-xl border border-white/5">
                         <p className="text-[9px] text-zinc-500 font-bold uppercase mb-1">Order Date</p>
-                        <p className="text-[11px] font-bold text-zinc-200">{d.toLocaleDateString()}</p>
+                        <p className="text-[11px] font-bold text-zinc-200">{d.toLocaleDateString('en-GB')}</p>
                       </div>
                     ) : null;
                   })()}

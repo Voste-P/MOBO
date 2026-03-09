@@ -66,6 +66,9 @@ import {
   Sparkles,
   Loader2,
   HelpCircle,
+  ClipboardList,
+  ShieldAlert,
+  Filter,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -575,7 +578,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
 
     const csvRows: string[] = [];
     // Metadata header
-    csvRows.push(`"Agency Orders Report - ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}","Generated: ${new Date().toLocaleString()}","Total Orders: ${ledger.length}","${activeFilters.length ? 'Filters: ' + activeFilters.join(' | ') : 'Filters: None'}"`);
+    csvRows.push(`"Agency Orders Report - ${new Date().toLocaleDateString('en-GB')}","Generated: ${new Date().toLocaleString('en-GB')}","Total Orders: ${ledger.length}","${activeFilters.length ? 'Filters: ' + activeFilters.join(' | ') : 'Filters: None'}"`);
     csvRows.push(''); // blank separator row
     csvRows.push(headers.join(','));
 
@@ -584,8 +587,8 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
 
     ledger.forEach((o: Order) => {
       const dateObj = new Date(o.createdAt);
-      const date = dateObj.toLocaleDateString();
-      const time = dateObj.toLocaleTimeString();
+      const date = dateObj.toLocaleDateString('en-GB');
+      const time = dateObj.toLocaleTimeString('en-GB');
       const item = o.items?.[0];
       totalValue += o.total || 0;
       totalCommission += item?.commission || 0;
@@ -602,7 +605,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
         item?.quantity || 1,
         o.total,
         item?.commission || 0,
-        (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString() : '',
+        (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString('en-GB') : '',
         csvSafe(o.agencyName || user?.name || 'Agency'),
         csvSafe(o.managerName || ''),
         csvSafe(o.mediatorCode || (o as any).managerCode || ''),
@@ -614,7 +617,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
         csvSafe(o.affiliateStatus || ''),
         o.id,
         csvSafe(o.soldBy || ''),
-        o.orderDate ? new Date(o.orderDate).toLocaleDateString() : '',
+        o.orderDate ? new Date(o.orderDate).toLocaleDateString('en-GB') : '',
         csvSafe(o.extractedProductName || ''),
         csvSafe(o.settlementRef || ''),
         csvSafe(o.settlementMode || ''),
@@ -646,8 +649,8 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
       const item = o.items?.[0];
       return [
         getPrimaryOrderId(o),
-        dateObj.toLocaleDateString(),
-        dateObj.toLocaleTimeString(),
+        dateObj.toLocaleDateString('en-GB'),
+        dateObj.toLocaleTimeString('en-GB'),
         item?.title || '',
         item?.brandName || '',
         item?.platform || '',
@@ -656,7 +659,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
         item?.quantity || 1,
         o.total,
         item?.commission || 0,
-        (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString() : '',
+        (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString('en-GB') : '',
         o.agencyName || user?.name || 'Agency',
         o.managerName || '',
         o.mediatorCode || (o as any).managerCode || '',
@@ -668,7 +671,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
         o.affiliateStatus || '',
         o.id,
         o.soldBy || '',
-        o.orderDate ? new Date(o.orderDate).toLocaleDateString() : '',
+        o.orderDate ? new Date(o.orderDate).toLocaleDateString('en-GB') : '',
         o.extractedProductName || '',
         o.settlementRef || '',
         o.settlementMode || '',
@@ -862,7 +865,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
                         {getPrimaryOrderId(o)}
                       </div>
                       <div className="text-[10px] text-slate-400 font-bold mt-0.5">
-                        {new Date(o.createdAt).toLocaleDateString()}
+                        {new Date(o.createdAt).toLocaleDateString('en-GB')}
                       </div>
                     </td>
                     <td className="p-5">
@@ -957,7 +960,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
                       <td className="p-4 pl-8">
                         <span className="font-mono text-xs font-bold text-slate-700">{getPrimaryOrderId(o)}</span>
                         <div className="text-[9px] text-slate-400 mt-0.5">
-                          {new Date(o.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}
+                          {new Date(o.createdAt).toLocaleDateString('en-GB')}
                         </div>
                       </td>
                       <td className="p-4">
@@ -1225,8 +1228,8 @@ const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
 
     payouts.forEach((p: any) => {
       const dateObj = new Date(p.date);
-      const date = dateObj.toLocaleDateString();
-      const time = dateObj.toLocaleTimeString();
+      const date = dateObj.toLocaleDateString('en-GB');
+      const time = dateObj.toLocaleTimeString('en-GB');
 
       const row = [
         p.id,
@@ -1258,8 +1261,8 @@ const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
       const dateObj = new Date(p.date);
       return [
         p.id,
-        dateObj.toLocaleDateString(),
-        dateObj.toLocaleTimeString(),
+        dateObj.toLocaleDateString('en-GB'),
+        dateObj.toLocaleTimeString('en-GB'),
         p.mediatorName || '',
         p.mediatorCode || '',
         p.amount,
@@ -1361,7 +1364,7 @@ const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
                         {p.id}
                       </div>
                       <div className="text-[10px] text-slate-400 font-bold mt-0.5">
-                        {new Date(p.date).toLocaleDateString()}
+                        {new Date(p.date).toLocaleDateString('en-GB')}
                       </div>
                     </td>
                     <td className="p-5">
@@ -1471,7 +1474,7 @@ const DashboardView = ({ stats, allOrders }: any) => {
     });
 
     return Array.from(buckets.entries()).map(([iso, total]) => ({
-      name: new Date(iso).toLocaleDateString('en-US', { month: 'short', day: '2-digit' }),
+      name: new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }),
       val: Math.round(total),
     }));
   }, [allOrders, range]);
@@ -2159,7 +2162,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                       </td>
                       <td className="p-5">
                         <span className="text-[10px] font-medium text-slate-500">
-                          {c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                          {c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB') : '—'}
                         </span>
                       </td>
                       <td className="p-5 text-right font-mono text-slate-700 font-bold">
@@ -2909,6 +2912,380 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                 className="px-8 py-3 bg-purple-600 text-white font-bold rounded-2xl hover:bg-purple-700 transition-all shadow-xl hover:shadow-2xl hover:shadow-purple-200 active:scale-95 flex items-center gap-2"
               >
                 Confirm Distribution <CheckCircle size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ─── ORDER REVIEW TAB ─── */
+const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading, onRefresh }: any) => {
+  const { toast } = useToast();
+  const [campaignFilter, setCampaignFilter] = useState('all');
+  const [mediatorFilter, setMediatorFilter] = useState('all');
+  const [approvalFilter, setApprovalFilter] = useState<'all' | 'manual' | 'ai' | 'pending'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'COMPLETED'>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [proofOrder, setProofOrder] = useState<Order | null>(null);
+  const [rejectModal, setRejectModal] = useState<{ order: Order; type: 'order' | 'review' | 'rating' | 'returnWindow' } | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejecting, setRejecting] = useState(false);
+
+  useEffect(() => {
+    setProofOrder((prev) => {
+      if (!prev) return prev;
+      const updated = allOrders.find((o: Order) => o.id === prev.id);
+      return updated || null;
+    });
+  }, [allOrders]);
+
+  const getApprovalMethod = (o: Order): 'ai' | 'manual' | 'pending' => {
+    const v = (o as any).verification;
+    if (!v?.order?.verifiedAt) return 'pending';
+    return v.order.autoVerified ? 'ai' : 'manual';
+  };
+
+  const filtered = useMemo(() => {
+    return (allOrders as Order[]).filter((o) => {
+      if (campaignFilter !== 'all' && o.items?.[0]?.campaignId !== campaignFilter) return false;
+      if (mediatorFilter !== 'all' && (o.managerName || '') !== mediatorFilter) return false;
+      if (approvalFilter !== 'all' && getApprovalMethod(o) !== approvalFilter) return false;
+      if (statusFilter !== 'all' && (o.workflowStatus || '') !== statusFilter) return false;
+      if (searchTerm) {
+        const q = searchTerm.toLowerCase();
+        const oid = (o.externalOrderId || o.id || '').toLowerCase();
+        const buyer = (o.buyerName || '').toLowerCase();
+        const product = (o.items?.[0]?.title || '').toLowerCase();
+        if (!oid.includes(q) && !buyer.includes(q) && !product.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [allOrders, campaignFilter, mediatorFilter, approvalFilter, statusFilter, searchTerm]);
+
+  const handleReject = async () => {
+    if (!rejectModal || rejectReason.trim().length < 5) return;
+    setRejecting(true);
+    try {
+      await api.ops.rejectOrderProof(rejectModal.order.id, rejectModal.type, rejectReason.trim());
+      toast.success('Proof rejected — buyer has been notified');
+      setRejectModal(null);
+      setRejectReason('');
+      onRefresh();
+    } catch (e: any) {
+      toast.error(formatErrorMessage(e, 'Failed to reject proof'));
+    } finally {
+      setRejecting(false);
+    }
+  };
+
+  const uniqueMediators = useMemo(() => {
+    const codes = new Set<string>();
+    allOrders.forEach((o: Order) => { if (o.managerName) codes.add(o.managerName); });
+    return Array.from(codes).sort();
+  }, [allOrders]);
+
+  const uniqueCampaigns = useMemo(() => {
+    const map = new Map<string, string>();
+    allOrders.forEach((o: Order) => {
+      const cid = o.items?.[0]?.campaignId;
+      if (cid) {
+        const camp = campaigns.find((c: Campaign) => c.id === cid);
+        map.set(cid, camp?.title || cid.slice(0, 8));
+      }
+    });
+    return Array.from(map.entries());
+  }, [allOrders, campaigns]);
+
+  const manualCount = useMemo(() => filtered.filter((o) => getApprovalMethod(o) === 'manual').length, [filtered]);
+
+  return (
+    <div className="animate-enter">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Order Review</h2>
+          <p className="text-xs text-slate-500 mt-1">{filtered.length} orders · {manualCount} manually approved</p>
+        </div>
+        <button onClick={onRefresh} disabled={loading} className="text-xs font-bold text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 px-4 py-2 rounded-xl transition-colors">
+          {loading ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 mb-6">
+        <div className="relative">
+          <Filter size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search orders…"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8 pr-4 py-2 text-xs border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-300 outline-none w-48"
+          />
+        </div>
+        <select value={campaignFilter} onChange={(e) => setCampaignFilter(e.target.value)} className="text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:ring-2 focus:ring-purple-200">
+          <option value="all">All Campaigns</option>
+          {uniqueCampaigns.map(([id, title]) => <option key={id} value={id}>{title}</option>)}
+        </select>
+        <select value={mediatorFilter} onChange={(e) => setMediatorFilter(e.target.value)} className="text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:ring-2 focus:ring-purple-200">
+          <option value="all">All Mediators</option>
+          {uniqueMediators.map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <select value={approvalFilter} onChange={(e) => setApprovalFilter(e.target.value as any)} className="text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:ring-2 focus:ring-purple-200">
+          <option value="all">All Approval</option>
+          <option value="manual">Manual Only</option>
+          <option value="ai">AI Auto</option>
+          <option value="pending">Pending</option>
+        </select>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:ring-2 focus:ring-purple-200">
+          <option value="all">All Statuses</option>
+          <option value="UNDER_REVIEW">Under Review</option>
+          <option value="APPROVED">Approved</option>
+          <option value="REJECTED">Rejected</option>
+          <option value="COMPLETED">Completed</option>
+        </select>
+      </div>
+
+      {/* Orders table */}
+      {filtered.length === 0 ? (
+        <EmptyState
+          title="No orders match filters"
+          description="Adjust your filters or wait for new orders."
+          icon={<ClipboardList size={22} className="text-slate-400" />}
+          className="bg-transparent"
+        />
+      ) : (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-slate-50 text-slate-400 text-[10px] font-extrabold uppercase tracking-wider sticky top-0 z-10">
+                <tr>
+                  <th className="p-4 pl-6">Order ID / Date</th>
+                  <th className="p-4">Buyer & Product</th>
+                  <th className="p-4">Mediator</th>
+                  <th className="p-4">Campaign</th>
+                  <th className="p-4 text-right">Amount</th>
+                  <th className="p-4 text-center">Approval</th>
+                  <th className="p-4 text-center">Status</th>
+                  <th className="p-4 pr-6 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50 text-sm">
+                {filtered.map((o: Order) => {
+                  const method = getApprovalMethod(o);
+                  const isManual = method === 'manual';
+                  const wf = (o.workflowStatus || 'CREATED').toUpperCase();
+                  const campTitle = campaigns.find((c: Campaign) => c.id === o.items?.[0]?.campaignId)?.title || '—';
+                  return (
+                    <tr key={o.id} className={`hover:bg-slate-50/80 transition-colors group ${isManual ? 'bg-amber-50/40' : ''}`}>
+                      <td className="p-4 pl-6">
+                        <div className="font-mono text-xs font-bold text-slate-900">{getPrimaryOrderId(o)}</div>
+                        <div className="text-[10px] text-slate-400 font-bold mt-0.5">{new Date(o.createdAt).toLocaleDateString('en-GB')}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="font-bold text-slate-900 text-xs truncate max-w-[160px]">{o.buyerName || 'Unknown'}</div>
+                        <div className="text-[10px] text-slate-500 truncate max-w-[160px]">{o.items?.[0]?.title}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-xs font-bold text-slate-700">{o.managerName || 'Unknown'}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-xs text-slate-600 truncate max-w-[120px]">{campTitle}</div>
+                      </td>
+                      <td className="p-4 text-right font-mono font-bold text-slate-900 text-xs">{formatCurrency(o.total)}</td>
+                      <td className="p-4 text-center">
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          method === 'ai' ? 'bg-blue-50 text-blue-600 border-blue-100'
+                          : method === 'manual' ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          : 'bg-slate-50 text-slate-500 border-slate-200'
+                        }`}>
+                          {method === 'ai' ? <><Sparkles size={10} /> AI</> : method === 'manual' ? <><ShieldAlert size={10} /> Manual</> : <><Clock size={10} /> Pending</>}
+                        </span>
+                      </td>
+                      <td className="p-4 text-center">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase ${
+                          wf === 'APPROVED' || wf === 'COMPLETED' ? 'bg-green-50 text-green-700 border-green-100'
+                          : wf === 'UNDER_REVIEW' ? 'bg-blue-50 text-blue-700 border-blue-100'
+                          : wf === 'REJECTED' ? 'bg-red-50 text-red-600 border-red-100'
+                          : 'bg-slate-50 text-slate-500 border-slate-200'
+                        }`}>
+                          {wf.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className="p-4 pr-6 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => setProofOrder(o)}
+                            className="text-[10px] font-bold text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                          >
+                            <Eye size={12} /> Proof
+                          </button>
+                          {wf === 'UNDER_REVIEW' && (
+                            <button
+                              onClick={() => {
+                                const v = (o as any).verification;
+                                const proofType = !v?.order?.verifiedAt ? 'order'
+                                  : o.items?.[0]?.dealType === 'Review' && !v?.review?.verifiedAt ? 'review'
+                                  : o.items?.[0]?.dealType === 'Rating' && !v?.rating?.verifiedAt ? 'rating'
+                                  : 'order';
+                                setRejectModal({ order: o, type: proofType });
+                              }}
+                              className="text-[10px] font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                            >
+                              <AlertTriangle size={12} /> Reject
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Proof Modal (reusable) */}
+      {proofOrder && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in"
+          onClick={() => setProofOrder(null)}
+        >
+          <div
+            className="bg-white w-full max-w-lg rounded-[2rem] p-6 shadow-2xl relative flex flex-col max-h-[85vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button type="button" aria-label="Close" onClick={() => setProofOrder(null)} className="absolute top-4 right-4 p-2 bg-slate-50 rounded-full hover:bg-slate-100 transition-colors">
+              <X size={18} />
+            </button>
+            <div className="mb-4">
+              <h3 className="font-extrabold text-lg text-zinc-900">Proof of Performance</h3>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs text-slate-500 font-bold">Order {getPrimaryOrderId(proofOrder)}</span>
+                <span className="w-1 h-1 bg-slate-300 rounded-full" />
+                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded border ${
+                  proofOrder.items?.[0]?.dealType === 'Rating' ? 'bg-orange-50 text-orange-600 border-orange-100'
+                  : proofOrder.items?.[0]?.dealType === 'Review' ? 'bg-purple-50 text-purple-600 border-purple-100'
+                  : 'bg-blue-50 text-blue-600 border-blue-100'
+                }`}>
+                  {proofOrder.items?.[0]?.dealType || 'Discount'} Deal
+                </span>
+                {(() => {
+                  const m = getApprovalMethod(proofOrder);
+                  return m !== 'pending' ? (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${m === 'manual' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                      {m === 'manual' ? 'Manual' : 'AI Auto'}
+                    </span>
+                  ) : null;
+                })()}
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto scrollbar-styled space-y-5 pr-2">
+              {/* Product */}
+              <div className="flex gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <ProxiedImage src={proofOrder.items?.[0]?.image} alt={proofOrder.items?.[0]?.title || 'Product'} className="w-12 h-12 object-contain mix-blend-multiply rounded-lg bg-white border border-slate-100 p-1" />
+                <div>
+                  <p className="text-sm font-bold text-slate-900 line-clamp-1">{proofOrder.items?.[0]?.title}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Total: <span className="font-mono font-bold text-zinc-900">{formatCurrency(proofOrder.total)}</span></p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Mediator: {proofOrder.managerName} · Buyer: {proofOrder.buyerName}</p>
+                </div>
+              </div>
+              {/* Order Screenshot */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs font-extrabold text-slate-400 uppercase tracking-widest"><FileText size={14} /> Purchase Proof</div>
+                {proofOrder.screenshots?.order ? (
+                  <div className="rounded-2xl border-2 border-slate-100 overflow-hidden shadow-sm">
+                    <ProofImage orderId={proofOrder.id} proofType="order" existingSrc={proofOrder.screenshots.order !== 'exists' ? proofOrder.screenshots.order : undefined} alt="Order Proof" className="w-full h-auto block" />
+                  </div>
+                ) : (
+                  <div className="p-6 border-2 border-dashed border-red-200 bg-red-50 rounded-2xl text-center"><AlertCircle size={20} className="mx-auto text-red-400 mb-1" /><p className="text-xs font-bold text-red-500">Missing</p></div>
+                )}
+                {proofOrder.orderAiVerification && (
+                  <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
+                    <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-2"><Sparkles size={12} className="inline mr-1" />AI Verification</p>
+                    <div className="flex gap-2">
+                      <div className={`flex-1 p-2 rounded-lg border text-center ${proofOrder.orderAiVerification.orderIdMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                        <p className="text-[9px] font-bold uppercase text-slate-500">Order ID</p>
+                        <p className={`text-xs font-bold ${proofOrder.orderAiVerification.orderIdMatch ? 'text-green-600' : 'text-red-600'}`}>{proofOrder.orderAiVerification.orderIdMatch ? 'Match' : 'Mismatch'}</p>
+                      </div>
+                      <div className={`flex-1 p-2 rounded-lg border text-center ${proofOrder.orderAiVerification.amountMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                        <p className="text-[9px] font-bold uppercase text-slate-500">Amount</p>
+                        <p className={`text-xs font-bold ${proofOrder.orderAiVerification.amountMatch ? 'text-green-600' : 'text-red-600'}`}>{proofOrder.orderAiVerification.amountMatch ? 'Match' : 'Mismatch'}</p>
+                      </div>
+                    </div>
+                    <p className="text-[9px] text-slate-500 mt-2">Confidence: {proofOrder.orderAiVerification.confidenceScore ?? 0}%</p>
+                  </div>
+                )}
+              </div>
+              {/* Rating Proof */}
+              {proofOrder.items?.[0]?.dealType === 'Rating' && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-extrabold text-orange-400 uppercase tracking-widest"><Star size={14} /> Rating Proof</div>
+                  {proofOrder.screenshots?.rating ? (
+                    <div className="rounded-2xl border-2 border-orange-100 overflow-hidden shadow-sm">
+                      <ProofImage orderId={proofOrder.id} proofType="rating" existingSrc={proofOrder.screenshots.rating !== 'exists' ? proofOrder.screenshots.rating : undefined} alt="Rating Proof" className="w-full h-auto block" />
+                    </div>
+                  ) : (
+                    <div className="p-4 border-2 border-dashed border-orange-200 bg-orange-50 rounded-2xl text-center"><p className="text-xs font-bold text-orange-500">Awaiting rating proof…</p></div>
+                  )}
+                </div>
+              )}
+              {/* Review Link */}
+              {proofOrder.items?.[0]?.dealType === 'Review' && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-extrabold text-purple-400 uppercase tracking-widest"><MessageCircle size={14} /> Live Review</div>
+                  {proofOrder.reviewLink ? (
+                    <a href={proofOrder.reviewLink} target="_blank" rel="noreferrer" className="flex items-center justify-between p-3 bg-purple-50 text-purple-700 rounded-xl font-bold text-xs border border-purple-100 hover:bg-purple-100 transition-colors group">
+                      <span className="truncate flex-1 mr-2">{proofOrder.reviewLink}</span>
+                      <ExternalLink size={14} className="group-hover:scale-110 transition-transform" />
+                    </a>
+                  ) : (
+                    <div className="p-4 border-2 border-dashed border-purple-200 bg-purple-50 rounded-2xl text-center"><p className="text-xs font-bold text-purple-500">Review link not submitted</p></div>
+                  )}
+                </div>
+              )}
+              {/* Return Window */}
+              {proofOrder.screenshots?.returnWindow && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-extrabold text-teal-500 uppercase tracking-widest"><Package size={14} /> Return Window</div>
+                  <div className="rounded-2xl border-2 border-teal-100 overflow-hidden shadow-sm">
+                    <ProofImage orderId={proofOrder.id} proofType="returnWindow" existingSrc={proofOrder.screenshots.returnWindow !== 'exists' ? proofOrder.screenshots.returnWindow : undefined} className="w-full h-auto max-h-[60vh] object-contain bg-zinc-50" alt="Return Window" />
+                  </div>
+                </div>
+              )}
+              {/* Rejection info */}
+              {proofOrder.rejection?.type && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                  <p className="text-[10px] font-bold text-red-600 uppercase tracking-wider mb-1">Rejected: {proofOrder.rejection.type}</p>
+                  <p className="text-xs text-red-700">{proofOrder.rejection.reason || 'No reason provided'}</p>
+                  {proofOrder.rejection.rejectedAt && <p className="text-[9px] text-red-400 mt-1">{new Date(proofOrder.rejection.rejectedAt).toLocaleDateString('en-GB')}</p>}
+                </div>
+              )}
+            </div>
+            <button onClick={() => setProofOrder(null)} className="w-full py-3 mt-4 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-black transition-colors shadow-lg">Close</button>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Modal */}
+      {rejectModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in" onClick={() => { setRejectModal(null); setRejectReason(''); }}>
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-extrabold text-lg text-red-600 mb-1 flex items-center gap-2"><AlertTriangle size={20} /> Reject Proof</h3>
+            <p className="text-xs text-slate-500 mb-4">Order {getPrimaryOrderId(rejectModal.order)} · Rejecting <strong>{rejectModal.type}</strong> proof</p>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Reason for rejection (min 5 characters)…"
+              className="w-full border border-slate-200 rounded-xl p-3 text-sm resize-none h-24 focus:ring-2 focus:ring-red-200 focus:border-red-300 outline-none"
+            />
+            <div className="flex gap-3 mt-4">
+              <button onClick={() => { setRejectModal(null); setRejectReason(''); }} className="flex-1 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">Cancel</button>
+              <button onClick={handleReject} disabled={rejecting || rejectReason.trim().length < 5} className="flex-1 py-2.5 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                {rejecting ? 'Rejecting…' : 'Reject Proof'}
               </button>
             </div>
           </div>
@@ -3743,7 +4120,7 @@ export const AgencyDashboard: React.FC = () => {
   const { toast } = useToast();
   useRealtimeConnection();
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'team' | 'inventory' | 'finance' | 'payouts' | 'brands' | 'tickets' | 'profile'
+    'dashboard' | 'team' | 'inventory' | 'orders' | 'finance' | 'payouts' | 'brands' | 'tickets' | 'profile'
   >('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -3910,6 +4287,15 @@ export const AgencyDashboard: React.FC = () => {
                 }}
               />
               <SidebarItem
+                icon={<ClipboardList />}
+                label="Order Review"
+                active={activeTab === 'orders'}
+                onClick={() => {
+                  setActiveTab('orders');
+                  setIsSidebarOpen(false);
+                }}
+              />
+              <SidebarItem
                 icon={<FileText />}
                 label="Finance"
                 active={activeTab === 'finance'}
@@ -4005,6 +4391,15 @@ export const AgencyDashboard: React.FC = () => {
           allOrders={orders}
         />
       )}
+      {activeTab === 'orders' && (
+        <OrderReviewView
+          allOrders={orders}
+          campaigns={campaigns}
+          mediators={mediators}
+          loading={isDataLoading}
+          onRefresh={fetchData}
+        />
+      )}
       {activeTab === 'finance' && (
         <FinanceView
           allOrders={orders}
@@ -4036,8 +4431,8 @@ export const AgencyDashboard: React.FC = () => {
                 csvSafe(String(t.issueType)), csvSafe(String(t.description || '')), csvSafe(String((t as any).userName || '')),
                 csvSafe(String((t as any).role || '')), csvSafe(String((t as any).targetRole || '')), csvSafe(String(t.orderId || '')),
                 csvSafe(String((t as any).resolutionNote || '')), csvSafe(String((t as any).resolvedByName || '')),
-                csvSafe((t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString() : ''),
-                csvSafe(t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''),
+                csvSafe((t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString('en-GB') : ''),
+                csvSafe(t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''),
               ].join(','));
               downloadCsv(`agency-tickets-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...rows].join('\n'));
               toast.success(`Exported ${supportTickets.length} tickets`);
@@ -4101,7 +4496,7 @@ export const AgencyDashboard: React.FC = () => {
                         }`}>{String(t.status || 'Open')}</span>
                       </div>
                     </div>
-                    <span className="text-[10px] text-slate-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''}</span>
+                    <span className="text-[10px] text-slate-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''}</span>
                   </div>
                   {t.description && (
                     <div className="text-xs text-slate-600 bg-slate-50 rounded-lg px-3 py-2 line-clamp-3">
@@ -4123,7 +4518,7 @@ export const AgencyDashboard: React.FC = () => {
                     <div className="text-[10px] text-slate-400">
                       {String(t.status) === 'Resolved' ? 'Resolved' : 'Rejected'}
                       {(t as any).resolvedByName ? ` by ${String((t as any).resolvedByName)}` : ''}
-                      {(t as any).resolvedAt ? ` on ${new Date(String((t as any).resolvedAt)).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
+                      {(t as any).resolvedAt ? ` on ${new Date(String((t as any).resolvedAt)).toLocaleDateString('en-GB')}` : ''}
                     </div>
                   )}
                   <div className="flex items-center gap-2 justify-end flex-wrap">

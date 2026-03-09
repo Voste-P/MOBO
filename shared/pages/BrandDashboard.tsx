@@ -419,7 +419,7 @@ const DashboardView = ({
       const d = new Date(start);
       d.setDate(start.getDate() + i);
       const dateKey = localDayKey(d);
-      const name = d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+      const name = d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
       points.push({ name, revenue: totalsByDay.get(dateKey) ?? 0, dateKey });
     }
 
@@ -777,7 +777,7 @@ const OrdersView = ({ user }: any) => {
 
     const csvRows: string[] = [];
     // Metadata header
-    csvRows.push(`"Brand Orders Report - ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}","Generated: ${new Date().toLocaleString()}","Total Orders: ${filtered.length}","${activeFilters.length ? 'Filters: ' + activeFilters.join(' | ') : 'Filters: None'}"`);
+    csvRows.push(`"Brand Orders Report - ${new Date().toLocaleDateString('en-GB')}","Generated: ${new Date().toLocaleString('en-GB')}","Total Orders: ${filtered.length}","${activeFilters.length ? 'Filters: ' + activeFilters.join(' | ') : 'Filters: None'}"`);
     csvRows.push(''); // blank separator row
     csvRows.push(headers.join(','));
 
@@ -786,8 +786,8 @@ const OrdersView = ({ user }: any) => {
 
     filtered.forEach((o) => {
       const dateObj = new Date(o.createdAt);
-      const date = dateObj.toLocaleDateString();
-      const time = dateObj.toLocaleTimeString();
+      const date = dateObj.toLocaleDateString('en-GB');
+      const time = dateObj.toLocaleTimeString('en-GB');
       const item = o.items?.[0];
       totalValue += o.total || 0;
       totalCommission += item?.commission || 0;
@@ -804,7 +804,7 @@ const OrdersView = ({ user }: any) => {
         item?.quantity || 1,
         o.total,
         item?.commission || 0,
-        (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString() : '',
+        (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString('en-GB') : '',
         csvSafe(o.agencyName || 'Direct'),
         csvSafe(o.managerName || ''),
         csvSafe(o.mediatorCode || (o as any).managerCode || ''),
@@ -816,7 +816,7 @@ const OrdersView = ({ user }: any) => {
         csvSafe(o.affiliateStatus || ''),
         o.id,
         csvSafe(o.soldBy || ''),
-        o.orderDate ? new Date(o.orderDate).toLocaleDateString() : '',
+        o.orderDate ? new Date(o.orderDate).toLocaleDateString('en-GB') : '',
         csvSafe(o.extractedProductName || ''),
         csvSafe(o.settlementRef || ''),
         csvSafe(o.settlementMode || ''),
@@ -850,8 +850,8 @@ const OrdersView = ({ user }: any) => {
       const item = o.items?.[0];
       return [
         getPrimaryOrderId(o),
-        dateObj.toLocaleDateString(),
-        dateObj.toLocaleTimeString(),
+        dateObj.toLocaleDateString('en-GB'),
+        dateObj.toLocaleTimeString('en-GB'),
         item?.title || '',
         item?.platform || '',
         item?.dealType || 'Discount',
@@ -859,7 +859,7 @@ const OrdersView = ({ user }: any) => {
         item?.quantity || 1,
         o.total,
         item?.commission || 0,
-        (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString() : '',
+        (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString('en-GB') : '',
         o.agencyName || 'Direct',
         o.managerName || '',
         o.mediatorCode || (o as any).managerCode || '',
@@ -871,7 +871,7 @@ const OrdersView = ({ user }: any) => {
         o.affiliateStatus || '',
         o.id,
         o.soldBy || '',
-        o.orderDate ? new Date(o.orderDate).toLocaleDateString() : '',
+        o.orderDate ? new Date(o.orderDate).toLocaleDateString('en-GB') : '',
         o.extractedProductName || '',
         o.settlementRef || '',
         o.settlementMode || '',
@@ -1126,7 +1126,7 @@ const OrdersView = ({ user }: any) => {
                           <span className="font-mono text-xs font-bold text-zinc-500">{getPrimaryOrderId(o)}</span>
                         </td>
                         <td className="p-6">
-                          <span className="text-xs text-zinc-500">{new Date(o.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}</span>
+                          <span className="text-xs text-zinc-500">{new Date(o.createdAt).toLocaleDateString('en-GB')}</span>
                         </td>
                         <td className="p-6">
                           <span className="text-xs font-bold bg-zinc-100 text-zinc-600 px-2 py-1 rounded">{o.agencyName || 'Direct'}</span>
@@ -1297,7 +1297,7 @@ const OrdersView = ({ user }: any) => {
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[10px] text-zinc-400">
                         {viewProofOrder.extractedProductName && <span>Product: {viewProofOrder.extractedProductName}</span>}
                         {seller && <span>Seller: {seller}</span>}
-                        {validDate && <span>Ordered: {validDate.toLocaleDateString()}</span>}
+                        {validDate && <span>Ordered: {validDate.toLocaleDateString('en-GB')}</span>}
                       </div>
                     ) : null;
                   })()}
@@ -1892,7 +1892,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
                     <span className="text-[10px] font-bold text-zinc-400">(4.8)</span>
                   </div>
                   <p className="text-xl font-extrabold text-lime-600 leading-none">
-                    {Number(form.price).toLocaleString()}
+                    {Number(form.price).toLocaleString('en-GB')}
                   </p>
                 </div>
               </div>
@@ -1904,7 +1904,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
                 <div className="pt-2 border-t border-zinc-200 border-dashed flex justify-between items-center">
                   <span>Product Price:</span>
                   <span className="text-zinc-900 font-bold decoration-slice line-through">
-                    {Number(form.originalPrice).toLocaleString()}
+                    {Number(form.originalPrice).toLocaleString('en-GB')}
                   </span>
                 </div>
               </div>
@@ -1921,7 +1921,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
                 <Wallet size={16} className="text-lime-400" />
               </div>
               <h2 className="text-3xl font-extrabold">
-                {(Number(form.payout) * Number(form.totalSlots)).toLocaleString()}
+                {(Number(form.payout) * Number(form.totalSlots)).toLocaleString('en-GB')}
               </h2>
               <p className="text-xs text-zinc-500 mt-2">Based on commission to agency & total units.</p>
             </div>
@@ -2069,7 +2069,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
                     <div className="w-[1px] h-6 bg-zinc-100"></div>
                     <div className="flex flex-col">
                       <span className="text-[9px] font-bold text-zinc-400 uppercase">Created</span>
-                      <span className="text-[10px] font-medium text-zinc-500">{c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</span>
+                      <span className="text-[10px] font-medium text-zinc-500">{c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB') : '—'}</span>
                     </div>
                   </div>
                 </div>
@@ -2288,8 +2288,8 @@ export const BrandDashboard: React.FC = () => {
 
     transactions.forEach((tx: any) => {
       const dateObj = new Date(tx.date);
-      const date = dateObj.toLocaleDateString();
-      const time = dateObj.toLocaleTimeString();
+      const date = dateObj.toLocaleDateString('en-GB');
+      const time = dateObj.toLocaleTimeString('en-GB');
 
       const row = [
         csvSafe(tx.id),
@@ -2314,8 +2314,8 @@ export const BrandDashboard: React.FC = () => {
       const dateObj = new Date(tx.date);
       return [
         tx.id,
-        dateObj.toLocaleDateString(),
-        dateObj.toLocaleTimeString(),
+        dateObj.toLocaleDateString('en-GB'),
+        dateObj.toLocaleTimeString('en-GB'),
         tx.agencyName || '',
         tx.amount,
         tx.ref || '',
@@ -2525,8 +2525,8 @@ export const BrandDashboard: React.FC = () => {
                   csvSafe(String(t.issueType)), csvSafe(String(t.description || '')), csvSafe(String((t as any).userName || '')),
                   csvSafe(String((t as any).role || '')), csvSafe(String((t as any).targetRole || '')), csvSafe(String(t.orderId || '')),
                   csvSafe(String((t as any).resolutionNote || '')), csvSafe(String((t as any).resolvedByName || '')),
-                  csvSafe((t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString() : ''),
-                  csvSafe(t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''),
+                  csvSafe((t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString('en-GB') : ''),
+                  csvSafe(t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''),
                 ].join(','));
                 downloadCsv(`brand-tickets-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...rows].join('\n'));
                 toast.success(`Exported ${supportTickets.length} tickets`);
@@ -2590,7 +2590,7 @@ export const BrandDashboard: React.FC = () => {
                           }`}>{String(t.status || 'Open')}</span>
                         </div>
                       </div>
-                      <span className="text-[10px] text-zinc-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''}</span>
+                      <span className="text-[10px] text-zinc-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''}</span>
                     </div>
                     {t.description && (
                       <div className="text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2 line-clamp-3">
@@ -2612,7 +2612,7 @@ export const BrandDashboard: React.FC = () => {
                       <div className="text-[10px] text-zinc-400">
                         {String(t.status) === 'Resolved' ? 'Resolved' : 'Rejected'}
                         {(t as any).resolvedByName ? ` by ${String((t as any).resolvedByName)}` : ''}
-                        {(t as any).resolvedAt ? ` on ${new Date(String((t as any).resolvedAt)).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
+                        {(t as any).resolvedAt ? ` on ${new Date(String((t as any).resolvedAt)).toLocaleDateString('en-GB')}` : ''}
                       </div>
                     )}
                     <div className="flex items-center gap-2 justify-end flex-wrap">
@@ -2828,7 +2828,7 @@ export const BrandDashboard: React.FC = () => {
                         transactions.map((tx) => (
                           <tr key={tx.id} className="hover:bg-zinc-50/50 transition-colors">
                             <td className="p-6 text-sm font-bold text-zinc-500">
-                              {new Date(tx.date).toLocaleDateString()}
+                              {new Date(tx.date).toLocaleDateString('en-GB')}
                             </td>
                             <td className="p-6 font-mono text-xs font-bold text-zinc-400">
                               {tx.id || tx.ref}

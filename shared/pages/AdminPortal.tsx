@@ -593,8 +593,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       csvSafe(t.orderId || ''),
       csvSafe((t as any).resolutionNote || ''),
       csvSafe((t as any).resolvedByName || ''),
-      csvSafe((t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString() : ''),
-      csvSafe(t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''),
+      csvSafe((t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString('en-GB') : ''),
+      csvSafe(t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''),
     ].join(','));
     downloadCsv(`tickets_${new Date().toISOString().slice(0, 10)}.csv`, [header, ...rows].join('\n'));
     toast.success(`Exported ${supportTickets.length} tickets`);
@@ -686,8 +686,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
 
     dataToExport.forEach((order) => {
       const dateObj = new Date(order.createdAt);
-      const dateStr = dateObj.toLocaleDateString();
-      const timeStr = dateObj.toLocaleTimeString();
+      const dateStr = dateObj.toLocaleDateString('en-GB');
+      const timeStr = dateObj.toLocaleTimeString('en-GB');
       const item = order.items?.[0];
 
       const row = [
@@ -704,7 +704,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         item?.quantity ?? 1,
         item?.priceAtPurchase ?? 0,
         order.total,
-        (order as any).expectedSettlementDate ? new Date((order as any).expectedSettlementDate).toLocaleDateString() : '',
+        (order as any).expectedSettlementDate ? new Date((order as any).expectedSettlementDate).toLocaleDateString('en-GB') : '',
         csvSafe(order.status || ''),
         csvSafe(order.paymentStatus || ''),
         csvSafe(order.affiliateStatus || ''),
@@ -713,7 +713,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         csvSafe(order.agencyName || 'Direct'),
         order.id,
         csvSafe(order.soldBy || ''),
-        order.orderDate ? new Date(order.orderDate).toLocaleDateString() : '',
+        order.orderDate ? new Date(order.orderDate).toLocaleDateString('en-GB') : '',
         csvSafe(order.extractedProductName || ''),
         csvSafe(order.settlementRef || ''),
         csvSafe(order.settlementMode || ''),
@@ -746,8 +746,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       const item = order.items?.[0];
       return [
         order.externalOrderId || order.id,
-        dateObj.toLocaleDateString(),
-        dateObj.toLocaleTimeString(),
+        dateObj.toLocaleDateString('en-GB'),
+        dateObj.toLocaleTimeString('en-GB'),
         order.buyerName || '',
         order.buyerMobile || '',
         (order as any).reviewerName || '',
@@ -758,7 +758,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         item?.quantity ?? 1,
         item?.priceAtPurchase ?? 0,
         order.total,
-        (order as any).expectedSettlementDate ? new Date((order as any).expectedSettlementDate).toLocaleDateString() : '',
+        (order as any).expectedSettlementDate ? new Date((order as any).expectedSettlementDate).toLocaleDateString('en-GB') : '',
         order.status,
         order.paymentStatus,
         order.affiliateStatus || '',
@@ -767,7 +767,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         order.agencyName || 'Direct',
         order.id,
         order.soldBy || '',
-        order.orderDate ? new Date(order.orderDate).toLocaleDateString() : '',
+        order.orderDate ? new Date(order.orderDate).toLocaleDateString('en-GB') : '',
         order.extractedProductName || '',
         order.settlementRef || '',
         order.settlementMode || '',
@@ -1085,7 +1085,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   />
                   <StatCard
                     title="Orders Processed"
-                    value={(stats?.totalOrders || 0).toLocaleString()}
+                    value={(stats?.totalOrders || 0).toLocaleString('en-GB')}
                     subtext="Total"
                     icon={ShoppingCart}
                     colorClass="text-purple-600"
@@ -1340,7 +1340,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                             <h4 className="font-bold text-slate-900 text-sm">{t.issueType}</h4>
                           </div>
                           <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded">
-                            {new Date(t.createdAt).toLocaleDateString()}
+                            {new Date(t.createdAt).toLocaleDateString('en-GB')}
                           </span>
                         </div>
 
@@ -1501,7 +1501,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                               </div>
                             </div>
                             <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded">
-                              {new Date(f.createdAt).toLocaleDateString()}
+                              {new Date(f.createdAt).toLocaleDateString('en-GB')}
                             </span>
                           </div>
 
@@ -1631,7 +1631,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                             </span>
                           </td>
                           <td className="p-5 font-mono text-slate-700 font-bold">
-                            {(u.walletBalance || 0).toLocaleString()}
+                            {(u.walletBalance || 0).toLocaleString('en-GB')}
                           </td>
                           <td className="p-5">
                             <StatusBadge status={u.status} />
@@ -1871,7 +1871,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                             </div>
                           </td>
                           <td className="p-5 text-slate-600">
-                            {new Date(o.createdAt).toLocaleDateString()}
+                            {new Date(o.createdAt).toLocaleDateString('en-GB')}
                           </td>
                           <td className="p-5 font-mono text-slate-900 font-bold">{o.total}</td>
                           <td className="p-5 text-slate-700">{o.buyerName}</td>
@@ -2143,7 +2143,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         .map((log: any, idx: number) => (
                           <tr key={log.id || idx} className="border-b border-slate-100 hover:bg-slate-50">
                             <td className="p-4 text-xs text-slate-500 font-mono whitespace-nowrap">
-                              {log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}
+                              {log.createdAt ? new Date(log.createdAt).toLocaleString('en-GB') : '-'}
                             </td>
                             <td className="p-4">
                               <span className="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold uppercase">
@@ -2200,7 +2200,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                 <div><span className="text-slate-400 font-bold text-xs uppercase">Status</span><p><StatusBadge status={proofModal.affiliateStatus === 'Unchecked' ? proofModal.paymentStatus : proofModal.affiliateStatus} /></p></div>
                 <div><span className="text-slate-400 font-bold text-xs uppercase">Payment</span><p className="font-bold text-slate-900">{proofModal.paymentStatus}</p></div>
                 {proofModal.soldBy && <div><span className="text-slate-400 font-bold text-xs uppercase">Sold By</span><p className="font-bold text-slate-900">{proofModal.soldBy}</p></div>}
-                {proofModal.orderDate && <div><span className="text-slate-400 font-bold text-xs uppercase">Order Date</span><p className="font-bold text-slate-900">{new Date(proofModal.orderDate).toLocaleDateString()}</p></div>}
+                {proofModal.orderDate && <div><span className="text-slate-400 font-bold text-xs uppercase">Order Date</span><p className="font-bold text-slate-900">{new Date(proofModal.orderDate).toLocaleDateString('en-GB')}</p></div>}
                 {proofModal.extractedProductName && <div className="col-span-2"><span className="text-slate-400 font-bold text-xs uppercase">Extracted Product</span><p className="font-bold text-slate-900">{proofModal.extractedProductName}</p></div>}
                 <div><span className="text-slate-400 font-bold text-xs uppercase">Deal Type</span><p className="font-bold text-slate-900">{proofModal.items?.[0]?.dealType || 'Discount'}</p></div>
                 {proofModal.managerName && <div><span className="text-slate-400 font-bold text-xs uppercase">Mediator</span><p className="font-bold text-slate-900">{proofModal.managerName}</p></div>}

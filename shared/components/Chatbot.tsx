@@ -463,7 +463,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                           </div>
                           {n.createdAt && (
                             <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mt-1">
-                              {new Date(n.createdAt).toLocaleString()}
+                              {new Date(n.createdAt).toLocaleString('en-GB')}
                             </div>
                           )}
                         </div>
@@ -667,7 +667,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                               {order.expectedSettlementDate && !isPaid && (
                                 <span className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
                                   <CalendarClock size={10} />{' '}
-                                  {new Date(order.expectedSettlementDate).toLocaleDateString()}
+                                  {new Date(order.expectedSettlementDate).toLocaleDateString('en-GB')}
                                 </span>
                               )}
                             </div>

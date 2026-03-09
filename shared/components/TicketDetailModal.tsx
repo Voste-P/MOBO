@@ -202,7 +202,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
               </span>
             </div>
             <p className="text-[10px] text-zinc-400 mt-1">
-              Ticket #{ticket.id.slice(-8)} &middot; Created {new Date(ticket.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+              Ticket #{ticket.id.slice(-8)} &middot; Created {new Date(ticket.createdAt).toLocaleDateString('en-GB')}
             </p>
           </div>
           <button
@@ -235,7 +235,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
               <p className="text-[10px] text-zinc-400">
                 {ticket.status === 'Resolved' ? 'Resolved' : 'Rejected'}
                 {ticket.resolvedByName ? ` by ${ticket.resolvedByName}` : ''}
-                {ticket.resolvedAt ? ` on ${new Date(ticket.resolvedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
+                {ticket.resolvedAt ? ` on ${new Date(ticket.resolvedAt).toLocaleDateString('en-GB')}` : ''}
               </p>
             )}
           </div>
@@ -273,7 +273,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
                   <div><span className="text-zinc-500">Deal Type:</span> <strong className="text-zinc-800">{orderDetails.dealType}</strong></div>
                 )}
                 {orderDetails.orderDate && (
-                  <div><span className="text-zinc-500">Order Date:</span> <strong className="text-zinc-800">{new Date(orderDetails.orderDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</strong></div>
+                  <div><span className="text-zinc-500">Order Date:</span> <strong className="text-zinc-800">{new Date(orderDetails.orderDate).toLocaleDateString('en-GB')}</strong></div>
                 )}
                 {orderDetails.workflowStatus && (
                   <div><span className="text-zinc-500">Workflow:</span> <strong className="text-zinc-800">{orderDetails.workflowStatus}</strong></div>
@@ -302,7 +302,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
                 <div className="absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full bg-blue-400 border-2 border-white" />
                 <p className="text-[10px] text-zinc-600">
                   <strong className={roleColors[(ticket as any).userRole || ticket.role] || ''}>{ticket.userName}</strong> created this ticket
-                  <span className="text-zinc-400 ml-1">{new Date(ticket.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="text-zinc-400 ml-1">{new Date(ticket.createdAt).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                 </p>
               </div>
               {ticket.targetRole && ticket.targetRole !== ((ticket as any).userRole === 'shopper' ? 'mediator' : ESCALATION_PATH[(ticket as any).userRole || '']) && (
@@ -318,7 +318,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
                   <div className={`absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${ticket.status === 'Resolved' ? 'bg-emerald-400' : 'bg-red-400'}`} />
                   <p className="text-[10px] text-zinc-600">
                     <strong>{ticket.resolvedByName || 'System'}</strong> {ticket.status === 'Resolved' ? 'resolved' : 'rejected'} this ticket
-                    {ticket.resolvedAt && <span className="text-zinc-400 ml-1">{new Date(ticket.resolvedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>}
+                    {ticket.resolvedAt && <span className="text-zinc-400 ml-1">{new Date(ticket.resolvedAt).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>}
                   </p>
                 </div>
               )}
@@ -354,7 +354,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
                         </div>
                         <p className="text-[11px] leading-relaxed whitespace-pre-wrap break-words">{c.message}</p>
                         <p className={`text-[8px] mt-1 ${isMe ? 'text-zinc-400 text-right' : 'text-zinc-400'}`}>
-                          {new Date(c.createdAt).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          {new Date(c.createdAt).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
                     </div>
