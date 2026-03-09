@@ -4523,27 +4523,10 @@ export const AgencyDashboard: React.FC = () => {
                   )}
                   <div className="flex items-center gap-2 justify-end flex-wrap">
                     {String(t.status || '').toLowerCase() === 'open' && resolvingTicketId !== t.id && (
-                      <>
                         <button type="button" onClick={() => { setResolvingTicketId(t.id); setResolutionNote(''); }}
                           className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
                           ✓ Resolve / Reject
                         </button>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            try {
-                              await api.tickets.escalate(t.id);
-                              toast.success('Ticket escalated to brand.');
-                              fetchData();
-                            } catch (err: any) {
-                              toast.error(formatErrorMessage(err, 'Failed to escalate ticket.'));
-                            }
-                          }}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100"
-                        >
-                          ↑ Escalate
-                        </button>
-                      </>
                     )}
                     {String(t.status || '').toLowerCase() === 'open' && resolvingTicketId === t.id && (
                       <div className="w-full mt-1 space-y-1.5">
