@@ -610,8 +610,8 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                 {(t as any).userName && (
                   <div className="text-[9px] text-zinc-400">From: {String((t as any).userName)} ({String((t as any).userRole || '')})</div>
                 )}
-                {t.orderId && (
-                  <div className="text-[9px] text-zinc-400"><span className="font-bold">Order:</span> {String(t.orderId)}</div>
+                {(t.externalOrderId || t.orderId) && (
+                  <div className="text-[9px] text-zinc-400"><span className="font-bold">Order:</span> {String(t.externalOrderId || t.orderId)}</div>
                 )}
                 {(t as any).resolutionNote && (
                   <div className="text-[10px] text-green-700 bg-green-50 rounded-lg px-2 py-1.5">
@@ -671,15 +671,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                             className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
                             ✓ Resolve / Reject
                           </button>
-                          <button type="button" onClick={async () => {
-                            try {
-                              await api.tickets.escalate(t.id);
-                              toast.success('Ticket escalated to agency.');
-                              onRefresh();
-                            } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to escalate.')); }
-                          }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100">
-                            ↑ Escalate
-                          </button>
+
                         </>
                       )}
                     </>

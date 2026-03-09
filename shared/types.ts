@@ -266,6 +266,8 @@ export interface Ticket {
   userName: string;
   role: Role;
   orderId?: string;
+  /** Enriched external order ID (e.g. Amazon/Flipkart order ID) resolved by backend */
+  externalOrderId?: string;
   issueType: string;
   description: string;
   status: TicketStatus;
