@@ -452,7 +452,7 @@ export function makeOrdersController(env: Env) {
           );
           // Guard against NaN/Infinity from bad request data
           if (!Number.isFinite(expectedAmount) || expectedAmount <= 0) {
-            throw new AppError(400, 'INVALID_ORDER_AMOUNT', 'Could not compute a valid order amount for verification.');
+            throw new AppError(400, 'INVALID_ORDER_AMOUNT', 'Unable to process your order. Please check the order details and try again.');
           }
           const aiStart = Date.now();
           const verification = await verifyProofWithAi(env, {
@@ -471,12 +471,12 @@ export function makeOrdersController(env: Env) {
             throw new AppError(
               422,
               'INVALID_ORDER_PROOF',
-              `Order proof did not match the order ID and amount (confidence: ${verification?.confidenceScore ?? 0}/${confidenceThreshold}). Please upload a clear, valid proof.`
+              'Your order proof could not be verified. Please upload a clear screenshot showing the order ID and amount.'
             );
           }
           aiOrderConfidence = verification?.confidenceScore ?? 0;
         } else {
-          throw new AppError(503, 'AI_NOT_CONFIGURED', 'Proof validation is not configured.');
+          throw new AppError(503, 'AI_NOT_CONFIGURED', 'Proof verification is temporarily unavailable. Please try again later.');
         }
         const campaignWhere = UUID_RE.test(item.campaignId)
           ? { OR: [{ id: item.campaignId }, { mongoId: item.campaignId }], isDeleted: false }
@@ -559,7 +559,7 @@ export function makeOrdersController(env: Env) {
           throw new AppError(
             409,
             'SOLD_OUT_FOR_PARTNER',
-            `Sold out for your partner (${upstreamMediatorCode}).`
+            'This product is currently sold out for your network. Please try again later.'
           );
         }
 

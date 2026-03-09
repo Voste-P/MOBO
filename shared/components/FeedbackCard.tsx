@@ -3,6 +3,7 @@ import { MessageCircle, Star, CheckCircle, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { formatErrorMessage } from '../utils/errors';
 
 interface FeedbackCardProps {
   role: 'user' | 'mediator' | 'agency' | 'brand';
@@ -31,7 +32,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({ role }) => {
       setSent(true);
       toast.success('Feedback submitted — thank you!');
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to send feedback');
+      toast.error(formatErrorMessage(err, 'Failed to send feedback'));
     } finally {
       setSubmitting(false);
     }

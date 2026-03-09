@@ -492,7 +492,7 @@ export const Profile: React.FC = () => {
                     setFeedbackSent(true);
                     toast.success('Feedback submitted — thank you!');
                   } catch (err: any) {
-                    toast.error(err?.message || 'Failed to send feedback');
+                    toast.error(formatErrorMessage(err, 'Failed to send feedback'));
                   } finally {
                     setFeedbackSubmitting(false);
                   }

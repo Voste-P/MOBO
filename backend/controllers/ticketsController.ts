@@ -17,7 +17,7 @@ import { writeAuditLog } from '../services/audit.js';
 import { parsePagination, paginatedResponse } from '../utils/pagination.js';
 
 /** Batch-resolve resolvedBy user IDs to user names for a list of tickets */
-async function enrichTicketsWithResolverNames(tickets: any[]): Promise<any[]> {
+async function enrichTickets(tickets: any[]): Promise<any[]> {
   const db = prisma();
   const resolverIds = [...new Set(tickets.map(t => t.resolvedBy).filter(Boolean))];
   if (!resolverIds.length) return tickets;
@@ -30,6 +30,37 @@ async function enrichTicketsWithResolverNames(tickets: any[]): Promise<any[]> {
     ...t,
     resolvedByName: t.resolvedBy ? (nameMap.get(t.resolvedBy) || null) : null,
   }));
+}
+
+/** Batch-resolve orderId → externalOrderId for a list of tickets */
+async function enrichTicketsWithExternalOrderIds(tickets: any[]): Promise<any[]> {
+  const db = prisma();
+  const orderIds = [...new Set(tickets.map(t => String(t.orderId || '').trim()).filter(Boolean))];
+  if (!orderIds.length) return tickets;
+  // Look up orders by id or mongoId depending on format
+  const uuidIds = orderIds.filter(id => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
+  const mongoIds = orderIds.filter(id => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
+  const orders = await db.order.findMany({
+    where: { OR: [...(uuidIds.length ? [{ id: { in: uuidIds } }] : []), ...(mongoIds.length ? [{ mongoId: { in: mongoIds } }] : [])] },
+    select: { id: true, mongoId: true, externalOrderId: true },
+  });
+  const extMap = new Map<string, string>();
+  for (const o of orders) {
+    if (o.externalOrderId) {
+      extMap.set(o.id, o.externalOrderId);
+      if (o.mongoId) extMap.set(o.mongoId, o.externalOrderId);
+    }
+  }
+  return tickets.map(t => ({
+    ...t,
+    externalOrderId: t.orderId ? (extMap.get(t.orderId) || null) : null,
+  }));
+}
+
+/** Combined enrichment: resolver names + external order IDs */
+async function enrichTickets(tickets: any[]): Promise<any[]> {
+  const withResolvers = await enrichTickets(tickets);
+  return enrichTicketsWithExternalOrderIds(withResolvers);
 }
 
 async function buildTicketAudience(ticket: any) {
@@ -149,7 +180,7 @@ async function assertCanReferenceOrder(params: { orderId: string; pgUserId: stri
     if (!mediatorCodes.includes(order.managerName)) throw new AppError(403, 'FORBIDDEN', 'Cannot reference orders outside your network');
     return;
   }
-  throw new AppError(403, 'FORBIDDEN', 'Insufficient role');
+  throw new AppError(403, 'FORBIDDEN', 'You don\'t have permission to access this order.');
 }
 
 /**
@@ -430,11 +461,47 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
         if (!canAccess) throw new AppError(403, 'FORBIDDEN', 'Not allowed');
 
         const mapped = pgTicket(ticket);
-        const enriched = (await enrichTicketsWithResolverNames([mapped]))[0];
+        const enriched = (await enrichTickets([mapped]))[0];
         const uiTicket = roles.includes('brand') ? toUiTicketForBrand(enriched) : toUiTicket(enriched);
+
+        // Enrich with order details if orderId is present
+        let orderDetails: any = null;
+        const rawOrderId = String(ticket.orderId || '').trim();
+        if (rawOrderId) {
+          const order = await db.order.findFirst({
+            where: { ...idWhere(rawOrderId), isDeleted: false },
+            select: {
+              id: true, externalOrderId: true, total: true, workflowStatus: true,
+              affiliateStatus: true, paymentStatus: true, orderDate: true,
+              managerName: true, soldBy: true, createdAt: true,
+              items: { where: { isDeleted: false }, select: { title: true, platform: true, brandName: true, priceAtPurchase: true, quantity: true, commission: true, dealType: true } },
+            },
+          });
+          if (order) {
+            const item = (order.items as any)?.[0];
+            orderDetails = {
+              externalOrderId: order.externalOrderId || null,
+              total: order.total,
+              workflowStatus: order.workflowStatus,
+              affiliateStatus: order.affiliateStatus,
+              paymentStatus: order.paymentStatus,
+              orderDate: order.orderDate ? new Date(order.orderDate).toISOString() : null,
+              mediator: order.managerName || null,
+              soldBy: order.soldBy || null,
+              product: item?.title || null,
+              platform: item?.platform || null,
+              brand: item?.brandName || null,
+              unitPrice: item?.priceAtPurchase ?? null,
+              quantity: item?.quantity ?? null,
+              commission: item?.commission ?? null,
+              dealType: item?.dealType || null,
+            };
+          }
+        }
 
         res.json({
           ...uiTicket,
+          orderDetails,
           comments: (ticket.comments || []).map((c: any) => ({
             id: c.id,
             userId: c.userId,
@@ -570,18 +637,16 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
           const roleFilter = String(req.query.role || '').trim().toLowerCase();
           const statusFilter = String(req.query.status || '').trim();
           const targetRoleFilter = String(req.query.targetRole || '').trim().toLowerCase();
-          const priorityFilter = String(req.query.priority || '').trim().toLowerCase();
           const ticketWhere: any = { isDeleted: false };
           if (roleFilter && roleFilter !== 'all') ticketWhere.role = roleFilter;
           if (statusFilter && statusFilter !== 'All' && statusFilter !== 'all') ticketWhere.status = statusFilter;
           if (targetRoleFilter && targetRoleFilter !== 'all') ticketWhere.targetRole = targetRoleFilter;
-          if (priorityFilter && priorityFilter !== 'all') ticketWhere.priority = priorityFilter;
           const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 200, maxLimit: 500 });
           const [tickets, total] = await Promise.all([
             db.ticket.findMany({ where: ticketWhere, orderBy: { createdAt: 'desc' }, skip, take: limit }),
             db.ticket.count({ where: ticketWhere }),
           ]);
-          const enriched = await enrichTicketsWithResolverNames(tickets);
+          const enriched = await enrichTickets(tickets);
           res.json(paginatedResponse(enriched.map((t) => { try { return toUiTicket(pgTicket(t)); } catch (e) { orderLog.error(`[tickets] toUiTicket failed for ${t.id}`, { error: e }); return null; } }).filter(Boolean) as any[], total, page, limit, isPaginated));
           logTicketAccess(tickets.length);
           return;
@@ -594,7 +659,7 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
             db.ticket.findMany({ where: shopperWhere, orderBy: { createdAt: 'desc' }, skip, take: limit }),
             db.ticket.count({ where: shopperWhere }),
           ]);
-          const enriched = await enrichTicketsWithResolverNames(tickets);
+          const enriched = await enrichTickets(tickets);
           res.json(paginatedResponse(enriched.map((t) => { try { return toUiTicket(pgTicket(t)); } catch (e) { orderLog.error(`[tickets] toUiTicket failed for ${t.id}`, { error: e }); return null; } }).filter(Boolean) as any[], total, page, limit, isPaginated));
           logTicketAccess(tickets.length);
           return;
@@ -728,7 +793,7 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
           db.ticket.count({ where: ticketWhere }),
         ]);
 
-        const enriched = await enrichTicketsWithResolverNames(tickets);
+        const enriched = await enrichTickets(tickets);
 
         if (roles.includes('brand')) {
           res.json(paginatedResponse(enriched.map((t) => { try { return toUiTicketForBrand(pgTicket(t)); } catch (e) { orderLog.error(`[tickets] toUiTicketForBrand failed for ${t.id}`, { error: e }); return null; } }).filter(Boolean) as any[], total, page, limit, isPaginated));
@@ -754,7 +819,7 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
         // Server-side issueType validation against role-specific allowed types
         const allowedTypes = ROLE_ISSUE_TYPES[role];
         if (allowedTypes && !allowedTypes.includes(body.issueType)) {
-          throw new AppError(400, 'INVALID_ISSUE_TYPE', `Invalid issue type "${body.issueType}" for role ${role}. Allowed: ${allowedTypes.join(', ')}`);
+          throw new AppError(400, 'INVALID_ISSUE_TYPE', 'This issue type is not available for your account. Please select a different option.');
         }
 
         if (body.orderId) {
@@ -774,7 +839,6 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
             description: body.description,
             status: 'Open' as any,
             targetRole,
-            priority: body.priority || 'medium',
             createdBy: pgUserId,
           },
         });
@@ -824,14 +888,14 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
         // Exception: ticket owner can always resolve/reject their own ticket
         if (body.status === 'Resolved' || body.status === 'Rejected' || body.escalate) {
           if (!isTicketOwner && !isPrivileged(roles) && actorLevel < targetLevel) {
-            throw new AppError(403, 'ROLE_LEVEL_INSUFFICIENT', `Only ${existing.targetRole} or higher can ${body.escalate ? 'escalate' : body.status === 'Resolved' ? 'resolve' : 'reject'} this ticket`);
+            throw new AppError(403, 'ROLE_LEVEL_INSUFFICIENT', `You don't have permission to ${body.escalate ? 'escalate' : body.status === 'Resolved' ? 'resolve' : 'reject'} this ticket.`);
           }
         }
 
         // For reopening: allow owner OR anyone at/above target level
         if (previousStatus !== 'Open' && body.status === 'Open' && !body.escalate) {
           if (!isTicketOwner && !isPrivileged(roles) && actorLevel < targetLevel) {
-            throw new AppError(403, 'ROLE_LEVEL_INSUFFICIENT', 'Only the ticket owner or a higher role can reopen this ticket');
+            throw new AppError(403, 'ROLE_LEVEL_INSUFFICIENT', 'You don\'t have permission to reopen this ticket.');
           }
         }
 
@@ -839,6 +903,13 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
         if (body.escalate && existing.targetRole) {
           const nextRole = ESCALATION_PATH[existing.targetRole];
           if (!nextRole) throw new AppError(400, 'CANNOT_ESCALATE', 'Ticket cannot be escalated further');
+
+          // Buyer/mediator tickets stop at agency — agency is the final resolution point
+          const ticketOriginRole = String(existing.role || '').toLowerCase();
+          if (['shopper', 'user', 'mediator'].includes(ticketOriginRole) && existing.targetRole === 'agency') {
+            throw new AppError(400, 'CANNOT_ESCALATE', 'This ticket is already at the final resolution stage');
+          }
+
           updatePayload.targetRole = nextRole;
           updatePayload.status = 'Open'; // keep open when escalating
         }
@@ -851,7 +922,7 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
 
         const ticket = await db.ticket.update({ where: { id: existing.id }, data: updatePayload });
         const mapped = pgTicket(ticket);
-        const enriched = (await enrichTicketsWithResolverNames([mapped]))[0];
+        const enriched = (await enrichTickets([mapped]))[0];
 
         const audience = await buildTicketAudience(enriched);
         publishRealtime({ type: 'tickets.changed', ts: new Date().toISOString(), payload: { ticketId: String(enriched._id), status: body.status }, audience });

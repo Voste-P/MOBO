@@ -210,7 +210,6 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   const [ticketRoleFilter, setTicketRoleFilter] = useState<string>('All');
   const [ticketStatusFilter, setTicketStatusFilter] = useState<string>('All');
   const [ticketSearch, setTicketSearch] = useState('');
-  const [ticketPriorityFilter, setTicketPriorityFilter] = useState<string>('All');
   const [resolvingTicketId, setResolvingTicketId] = useState<string | null>(null);
   const [resolutionNote, setResolutionNote] = useState('');
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
@@ -582,11 +581,10 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   const exportTicketsCsv = () => {
     const supportTickets = tickets.filter((t) => t.issueType !== 'Feedback');
     if (supportTickets.length === 0) { toast.error('No tickets to export'); return; }
-    const header = ['Ticket ID', 'Status', 'Priority', 'Issue Type', 'Description', 'User', 'Role', 'Target Role', 'Order ID', 'Resolution Note', 'Resolved By', 'Resolved At', 'Created At'].map(csvSafe).join(',');
+    const header = ['Ticket ID', 'Status', 'Issue Type', 'Description', 'User', 'Role', 'Target Role', 'Order ID', 'Resolution Note', 'Resolved By', 'Resolved At', 'Created At'].map(csvSafe).join(',');
     const rows = supportTickets.map((t) => [
       csvSafe(t.id.slice(-8)),
       csvSafe(t.status),
-      csvSafe((t as any).priority || 'medium'),
       csvSafe(t.issueType),
       csvSafe(t.description),
       csvSafe(t.userName),
@@ -675,6 +673,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       'Sold By',
       'Order Date',
       'Extracted Product',
+      'UTR/Reference',
+      'Payment Mode',
       'Proof: Order',
       'Proof: Payment',
       'Proof: Rating',
@@ -715,6 +715,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         csvSafe(order.soldBy || ''),
         order.orderDate ? new Date(order.orderDate).toLocaleDateString() : '',
         csvSafe(order.extractedProductName || ''),
+        csvSafe(order.settlementRef || ''),
+        csvSafe(order.settlementMode || ''),
         order.screenshots?.order ? hyperlinkYes(buildProofUrl(order.id, 'order')) : 'No',
         order.screenshots?.payment ? hyperlinkYes(buildProofUrl(order.id, 'payment')) : 'No',
         order.screenshots?.rating ? hyperlinkYes(buildProofUrl(order.id, 'rating')) : 'No',
@@ -738,7 +740,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       toast.info('No data available to export.');
       return;
     }
-    const sheetHeaders = ['Order ID','Date','Time','Customer Name','Customer Mobile','Reviewer Name','Brand','Product','Platform','Deal Type','Quantity','Unit Price','Total Amount','Settlement Date','Order Status','Payment Status','Verification Status','Mediator Name','Mediator Code','Agency Name','Internal Ref','Sold By','Order Date','Extracted Product'];
+    const sheetHeaders = ['Order ID','Date','Time','Customer Name','Customer Mobile','Reviewer Name','Brand','Product','Platform','Deal Type','Quantity','Unit Price','Total Amount','Settlement Date','Order Status','Payment Status','Verification Status','Mediator Name','Mediator Code','Agency Name','Internal Ref','Sold By','Order Date','Extracted Product','UTR/Reference','Payment Mode'];
     const sheetRows = dataToExport.map((order) => {
       const dateObj = new Date(order.createdAt);
       const item = order.items?.[0];
@@ -767,6 +769,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         order.soldBy || '',
         order.orderDate ? new Date(order.orderDate).toLocaleDateString() : '',
         order.extractedProductName || '',
+        order.settlementRef || '',
+        order.settlementMode || '',
       ] as (string | number)[];
     });
     exportToGoogleSheet({
@@ -825,7 +829,6 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     return products.filter(
       (p) =>
         (p.title || '').toLowerCase().includes(q) ||
-        (p.category || '').toLowerCase().includes(q) ||
         (p.platform || '').toLowerCase().includes(q)
     );
   }, [products, inventorySearch]);
@@ -1212,7 +1215,6 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
               const filteredTickets = supportTickets.filter((t) => {
                 if (ticketRoleFilter !== 'All' && (t.role || '').toLowerCase() !== ticketRoleFilter.toLowerCase()) return false;
                 if (ticketStatusFilter !== 'All' && t.status !== ticketStatusFilter) return false;
-                if (ticketPriorityFilter !== 'All' && ((t as any).priority || 'medium') !== ticketPriorityFilter) return false;
                 if (ticketSearch.trim()) {
                   const q = ticketSearch.trim().toLowerCase();
                   if (
@@ -1302,24 +1304,6 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   </div>
                 </div>
 
-                {/* Priority Filter */}
-                <div className="flex flex-wrap gap-1.5">
-                  {(['All', 'urgent', 'high', 'medium', 'low'] as const).map((p) => (
-                    <button key={p} type="button" onClick={() => setTicketPriorityFilter(p)}
-                      className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all border ${
-                        ticketPriorityFilter === p
-                          ? p === 'urgent' ? 'bg-red-500 text-white border-red-500' :
-                            p === 'high' ? 'bg-orange-500 text-white border-orange-500' :
-                            p === 'medium' ? 'bg-blue-500 text-white border-blue-500' :
-                            p === 'low' ? 'bg-slate-500 text-white border-slate-500' :
-                            'bg-slate-700 text-white border-slate-700'
-                          : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
-                      }`}>
-                      {p === 'All' ? 'All Priorities' : p.charAt(0).toUpperCase() + p.slice(1)}
-                    </button>
-                  ))}
-                </div>
-
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 max-h-[70vh] overflow-y-auto scrollbar-styled">
                   {isLoading ? (
                     <div className="col-span-full">
@@ -1351,17 +1335,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                               <span className="text-[10px] font-mono text-slate-400">
                                 #{t.id.slice(-6)}
                               </span>
-                              <StatusBadge status={t.status} />
-                              {(t as any).priority && (t as any).priority !== 'medium' && (
-                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                                  (t as any).priority === 'urgent' ? 'bg-red-100 text-red-600'
-                                  : (t as any).priority === 'high' ? 'bg-orange-100 text-orange-600'
-                                  : 'bg-slate-100 text-slate-500'
-                                }`}>
-                                  {(t as any).priority}
-                                </span>
-                              )}
-                            </div>
+                              <StatusBadge status={t.status} />\n                            </div>", "oldString": "                              <StatusBadge status={t.status} />\n                              {(t as any).priority && (t as any).priority !== 'medium' && (\n                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${\n                                  (t as any).priority === 'urgent' ? 'bg-red-100 text-red-600'\n                                  : (t as any).priority === 'high' ? 'bg-orange-100 text-orange-600'\n                                  : 'bg-slate-100 text-slate-500'\n                                }`}>\n                                  {(t as any).priority}\n                                </span>\n                              )}\n                            </div>
                             <h4 className="font-bold text-slate-900 text-sm">{t.issueType}</h4>
                           </div>
                           <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded">
@@ -1876,13 +1850,15 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         <th className="p-5">Date</th>
                         <th className="p-5">Amount</th>
                         <th className="p-5">Customer</th>
+                        <th className="p-5">Mediator</th>
+                        <th className="p-5">Campaign</th>
                         <th className="p-5">Proofs</th>
                         <th className="p-5 text-right">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 text-sm font-medium">
                       {filteredOrders.length > 200 && (
-                        <tr><td colSpan={5} className="p-3 text-center text-xs text-amber-600 bg-amber-50 font-semibold">
+                        <tr><td colSpan={8} className="p-3 text-center text-xs text-amber-600 bg-amber-50 font-semibold">
                           Showing 200 of {filteredOrders.length} orders. Use filters to narrow results.
                         </td></tr>
                       )}
@@ -1898,6 +1874,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                           </td>
                           <td className="p-5 font-mono text-slate-900 font-bold">{o.total}</td>
                           <td className="p-5 text-slate-700">{o.buyerName}</td>
+                          <td className="p-5 text-slate-600 text-xs">{o.managerName || '-'}</td>
+                          <td className="p-5 text-slate-600 text-xs truncate max-w-[120px]">{o.items?.[0]?.campaignId ? o.items[0].campaignId.slice(-8) : '-'}</td>
                           <td className="p-5">
                             <button
                               type="button"
@@ -1933,7 +1911,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                 </div>
                 <div className="p-4 border-b border-slate-100">
                   <Input
-                    placeholder="Search products (name, category, platform)..."
+                    placeholder="Search products (name, platform)..."
                     value={inventorySearch}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInventorySearch(e.target.value)}
                     className="text-sm"
@@ -1944,7 +1922,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   <thead className="bg-slate-50 text-xs font-extrabold uppercase text-slate-400 tracking-wider sticky top-0 z-10">
                     <tr>
                       <th className="p-5">Product</th>
-                      <th className="p-5">Category</th>
+                      <th className="p-5">Platform</th>
                       <th className="p-5 text-right">Price</th>
                       <th className="p-5 text-right">Commission</th>
                       <th className="p-5 text-right">Status</th>
@@ -1963,7 +1941,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                           </div>
                         </td>
                         <td className="p-5 text-slate-500 uppercase text-xs font-bold">
-                          {p.category}
+                          {p.platform || '-'}
                         </td>
                         <td className="p-5 text-right font-mono text-slate-900">{p.price}</td>
                         <td className="p-5 text-right font-mono text-emerald-600">
@@ -2203,6 +2181,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                 {proofModal.extractedProductName && <div className="col-span-2"><span className="text-slate-400 font-bold text-xs uppercase">Extracted Product</span><p className="font-bold text-slate-900">{proofModal.extractedProductName}</p></div>}
                 <div><span className="text-slate-400 font-bold text-xs uppercase">Deal Type</span><p className="font-bold text-slate-900">{proofModal.items?.[0]?.dealType || 'Discount'}</p></div>
                 {proofModal.managerName && <div><span className="text-slate-400 font-bold text-xs uppercase">Mediator</span><p className="font-bold text-slate-900">{proofModal.managerName}</p></div>}
+                {proofModal.settlementRef && <div><span className="text-slate-400 font-bold text-xs uppercase">UTR / Reference</span><p className="font-bold text-slate-900 font-mono text-xs">{proofModal.settlementRef}</p></div>}
+                {proofModal.settlementMode && <div><span className="text-slate-400 font-bold text-xs uppercase">Payment Mode</span><p className="font-bold text-slate-900 uppercase">{proofModal.settlementMode}</p></div>}
               </div>
 
               {/* 1. Purchase Proof */}

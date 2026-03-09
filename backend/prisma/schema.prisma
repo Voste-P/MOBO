@@ -794,8 +794,8 @@ model Ticket {
   /// Which role should handle this ticket (cascade routing)
   targetRole  String?      @map("target_role")
 
-  /// Priority level: low, medium, high, urgent
-  priority    String       @default("medium")
+  /// @deprecated — priority removed from UI; kept nullable for backward-compat
+  priority    String?      @map("priority")
 
   resolvedBy     String?   @map("resolved_by") @db.Uuid
   resolvedAt     DateTime? @map("resolved_at")

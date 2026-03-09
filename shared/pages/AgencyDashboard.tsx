@@ -564,6 +564,8 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
       'Sold By',
       'Order Date',
       'Extracted Product',
+      'UTR/Reference',
+      'Payment Mode',
       'Proof: Order',
       'Proof: Payment',
       'Proof: Rating',
@@ -614,6 +616,8 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
         csvSafe(o.soldBy || ''),
         o.orderDate ? new Date(o.orderDate).toLocaleDateString() : '',
         csvSafe(o.extractedProductName || ''),
+        csvSafe(o.settlementRef || ''),
+        csvSafe(o.settlementMode || ''),
         o.screenshots?.order ? hyperlinkYes(buildProofUrl(o.id, 'order')) : 'No',
         o.screenshots?.payment ? hyperlinkYes(buildProofUrl(o.id, 'payment')) : 'No',
         o.screenshots?.rating ? hyperlinkYes(buildProofUrl(o.id, 'rating')) : 'No',
@@ -666,12 +670,14 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
         o.soldBy || '',
         o.orderDate ? new Date(o.orderDate).toLocaleDateString() : '',
         o.extractedProductName || '',
+        o.settlementRef || '',
+        o.settlementMode || '',
       ] as (string | number)[];
     });
 
     exportToGoogleSheet({
       title: `Agency Orders Report - ${new Date().toISOString().slice(0, 10)}`,
-      headers: ['Order ID','Date','Time','Product','Brand','Platform','Deal Type','Unit Price','Quantity','Total Value','Commission (₹)','Settlement Date','Agency Name','Mediator Name','Mediator Code','Buyer Name','Buyer Mobile','Reviewer Name','Workflow Status','Payment Status','Verification Status','Internal Ref','Sold By','Order Date','Extracted Product'],
+      headers: ['Order ID','Date','Time','Product','Brand','Platform','Deal Type','Unit Price','Quantity','Total Value','Commission (₹)','Settlement Date','Agency Name','Mediator Name','Mediator Code','Buyer Name','Buyer Mobile','Reviewer Name','Workflow Status','Payment Status','Verification Status','Internal Ref','Sold By','Order Date','Extracted Product','UTR/Reference','Payment Mode'],
       rows: orderRows,
       sheetName: 'Agency Orders',
       onStart: () => setSheetsExporting(true),
@@ -3752,7 +3758,6 @@ export const AgencyDashboard: React.FC = () => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [ticketFilter, setTicketFilter] = useState<'All' | 'Open' | 'Resolved' | 'Rejected'>('All');
   const [ticketSearch, setTicketSearch] = useState('');
-  const [ticketPriorityFilter, setTicketPriorityFilter] = useState<string>('All');
   const [resolvingTicketId, setResolvingTicketId] = useState<string | null>(null);
   const [resolutionNote, setResolutionNote] = useState('');
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
@@ -4025,10 +4030,7 @@ export const AgencyDashboard: React.FC = () => {
             <button type="button" onClick={() => {
               const supportTickets = tickets.filter(t => t.issueType !== 'Feedback');
               if (!supportTickets.length) { toast.error('No tickets to export'); return; }
-              const header = ['Ticket ID','Status','Priority','Issue Type','Description','User','Role','Target Role','Order ID','Resolution Note','Resolved By','Resolved At','Created At'].map(csvSafe).join(',');
-              const rows = supportTickets.map(t => [
-                csvSafe(t.id.slice(-8)), csvSafe(String(t.status)), csvSafe(String((t as any).priority || 'medium')),
-                csvSafe(String(t.issueType)), csvSafe(String(t.description || '')), csvSafe(String((t as any).userName || '')),
+              const header = ['Ticket ID','Status','Issue Type','Description','User','Role','Target Role','Order ID','Resolution Note','Resolved By','Resolved At','Created At'].map(csvSafe).join(',');\n              const rows = supportTickets.map(t => [\n                csvSafe(t.id.slice(-8)), csvSafe(String(t.status)),\n                csvSafe(String(t.issueType)),", "oldString": "              const header = ['Ticket ID','Status','Priority','Issue Type','Description','User','Role','Target Role','Order ID','Resolution Note','Resolved By','Resolved At','Created At'].map(csvSafe).join(',');\n              const rows = supportTickets.map(t => [\n                csvSafe(t.id.slice(-8)), csvSafe(String(t.status)), csvSafe(String((t as any).priority || 'medium')),\n                csvSafe(String(t.issueType)), csvSafe(String(t.description || '')), csvSafe(String((t as any).userName || '')),
                 csvSafe(String((t as any).role || '')), csvSafe(String((t as any).targetRole || '')), csvSafe(String(t.orderId || '')),
                 csvSafe(String((t as any).resolutionNote || '')), csvSafe(String((t as any).resolvedByName || '')),
                 csvSafe((t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString() : ''),
@@ -4062,23 +4064,6 @@ export const AgencyDashboard: React.FC = () => {
                 );
               })}
             </div>
-            <div className="flex items-center gap-1.5 mb-4 flex-wrap">
-              <span className="text-[10px] font-bold text-slate-400 mr-1">Priority:</span>
-              {['All', 'urgent', 'high', 'medium', 'low'].map(p => (
-                <button key={p} type="button" onClick={() => setTicketPriorityFilter(p)}
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
-                    ticketPriorityFilter === p
-                      ? p === 'urgent' ? 'bg-red-500 text-white border-red-500' :
-                        p === 'high' ? 'bg-orange-500 text-white border-orange-500' :
-                        p === 'medium' ? 'bg-blue-500 text-white border-blue-500' :
-                        p === 'low' ? 'bg-slate-500 text-white border-slate-500' :
-                        'bg-slate-800 text-white border-slate-800'
-                      : 'bg-white text-slate-500 border-slate-200'
-                  }`}>
-                  {p === 'All' ? 'All' : p.charAt(0).toUpperCase() + p.slice(1)}
-                </button>
-              ))}
-            </div>
             </>
           )}
           {(!tickets || tickets.length === 0) ? (
@@ -4091,7 +4076,6 @@ export const AgencyDashboard: React.FC = () => {
             <div className="space-y-3 max-h-[65vh] overflow-y-auto scrollbar-styled">
               {tickets.filter((t: Ticket) => {
                 if (ticketFilter !== 'All' && String(t.status) !== ticketFilter) return false;
-                if (ticketPriorityFilter !== 'All' && String(t.priority || 'medium') !== ticketPriorityFilter) return false;
                 if (ticketSearch.trim()) {
                   const q = ticketSearch.trim().toLowerCase();
                   return (String(t.issueType || '').toLowerCase().includes(q) ||

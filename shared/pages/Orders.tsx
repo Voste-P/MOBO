@@ -7,7 +7,6 @@ import { subscribeRealtime } from '../services/realtime';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 
-import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { formatCurrency } from '../utils/formatCurrency';
 import { getPrimaryOrderId } from '../utils/orderHelpers';
 import { csvSafe, downloadCsv } from '../utils/csvHelpers';
@@ -33,7 +32,6 @@ import {
   Zap,
   ChevronDown,
   ChevronUp,
-  FileSpreadsheet,
   Download,
   Info,
   MessageSquare,
@@ -222,7 +220,6 @@ export const Orders: React.FC = () => {
   }>({ id: 'none', amount: 'none', productName: 'none' });
   const [orderIdLocked, setOrderIdLocked] = useState(false);
   const [productNameOverridden, setProductNameOverridden] = useState(false);
-  const [sheetsExporting, setSheetsExporting] = useState(false);
 
   // Buyer ticket state
   const [myTickets, setMyTickets] = useState<Ticket[]>([]);
@@ -743,58 +740,6 @@ export const Orders: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            aria-label="Export to Google Sheets"
-            title="Export to Google Sheets"
-            disabled={sheetsExporting}
-            onClick={() => {
-              if (!orders.length) { toast.error('No orders to export'); return; }
-              exportToGoogleSheet({
-                title: `My Orders - ${new Date().toISOString().slice(0, 10)}`,
-                headers: [
-                  'External Order ID', 'Date', 'Time', 'Product', 'Platform', 'Brand', 'Deal Type',
-                  'Unit Price (₹)', 'Quantity', 'Total (₹)', 'Commission/Cashback (₹)',
-                  'Workflow Status', 'Affiliate Status', 'Payment Status',
-                  'Mediator', 'Reviewer Name', 'Sold By', 'Order Date', 'Extracted Product', 'Internal Ref',
-                ],
-                rows: orders.map((o) => {
-                  const d = new Date(o.createdAt);
-                  const item = o.items?.[0];
-                  return [
-                    getPrimaryOrderId(o),
-                    d.toLocaleDateString(),
-                    d.toLocaleTimeString(),
-                    item?.title || '',
-                    item?.platform || '',
-                    item?.brandName || '',
-                    item?.dealType || 'Discount',
-                    item?.priceAtPurchase ?? 0,
-                    item?.quantity || 1,
-                    o.total || 0,
-                    item?.commission || 0,
-                    o.workflowStatus || '',
-                    o.affiliateStatus || '',
-                    o.paymentStatus || '',
-                    o.managerName || '',
-                    (o as any).reviewerName || '',
-                    o.soldBy || '',
-                    o.orderDate ? new Date(o.orderDate).toLocaleDateString() : '',
-                    o.extractedProductName || '',
-                    o.id,
-                  ] as (string | number)[];
-                }),
-                sheetName: 'Orders',
-                onStart: () => setSheetsExporting(true),
-                onEnd: () => setSheetsExporting(false),
-                onSuccess: () => toast.success('Exported to Google Sheets!'),
-                onError: (msg) => toast.error(msg),
-              });
-            }}
-            className="p-2.5 rounded-xl border border-green-100 bg-white hover:bg-green-50 transition-colors disabled:opacity-50"
-          >
-            <FileSpreadsheet size={18} className="text-green-600" />
-          </button>
           <button
             type="button"
             aria-label="Download CSV"
@@ -1363,9 +1308,9 @@ export const Orders: React.FC = () => {
               {/* Export tickets CSV */}
               {myTickets.length > 0 && (
                 <button type="button" onClick={() => {
-                  const header = ['Ticket ID','Status','Priority','Issue Type','Description','Order ID','Resolution Note','Resolved By','Resolved At','Created At'].map(csvSafe).join(',');
+                  const header = ['Ticket ID','Status','Issue Type','Description','Order ID','Resolution Note','Resolved By','Resolved At','Created At'].map(csvSafe).join(',');
                   const rows = myTickets.map(t => [
-                    csvSafe(t.id.slice(-8)), csvSafe(String(t.status)), csvSafe(String(t.priority || 'medium')),
+                    csvSafe(t.id.slice(-8)), csvSafe(String(t.status)),
                     csvSafe(String(t.issueType)), csvSafe(String(t.description || '')), csvSafe(String(t.orderId || '')),
                     csvSafe(String(t.resolutionNote || '')), csvSafe(String(t.resolvedByName || '')),
                     csvSafe(t.resolvedAt ? new Date(t.resolvedAt).toLocaleDateString() : ''),
@@ -1439,13 +1384,6 @@ export const Orders: React.FC = () => {
                         {new Date(t.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
                       </span>
                       <div className="flex items-center gap-1.5">
-                        {t.priority && t.priority !== 'medium' && (
-                          <span className={`text-[9px] font-bold ${
-                            t.priority === 'urgent' ? 'text-red-500' : t.priority === 'high' ? 'text-orange-500' : 'text-slate-400'
-                          }`}>
-                            {t.priority.toUpperCase()}
-                          </span>
-                        )}
                         {(t.status === 'Resolved' || t.status === 'Rejected') && (
                           <button
                             type="button"
