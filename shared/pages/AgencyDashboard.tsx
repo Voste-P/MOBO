@@ -4030,7 +4030,10 @@ export const AgencyDashboard: React.FC = () => {
             <button type="button" onClick={() => {
               const supportTickets = tickets.filter(t => t.issueType !== 'Feedback');
               if (!supportTickets.length) { toast.error('No tickets to export'); return; }
-              const header = ['Ticket ID','Status','Issue Type','Description','User','Role','Target Role','Order ID','Resolution Note','Resolved By','Resolved At','Created At'].map(csvSafe).join(',');\n              const rows = supportTickets.map(t => [\n                csvSafe(t.id.slice(-8)), csvSafe(String(t.status)),\n                csvSafe(String(t.issueType)),", "oldString": "              const header = ['Ticket ID','Status','Priority','Issue Type','Description','User','Role','Target Role','Order ID','Resolution Note','Resolved By','Resolved At','Created At'].map(csvSafe).join(',');\n              const rows = supportTickets.map(t => [\n                csvSafe(t.id.slice(-8)), csvSafe(String(t.status)), csvSafe(String((t as any).priority || 'medium')),\n                csvSafe(String(t.issueType)), csvSafe(String(t.description || '')), csvSafe(String((t as any).userName || '')),
+              const header = ['Ticket ID','Status','Issue Type','Description','User','Role','Target Role','Order ID','Resolution Note','Resolved By','Resolved At','Created At'].map(csvSafe).join(',');
+              const rows = supportTickets.map(t => [
+                csvSafe(t.id.slice(-8)), csvSafe(String(t.status)),
+                csvSafe(String(t.issueType)), csvSafe(String(t.description || '')), csvSafe(String((t as any).userName || '')),
                 csvSafe(String((t as any).role || '')), csvSafe(String((t as any).targetRole || '')), csvSafe(String(t.orderId || '')),
                 csvSafe(String((t as any).resolutionNote || '')), csvSafe(String((t as any).resolvedByName || '')),
                 csvSafe((t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString() : ''),
@@ -4042,7 +4045,7 @@ export const AgencyDashboard: React.FC = () => {
               Export Tickets CSV
             </button>
           )}
-          {/* Search + Status + Priority filter */}
+          {/* Search + Status filter */}
           {tickets && tickets.length > 0 && (
             <>
             <div className="mb-2">
@@ -4097,7 +4100,6 @@ export const AgencyDashboard: React.FC = () => {
                           'bg-amber-50 text-amber-600'
                         }`}>{String(t.status || 'Open')}</span>
                       </div>
-                      {t.priority && <div className="text-[10px] text-slate-400 mt-0.5">Priority: {String(t.priority)}</div>}
                     </div>
                     <span className="text-[10px] text-slate-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''}</span>
                   </div>

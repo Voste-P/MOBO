@@ -1264,7 +1264,7 @@ export const Orders: React.FC = () => {
                     )}
                     {/* Raise Ticket for this specific order */}
                     <button
-                      onClick={() => { setTicketOrderId(order.id); setTicketModalOpen(true); }}
+                      onClick={() => { setTicketOrderId(order.externalOrderId || order.id); setTicketModalOpen(true); }}
                       className="text-[10px] font-bold uppercase text-red-500 hover:text-red-700"
                     >
                       Raise Ticket

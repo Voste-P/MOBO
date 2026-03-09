@@ -2534,7 +2534,7 @@ export const BrandDashboard: React.FC = () => {
                 Export Tickets CSV
               </button>
             )}
-            {/* Search + Status + Priority filter */}
+            {/* Search + Status filter */}
             {tickets && tickets.length > 0 && (
               <>
               <div className="mb-2">
@@ -2590,7 +2590,7 @@ export const BrandDashboard: React.FC = () => {
                           }`}>{String(t.status || 'Open')}</span>
                         </div>
                       </div>
-                      <span className=\"text-[10px] text-zinc-400 shrink-0\">{t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''}</span>", "oldString": "                        </div>\n                        {t.priority && <div className=\"text-[10px] text-zinc-400 mt-0.5\">Priority: {String(t.priority)}</div>}\n                      </div>\n                      <span className=\"text-[10px] text-zinc-400 shrink-0\">{t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''}</span>
+                      <span className="text-[10px] text-zinc-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''}</span>
                     </div>
                     {t.description && (
                       <div className="text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2 line-clamp-3">

@@ -1335,7 +1335,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                               <span className="text-[10px] font-mono text-slate-400">
                                 #{t.id.slice(-6)}
                               </span>
-                              <StatusBadge status={t.status} />\n                            </div>", "oldString": "                              <StatusBadge status={t.status} />\n                              {(t as any).priority && (t as any).priority !== 'medium' && (\n                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${\n                                  (t as any).priority === 'urgent' ? 'bg-red-100 text-red-600'\n                                  : (t as any).priority === 'high' ? 'bg-orange-100 text-orange-600'\n                                  : 'bg-slate-100 text-slate-500'\n                                }`}>\n                                  {(t as any).priority}\n                                </span>\n                              )}\n                            </div>
+                              <StatusBadge status={t.status} />
+                            </div>
                             <h4 className="font-bold text-slate-900 text-sm">{t.issueType}</h4>
                           </div>
                           <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded">
