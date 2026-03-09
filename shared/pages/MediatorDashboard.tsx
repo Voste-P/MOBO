@@ -1651,13 +1651,20 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
                       </button>
                     )}
                     {viewMode === 'settled' && (
-                      <button
-                        type="button"
-                        onClick={() => handleRevert(o.id)}
-                        className="text-[10px] font-bold text-zinc-400 hover:text-red-500 flex items-center gap-1 transition-colors"
-                      >
-                        <RefreshCcw size={10} /> Revert
-                      </button>
+                      <div className="flex items-center gap-3">
+                        {o.settlementRef && (
+                          <span className="text-[10px] font-mono font-bold text-zinc-400" title="UTR / Reference">
+                            UTR: {o.settlementRef}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRevert(o.id)}
+                          className="text-[10px] font-bold text-zinc-400 hover:text-red-500 flex items-center gap-1 transition-colors"
+                        >
+                          <RefreshCcw size={10} /> Revert
+                        </button>
+                      </div>
                     )}
                   </div>
 
