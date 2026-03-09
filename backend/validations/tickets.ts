@@ -29,9 +29,10 @@ export const createTicketSchema = z.object({
 });
 
 // Escalation: the next tier above each target role
+// Agency is the final resolution stage for buyer/mediator tickets — no escalation.
+// Only mediator→agency and brand→admin escalation paths are supported.
 export const ESCALATION_PATH: Record<string, string> = {
   mediator: 'agency',    // mediator → agency
-  agency: 'brand',       // agency → brand
   brand: 'admin',        // brand → admin
 } as const;
 
