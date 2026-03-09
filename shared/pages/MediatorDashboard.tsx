@@ -8,7 +8,7 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 import { api, asArray } from '../services/api';
 import { subscribeRealtime } from '../services/realtime';
-import { normalizeMobileTo10Digits } from '../utils/mobiles';
+import { normalizeMobileTo10Digits, maskMobile } from '../utils/mobiles';
 import { formatCurrency } from '../utils/formatCurrency';
 import { getPrimaryOrderId } from '../utils/orderHelpers';
 import { csvSafe, downloadCsv as downloadCsvFile } from '../utils/csvHelpers';
@@ -247,7 +247,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                   </div>
                   <div>
                     <h4 className="font-bold text-zinc-900 text-xs line-clamp-1">{u.name || 'Unknown'}</h4>
-                    <p className="text-[10px] text-zinc-400 font-mono tracking-wide">{u.mobile}</p>
+                    <p className="text-[10px] text-zinc-400 font-mono tracking-wide">{maskMobile(u.mobile)}</p>
                   </div>
                 </div>
                 <div className="flex gap-1">
@@ -1161,7 +1161,7 @@ const SquadView = ({ user, pendingUsers, verifiedUsers, loading, orders: _orders
                     </div>
                     <div>
                       <p className="font-bold text-xs text-zinc-900">{u.name || 'Unknown'}</p>
-                      <p className="text-[10px] text-zinc-400 font-mono">{u.mobile}</p>
+                      <p className="text-[10px] text-zinc-400 font-mono">{maskMobile(u.mobile)}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -1478,7 +1478,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
               <div>
                 <h3 className="text-xl font-black leading-none">{buyer?.name || 'Unknown'}</h3>
                 <p className="text-[10px] text-zinc-400 font-mono mt-1 opacity-80">
-                  {buyer.mobile}
+                  {maskMobile(buyer.mobile)}
                 </p>
               </div>
             </div>

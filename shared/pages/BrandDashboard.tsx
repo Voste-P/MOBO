@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getApiBaseAbsolute } from '../utils/apiBaseUrl';
+import { maskMobile } from '../utils/mobiles';
 import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage } from '../components/ProxiedImage';
 import { useAuth } from '../context/AuthContext';
@@ -3016,7 +3017,7 @@ export const BrandDashboard: React.FC = () => {
                 </h4>
                 <div className="flex justify-between">
                   <span className="text-xs font-bold text-zinc-500">Mobile</span>
-                  <span className="text-sm font-bold text-zinc-900">{selectedAgency.mobile}</span>
+                  <span className="text-sm font-bold text-zinc-900">{maskMobile(selectedAgency.mobile)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-xs font-bold text-zinc-500">Status</span>

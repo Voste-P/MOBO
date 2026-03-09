@@ -143,6 +143,7 @@ export const publishDealSchema = z.object({
 export const payoutMediatorSchema = z.object({
   mediatorId: z.string().min(1),
   amount: z.number().positive(),
+  ref: z.string().trim().min(1).max(128),
 });
 
 export const copyCampaignSchema = z.object({
