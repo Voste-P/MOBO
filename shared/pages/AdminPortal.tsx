@@ -781,7 +781,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       onStart: () => setSheetsExporting(true),
       onEnd: () => setSheetsExporting(false),
       onSuccess: () => toast.success('Exported to Google Sheets!'),
-      onError: (msg) => toast.error(msg),
+      onError: (msg) => toast.error(typeof msg === 'string' ? msg : 'Google Sheets export failed. Please try again.'),
     });
   };
 
@@ -832,6 +832,13 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         (p.platform || '').toLowerCase().includes(q)
     );
   }, [products, inventorySearch]);
+
+  // Campaign title map: campaignId → product title (for order table display)
+  const campaignTitleMap = useMemo(() => {
+    const map = new Map<string, string>();
+    products.forEach((p) => { if (p.campaignId && p.title) map.set(p.campaignId, p.title); });
+    return map;
+  }, [products]);
 
   // --- AUTH GUARD ---
   if (!user || user.role !== 'admin') {
@@ -1876,7 +1883,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                           <td className="p-5 font-mono text-slate-900 font-bold">{o.total}</td>
                           <td className="p-5 text-slate-700">{o.buyerName}</td>
                           <td className="p-5 text-slate-600 text-xs">{o.managerName || '-'}</td>
-                          <td className="p-5 text-slate-600 text-xs truncate max-w-[120px]">{o.items?.[0]?.campaignId ? o.items[0].campaignId.slice(-8) : '-'}</td>
+                          <td className="p-5 text-slate-600 text-xs truncate max-w-[160px]" title={o.items?.[0]?.campaignId || ''}>{o.items?.[0]?.campaignId ? (campaignTitleMap.get(o.items[0].campaignId) || o.items[0].campaignId.slice(-8)) : '-'}</td>
                           <td className="p-5">
                             <button
                               type="button"

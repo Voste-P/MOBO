@@ -885,7 +885,7 @@ const OrdersView = ({ user }: any) => {
       onStart: () => setSheetsExporting(true),
       onEnd: () => setSheetsExporting(false),
       onSuccess: () => toast.success('Exported to Google Sheets!'),
-      onError: (msg) => toast.error(msg),
+      onError: (msg) => toast.error(typeof msg === 'string' ? msg : 'Google Sheets export failed. Please try again.'),
     });
   };
 
@@ -1293,8 +1293,9 @@ const OrdersView = ({ user }: any) => {
                     const seller = viewProofOrder.soldBy && viewProofOrder.soldBy !== 'null' && viewProofOrder.soldBy !== 'undefined' ? viewProofOrder.soldBy : '';
                     const d = viewProofOrder.orderDate ? new Date(viewProofOrder.orderDate) : null;
                     const validDate = d && !isNaN(d.getTime()) && d.getFullYear() > 2020 ? d : null;
-                    return (viewProofOrder.extractedProductName || seller || validDate) ? (
+                    return (viewProofOrder.extractedProductName || seller || validDate || viewProofOrder.reviewerName) ? (
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[10px] text-zinc-400">
+                        {viewProofOrder.reviewerName && <span className="text-indigo-500 font-bold">Reviewer: {viewProofOrder.reviewerName}</span>}
                         {viewProofOrder.extractedProductName && <span>Product: {viewProofOrder.extractedProductName}</span>}
                         {seller && <span>Seller: {seller}</span>}
                         {validDate && <span>Ordered: {validDate.toLocaleDateString('en-GB')}</span>}
@@ -1303,6 +1304,13 @@ const OrdersView = ({ user }: any) => {
                   })()}
                 </div>
               </div>
+              {/* Settlement details */}
+              {(viewProofOrder.settlementRef || viewProofOrder.settlementMode) && (
+                <div className="flex flex-wrap gap-4 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                  {viewProofOrder.settlementRef && <div><span className="text-[10px] font-bold text-emerald-500 uppercase">UTR / Reference</span><p className="text-xs font-mono font-bold text-emerald-800">{viewProofOrder.settlementRef}</p></div>}
+                  {viewProofOrder.settlementMode && <div><span className="text-[10px] font-bold text-emerald-500 uppercase">Payment Mode</span><p className="text-xs font-bold text-emerald-800 uppercase">{viewProofOrder.settlementMode}</p></div>}
+                </div>
+              )}
 
               {/* 1. Mandatory Order Screenshot */}
               <div className="space-y-2">
@@ -2330,7 +2338,7 @@ export const BrandDashboard: React.FC = () => {
       onStart: () => setSheetsExporting(true),
       onEnd: () => setSheetsExporting(false),
       onSuccess: () => toast.success('Exported to Google Sheets!'),
-      onError: (msg) => toast.error(msg),
+      onError: (msg) => toast.error(typeof msg === 'string' ? msg : 'Google Sheets export failed. Please try again.'),
     });
   };
 

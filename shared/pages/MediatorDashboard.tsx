@@ -2241,6 +2241,24 @@ export const MediatorDashboard: React.FC = () => {
                 </div>
               )}
 
+              {/* Settlement details */}
+              {(proofModal.settlementRef || proofModal.settlementMode) && (
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  {proofModal.settlementRef && (
+                    <div className="bg-black/40 p-2.5 rounded-xl border border-emerald-500/20">
+                      <p className="text-[9px] text-emerald-400 font-bold uppercase mb-1">UTR / Reference</p>
+                      <p className="text-[11px] font-mono font-bold text-emerald-200">{proofModal.settlementRef}</p>
+                    </div>
+                  )}
+                  {proofModal.settlementMode && (
+                    <div className="bg-black/40 p-2.5 rounded-xl border border-emerald-500/20">
+                      <p className="text-[9px] text-emerald-400 font-bold uppercase mb-1">Payment Mode</p>
+                      <p className="text-[11px] font-bold text-emerald-200 uppercase">{proofModal.settlementMode}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {proofModal.screenshots?.order ? (
                 <div className="mt-4">
                   <p className="text-[10px] text-zinc-500 font-bold uppercase mb-2">

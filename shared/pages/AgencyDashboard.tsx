@@ -3191,8 +3191,17 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
                   <p className="text-sm font-bold text-slate-900 line-clamp-1">{proofOrder.items?.[0]?.title}</p>
                   <p className="text-xs text-slate-500 mt-0.5">Total: <span className="font-mono font-bold text-zinc-900">{formatCurrency(proofOrder.total)}</span></p>
                   <p className="text-[10px] text-slate-400 mt-0.5">Mediator: {proofOrder.managerName} · Buyer: {proofOrder.buyerName}</p>
+                  {proofOrder.reviewerName && <p className="text-[10px] text-indigo-500 font-bold mt-0.5">Reviewer: {proofOrder.reviewerName}</p>}
+                  {proofOrder.items?.[0]?.platform && <p className="text-[10px] text-slate-400 mt-0.5">Platform: {proofOrder.items[0].platform}</p>}
                 </div>
               </div>
+              {/* Settlement details */}
+              {(proofOrder.settlementRef || proofOrder.settlementMode) && (
+                <div className="flex flex-wrap gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                  {proofOrder.settlementRef && <div><span className="text-[10px] font-bold text-emerald-500 uppercase">UTR / Reference</span><p className="text-xs font-mono font-bold text-emerald-800">{proofOrder.settlementRef}</p></div>}
+                  {proofOrder.settlementMode && <div><span className="text-[10px] font-bold text-emerald-500 uppercase">Payment Mode</span><p className="text-xs font-bold text-emerald-800 uppercase">{proofOrder.settlementMode}</p></div>}
+                </div>
+              )}
               {/* Order Screenshot */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-xs font-extrabold text-slate-400 uppercase tracking-widest"><FileText size={14} /> Purchase Proof</div>
