@@ -159,12 +159,21 @@ const validateImageFile = (file: File): ImageValidationError => {
 /** @deprecated Use validateImageFile for detailed error */
 const isValidImageFile = (file: File) => validateImageFile(file) === null;
 
+const KNOWN_REVIEW_DOMAINS = [
+  'amazon.in', 'amazon.com', 'flipkart.com', 'myntra.com', 'meesho.com',
+  'ajio.com', 'jiomart.com', 'nykaa.com', 'tatacliq.com', 'snapdeal.com',
+  'bigbasket.com', '1mg.com', 'croma.com', 'purplle.com', 'shopsy.in',
+  'blinkit.com', 'zepto.co', 'lenskart.com', 'pharmeasy.in', 'swiggy.com',
+];
+
 const isValidReviewLink = (value: string) => {
   const trimmed = value.trim();
   if (!trimmed) return false;
   try {
     const url = new URL(trimmed);
-    return url.protocol === 'https:';
+    if (url.protocol !== 'https:') return false;
+    const host = url.hostname.toLowerCase().replace(/^www\./, '');
+    return KNOWN_REVIEW_DOMAINS.some(d => host === d || host.endsWith('.' + d));
   } catch {
     return false;
   }
@@ -388,7 +397,7 @@ export const Orders: React.FC = () => {
     setIsUploading(true);
     try {
       if (!isValidReviewLink(inputValue)) {
-        throw new Error('Please enter a valid https review link.');
+        throw new Error('Please enter a valid HTTPS review link from a recognized marketplace (Amazon, Flipkart, Myntra, etc.).');
       }
       await api.orders.submitClaim(selectedOrder.id, { type: 'review', data: inputValue });
       toast.success('Link submitted!');
@@ -2075,17 +2084,21 @@ export const Orders: React.FC = () => {
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">
                     Marketplace Reviewer / Account Name
+                    {selectedOrder?.reviewerName && <span className="ml-1 text-green-600">(locked)</span>}
                   </label>
                   <input
                     type="text"
                     value={reviewerNameInput}
-                    onChange={(e) => setReviewerNameInput(e.target.value)}
-                    className="w-full p-2.5 rounded-xl bg-indigo-50 border border-indigo-100 font-bold text-sm text-indigo-700 outline-none focus:ring-2 focus:ring-indigo-200 transition-all"
+                    onChange={(e) => { if (!selectedOrder?.reviewerName) setReviewerNameInput(e.target.value); }}
+                    readOnly={!!selectedOrder?.reviewerName}
+                    className={`w-full p-2.5 rounded-xl border font-bold text-sm outline-none transition-all ${selectedOrder?.reviewerName ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' : 'bg-indigo-50 border-indigo-100 text-indigo-700 focus:ring-2 focus:ring-indigo-200'}`}
                     placeholder="e.g. Gaurav C. on Amazon"
                     maxLength={200}
                   />
                   <p className="text-[9px] text-slate-400 ml-1">
-                    Name shown on the marketplace (Amazon, Flipkart, etc.) — must match the name in your rating screenshot.
+                    {selectedOrder?.reviewerName
+                      ? 'Locked from your first proof upload — must use the same marketplace account for all proofs.'
+                      : 'Name shown on the marketplace (Amazon, Flipkart, etc.) — must match the name in your rating screenshot.'}
                   </p>
                 </div>
 

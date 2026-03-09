@@ -1362,10 +1362,11 @@ async function verifyRatingWithOcr(
           (lastName.length >= 3 && lower.includes(lastName))) {
         accountNameMatch = true;
       }
-      // Strategy 4b: fuzzy match — allow 1-char edit distance for names ≥5 chars (handles OCR misreads)
+      // Strategy 4b: fuzzy match — allow 1-char edit distance for names ≥6 chars (handles OCR misreads)
+      // Require name part to be long enough that 1 edit is < 17% error rate (avoids "John"→"Joan")
       if (!accountNameMatch) {
         for (const part of allBuyerParts) {
-          if (part.length < 5) continue;
+          if (part.length < 6) continue;
           // Scan OCR text for words within 1-char edit distance
           const ocrWords = lower.split(/\s+/);
           const fuzzy = ocrWords.some(w => w.length >= part.length - 1 && w.length <= part.length + 1 && editDistance(w, part) <= 1);
@@ -1495,11 +1496,13 @@ export async function verifyRatingScreenshotWithAi(
               parsed.accountNameMatch = true;
               parsed.discrepancyNote = 'Account name matched via marketplace reviewer name.';
             } else {
-              // Fuzzy: check name parts
+              // Fuzzy: check name parts — scale edit distance tolerance with word length
               const revParts = reviewer.split(/\s+/).filter(p => p.length >= 2);
               const detParts = detected.split(/\s+/).filter(p => p.length >= 2);
               if (revParts.length > 0 && detParts.length > 0) {
-                const matchCount = revParts.filter(rp => detParts.some(dp => dp === rp || editDistance(dp, rp) <= 1)).length;
+                const matchCount = revParts.filter(rp => detParts.some(dp =>
+                  dp === rp || (rp.length >= 6 && editDistance(dp, rp) <= 1)
+                )).length;
                 if (matchCount >= Math.max(1, Math.ceil(revParts.length * 0.5))) {
                   parsed.accountNameMatch = true;
                   parsed.discrepancyNote = 'Account name matched via marketplace reviewer name (fuzzy).';
@@ -1685,12 +1688,29 @@ async function verifyReturnWindowWithOcr(
       }
     }
 
-    const soldByMatch = expected.expectedSoldBy
-      ? lower.includes(expected.expectedSoldBy.toLowerCase().trim())
-      : true;
+    // Normalize seller name: strip common suffixes like ".in", "Retail", "India", "Pvt", "Ltd"
+    // so "Amazon" matches "Amazon Retail", "amazon.in", "AMAZON INDIA PVT LTD", etc.
+    const normSeller = (s: string) => s.toLowerCase().replace(/\b(retail|india|pvt|ltd|private|limited|inc|llp|seller|\.in|\.com)\b/g, '').replace(/[.\-_,]/g, ' ').replace(/\s+/g, ' ').trim();
+    let soldByMatch = !expected.expectedSoldBy; // true if not expected
+    if (expected.expectedSoldBy) {
+      const sellerNorm = normSeller(expected.expectedSoldBy);
+      const ocrNormSeller = normSeller(ocrText);
+      // Direct substring match after normalization
+      soldByMatch = ocrNormSeller.includes(sellerNorm);
+      // Fallback: check if the core seller word (first significant word) appears
+      if (!soldByMatch) {
+        const coreWords = sellerNorm.split(/\s+/).filter(w => w.length >= 3);
+        if (coreWords.length > 0) {
+          soldByMatch = coreWords.some(w => lower.includes(w));
+        }
+      }
+    }
 
     // Check for explicit return window closure keywords (avoid treating mere delivery as closure)
-    const returnWindowRe = /return\s*window\s*(closed|expired|ended|over|passed)|no\s*return|non.?returnable/i;
+    // Covers: Amazon ("Return window closed"), Flipkart ("Return/Replace by [past date]"),
+    // generic ("Non-returnable", "Exchange only", "Returnable until [past date]"),
+    // and date-based heuristics for delivery screenshots.
+    const returnWindowRe = /return\s*window\s*(closed|expired|ended|over|passed)|no\s*return|non.?returnable|not\s*eligible\s*for\s*return|exchange\s*only|cannot\s*be\s*returned|return\s*(period|policy)\s*(expired|ended|closed|over)|refund\s*window\s*(closed|expired)|replacement\s*(not|no\s*longer)\s*(available|eligible|possible)|no\s*longer\s*returnable|past\s*return\s*(date|deadline|window)|return\s*rejected/i;
     const returnWindowClosed = returnWindowRe.test(ocrText);
 
     let confidenceScore: number = CONFIDENCE.RETURN_WINDOW_BASE;
@@ -1766,8 +1786,8 @@ export async function verifyReturnWindowWithAi(
               `1. Find the ORDER ID in the screenshot and compare to "${payload.expectedOrderId}".`,
               `2. Find the PRODUCT NAME and compare key words to "${payload.expectedProductName}".`,
               `3. Find the GRAND TOTAL / AMOUNT and compare to ₹${payload.expectedAmount} (±₹1 tolerance).`,
-              `4. Find "Sold by" / "Seller" and compare to "${payload.expectedSoldBy || 'N/A'}".`,
-              `5. Check if the RETURN WINDOW is CLOSED/EXPIRED. Look for: "Return window closed", "No longer returnable", delivery date that is > 7 days ago, or text indicating the item cannot be returned.`,
+              `4. Find "Sold by" / "Seller" and compare to "${payload.expectedSoldBy || 'N/A'}". Normalize by ignoring suffixes like "Retail", "India", "Pvt Ltd", ".in", ".com" before comparing.`,
+              `5. Check if the RETURN WINDOW is CLOSED/EXPIRED. Look for: "Return window closed", "No longer returnable", "Non-returnable", "Not eligible for return", "Exchange only", "Cannot be returned", "Return period expired", delivery date that is > 7 days ago, or any text indicating the item cannot be returned/replaced.`,
               `6. Set confidenceScore 0-100 based on match quality.`,
               `7. Fill all detected fields with what you actually see in the image.`,
             ].join('\n') },
