@@ -156,6 +156,10 @@ export function toUiDeal(d: any, mediatorName?: string) {
     campaignId: String(d.campaignId),
     active: !!d.active,
     inventoryCount: d.inventoryCount ?? 0,
+    totalSlots: d.totalSlots ?? 0,
+    usedSlots: d.usedSlots ?? 0,
+    remainingSlots: d.remainingSlots ?? 0,
+    sellingSpeed: d.sellingSpeed ?? 0,
   };
 }
 

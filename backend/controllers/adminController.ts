@@ -303,9 +303,30 @@ export function makeAdminController() {
 
         const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
         const [deals, total] = await Promise.all([
-          db().deal.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take: limit }),
+          db().deal.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take: limit,
+            include: { campaign: { select: { totalSlots: true, usedSlots: true, createdAt: true } } },
+          }),
           db().deal.count({ where }),
         ]);
+
+        // Compute selling speed: usedSlots / days since campaign creation
+        const enrichedDeals = deals.map((d: any) => {
+          const campaign = d.campaign;
+          const totalSlots = campaign?.totalSlots || 0;
+          const usedSlots = campaign?.usedSlots || 0;
+          const remainingSlots = Math.max(0, totalSlots - usedSlots);
+          let sellingSpeed = 0;
+          if (campaign?.createdAt && usedSlots > 0) {
+            const daysSinceCreation = Math.max(1, (Date.now() - new Date(campaign.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+            sellingSpeed = Math.round((usedSlots / daysSinceCreation) * 10) / 10; // slots per day
+          }
+          const { campaign: _c, ...rest } = d;
+          return { ...rest, totalSlots, usedSlots, remainingSlots, sellingSpeed };
+        });
         businessLog.info('Products listed', { userId: req.auth?.userId, resultCount: deals.length, total, page, limit, ip: req.ip });
         logAccessEvent('ADMIN_ACTION', {
           userId: req.auth?.userId,
@@ -315,7 +336,7 @@ export function makeAdminController() {
           requestId: String((res as any).locals?.requestId || ''),
           metadata: { resultCount: deals.length, total, page, limit },
         });
-        res.json(paginatedResponse(deals.map(d => toUiDeal(pgDeal(d))), total, page, limit, isPaginated));
+        res.json(paginatedResponse(enrichedDeals.map((d: any) => toUiDeal(pgDeal(d))), total, page, limit, isPaginated));
       } catch (err) {
         logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'BUSINESS_LOGIC', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'admin/getProducts' } });
         next(err);

@@ -92,6 +92,10 @@ export interface Product {
   campaignId: string;
   active: boolean;
   inventoryCount?: number;
+  totalSlots?: number;
+  usedSlots?: number;
+  remainingSlots?: number;
+  sellingSpeed?: number;
 }
 
 export interface Order {

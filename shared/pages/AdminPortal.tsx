@@ -1925,6 +1925,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       <th className="p-5">Platform</th>
                       <th className="p-5 text-right">Price</th>
                       <th className="p-5 text-right">Commission</th>
+                      <th className="p-5 text-center">Slots</th>
+                      <th className="p-5 text-center">Speed</th>
                       <th className="p-5 text-right">Status</th>
                       <th className="p-5 text-right">Actions</th>
                     </tr>
@@ -1946,6 +1948,26 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         <td className="p-5 text-right font-mono text-slate-900">{p.price}</td>
                         <td className="p-5 text-right font-mono text-emerald-600">
                           {p.commission}
+                        </td>
+                        <td className="p-5 text-center">
+                          <div className="text-xs">
+                            <span className="font-bold text-slate-900">{p.usedSlots || 0}</span>
+                            <span className="text-slate-400">/{p.totalSlots || 0}</span>
+                          </div>
+                          {(p.totalSlots || 0) > 0 && (
+                            <div className="w-full bg-slate-100 rounded-full h-1 mt-1">
+                              <div className="bg-blue-500 h-1 rounded-full transition-all" style={{ width: `${Math.min(100, ((p.usedSlots || 0) / (p.totalSlots || 1)) * 100)}%` }} />
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-5 text-center">
+                          {(p.sellingSpeed || 0) > 0 ? (
+                            <span className={`text-[10px] font-bold px-2 py-1 rounded ${(p.sellingSpeed || 0) >= 5 ? 'bg-emerald-50 text-emerald-600' : (p.sellingSpeed || 0) >= 2 ? 'bg-amber-50 text-amber-600' : 'bg-slate-50 text-slate-500'}`}>
+                              {p.sellingSpeed}/day
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400">—</span>
+                          )}
                         </td>
                         <td className="p-5 text-right">
                           <span
