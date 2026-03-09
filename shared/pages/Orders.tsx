@@ -287,7 +287,7 @@ export const Orders: React.FC = () => {
         setAvailableProducts(Array.isArray(data) ? data : []);
         setProductsLoadError(false);
       }).catch((err) => {
-        console.error('Failed to load products:', err);
+        if (process.env.NODE_ENV !== 'production') console.error('Failed to load products:', err);
         setAvailableProducts([]);
         setProductsLoadError(true);
         toast.error('Failed to load available deals. Pull down to retry.');
@@ -325,7 +325,7 @@ export const Orders: React.FC = () => {
         return updated || null;
       });
     } catch (e) {
-      console.error(e);
+      if (process.env.NODE_ENV !== 'production') console.error(e);
       toast.error('Failed to load orders. Please try again.');
     } finally {
       setIsLoading(false);
@@ -352,7 +352,7 @@ export const Orders: React.FC = () => {
           .getAll()
           .then((data) => { setAvailableProducts(Array.isArray(data) ? data : []); setProductsLoadError(false); })
           .catch((err) => {
-            console.error('Failed to load products:', err);
+            if (process.env.NODE_ENV !== 'production') console.error('Failed to load products:', err);
             setAvailableProducts([]);
             setProductsLoadError(true);
           });
@@ -373,6 +373,7 @@ export const Orders: React.FC = () => {
         const err = validateImageFile(file);
         throw new Error(err === 'too_large' ? 'Image too large (max 10 MB).' : 'Please upload a PNG, JPG, or WebP image.');
       }
+      const reviewerName = reviewerNameInput.trim() || selectedOrder.reviewerName || '';
       await api.orders.submitClaim(selectedOrder.id, {
         type: uploadType,
         data: await new Promise<string>((resolve, reject) => {
@@ -381,6 +382,7 @@ export const Orders: React.FC = () => {
           reader.onerror = () => reject(new Error('Failed to read file'));
           reader.readAsDataURL(file);
         }),
+        ...(reviewerName ? { reviewerName } : {}),
       });
       toast.success('Proof uploaded!');
       setSelectedOrder(null);
@@ -550,7 +552,7 @@ export const Orders: React.FC = () => {
         }
       }
     } catch (e: any) {
-      console.error('[extraction error]', e);
+      if (process.env.NODE_ENV !== 'production') console.error('[extraction error]', e);
       // Still allow manual entry by showing empty extraction fields
       setExtractedDetails({ orderId: '', amount: '' });
       setMatchStatus({ id: 'none', amount: 'none', productName: 'none' });
@@ -610,7 +612,7 @@ export const Orders: React.FC = () => {
         toast.info('Screenshot ready for upload.');
       }
     } catch (err) {
-      console.error('Rating pre-validation failed:', err);
+      if (process.env.NODE_ENV !== 'production') console.error('Rating pre-validation failed:', err);
       // Allow upload even if pre-validation fails — backend will still validate
       setRatingVerification(null);
       toast.info('Screenshot ready. AI pre-check unavailable.');
@@ -2203,8 +2205,7 @@ export const Orders: React.FC = () => {
                   disabled={
                     isUploading ||
                     ratingAnalyzing ||
-                    !ratingFile ||
-                    (ratingVerification != null && !ratingVerification.accountNameMatch && !ratingVerification.productNameMatch)
+                    !ratingFile
                   }
                   className="w-full py-3.5 bg-black text-white font-bold rounded-2xl hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >

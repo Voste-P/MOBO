@@ -182,8 +182,9 @@ class RealtimeClient {
           } else {
             await this.sleep(this.backoffMs);
           }
-          // Add a little jitter to avoid reconnect stampedes.
+          // Add jitter to avoid reconnect stampedes (randomize cap to prevent thundering herd).
           this.backoffMs = Math.min(Math.floor(this.backoffMs * 1.8 + Math.random() * 250), this.maxBackoffMs);
+          await this.sleep(this.backoffMs + Math.floor(Math.random() * 500));
           continue;
         }
 

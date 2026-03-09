@@ -1548,6 +1548,7 @@ export type ReturnWindowVerificationPayload = {
   expectedProductName: string;
   expectedAmount: number;
   expectedSoldBy?: string;
+  expectedReviewerName?: string;
 };
 
 export type ReturnWindowVerificationResult = {
@@ -1556,6 +1557,7 @@ export type ReturnWindowVerificationResult = {
   amountMatch: boolean;
   soldByMatch: boolean;
   returnWindowClosed: boolean;
+  reviewerNameMatch: boolean;
   confidenceScore: number;
   detectedReturnWindow?: string;
   discrepancyNote?: string;
@@ -1625,7 +1627,7 @@ async function verifyReturnWindowWithOcr(
 
     if (!ocrText || ocrText.length < 5) {
       return { orderIdMatch: false, productNameMatch: false, amountMatch: false, soldByMatch: false,
-        returnWindowClosed: false, confidenceScore: 10,
+        returnWindowClosed: false, reviewerNameMatch: !expected.expectedReviewerName, confidenceScore: 10,
         discrepancyNote: 'OCR could not read text from the delivery screenshot.' };
     }
 
@@ -1706,6 +1708,22 @@ async function verifyReturnWindowWithOcr(
       }
     }
 
+    // Reviewer name match (same logic as rating verification — substring + fuzzy)
+    let reviewerNameMatch = !expected.expectedReviewerName; // true when not expected
+    if (expected.expectedReviewerName) {
+      const revName = expected.expectedReviewerName.toLowerCase().trim();
+      // Direct substring match
+      reviewerNameMatch = lower.includes(revName);
+      // Partial name match: check individual name parts
+      if (!reviewerNameMatch) {
+        const nameParts = revName.split(/\s+/).filter(p => p.length >= 2);
+        if (nameParts.length > 0) {
+          const matched = nameParts.filter(p => lower.includes(p));
+          reviewerNameMatch = matched.length >= Math.max(1, Math.ceil(nameParts.length * 0.5));
+        }
+      }
+    }
+
     // Check for explicit return window closure keywords (avoid treating mere delivery as closure)
     // Covers: Amazon ("Return window closed"), Flipkart ("Return/Replace by [past date]"),
     // generic ("Non-returnable", "Exchange only", "Returnable until [past date]"),
@@ -1723,15 +1741,17 @@ async function verifyReturnWindowWithOcr(
     if (amountMatch) confidenceScore += CONFIDENCE.RETURN_WINDOW_AMOUNT_BONUS;
     if (soldByMatch) confidenceScore += CONFIDENCE.RETURN_WINDOW_SOLD_BONUS;
     if (returnWindowClosed) confidenceScore += CONFIDENCE.RETURN_WINDOW_CLOSED_BONUS;
+    if (reviewerNameMatch && expected.expectedReviewerName) confidenceScore += 5;
 
     return {
-      orderIdMatch, productNameMatch, amountMatch, soldByMatch, returnWindowClosed, confidenceScore,
+      orderIdMatch, productNameMatch, amountMatch, soldByMatch, returnWindowClosed, reviewerNameMatch, confidenceScore,
       discrepancyNote: [
         !orderIdMatch ? `Order ID "${expected.expectedOrderId}" not found.` : '',
         !productNameMatch ? 'Product name mismatch.' : '',
         !amountMatch ? `Amount ₹${expected.expectedAmount} not found.` : '',
         !soldByMatch && expected.expectedSoldBy ? `Seller "${expected.expectedSoldBy}" not found.` : '',
         !returnWindowClosed ? 'Return window status not confirmed.' : '',
+        !reviewerNameMatch && expected.expectedReviewerName ? `Reviewer name "${expected.expectedReviewerName}" not found.` : '',
       ].filter(Boolean).join(' ') || 'OCR verification complete.',
     };
     } catch (workerErr) {
@@ -1741,7 +1761,7 @@ async function verifyReturnWindowWithOcr(
   } catch (err) {
     aiLog.error('OCR return window verification error', { error: err });
     return { orderIdMatch: false, productNameMatch: false, amountMatch: false, soldByMatch: false,
-      returnWindowClosed: false, confidenceScore: 0,
+      returnWindowClosed: false, reviewerNameMatch: false, confidenceScore: 0,
       discrepancyNote: 'Return window verification unavailable. Please verify manually.' };
   }
 }
@@ -1753,7 +1773,7 @@ export async function verifyReturnWindowWithAi(
   const _aiStart = Date.now();
   if (payload.imageBase64.length > env.AI_MAX_IMAGE_CHARS) {
     return { orderIdMatch: false, productNameMatch: false, amountMatch: false, soldByMatch: false,
-      returnWindowClosed: false, confidenceScore: 0,
+      returnWindowClosed: false, reviewerNameMatch: false, confidenceScore: 0,
       discrepancyNote: 'Image too large for auto verification.' };
   }
 
@@ -1781,6 +1801,7 @@ export async function verifyReturnWindowWithAi(
               `  Expected Product Name: ${payload.expectedProductName}`,
               `  Expected Grand Total: ₹${payload.expectedAmount}`,
               `  Expected Sold By: ${payload.expectedSoldBy || 'N/A'}`,
+              `  Expected Reviewer/Account Name: ${payload.expectedReviewerName || 'N/A'}`,
               ``,
               `RULES:`,
               `1. Find the ORDER ID in the screenshot and compare to "${payload.expectedOrderId}".`,
@@ -1788,8 +1809,9 @@ export async function verifyReturnWindowWithAi(
               `3. Find the GRAND TOTAL / AMOUNT and compare to ₹${payload.expectedAmount} (±₹1 tolerance).`,
               `4. Find "Sold by" / "Seller" and compare to "${payload.expectedSoldBy || 'N/A'}". Normalize by ignoring suffixes like "Retail", "India", "Pvt Ltd", ".in", ".com" before comparing.`,
               `5. Check if the RETURN WINDOW is CLOSED/EXPIRED. Look for: "Return window closed", "No longer returnable", "Non-returnable", "Not eligible for return", "Exchange only", "Cannot be returned", "Return period expired", delivery date that is > 7 days ago, or any text indicating the item cannot be returned/replaced.`,
-              `6. Set confidenceScore 0-100 based on match quality.`,
-              `7. Fill all detected fields with what you actually see in the image.`,
+              `6. If an Expected Reviewer/Account Name is provided, find the account/profile name shown in the screenshot and check if it matches. Set reviewerNameMatch accordingly.`,
+              `7. Set confidenceScore 0-100 based on match quality.`,
+              `8. Fill all detected fields with what you actually see in the image.`,
             ].join('\n') },
           ],
           config: {
@@ -1803,11 +1825,12 @@ export async function verifyReturnWindowWithAi(
                 amountMatch: { type: Type.BOOLEAN },
                 soldByMatch: { type: Type.BOOLEAN },
                 returnWindowClosed: { type: Type.BOOLEAN },
+                reviewerNameMatch: { type: Type.BOOLEAN },
                 confidenceScore: { type: Type.INTEGER },
                 detectedReturnWindow: { type: Type.STRING },
                 discrepancyNote: { type: Type.STRING },
               },
-              required: ['orderIdMatch', 'productNameMatch', 'amountMatch', 'soldByMatch', 'returnWindowClosed', 'confidenceScore'],
+              required: ['orderIdMatch', 'productNameMatch', 'amountMatch', 'soldByMatch', 'returnWindowClosed', 'reviewerNameMatch', 'confidenceScore'],
             },
           },
         }));
