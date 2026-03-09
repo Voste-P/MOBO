@@ -17,7 +17,7 @@ import { writeAuditLog } from '../services/audit.js';
 import { parsePagination, paginatedResponse } from '../utils/pagination.js';
 
 /** Batch-resolve resolvedBy user IDs to user names for a list of tickets */
-async function enrichTickets(tickets: any[]): Promise<any[]> {
+async function enrichTicketsWithResolverNames(tickets: any[]): Promise<any[]> {
   const db = prisma();
   const resolverIds = [...new Set(tickets.map(t => t.resolvedBy).filter(Boolean))];
   if (!resolverIds.length) return tickets;
@@ -37,7 +37,6 @@ async function enrichTicketsWithExternalOrderIds(tickets: any[]): Promise<any[]>
   const db = prisma();
   const orderIds = [...new Set(tickets.map(t => String(t.orderId || '').trim()).filter(Boolean))];
   if (!orderIds.length) return tickets;
-  // Look up orders by id or mongoId depending on format
   const uuidIds = orderIds.filter(id => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
   const mongoIds = orderIds.filter(id => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
   const orders = await db.order.findMany({
@@ -59,7 +58,7 @@ async function enrichTicketsWithExternalOrderIds(tickets: any[]): Promise<any[]>
 
 /** Combined enrichment: resolver names + external order IDs */
 async function enrichTickets(tickets: any[]): Promise<any[]> {
-  const withResolvers = await enrichTickets(tickets);
+  const withResolvers = await enrichTicketsWithResolverNames(tickets);
   return enrichTicketsWithExternalOrderIds(withResolvers);
 }
 
@@ -471,17 +470,17 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
           const order = await db.order.findFirst({
             where: { ...idWhere(rawOrderId), isDeleted: false },
             select: {
-              id: true, externalOrderId: true, total: true, workflowStatus: true,
+              id: true, externalOrderId: true, totalPaise: true, workflowStatus: true,
               affiliateStatus: true, paymentStatus: true, orderDate: true,
               managerName: true, soldBy: true, createdAt: true,
-              items: { where: { isDeleted: false }, select: { title: true, platform: true, brandName: true, priceAtPurchase: true, quantity: true, commission: true, dealType: true } },
+              items: { where: { isDeleted: false }, select: { title: true, platform: true, brandName: true, priceAtPurchasePaise: true, quantity: true, commissionPaise: true, dealType: true } },
             },
           });
           if (order) {
-            const item = (order.items as any)?.[0];
+            const item = order.items?.[0];
             orderDetails = {
               externalOrderId: order.externalOrderId || null,
-              total: order.total,
+              total: order.totalPaise,
               workflowStatus: order.workflowStatus,
               affiliateStatus: order.affiliateStatus,
               paymentStatus: order.paymentStatus,
@@ -491,9 +490,9 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
               product: item?.title || null,
               platform: item?.platform || null,
               brand: item?.brandName || null,
-              unitPrice: item?.priceAtPurchase ?? null,
+              unitPrice: item?.priceAtPurchasePaise ?? null,
               quantity: item?.quantity ?? null,
-              commission: item?.commission ?? null,
+              commission: item?.commissionPaise ?? null,
               dealType: item?.dealType || null,
             };
           }
