@@ -757,8 +757,8 @@ export const Orders: React.FC = () => {
                 const item = o.items?.[0];
                 return [
                   csvSafe(getPrimaryOrderId(o)),
-                  csvSafe(d.toLocaleDateString()),
-                  csvSafe(d.toLocaleTimeString()),
+                  csvSafe(d.toLocaleDateString('en-GB')),
+                  csvSafe(d.toLocaleTimeString('en-GB')),
                   csvSafe(item?.title || ''),
                   csvSafe(item?.platform || ''),
                   csvSafe(item?.brandName || ''),
@@ -770,12 +770,12 @@ export const Orders: React.FC = () => {
                   csvSafe(o.workflowStatus || ''),
                   csvSafe(o.affiliateStatus || ''),
                   csvSafe(o.paymentStatus || ''),
-                  csvSafe((o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString() : ''),
+                  csvSafe((o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString('en-GB') : ''),
                   csvSafe(o.managerName || ''),
                   csvSafe(o.agencyName || ''),
                   csvSafe((o as any).reviewerName || ''),
                   csvSafe(o.soldBy || ''),
-                  csvSafe(o.orderDate ? new Date(o.orderDate).toLocaleDateString() : ''),
+                  csvSafe(o.orderDate ? new Date(o.orderDate).toLocaleDateString('en-GB') : ''),
                   csvSafe(o.extractedProductName || ''),
                   csvSafe(o.id),
                 ].join(',');
@@ -950,7 +950,7 @@ export const Orders: React.FC = () => {
                     </div>
                     <p className="text-xs font-bold text-gray-400 flex items-center gap-1">
                       <Clock size={10} />
-                      {new Date(order.createdAt).toLocaleDateString()}
+                      {new Date(order.createdAt).toLocaleDateString('en-GB')}
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-1 max-w-[40%]">
@@ -986,7 +986,7 @@ export const Orders: React.FC = () => {
                       return (seller || validDate) ? (
                         <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-[10px] text-slate-400 font-medium">
                           {seller && <span>Seller: {seller}</span>}
-                          {validDate && <span>Ordered: {validDate.toLocaleDateString()}</span>}
+                          {validDate && <span>Ordered: {validDate.toLocaleDateString('en-GB')}</span>}
                         </div>
                       ) : null;
                     })()}
@@ -1313,8 +1313,8 @@ export const Orders: React.FC = () => {
                     csvSafe(t.id.slice(-8)), csvSafe(String(t.status)),
                     csvSafe(String(t.issueType)), csvSafe(String(t.description || '')), csvSafe(String(t.orderId || '')),
                     csvSafe(String(t.resolutionNote || '')), csvSafe(String(t.resolvedByName || '')),
-                    csvSafe(t.resolvedAt ? new Date(t.resolvedAt).toLocaleDateString() : ''),
-                    csvSafe(t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''),
+                    csvSafe(t.resolvedAt ? new Date(t.resolvedAt).toLocaleDateString('en-GB') : ''),
+                    csvSafe(t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''),
                   ].join(','));
                   downloadCsv(`my-tickets-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...rows].join('\n'));
                   toast.success(`Exported ${myTickets.length} tickets`);
@@ -1376,12 +1376,12 @@ export const Orders: React.FC = () => {
                       <p className="text-[9px] text-slate-500">
                         {t.status === 'Resolved' ? 'Resolved' : 'Rejected'}
                         {t.resolvedByName ? ` by ${t.resolvedByName}` : ''}
-                        {t.resolvedAt ? ` on ${new Date(t.resolvedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
+                        {t.resolvedAt ? ` on ${new Date(t.resolvedAt).toLocaleDateString('en-GB')}` : ''}
                       </p>
                     )}
                     <div className="flex items-center justify-between">
                       <span className="text-[9px] text-slate-400">
-                        {new Date(t.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {new Date(t.createdAt).toLocaleDateString('en-GB')}
                       </span>
                       <div className="flex items-center gap-1.5">
                         {(t.status === 'Resolved' || t.status === 'Rejected') && (
