@@ -1221,6 +1221,7 @@ const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
       'Beneficiary Name',
       'Beneficiary Code',
       'Amount (INR)',
+      'Reference/UTR',
       'Status',
     ];
 
@@ -1238,6 +1239,7 @@ const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
         `"${(p.mediatorName || '').replace(/"/g, '""')}"`,
         p.mediatorCode,
         p.amount,
+        `"${(p.ref || '').replace(/"/g, '""')}"`,
         p.status,
       ];
       csvRows.push(row.join(','));
@@ -1256,7 +1258,7 @@ const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
   };
 
   const handleExportPayoutsToSheets = () => {
-    const payoutHeaders = ['Transaction ID','Date','Time','Beneficiary Name','Beneficiary Code','Amount (INR)','Status'];
+    const payoutHeaders = ['Transaction ID','Date','Time','Beneficiary Name','Beneficiary Code','Amount (INR)','Reference/UTR','Status'];
     const payoutRows = payouts.map((p: any) => {
       const dateObj = new Date(p.date);
       return [
@@ -1266,6 +1268,7 @@ const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
         p.mediatorName || '',
         p.mediatorCode || '',
         p.amount,
+        p.ref || '',
         p.status || '',
       ] as (string | number)[];
     });
@@ -1351,6 +1354,7 @@ const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
                 <tr>
                   <th className="p-5 pl-8">Transaction ID / Date</th>
                   <th className="p-5">Beneficiary (Mediator)</th>
+                  <th className="p-5">Reference/UTR</th>
                   <th className="p-5 text-right">Amount</th>
                   <th className="p-5 text-right">Status</th>
                   <th className="p-5 pr-8 text-right">Actions</th>
@@ -1381,6 +1385,9 @@ const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
                           </div>
                         </div>
                       </div>
+                    </td>
+                    <td className="p-5">
+                      <span className="font-mono text-xs font-bold text-slate-500">{p.ref || '—'}</span>
                     </td>
                     <td className="p-5 text-right font-mono font-bold text-slate-900">
                       {formatCurrency(p.amount)}
@@ -3311,6 +3318,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [selectedMediator, setSelectedMediator] = useState<User | null>(null);
   const [payoutAmount, setPayoutAmount] = useState('');
+  const [payoutRef, setPayoutRef] = useState('');
   const [proofOrder, setProofOrder] = useState<Order | null>(null);
 
 
@@ -3358,7 +3366,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
   };
 
   const handlePayout = async () => {
-    if (!selectedMediator || !payoutAmount) return;
+    if (!selectedMediator || !payoutAmount || !payoutRef) return;
     if (!selectedMediator.upiId && !selectedMediator.qrCode) {
       toast.error('UPI ID or QR is required to payout');
       return;
@@ -3366,9 +3374,10 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
     const amount = Number(payoutAmount);
 
     try {
-      await api.ops.payoutMediator(selectedMediator.id, amount);
+      await api.ops.payoutMediator(selectedMediator.id, amount, payoutRef);
       toast.success(`Sent ${amount} to ${selectedMediator.name}`);
       setPayoutAmount('');
+      setPayoutRef('');
       onRefresh();
       setSelectedMediator(null);
     } catch (err) {
@@ -3798,6 +3807,18 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                         />
                       </div>
                     </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">
+                        Transaction Reference (UTR)
+                      </label>
+                      <input
+                        type="text"
+                        value={payoutRef}
+                        onChange={(e) => setPayoutRef(e.target.value)}
+                        className="w-full px-4 py-4 border border-slate-200 bg-slate-50 rounded-2xl font-bold text-sm text-slate-900 focus:outline-none focus:border-green-500 focus:ring-4 focus:ring-green-50 focus:bg-white transition-all placeholder:text-slate-300"
+                        placeholder="Enter UTR / Reference ID"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -3807,6 +3828,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                     disabled={
                       !payoutAmount ||
                       Number(payoutAmount) <= 0 ||
+                      !payoutRef ||
                       (!selectedMediator.upiId && !selectedMediator.qrCode)
                     }
                     className="w-full py-4 bg-black text-white font-bold rounded-2xl shadow-xl hover:bg-green-600 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:scale-100 disabled:hover:bg-black"

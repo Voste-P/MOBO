@@ -716,7 +716,7 @@ export function makeOpsController(env: Env) {
             orderBy: { requestedAt: 'desc' },
             take: limit,
             skip,
-            select: { id: true, mongoId: true, beneficiaryUserId: true, amountPaise: true, requestedAt: true, createdAt: true, status: true },
+            select: { id: true, mongoId: true, beneficiaryUserId: true, amountPaise: true, requestedAt: true, createdAt: true, status: true, providerRef: true },
           }),
           db().payout.count({ where: payoutWhere }),
         ]);
@@ -737,6 +737,7 @@ export function makeOpsController(env: Env) {
             amount: Math.round((p.amountPaise ?? 0) / 100),
             date: safeIso(p.requestedAt ?? p.createdAt) ?? new Date().toISOString(),
             status: p.status === 'paid' ? 'Success' : String(p.status),
+            ref: p.providerRef || '',
           };
         });
         res.json(paginatedResponse(mapped, payoutTotal, page, limit, isPaginated));
@@ -2600,7 +2601,7 @@ export function makeOpsController(env: Env) {
               amountPaise,
               status: canAny ? 'paid' : 'recorded',
               provider: 'manual',
-              providerRef: idempotencySuffix,
+              providerRef: body.ref,
               processedAt: new Date(),
               requestedAt: new Date(),
               createdBy: pgUserId || undefined,

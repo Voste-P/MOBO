@@ -622,7 +622,7 @@ export const opsAPI = {
       saveUsers(users);
     }
   },
-  payoutMediator: async (mediatorId: string, amount: number): Promise<void> => {
+  payoutMediator: async (mediatorId: string, amount: number, ref: string): Promise<void> => {
     await delay(MOCK_DELAY);
     const users = getUsers();
     const user = users.find((u) => u.id === mediatorId);
@@ -638,6 +638,7 @@ export const opsAPI = {
         amount,
         date: new Date().toISOString(),
         status: 'Success',
+        ref,
       });
       saveLedger(ledger);
     }

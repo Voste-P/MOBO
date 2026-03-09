@@ -4,6 +4,7 @@ import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../components/ui/ConfirmDialog';
 import { api, asArray } from '../services/api';
 import { getApiBaseAbsolute } from '../utils/apiBaseUrl';
+import { maskMobile } from '../utils/mobiles';
 import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage } from '../components/ProxiedImage';
 
@@ -1627,7 +1628,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                               <div>
                                 <p className="font-bold text-slate-900">{u.name || 'Unknown'}</p>
                                 <p className="text-xs text-slate-400 font-mono mt-0.5">
-                                  {u.mobile}
+                                  {maskMobile(u.mobile)}
                                 </p>
                               </div>
                             </div>

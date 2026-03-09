@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
+import { maskMobile } from '../utils/mobiles';
 import { ProxiedImage } from '../components/ProxiedImage';
 import { api } from '../services/api';
 import { subscribeRealtime } from '../services/realtime';
@@ -63,12 +64,6 @@ export const Profile: React.FC = () => {
     setAvatar(user.avatar);
     setQrCode(user.qrCode);
   }, [user, isEditing]);
-
-  /** Mask mobile number for display: 98****1234 */
-  function maskMobile(m: string): string {
-    if (!m || m.length < 6) return m || '';
-    return m.slice(0, 2) + '****' + m.slice(-4);
-  }
 
   /** Validate UPI ID format: handle@provider, 3-50 chars */
   function validateUpiId(value: string): string {

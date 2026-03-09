@@ -24,3 +24,9 @@ export function normalizeMobileTo10Digits(value: unknown): string {
 export function isValidMobile10(value: string): boolean {
   return /^\d{10}$/.test(value);
 }
+
+/** Mask mobile number for display: 98****1234 */
+export function maskMobile(m: string | undefined | null): string {
+  if (!m || m.length < 6) return m || '';
+  return m.slice(0, 2) + '****' + m.slice(-4);
+}

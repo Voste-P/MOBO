@@ -832,11 +832,11 @@ export const api = {
         body: JSON.stringify({ id, commission: Number.isFinite(commission as number) ? commission : 0, mediatorCode }),
       });
     },
-    payoutMediator: async (mediatorId: string, amount: number) => {
+    payoutMediator: async (mediatorId: string, amount: number, ref: string) => {
       await fetchOk('/ops/payouts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ mediatorId, amount }),
+        body: JSON.stringify({ mediatorId, amount, ref }),
       });
     },
     deletePayout: async (payoutId: string) => {
