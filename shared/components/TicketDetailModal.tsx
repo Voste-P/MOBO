@@ -15,7 +15,6 @@ interface TicketDetailModalProps {
 
 const ESCALATION_PATH: Record<string, string> = {
   mediator: 'agency',
-  agency: 'brand',
   brand: 'admin',
 };
 
@@ -223,7 +222,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-zinc-500">
               <span>By: <strong className={roleColors[(ticket as any).userRole || ticket.role] || ''}>{ticket.userName}</strong> ({(ticket as any).userRole || ticket.role})</span>
-              {ticket.orderId && <span>Order: <strong>{ticket.orderId}</strong></span>}
+              {(ticket.externalOrderId || ticket.orderId) && <span>Order: <strong>{ticket.externalOrderId || ticket.orderId}</strong></span>}
               {ticket.targetRole && <span>Assigned to: <strong>{ticket.targetRole}</strong></span>}
             </div>
             {ticket.resolutionNote && (

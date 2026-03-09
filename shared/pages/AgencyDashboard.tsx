@@ -4460,7 +4460,7 @@ export const AgencyDashboard: React.FC = () => {
               const rows = supportTickets.map(t => [
                 csvSafe(t.id.slice(-8)), csvSafe(String(t.status)),
                 csvSafe(String(t.issueType)), csvSafe(String(t.description || '')), csvSafe(String((t as any).userName || '')),
-                csvSafe(String((t as any).role || '')), csvSafe(String((t as any).targetRole || '')), csvSafe(String(t.orderId || '')),
+                csvSafe(String((t as any).role || '')), csvSafe(String((t as any).targetRole || '')), csvSafe(String(t.externalOrderId || t.orderId || '')),
                 csvSafe(String((t as any).resolutionNote || '')), csvSafe(String((t as any).resolvedByName || '')),
                 csvSafe((t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString('en-GB') : ''),
                 csvSafe(t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''),
@@ -4510,7 +4510,7 @@ export const AgencyDashboard: React.FC = () => {
                   return (String(t.issueType || '').toLowerCase().includes(q) ||
                     String(t.description || '').toLowerCase().includes(q) ||
                     String((t as any).userName || '').toLowerCase().includes(q) ||
-                    String(t.orderId || '').toLowerCase().includes(q) ||
+                    String(t.externalOrderId || t.orderId || '').toLowerCase().includes(q) ||
                     t.id.toLowerCase().includes(q));
                 }
                 return true;
@@ -4537,8 +4537,8 @@ export const AgencyDashboard: React.FC = () => {
                   {(t as any).userName && (
                     <div className="text-[10px] text-slate-400">From: {String((t as any).userName)} ({String((t as any).userRole || '')})</div>
                   )}
-                  {t.orderId && (
-                    <div className="text-[10px] text-slate-400"><span className="font-bold">Order:</span> {String(t.orderId)}</div>
+                  {(t.externalOrderId || t.orderId) && (
+                    <div className="text-[10px] text-slate-400"><span className="font-bold">Order:</span> {String(t.externalOrderId || t.orderId)}</div>
                   )}
                   {(t as any).resolutionNote && (
                     <div className="text-[10px] text-green-700 bg-green-50 rounded-lg px-2 py-1.5">

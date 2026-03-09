@@ -591,7 +591,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       csvSafe(t.userName),
       csvSafe(t.role || ''),
       csvSafe((t as any).targetRole || ''),
-      csvSafe(t.orderId || ''),
+      csvSafe(t.externalOrderId || t.orderId || ''),
       csvSafe((t as any).resolutionNote || ''),
       csvSafe((t as any).resolvedByName || ''),
       csvSafe((t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString('en-GB') : ''),
@@ -1229,7 +1229,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     !(t.issueType || '').toLowerCase().includes(q) &&
                     !(t.description || '').toLowerCase().includes(q) &&
                     !(t.userName || '').toLowerCase().includes(q) &&
-                    !(t.orderId || '').toLowerCase().includes(q) &&
+                    !(t.externalOrderId || t.orderId || '').toLowerCase().includes(q) &&
                     !t.id.toLowerCase().includes(q)
                   ) return false;
                 }
@@ -1356,8 +1356,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                           <p className="text-xs text-slate-600 font-medium leading-relaxed">
                             "{t.description}"
                           </p>
-                          {t.orderId && (
-                            <p className="text-[10px] text-slate-400 mt-1.5"><span className="font-bold">Order:</span> {t.orderId}</p>
+                          {(t.externalOrderId || t.orderId) && (
+                            <p className="text-[10px] text-slate-400 mt-1.5"><span className="font-bold">Order:</span> {t.externalOrderId || t.orderId}</p>
                           )}
                         </div>
 
