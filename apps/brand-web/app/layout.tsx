@@ -5,6 +5,7 @@ import { MoboHead } from '../../../shared/layouts/MoboHead';
 import { BODY_CLASSNAME, HTML_CLASSNAME } from '../../../shared/styles/moboGlobals';
 import { DisableNumberScroll } from '../../../shared/components/DisableNumberScroll';
 import { plusJakartaSans, jetbrainsMono } from '../../../shared/fonts';
+import { BetaBanner } from '../../../shared/components/BetaBanner';
 
 export const metadata: Metadata = {
   title: 'BUZZMA Brand',
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <MoboHead />
       </head>
       <body className={BODY_CLASSNAME} suppressHydrationWarning>
+        <BetaBanner />
         <DisableNumberScroll />
         {children}
       </body>

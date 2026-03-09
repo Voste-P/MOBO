@@ -6,6 +6,7 @@ import { BODY_CLASSNAME, HTML_CLASSNAME } from '../../../shared/styles/moboGloba
 import { DisableNumberScroll } from '../../../shared/components/DisableNumberScroll';
 import { PwaRuntime } from './PwaRuntime';
 import { plusJakartaSans, jetbrainsMono } from '../../../shared/fonts';
+import { BetaBanner } from '../../../shared/components/BetaBanner';
 
 export const metadata: Metadata = {
   title: 'BUZZMA Buyer',
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#A3E635" />
       </head>
       <body className={BODY_CLASSNAME} suppressHydrationWarning>
+        <BetaBanner />
         <DisableNumberScroll />
         <PwaRuntime app="buyer" />
         {children}
