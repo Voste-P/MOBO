@@ -2806,6 +2806,7 @@ export const BrandDashboard: React.FC = () => {
                         <th className="p-6">Date</th>
                         <th className="p-6">Transaction ID</th>
                         <th className="p-6">Agency</th>
+                        <th className="p-6">Reference/UTR</th>
                         <th className="p-6 text-right">Amount</th>
                         <th className="p-6 text-right">Status</th>
                       </tr>
@@ -2813,7 +2814,7 @@ export const BrandDashboard: React.FC = () => {
                     <tbody className="divide-y divide-zinc-50">
                       {isDataLoading ? (
                         <tr>
-                          <td colSpan={5} className="p-8">
+                          <td colSpan={6} className="p-8">
                             <EmptyState
                               title="Loading transactions"
                               description="Fetching payout ledger"
@@ -2824,7 +2825,7 @@ export const BrandDashboard: React.FC = () => {
                         </tr>
                       ) : transactions.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="p-8">
+                          <td colSpan={6} className="p-8">
                             <EmptyState
                               title="No transactions yet"
                               description="Recorded payouts will appear here."
@@ -2851,6 +2852,9 @@ export const BrandDashboard: React.FC = () => {
                                   {tx.agencyName}
                                 </span>
                               </div>
+                            </td>
+                            <td className="p-6 font-mono text-xs font-bold text-zinc-500">
+                              {tx.ref || '—'}
                             </td>
                             <td className="p-6 text-right font-mono font-bold text-zinc-900">
                               {tx.amount}
