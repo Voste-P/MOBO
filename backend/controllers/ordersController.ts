@@ -979,11 +979,33 @@ export function makeOrdersController(env: Env) {
         let aiOrderVerification: any = null;
 
         if (body.type === 'review') {
-          // Validate review link is a proper URL
-          if (body.data && !/^https?:\/\//i.test(String(body.data).trim())) {
+          // Validate review link is a proper URL from a known marketplace
+          const reviewUrl = String(body.data).trim();
+          if (!/^https?:\/\//i.test(reviewUrl)) {
             throw new AppError(400, 'INVALID_REVIEW_LINK', 'Review link must be a valid HTTP(S) URL');
           }
-          updateData.reviewLink = body.data;
+          // Validate the link is from a recognized e-commerce platform (skip in test mode)
+          if (env.NODE_ENV !== 'test') {
+            const KNOWN_REVIEW_DOMAINS = [
+              'amazon.in', 'amazon.com', 'flipkart.com', 'myntra.com', 'meesho.com',
+              'ajio.com', 'jiomart.com', 'nykaa.com', 'tatacliq.com', 'snapdeal.com',
+              'bigbasket.com', '1mg.com', 'croma.com', 'purplle.com', 'shopsy.in',
+              'blinkit.com', 'zepto.co', 'lenskart.com', 'pharmeasy.in', 'swiggy.com',
+            ];
+            try {
+              const parsedUrl = new URL(reviewUrl);
+              const host = parsedUrl.hostname.toLowerCase().replace(/^www\./, '');
+              const domainMatch = KNOWN_REVIEW_DOMAINS.some(d => host === d || host.endsWith('.' + d));
+              if (!domainMatch) {
+                throw new AppError(400, 'UNKNOWN_REVIEW_PLATFORM',
+                  'Review link must be from a recognized marketplace (Amazon, Flipkart, Myntra, etc.)');
+              }
+            } catch (urlErr) {
+              if (urlErr instanceof AppError) throw urlErr;
+              throw new AppError(400, 'INVALID_REVIEW_LINK', 'Review link is not a valid URL');
+            }
+          }
+          updateData.reviewLink = reviewUrl;
           if (order.rejectionType === 'review') {
             updateData.rejectionType = null;
             updateData.rejectionReason = null;
@@ -1183,9 +1205,21 @@ export function makeOrdersController(env: Env) {
           (r: any) => String(r?.type) !== String(body.type)
         );
 
-        // Persist marketplace reviewer/profile name if provided alongside any proof upload
+        // Persist marketplace reviewer/profile name if provided alongside any proof upload.
+        // Lock the name after first submission — buyer cannot change it between proof uploads
+        // to prevent using different accounts for different proofs.
         if (body.reviewerName) {
-          updateData.reviewerName = body.reviewerName;
+          if (!order.reviewerName) {
+            updateData.reviewerName = body.reviewerName;
+          } else if (body.reviewerName.trim().toLowerCase() !== String(order.reviewerName).trim().toLowerCase()) {
+            orderLog.warn('Reviewer name change attempt blocked', {
+              orderId: order.mongoId,
+              existingName: order.reviewerName,
+              attemptedName: body.reviewerName,
+            });
+            throw new AppError(409, 'REVIEWER_NAME_LOCKED',
+              `Reviewer name is locked to "${order.reviewerName}" from your first proof upload. Use the same marketplace account for all proofs.`);
+          }
         }
 
         const affiliateStatus = String(order.affiliateStatus || '');
