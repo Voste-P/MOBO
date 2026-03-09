@@ -14,19 +14,12 @@ interface RaiseTicketModalProps {
 
 // Role-specific issue types (fallback if API fails)
 const ROLE_ISSUE_TYPES: Record<string, readonly string[]> = {
-  shopper: ['Cashback Delay', 'Wrong Amount', 'Order Issue', 'Product Issue', 'Delivery Problem', 'Refund Request', 'Feedback', 'Other'],
-  user: ['Cashback Delay', 'Wrong Amount', 'Order Issue', 'Product Issue', 'Delivery Problem', 'Refund Request', 'Feedback', 'Other'],
+  shopper: ['Cashback Delay', 'Wrong Amount', 'Order Issue', 'Product Issue', 'Delivery Problem', 'Refund Request', 'Other'],
+  user: ['Cashback Delay', 'Wrong Amount', 'Order Issue', 'Product Issue', 'Delivery Problem', 'Refund Request', 'Other'],
   mediator: ['Commission Delay', 'Team Issue', 'Campaign Problem', 'Payout Issue', 'Buyer Complaint', 'Other'],
   agency: ['Brand Campaign Issue', 'Mediator Performance', 'Payout Delay', 'Technical Issue', 'Campaign Setup', 'Other'],
   brand: ['Campaign Setup', 'Agency Connection', 'Order Dispute', 'Payment Issue', 'Quality Concern', 'Other'],
 };
-
-const PRIORITY_OPTIONS = [
-  { value: 'low', label: 'Low', color: 'text-slate-500 bg-slate-50 border-slate-200' },
-  { value: 'medium', label: 'Medium', color: 'text-amber-600 bg-amber-50 border-amber-200' },
-  { value: 'high', label: 'High', color: 'text-orange-600 bg-orange-50 border-orange-200' },
-  { value: 'urgent', label: 'Urgent', color: 'text-red-600 bg-red-50 border-red-200' },
-] as const;
 
 export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClose, orderId: prefilledOrderId }) => {
   const { user } = useAuth();
@@ -42,7 +35,6 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClos
 
   const [issueType, setIssueType] = useState<string>('');
   const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState<string>('medium');
   const [orderIdInput, setOrderIdInput] = useState(prefilledOrderId || '');
   const [submitting, setSubmitting] = useState(false);
 
@@ -61,7 +53,6 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClos
   const reset = useCallback(() => {
     setIssueType(issueTypes[0] || '');
     setDescription('');
-    setPriority('medium');
     setOrderIdInput(prefilledOrderId || '');
     setSubmitting(false);
   }, [issueTypes, prefilledOrderId]);
@@ -82,7 +73,6 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClos
         role: userRole,
         issueType,
         description: description.trim(),
-        priority,
         ...(orderIdInput.trim() ? { orderId: orderIdInput.trim() } : {}),
       });
       toast.success('Ticket submitted! Our team will review it shortly.');
@@ -93,7 +83,7 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClos
     } finally {
       setSubmitting(false);
     }
-  }, [user, description, submitting, issueType, priority, userRole, toast, reset, onClose]);
+  }, [user, description, submitting, issueType, userRole, toast, reset, onClose]);
 
   if (!open) return null;
 
@@ -139,26 +129,6 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClos
                   }`}
                 >
                   {type}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-2">
-              Priority
-            </label>
-            <div className="flex gap-2">
-              {PRIORITY_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setPriority(opt.value)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                    priority === opt.value ? opt.color + ' shadow-sm' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  {opt.label}
                 </button>
               ))}
             </div>

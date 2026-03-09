@@ -5,6 +5,7 @@ import { ProxiedImage, placeholderImage } from './ProxiedImage';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { formatErrorMessage } from '../utils/errors';
 
 interface ProductCardProps {
   product: Product;
@@ -147,7 +148,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
       toast.success('Order submitted! Track it in the Orders tab.');
       setTimeout(resetForm, 1500);
     } catch (err: any) {
-      toast.error(typeof err?.message === 'string' ? err.message : 'Failed to submit order. Try again.');
+      toast.error(formatErrorMessage(err, 'Failed to submit order. Try again.'));
     } finally {
       setSubmitting(false);
     }

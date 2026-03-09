@@ -25,13 +25,6 @@ const statusColors: Record<string, string> = {
   Rejected: 'bg-red-50 text-red-600 border-red-200',
 };
 
-const priorityColors: Record<string, string> = {
-  urgent: 'bg-red-500 text-white',
-  high: 'bg-orange-500 text-white',
-  medium: 'bg-blue-500 text-white',
-  low: 'bg-slate-500 text-white',
-};
-
 const roleColors: Record<string, string> = {
   shopper: 'text-blue-600',
   user: 'text-blue-600',
@@ -52,6 +45,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [resolutionNote, setResolutionNote] = useState('');
   const [showResolveForm, setShowResolveForm] = useState(false);
+  const [orderDetails, setOrderDetails] = useState<any>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
   const userRole = user?.role || 'user';
@@ -65,7 +59,10 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
   const canManageTarget = userLevel >= targetLevel;
   const isAdmin = userRole === 'admin';
   // Escalate: the targeted role can escalate, OR any higher-tier role can escalate (not admin, not owner)
-  const canEscalate = isOpen && !isOwner && canManageTarget && !!ESCALATION_PATH[ticket?.targetRole || ''] && !isAdmin;
+  // Buyer/mediator tickets cannot be escalated beyond agency
+  const ticketOriginRole = ((ticket as any)?.userRole || ticket?.role || '').toLowerCase();
+  const isBuyerMediatorTicketAtAgency = ['shopper', 'user', 'mediator'].includes(ticketOriginRole) && ticket?.targetRole === 'agency';
+  const canEscalate = isOpen && !isOwner && canManageTarget && !!ESCALATION_PATH[ticket?.targetRole || ''] && !isAdmin && !isBuyerMediatorTicketAtAgency;
   // Resolve/reject: ticket owner can always resolve/reject their own, OR targeted role+ can for any in-network ticket
   const canResolve = isOpen && (isOwner || canManageTarget || isAdmin) && !(userRole === 'user' && !isOwner);
   const canReopen = isClosed && (canManageTarget || isAdmin || isOwner);
@@ -90,6 +87,11 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
       setNewComment('');
       setResolutionNote('');
       setShowResolveForm(false);
+      setOrderDetails(null);
+      // Fetch full ticket details including order info
+      api.tickets.getById(ticket.id).then((resp: any) => {
+        if (resp.orderDetails) setOrderDetails(resp.orderDetails);
+      }).catch(() => {});
     }
   }, [open, ticket, loadComments]);
 
@@ -198,11 +200,6 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusColors[ticket.status] || statusColors.Open}`}>
                 {ticket.status}
               </span>
-              {ticket.priority && (
-                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${priorityColors[ticket.priority] || priorityColors.medium}`}>
-                  {ticket.priority.toUpperCase()}
-                </span>
-              )}
             </div>
             <p className="text-[10px] text-zinc-400 mt-1">
               Ticket #{ticket.id.slice(-8)} &middot; Created {new Date(ticket.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -242,6 +239,60 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
               </p>
             )}
           </div>
+
+          {/* Order Details */}
+          {orderDetails && (
+            <div className="space-y-1.5">
+              <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Order Details</h3>
+              <div className="bg-blue-50/60 rounded-xl p-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
+                {orderDetails.externalOrderId && (
+                  <div><span className="text-zinc-500">Order ID:</span> <strong className="text-zinc-800">{orderDetails.externalOrderId}</strong></div>
+                )}
+                {orderDetails.product && (
+                  <div><span className="text-zinc-500">Product:</span> <strong className="text-zinc-800">{orderDetails.product}</strong></div>
+                )}
+                {orderDetails.platform && (
+                  <div><span className="text-zinc-500">Platform:</span> <strong className="text-zinc-800">{orderDetails.platform}</strong></div>
+                )}
+                {orderDetails.brand && (
+                  <div><span className="text-zinc-500">Brand:</span> <strong className="text-zinc-800">{orderDetails.brand}</strong></div>
+                )}
+                {orderDetails.unitPrice != null && (
+                  <div><span className="text-zinc-500">Unit Price:</span> <strong className="text-zinc-800">₹{orderDetails.unitPrice}</strong></div>
+                )}
+                {orderDetails.quantity != null && (
+                  <div><span className="text-zinc-500">Qty:</span> <strong className="text-zinc-800">{orderDetails.quantity}</strong></div>
+                )}
+                {orderDetails.total != null && (
+                  <div><span className="text-zinc-500">Total:</span> <strong className="text-zinc-800">₹{orderDetails.total}</strong></div>
+                )}
+                {orderDetails.commission != null && (
+                  <div><span className="text-zinc-500">Commission:</span> <strong className="text-zinc-800">₹{orderDetails.commission}</strong></div>
+                )}
+                {orderDetails.dealType && (
+                  <div><span className="text-zinc-500">Deal Type:</span> <strong className="text-zinc-800">{orderDetails.dealType}</strong></div>
+                )}
+                {orderDetails.orderDate && (
+                  <div><span className="text-zinc-500">Order Date:</span> <strong className="text-zinc-800">{new Date(orderDetails.orderDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</strong></div>
+                )}
+                {orderDetails.workflowStatus && (
+                  <div><span className="text-zinc-500">Workflow:</span> <strong className="text-zinc-800">{orderDetails.workflowStatus}</strong></div>
+                )}
+                {orderDetails.affiliateStatus && (
+                  <div><span className="text-zinc-500">Affiliate:</span> <strong className="text-zinc-800">{orderDetails.affiliateStatus}</strong></div>
+                )}
+                {orderDetails.paymentStatus && (
+                  <div><span className="text-zinc-500">Payment:</span> <strong className="text-zinc-800">{orderDetails.paymentStatus}</strong></div>
+                )}
+                {orderDetails.mediator && (
+                  <div><span className="text-zinc-500">Mediator:</span> <strong className="text-zinc-800">{orderDetails.mediator}</strong></div>
+                )}
+                {orderDetails.soldBy && (
+                  <div><span className="text-zinc-500">Sold By:</span> <strong className="text-zinc-800">{orderDetails.soldBy}</strong></div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Ticket activity timeline */}
           <div className="space-y-1.5">

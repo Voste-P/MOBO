@@ -122,6 +122,7 @@ export interface Order {
   frozenAt?: string;
   frozenReason?: string;
   settlementRef?: string;
+  settlementMode?: 'wallet' | 'external';
   screenshots?: { order?: string; payment?: string; review?: string; rating?: string; returnWindow?: string };
   reviewLink?: string;
   managerName: string;
@@ -265,7 +266,6 @@ export interface Ticket {
   description: string;
   status: TicketStatus;
   targetRole?: string;
-  priority?: 'low' | 'medium' | 'high' | 'urgent';
   resolvedBy?: string;
   resolvedByName?: string;
   resolvedAt?: string;

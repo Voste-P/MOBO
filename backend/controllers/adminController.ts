@@ -391,7 +391,7 @@ export function makeAdminController() {
 
         const roles = Array.isArray(user.roles) ? (user.roles as string[]) : [];
         if (roles.includes('admin') || roles.includes('ops')) {
-          throw new AppError(403, 'FORBIDDEN', 'Cannot delete privileged users');
+          throw new AppError(403, 'FORBIDDEN', 'This user cannot be deleted due to their account permissions.');
         }
 
         const mediatorCode = String(user.mediatorCode || '').trim();
@@ -418,15 +418,15 @@ export function makeAdminController() {
           db().wallet.findFirst({ where: { ownerUserId: user.id, isDeleted: false } }),
         ]);
 
-        if (hasCampaigns) throw new AppError(409, 'USER_HAS_CAMPAIGNS', 'User has campaigns');
-        if (hasDeals) throw new AppError(409, 'USER_HAS_DEALS', 'User has deals');
-        if (hasOrders) throw new AppError(409, 'USER_HAS_ORDERS', 'User has orders');
-        if (hasPendingPayout) throw new AppError(409, 'USER_HAS_PAYOUTS', 'User has pending payouts');
+        if (hasCampaigns) throw new AppError(409, 'USER_HAS_CAMPAIGNS', 'This user has active campaigns. Please remove them first before deleting.');
+        if (hasDeals) throw new AppError(409, 'USER_HAS_DEALS', 'This user has active deals. Please remove them first before deleting.');
+        if (hasOrders) throw new AppError(409, 'USER_HAS_ORDERS', 'This user has orders in the system. They cannot be deleted at this time.');
+        if (hasPendingPayout) throw new AppError(409, 'USER_HAS_PAYOUTS', 'This user has pending payouts. Please complete them first before deleting.');
         const available = Number(wallet?.availablePaise ?? 0);
         const pending = Number(wallet?.pendingPaise ?? 0);
         const locked = Number(wallet?.lockedPaise ?? 0);
         if (available > 0 || pending > 0 || locked > 0) {
-          throw new AppError(409, 'WALLET_NOT_EMPTY', 'Wallet has funds; cannot delete user');
+          throw new AppError(409, 'WALLET_NOT_EMPTY', 'This user still has funds in their wallet. Please settle the balance before deleting.');
         }
 
         const pgUserId = (req.auth as any)?.pgUserId as string | undefined;

@@ -103,7 +103,7 @@ export function makeAuthController(env: Env) {
 
             upstreamMediatorCode = String(invite.parentCode || '').trim();
             if (!upstreamMediatorCode) {
-              throw new AppError(400, 'INVALID_INVITE', 'Invite missing parent mediator code');
+              throw new AppError(400, 'INVALID_INVITE', 'This invite code is missing required information. Please contact your mediator.');
             }
             consume = { code: body.mediatorCode, role: 'shopper' };
           } else {
@@ -125,7 +125,7 @@ export function makeAuthController(env: Env) {
             select: { id: true },
           });
           if (!mediator) {
-            throw new AppError(400, 'INVALID_INVITE_PARENT', 'Invite parent mediator is not valid');
+            throw new AppError(400, 'INVALID_INVITE_PARENT', 'The mediator associated with this invite is no longer active. Please contact support.');
           }
 
           const mongoId = randomUUID();
@@ -537,7 +537,7 @@ export function makeAuthController(env: Env) {
 
           if (invite) {
             if (String(invite.role) !== String(body.role)) {
-              throw new AppError(400, 'INVITE_ROLE_MISMATCH', 'Invite role mismatch');
+              throw new AppError(400, 'INVITE_ROLE_MISMATCH', 'This invite code is not valid for your account type. Please check and try again.');
             }
             const maxUses = Number(invite.maxUses ?? 1);
             const useCount = Number(invite.useCount ?? 0);
@@ -747,7 +747,7 @@ export function makeAuthController(env: Env) {
           const invite = await tx.invite.findFirst({ where: { code: body.brandCode, status: 'active' } });
           if (!invite) throw new AppError(400, 'INVALID_INVITE', 'Invalid or inactive invite code');
           if (String(invite.role) !== 'brand') {
-            throw new AppError(400, 'INVITE_ROLE_MISMATCH', 'Invite role mismatch');
+            throw new AppError(400, 'INVITE_ROLE_MISMATCH', 'This invite code is not valid for brand registration. Please check and try again.');
           }
           const maxUses = Number(invite.maxUses ?? 1);
           const useCount = Number(invite.useCount ?? 0);

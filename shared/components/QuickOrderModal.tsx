@@ -4,6 +4,7 @@ import { Product } from '../types';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage, placeholderImage } from './ProxiedImage';
 
 interface QuickOrderModalProps {
@@ -135,7 +136,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
       onSuccess?.();
       setTimeout(handleClose, 1200);
     } catch (err: any) {
-      toast.error(typeof err?.message === 'string' ? err.message : 'Failed to submit order. Please try again.');
+      toast.error(formatErrorMessage(err, 'Failed to submit order. Please try again.'));
     } finally {
       setSubmitting(false);
     }

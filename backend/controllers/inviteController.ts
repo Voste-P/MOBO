@@ -283,7 +283,7 @@ export function makeInviteController() {
           throw new AppError(404, 'MEDIATOR_NOT_FOUND', 'Mediator not found');
         }
         if (!mediator.mediatorCode) {
-          throw new AppError(409, 'MISSING_MEDIATOR_CODE', 'Mediator missing code');
+          throw new AppError(409, 'MISSING_MEDIATOR_CODE', 'This mediator account is not fully set up. Please contact support.');
         }
 
         let code = generateHumanCode('INV');

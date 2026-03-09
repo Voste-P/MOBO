@@ -7,7 +7,6 @@ import { useSwipeTabs } from '../hooks/useSwipeTabs';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 import { api, asArray } from '../services/api';
-import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
 import { normalizeMobileTo10Digits } from '../utils/mobiles';
 import { formatCurrency } from '../utils/formatCurrency';
@@ -48,7 +47,6 @@ import {
   Search,
   Download,
   Package,
-  FileSpreadsheet,
 } from 'lucide-react';
 
 import { EmptyState, Spinner } from '../components/ui';
@@ -98,7 +96,6 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
   const [searchQuery, setSearchQuery] = useState('');
   const [ticketFilter, setTicketFilter] = useState<'All' | 'Open' | 'Resolved' | 'Rejected'>('All');
   const [ticketSearch, setTicketSearch] = useState('');
-  const [ticketPriorityFilter, setTicketPriorityFilter] = useState<string>('All');
   const [resolvingTicketId, setResolvingTicketId] = useState<string | null>(null);
   const [resolutionNote, setResolutionNote] = useState('');
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
@@ -120,7 +117,6 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
   ), [tickets]);
 
   const [viewMode, setViewMode] = useState<'todo' | 'cooling'>('todo');
-  const [sheetsExporting, setSheetsExporting] = useState(false);
 
   // [PERF] Memoize all earnings/stats calculations
   const { todayEarnings, totalDeals, totalEarnings, totalOrderValue, settledOrders, pendingOrders } = useMemo(() => {
@@ -263,7 +259,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                       api.ops
                         .approveUser(u.id)
                         .then(onRefresh)
-                        .catch((e: any) => toast.error(String(e?.message || 'Failed to approve user')))
+                        .catch((e: any) => toast.error(formatErrorMessage(e, 'Failed to approve user')))
                     }
                     className="w-8 h-8 rounded-lg bg-zinc-900 text-white flex items-center justify-center hover:bg-[#CCF381] hover:text-black transition-all shadow-md active:scale-90"
                   >
@@ -277,7 +273,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                       api.ops
                         .rejectUser(u.id)
                         .then(onRefresh)
-                        .catch((e: any) => toast.error(String(e?.message || 'Failed to reject user')))
+                        .catch((e: any) => toast.error(formatErrorMessage(e, 'Failed to reject user')))
                     }
                     className="w-8 h-8 rounded-lg bg-zinc-50 text-zinc-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all active:scale-90"
                   >
@@ -315,6 +311,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
               'Agency Name', 'Buyer Name', 'Buyer Mobile', 'Reviewer Name',
               'Workflow Status', 'Affiliate Status', 'Payment Status',
               'Sold By', 'Order Date', 'Extracted Product',
+              'UTR/Reference', 'Payment Mode',
               'Internal Ref',
             ];
             downloadCsv(
@@ -346,6 +343,8 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                   o.soldBy || '',
                   o.orderDate ? new Date(o.orderDate).toLocaleDateString() : '',
                   o.extractedProductName || '',
+                  o.settlementRef || '',
+                  o.settlementMode || '',
                   o.id,
                 ];
               })
@@ -355,63 +354,6 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
           className="p-2.5 rounded-xl border border-zinc-100 bg-white hover:bg-zinc-50 transition-colors"
         >
           <Download size={14} className="text-zinc-600" />
-        </button>
-        <button
-          type="button"
-          aria-label="Export to Google Sheets"
-          title="Export to Google Sheets"
-          disabled={sheetsExporting}
-          onClick={() => {
-            const allOrders = orders as Order[];
-            if (!allOrders.length) { toast.error('No orders to export'); return; }
-            exportToGoogleSheet({
-              title: `Mediator Orders - ${new Date().toISOString().slice(0, 10)}`,
-              headers: [
-                'External Order ID', 'Date', 'Time', 'Product', 'Platform', 'Brand', 'Deal Type',
-                'Unit Price (₹)', 'Quantity', 'Total (₹)', 'Commission (₹)', 'Settlement Date',
-                'Agency Name', 'Buyer Name', 'Buyer Mobile', 'Reviewer Name',
-                'Workflow Status', 'Affiliate Status', 'Payment Status',
-                'Sold By', 'Order Date', 'Extracted Product', 'Internal Ref',
-              ],
-              rows: allOrders.map((o) => {
-                const d = new Date(o.createdAt);
-                const item = o.items?.[0];
-                return [
-                  getPrimaryOrderId(o),
-                  d.toLocaleDateString(),
-                  d.toLocaleTimeString(),
-                  item?.title || '',
-                  item?.platform || '',
-                  item?.brandName || '',
-                  item?.dealType || 'Discount',
-                  item?.priceAtPurchase ?? 0,
-                  item?.quantity || 1,
-                  o.total || 0,
-                  item?.commission || 0,
-                  o.expectedSettlementDate ? new Date(o.expectedSettlementDate).toLocaleDateString() : '',
-                  o.agencyName || 'Direct',
-                  o.buyerName || '',
-                  o.buyerMobile || '',
-                  o.reviewerName || '',
-                  o.workflowStatus || '',
-                  o.affiliateStatus || '',
-                  o.paymentStatus || '',
-                  o.soldBy || '',
-                  o.orderDate ? new Date(o.orderDate).toLocaleDateString() : '',
-                  o.extractedProductName || '',
-                  o.id,
-                ] as (string | number)[];
-              }),
-              sheetName: 'Orders',
-              onStart: () => setSheetsExporting(true),
-              onEnd: () => setSheetsExporting(false),
-              onSuccess: () => toast.success('Exported to Google Sheets!'),
-              onError: (msg) => toast.error(msg),
-            });
-          }}
-          className="p-2.5 rounded-xl border border-green-100 bg-white hover:bg-green-50 transition-colors disabled:opacity-50"
-        >
-          <FileSpreadsheet size={14} className="text-green-600" />
         </button>
       </div>
 
@@ -578,9 +520,9 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
               <button type="button" onClick={() => {
                 const supportTickets = tickets.filter((t: Ticket) => t.issueType !== 'Feedback');
                 if (!supportTickets.length) { toast.error('No tickets to export'); return; }
-                const headers = ['Ticket ID', 'Status', 'Priority', 'Issue Type', 'Description', 'User', 'Role', 'Target Role', 'Order ID', 'Resolution Note', 'Resolved By', 'Resolved At', 'Created At'];
+                const headers = ['Ticket ID', 'Status', 'Issue Type', 'Description', 'User', 'Role', 'Target Role', 'Order ID', 'Resolution Note', 'Resolved By', 'Resolved At', 'Created At'];
                 const rows = supportTickets.map((t: Ticket) => [
-                  t.id.slice(-8), String(t.status), String((t as any).priority || 'medium'), String(t.issueType), String(t.description || ''),
+                  t.id.slice(-8), String(t.status), String(t.issueType), String(t.description || ''),
                   String((t as any).userName || ''), String((t as any).role || ''), String((t as any).targetRole || ''), String(t.orderId || ''),
                   String((t as any).resolutionNote || ''), String((t as any).resolvedByName || ''),
                   (t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString() : '',
@@ -620,24 +562,6 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
               );
             })}
           </div>
-          {/* Priority filter */}
-          <div className="flex items-center gap-1 mb-3 flex-wrap">
-            <span className="text-[9px] font-bold text-zinc-400 mr-1">Priority:</span>
-            {['All', 'urgent', 'high', 'medium', 'low'].map(p => (
-              <button key={p} type="button" onClick={() => setTicketPriorityFilter(p)}
-                className={`px-2 py-0.5 rounded-full text-[9px] font-bold border transition-all ${
-                  ticketPriorityFilter === p
-                    ? p === 'urgent' ? 'bg-red-500 text-white border-red-500' :
-                      p === 'high' ? 'bg-orange-500 text-white border-orange-500' :
-                      p === 'medium' ? 'bg-blue-500 text-white border-blue-500' :
-                      p === 'low' ? 'bg-slate-500 text-white border-slate-500' :
-                      'bg-zinc-800 text-white border-zinc-800'
-                    : 'bg-white text-zinc-500 border-zinc-200'
-                }`}>
-                {p === 'All' ? 'All' : p.charAt(0).toUpperCase() + p.slice(1)}
-              </button>
-            ))}
-          </div>
           </>
         )}
         {(!tickets || tickets.length === 0) ? (
@@ -650,7 +574,6 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
           <div className="space-y-2 max-h-[60vh] overflow-y-auto scrollbar-styled">
             {tickets.filter((t: Ticket) => {
               if (ticketFilter !== 'All' && String(t.status) !== ticketFilter) return false;
-              if (ticketPriorityFilter !== 'All' && String(t.priority || 'medium') !== ticketPriorityFilter) return false;
               if (ticketSearch.trim()) {
                 const q = ticketSearch.trim().toLowerCase();
                 return (String(t.issueType || '').toLowerCase().includes(q) ||
@@ -676,7 +599,6 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                         'bg-amber-50 text-amber-600'
                       }`}>{String(t.status || 'Open')}</span>
                     </div>
-                    {t.priority && <div className="text-[9px] text-zinc-400 mt-0.5">Priority: {String(t.priority)}</div>}
                   </div>
                   <span className="text-[9px] text-zinc-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''}</span>
                 </div>

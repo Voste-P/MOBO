@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 // Role-specific issue type options for the ticket system
 export const ROLE_ISSUE_TYPES: Record<string, readonly string[]> = {
-  shopper: ['Cashback Delay', 'Wrong Amount', 'Order Issue', 'Product Issue', 'Delivery Problem', 'Refund Request', 'Feedback', 'Other'],
-  user: ['Cashback Delay', 'Wrong Amount', 'Order Issue', 'Product Issue', 'Delivery Problem', 'Refund Request', 'Feedback', 'Other'],
+  shopper: ['Cashback Delay', 'Wrong Amount', 'Order Issue', 'Product Issue', 'Delivery Problem', 'Refund Request', 'Other'],
+  user: ['Cashback Delay', 'Wrong Amount', 'Order Issue', 'Product Issue', 'Delivery Problem', 'Refund Request', 'Other'],
   mediator: ['Commission Delay', 'Team Issue', 'Campaign Problem', 'Payout Issue', 'Buyer Complaint', 'Other'],
   agency: ['Brand Campaign Issue', 'Mediator Performance', 'Payout Delay', 'Technical Issue', 'Campaign Setup', 'Other'],
   brand: ['Campaign Setup', 'Agency Connection', 'Order Dispute', 'Payment Issue', 'Quality Concern', 'Other'],
@@ -23,8 +23,6 @@ export const createTicketSchema = z.object({
   orderId: z.string().min(1).optional(),
   issueType: z.string().min(1).max(200),
   description: z.string().min(1).max(5000),
-  priority: z.enum(['low', 'medium', 'high', 'urgent']).optional().default('medium'),
-
   userId: z.string().min(1).optional(),
   userName: z.string().min(1).max(200).optional(),
   role: z.string().min(1).max(50).optional(),
