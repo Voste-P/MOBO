@@ -632,7 +632,7 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
         };
 
         if (isPrivileged(roles)) {
-          // Admin/ops can filter by role, status, targetRole, and priority query params
+          // Admin/ops can filter by role, status, targetRole query params
           const roleFilter = String(req.query.role || '').trim().toLowerCase();
           const statusFilter = String(req.query.status || '').trim();
           const targetRoleFilter = String(req.query.targetRole || '').trim().toLowerCase();
