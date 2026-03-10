@@ -1307,7 +1307,7 @@ const MediatorProfileView = () => {
               inputMode="numeric"
               maxLength={10}
               pattern="[0-9]{10}"
-              value={mobile}
+              value={isEditing ? mobile : maskMobile(mobile)}
               onChange={(e) => setMobile(normalizeMobileTo10Digits(e.target.value))}
               aria-label="Mobile Number"
               className="w-full p-3 bg-zinc-50 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-lime-400 disabled:opacity-70 disabled:bg-transparent disabled:border disabled:border-zinc-100"
