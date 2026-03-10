@@ -51,7 +51,7 @@ export const Button = React.forwardRef<HTMLButtonElement, Props>(function Button
       className={cn(
         'inline-flex items-center justify-center gap-2 font-bold transition-all active:scale-[0.98]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-        'disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100',
+        'disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100 disabled:pointer-events-none',
         isIcon ? 'p-0' : '',
         sizeClasses[size],
         variantClasses[variant],

@@ -22,6 +22,9 @@ export const Explore: React.FC = () => {
   const [ticketOpen, setTicketOpen] = useState(false);
 
   const handlePullRefresh = useCallback(async () => {
+    setSearchTerm('');
+    setSelectedCategory('All');
+    setSelectedDealType('All');
     await fetchDeals();
   }, []);
   const { handlers: pullHandlers, pullDistance, isRefreshing } = usePullToRefresh({ onRefresh: handlePullRefresh });
@@ -136,6 +139,12 @@ export const Explore: React.FC = () => {
     if (categories.includes(selectedCategory)) return;
     setSelectedCategory('All');
   }, [categories, selectedCategory]);
+
+  useEffect(() => {
+    if (selectedDealType === 'All') return;
+    if (dealTypes.includes(selectedDealType)) return;
+    setSelectedDealType('All');
+  }, [dealTypes, selectedDealType]);
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-[#F4F4F5]">

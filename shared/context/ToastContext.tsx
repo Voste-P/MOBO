@@ -81,8 +81,18 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       };
 
       setToasts((prev) => {
-        // Deduplicate: if the same message+variant already visible, skip.
-        if (prev.some((x) => x.message === message && x.variant === variant)) return prev;
+        // Deduplicate: only skip if same message+variant is STILL visible and not yet expired.
+        if (prev.some((x) => x.message === message && x.variant === variant)) {
+          // Refresh the existing toast timer instead of adding duplicate
+          const existing = prev.find((x) => x.message === message && x.variant === variant);
+          if (existing) {
+            const oldTimer = timersRef.current.get(existing.id);
+            if (oldTimer) window.clearTimeout(oldTimer);
+            const newTimeout = window.setTimeout(() => dismiss(existing.id), durationMs);
+            timersRef.current.set(existing.id, newTimeout);
+          }
+          return prev;
+        }
         return [item, ...prev].slice(0, 4);
       });
 
@@ -109,7 +119,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={value}>
       {children}
 
-      <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[9999] w-[min(92vw,520px)] pointer-events-none">
+      <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[9999] w-[min(92vw,520px)] pointer-events-none">
         <div className="flex flex-col gap-3">
           {toasts.map((t) => (
             <div
