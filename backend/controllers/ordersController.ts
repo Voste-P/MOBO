@@ -1025,11 +1025,14 @@ export function makeOrdersController(env: Env) {
             const buyerName = String(buyerUser?.name || order.buyerName || '').trim();
             const productName = String((order.items?.[0] as any)?.title || order.extractedProductName || '').trim();
             const reviewerName = String(body.reviewerName || order.reviewerName || '').trim();
-            if (buyerName && productName) {
+            // When buyer ordered from a different person's marketplace account, the reviewer
+            // name is the name shown on that account — use it as the primary match target.
+            const nameToMatch = reviewerName || buyerName;
+            if (nameToMatch && productName) {
               const aiStart = Date.now();
               ratingAiResult = await verifyRatingScreenshotWithAi(env, {
                 imageBase64: body.data,
-                expectedBuyerName: buyerName,
+                expectedBuyerName: nameToMatch,
                 expectedProductName: productName,
                 ...(reviewerName ? { expectedReviewerName: reviewerName } : {}),
               });

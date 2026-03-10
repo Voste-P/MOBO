@@ -587,11 +587,14 @@ export const Orders: React.FC = () => {
     try {
       const buyerName = user.name || '';
       const productName = selectedOrder.items?.[0]?.title || '';
-      // Use marketplace reviewer name (provided during order creation) as primary match target
+      // Use marketplace reviewer name (provided during order creation) as primary match target.
+      // When buyer ordered from a different person's marketplace account, the reviewer name
+      // is the name shown on that account — use it instead of the buyer's app account name.
       const reviewerName = selectedOrder.reviewerName || '';
+      const nameToVerify = reviewerName || buyerName;
 
-      if (buyerName && productName) {
-        const result = await api.orders.verifyRating(file, buyerName, productName, reviewerName || undefined, selectedOrder.id);
+      if (nameToVerify && productName) {
+        const result = await api.orders.verifyRating(file, nameToVerify, productName, reviewerName || undefined, selectedOrder.id);
         setRatingVerification(result);
 
         const hasReviewerName = !!selectedOrder.reviewerName;
