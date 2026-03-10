@@ -194,7 +194,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
 
       {/* Top Section: Image & Key Info */}
       <div className="flex gap-4 mb-4">
-        <div className="w-24 h-24 rounded-2xl bg-gray-50 border border-gray-100 p-2 flex-shrink-0 flex items-center justify-center relative">
+        <div className="w-28 h-28 rounded-2xl bg-gray-50 border border-gray-100 p-2 flex-shrink-0 flex items-center justify-center relative">
             <ProxiedImage
               src={imageSrc}
               alt={product.title}
@@ -214,7 +214,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
               {[...Array(5)].map((_, i) => (
                 <Star
                   key={`star-${i}`}
-                  size={10}
+                  size={12}
                   fill={i < Math.floor(product.rating || 5) ? 'currentColor' : 'none'}
                   strokeWidth={0}
                 />
@@ -257,7 +257,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
         </div>
 
         {/* Decorative 'Online' Dot */}
-        <div className="absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-lime-500 animate-pulse"></div>
+        <div className="absolute top-3 right-3 w-2 h-2 rounded-full bg-lime-500 animate-pulse shadow-lg shadow-lime-500/50"></div>
       </div>
 
       {/* Action Buttons */}
@@ -285,7 +285,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="w-full py-6 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center gap-1.5 hover:border-lime-400 hover:bg-lime-50/30 transition-all"
+              className="w-full py-6 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center gap-1.5 hover:border-lime-400 hover:bg-lime-50/50 transition-all duration-200"
             >
               <Camera size={22} className="text-gray-400" />
               <span className="text-[11px] font-bold text-gray-500">Upload order screenshot</span>

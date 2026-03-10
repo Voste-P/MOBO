@@ -1318,56 +1318,76 @@ async function verifyRatingWithOcr(
     // Common stop words that cause false positives when matching names/products in OCR text
     const STOP_WORDS = new Set(['the','for','and','with','from','that','this','you','your','was','are','has','have','been','not','but','all','can','had','her','his','one','our','out','use','how','its','may','new','now','old','see','way','who','boy','did','get','him','let','say','she','too','any','per','set','top','end','off','big','own','put','run','two','via','free','pack','item','best','good','great','nice','size','pair','home','made','full','high','low','day','box','buy','kit']);
 
-    // Account name matching: fuzzy — lenient matching for OCR text
-    // Split name parts, keep even short parts (min 2 chars) but exclude stop words
+    // Account name matching: When reviewerName is provided, match against it FIRST
+    // since the buyer may use a different marketplace account than their app account.
+    // Buyer name is only used as fallback when no reviewerName is set.
     const buyerLower = expectedBuyerName.toLowerCase().trim();
     const allBuyerParts = buyerLower.split(/\s+/).filter(p => p.length >= 2);
-    // If stop-word filter removes ALL parts, fall back to using raw parts (prevents empty-match false negatives)
     const filteredParts = allBuyerParts.filter(p => !STOP_WORDS.has(p));
     const buyerParts = filteredParts.length > 0 ? filteredParts : allBuyerParts;
 
-    // Strategy 1: check full name as substring
-    let accountNameMatch = buyerLower.length >= 3 && lower.includes(buyerLower);
+    let accountNameMatch = false;
 
-    // Strategy 2: check individual name parts — match at least 1 part (or 40% for longer names)
-    if (!accountNameMatch && buyerParts.length > 0) {
-      const nameMatches = buyerParts.filter(p => lower.includes(p));
-      const threshold = buyerParts.length <= 2 ? 1 : Math.ceil(buyerParts.length * 0.4);
-      accountNameMatch = nameMatches.length >= threshold;
-    }
-
-    // Strategy 3: check marketplace profile / reviewer name if provided
-    if (!accountNameMatch && expectedReviewerName) {
+    // When reviewerName is provided, it is the PRIMARY match target
+    if (expectedReviewerName) {
       const reviewerLower = expectedReviewerName.toLowerCase().trim();
-      // Full reviewer name substring check
+      const allReviewerParts = reviewerLower.split(/\s+/).filter(p => p.length >= 2);
+      const filteredReviewerParts = allReviewerParts.filter(p => !STOP_WORDS.has(p));
+      const reviewerParts = filteredReviewerParts.length > 0 ? filteredReviewerParts : allReviewerParts;
+
+      // Strategy 1: full reviewer name substring
       if (reviewerLower.length >= 3 && lower.includes(reviewerLower)) {
         accountNameMatch = true;
-      } else {
-        const allReviewerParts = reviewerLower.split(/\s+/).filter(p => p.length >= 2);
-        const filteredReviewerParts = allReviewerParts.filter(p => !STOP_WORDS.has(p));
-        const reviewerParts = filteredReviewerParts.length > 0 ? filteredReviewerParts : allReviewerParts;
-        if (reviewerParts.length > 0) {
-          const reviewerMatches = reviewerParts.filter(p => lower.includes(p));
-          const threshold = reviewerParts.length <= 2 ? 1 : Math.ceil(reviewerParts.length * 0.4);
-          accountNameMatch = reviewerMatches.length >= threshold;
+      }
+      // Strategy 2: reviewer name parts
+      if (!accountNameMatch && reviewerParts.length > 0) {
+        const reviewerMatches = reviewerParts.filter(p => lower.includes(p));
+        const threshold = reviewerParts.length <= 2 ? 1 : Math.ceil(reviewerParts.length * 0.4);
+        accountNameMatch = reviewerMatches.length >= threshold;
+      }
+      // Strategy 3: first/last name of reviewer
+      if (!accountNameMatch && reviewerParts.length >= 1) {
+        const firstName = reviewerParts[0] || '';
+        const lastName = reviewerParts[reviewerParts.length - 1] || '';
+        if ((firstName.length >= 3 && lower.includes(firstName)) ||
+            (lastName.length >= 3 && lower.includes(lastName))) {
+          accountNameMatch = true;
         }
       }
-    }
-
-    // Strategy 4: handle very short names or nicknames — accept if first or last name matches
-    if (!accountNameMatch && buyerLower.length >= 2) {
-      const firstName = buyerParts[0] || '';
-      const lastName = buyerParts[buyerParts.length - 1] || '';
-      if ((firstName.length >= 3 && lower.includes(firstName)) ||
-          (lastName.length >= 3 && lower.includes(lastName))) {
-        accountNameMatch = true;
+      // Strategy 4: fuzzy match for reviewer name parts (OCR misreads)
+      if (!accountNameMatch) {
+        for (const part of allReviewerParts) {
+          if (part.length < 6) continue;
+          const ocrWords = lower.split(/\s+/);
+          const fuzzy = ocrWords.some(w => w.length >= part.length - 1 && w.length <= part.length + 1 && editDistance(w, part) <= 1);
+          if (fuzzy) { accountNameMatch = true; break; }
+        }
       }
-      // Strategy 4b: fuzzy match — allow 1-char edit distance for names ≥6 chars (handles OCR misreads)
-      // Require name part to be long enough that 1 edit is < 17% error rate (avoids "John"→"Joan")
+    } else {
+      // No reviewer name provided — fall back to buyer app account name
+      // Strategy 1: check full name as substring
+      accountNameMatch = buyerLower.length >= 3 && lower.includes(buyerLower);
+
+      // Strategy 2: check individual name parts — match at least 1 part (or 40% for longer names)
+      if (!accountNameMatch && buyerParts.length > 0) {
+        const nameMatches = buyerParts.filter(p => lower.includes(p));
+        const threshold = buyerParts.length <= 2 ? 1 : Math.ceil(buyerParts.length * 0.4);
+        accountNameMatch = nameMatches.length >= threshold;
+      }
+
+      // Strategy 3: handle very short names or nicknames — accept if first or last name matches
+      if (!accountNameMatch && buyerLower.length >= 2) {
+        const firstName = buyerParts[0] || '';
+        const lastName = buyerParts[buyerParts.length - 1] || '';
+        if ((firstName.length >= 3 && lower.includes(firstName)) ||
+            (lastName.length >= 3 && lower.includes(lastName))) {
+          accountNameMatch = true;
+        }
+      }
+      // Strategy 4: fuzzy match — allow 1-char edit distance for names ≥6 chars (handles OCR misreads)
       if (!accountNameMatch) {
         for (const part of allBuyerParts) {
           if (part.length < 6) continue;
-          // Scan OCR text for words within 1-char edit distance
           const ocrWords = lower.split(/\s+/);
           const fuzzy = ocrWords.some(w => w.length >= part.length - 1 && w.length <= part.length + 1 && editDistance(w, part) <= 1);
           if (fuzzy) { accountNameMatch = true; break; }
@@ -1407,7 +1427,7 @@ async function verifyRatingWithOcr(
       detectedProductName: matchedTokens.length > 0 ? matchedTokens.join(' ') : undefined,
       discrepancyNote: [
         !accountNameMatch ? (expectedReviewerName
-          ? `Neither buyer name "${expectedBuyerName}" nor reviewer name "${expectedReviewerName}" found in screenshot.`
+          ? `Reviewer name "${expectedReviewerName}" not found in screenshot.`
           : `Buyer name "${expectedBuyerName}" not found in screenshot.`) : '',
         !productNameMatch ? `Product name not matching in screenshot.` : '',
         accountNameMatch && productNameMatch ? 'Account name and product matched via OCR.' : '',
@@ -1450,15 +1470,19 @@ export async function verifyRatingScreenshotWithAi(
               `RATING SCREENSHOT VERIFICATION — GOD-LEVEL ACCURACY REQUIRED`,
               ``,
               `Verify this RATING/REVIEW screenshot:`,
-              `  Expected Account Name (buyer): ${payload.expectedBuyerName}`,
-              ...(payload.expectedReviewerName ? [`  Expected Marketplace Profile/Reviewer Name: ${payload.expectedReviewerName}`] : []),
+              ...(payload.expectedReviewerName
+                ? [`  EXPECTED Marketplace Reviewer Name (PRIMARY — MATCH AGAINST THIS): ${payload.expectedReviewerName}`,
+                   `  Buyer App Account Name (secondary, for reference only): ${payload.expectedBuyerName}`]
+                : [`  Expected Account Name (buyer): ${payload.expectedBuyerName}`]),
               `  Expected Product Name: ${payload.expectedProductName}`,
               ``,
               `RULES:`,
               `1. Find the REVIEWER / ACCOUNT NAME shown in the screenshot. This is the person who wrote the review or gave the rating. It may appear as "public name", "profile name", or at the top of the review.`,
-              `2. Compare the account name with "${payload.expectedBuyerName}"${payload.expectedReviewerName ? ` OR the marketplace profile name "${payload.expectedReviewerName}"` : ''} — allow for nickname variations, case differences, and abbreviated names. If EITHER name matches, consider it a match.`,
+              ...(payload.expectedReviewerName
+                ? [`2. Compare the account name PRIMARILY with the marketplace reviewer name "${payload.expectedReviewerName}". The buyer may have ordered from a DIFFERENT marketplace account than their app account — this is acceptable. Only match against "${payload.expectedReviewerName}". Allow for nickname variations, case differences, and abbreviated names.`]
+                : [`2. Compare the account name with "${payload.expectedBuyerName}" — allow for nickname variations, case differences, and abbreviated names.`]),
               `3. Find the PRODUCT NAME visible in the rating screenshot. Compare it to "${payload.expectedProductName}" — key words should match (brand, model, type). Exact match not required.`,
-              `4. If the account name does not match ANY of the expected names or the product does not match, this is potential FRAUD (someone rating a different product or using a different account).`,
+              `4. If the account name does not match the expected name or the product does not match, this is potential FRAUD (someone rating a different product or using a different account).`,
               `5. Set confidenceScore 0-100 based on how clearly visible and matching both fields are.`,
               `6. Always fill detectedAccountName and detectedProductName with what you actually see.`,
             ].join('\n') },
@@ -1485,30 +1509,47 @@ export async function verifyRatingScreenshotWithAi(
         if (!parsed) throw new Error('Failed to parse AI rating verification response');
         parsed.confidenceScore = Math.max(0, Math.min(100, parsed.confidenceScore ?? 0));
 
-        // Post-process: Gemini may ignore the OR instruction for reviewerName.
-        // If accountNameMatch is false but detectedAccountName matches expectedReviewerName, override.
-        if (!parsed.accountNameMatch && payload.expectedReviewerName) {
+        // Post-process: When reviewerName is provided, it is the PRIMARY match target.
+        // Gemini may have matched against buyer name instead — we need to verify against reviewer name.
+        if (payload.expectedReviewerName) {
           const detected = (parsed.detectedAccountName || '').toLowerCase().trim();
           const reviewer = payload.expectedReviewerName.toLowerCase().trim();
           if (detected && reviewer) {
-            // Full match
-            if (detected === reviewer || detected.includes(reviewer) || reviewer.includes(detected)) {
+            // Check if detected name matches reviewer name
+            const reviewerMatched =
+              detected === reviewer ||
+              detected.includes(reviewer) ||
+              reviewer.includes(detected);
+
+            if (reviewerMatched) {
               parsed.accountNameMatch = true;
               parsed.discrepancyNote = 'Account name matched via marketplace reviewer name.';
             } else {
               // Fuzzy: check name parts — scale edit distance tolerance with word length
               const revParts = reviewer.split(/\s+/).filter(p => p.length >= 2);
               const detParts = detected.split(/\s+/).filter(p => p.length >= 2);
+              let fuzzyMatch = false;
               if (revParts.length > 0 && detParts.length > 0) {
                 const matchCount = revParts.filter(rp => detParts.some(dp =>
                   dp === rp || (rp.length >= 6 && editDistance(dp, rp) <= 1)
                 )).length;
                 if (matchCount >= Math.max(1, Math.ceil(revParts.length * 0.5))) {
-                  parsed.accountNameMatch = true;
-                  parsed.discrepancyNote = 'Account name matched via marketplace reviewer name (fuzzy).';
+                  fuzzyMatch = true;
                 }
               }
+              if (fuzzyMatch) {
+                parsed.accountNameMatch = true;
+                parsed.discrepancyNote = 'Account name matched via marketplace reviewer name (fuzzy).';
+              } else {
+                // Reviewer name provided but NOT matched — override to false even if Gemini matched buyer name
+                parsed.accountNameMatch = false;
+                parsed.discrepancyNote = `Reviewer name "${payload.expectedReviewerName}" not found. Detected "${parsed.detectedAccountName || 'unknown'}".`;
+              }
             }
+          } else if (!detected && reviewer) {
+            // Could not detect account name from screenshot
+            parsed.accountNameMatch = false;
+            parsed.discrepancyNote = `Could not detect account name in screenshot to match reviewer "${payload.expectedReviewerName}".`;
           }
         }
 
@@ -1801,7 +1842,6 @@ export async function verifyReturnWindowWithAi(
               `  Expected Product Name: ${payload.expectedProductName}`,
               `  Expected Grand Total: ₹${payload.expectedAmount}`,
               `  Expected Sold By: ${payload.expectedSoldBy || 'N/A'}`,
-              `  Expected Reviewer/Account Name: ${payload.expectedReviewerName || 'N/A'}`,
               ``,
               `RULES:`,
               `1. Find the ORDER ID in the screenshot and compare to "${payload.expectedOrderId}".`,
@@ -1809,7 +1849,7 @@ export async function verifyReturnWindowWithAi(
               `3. Find the GRAND TOTAL / AMOUNT and compare to ₹${payload.expectedAmount} (±₹1 tolerance).`,
               `4. Find "Sold by" / "Seller" and compare to "${payload.expectedSoldBy || 'N/A'}". Normalize by ignoring suffixes like "Retail", "India", "Pvt Ltd", ".in", ".com" before comparing.`,
               `5. Check if the RETURN WINDOW is CLOSED/EXPIRED. Look for: "Return window closed", "No longer returnable", "Non-returnable", "Not eligible for return", "Exchange only", "Cannot be returned", "Return period expired", delivery date that is > 7 days ago, or any text indicating the item cannot be returned/replaced.`,
-              `6. If an Expected Reviewer/Account Name is provided, find the account/profile name shown in the screenshot and check if it matches. Set reviewerNameMatch accordingly.`,
+              `6. reviewerNameMatch should always be set to true — delivery/return window screenshots do not contain reviewer/account names.`,
               `7. Set confidenceScore 0-100 based on match quality.`,
               `8. Fill all detected fields with what you actually see in the image.`,
             ].join('\n') },

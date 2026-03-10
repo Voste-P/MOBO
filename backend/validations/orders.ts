@@ -45,11 +45,11 @@ export const createOrderSchema = z
   externalOrderId: z.string().min(1).max(128).optional(),
   reviewLink: z.string().min(1).max(2000).optional(),
   // Marketplace reviewer / profile name used by the buyer
-  reviewerName: z.string().max(200).optional(),
+  reviewerName: z.string().max(200).transform(v => v.replace(/<[^>]*>/g, '').replace(/[\x00-\x1f]/g, '').trim()).optional(),
   // AI-extracted metadata from order screenshot
   orderDate: z.string().max(100).optional(),
-  soldBy: z.string().max(200).optional(),
-  extractedProductName: z.string().max(500).optional(),
+  soldBy: z.string().max(200).transform(v => v.replace(/<[^>]*>/g, '').trim()).optional(),
+  extractedProductName: z.string().max(500).transform(v => v.replace(/<[^>]*>/g, '').trim()).optional(),
 })
   .superRefine((value, ctx) => {
     if (value.reviewLink && !isHttpsUrl(value.reviewLink)) {
@@ -88,7 +88,7 @@ export const submitClaimSchema = z
     type: z.enum(['review', 'rating', 'order', 'returnWindow']),
     data: z.string().min(1),
     // Marketplace reviewer / profile name (optional, can be updated with any proof upload)
-    reviewerName: z.string().max(200).optional(),
+    reviewerName: z.string().max(200).transform(v => v.replace(/<[^>]*>/g, '').replace(/[\x00-\x1f]/g, '').trim()).optional(),
   })
   .superRefine((value, ctx) => {
     if (value.type === 'review' && !isHttpsUrl(value.data)) {

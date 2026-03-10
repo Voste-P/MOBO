@@ -43,6 +43,7 @@ export const AppSwitchboard: React.FC<{ onSelect: (role: string) => void }> = ({
           icon={<ShoppingBag size={28} />}
           type="Mobile"
           color="lime"
+          delay={0}
           onClick={() => onSelect('consumer')}
         />
         <SwitchCard
@@ -51,6 +52,7 @@ export const AppSwitchboard: React.FC<{ onSelect: (role: string) => void }> = ({
           icon={<Users size={28} />}
           type="Mobile"
           color="indigo"
+          delay={1}
           onClick={() => onSelect('mediator')}
         />
         <SwitchCard
@@ -59,6 +61,7 @@ export const AppSwitchboard: React.FC<{ onSelect: (role: string) => void }> = ({
           icon={<Briefcase size={28} />}
           type="Web"
           color="purple"
+          delay={2}
           onClick={() => onSelect('agency')}
         />
         <SwitchCard
@@ -67,6 +70,7 @@ export const AppSwitchboard: React.FC<{ onSelect: (role: string) => void }> = ({
           icon={<Building2 size={28} />}
           type="Web"
           color="blue"
+          delay={3}
           onClick={() => onSelect('brand')}
         />
         <SwitchCard
@@ -75,30 +79,32 @@ export const AppSwitchboard: React.FC<{ onSelect: (role: string) => void }> = ({
           icon={<ShieldCheck size={28} />}
           type="Terminal"
           color="rose"
+          delay={4}
           onClick={() => onSelect('admin')}
         />
       </div>
 
       <footer className="mt-20 text-slate-600 text-[10px] font-bold uppercase tracking-[0.3em]">
-        Cluster0 Connection Secured • Gemini 3.0 Pro Active
+        BUZZMAOS v1.0 • Unified Commerce Platform
       </footer>
     </div>
   </div>
 );
 
-const SwitchCard = ({ title, desc, icon, type, color, onClick }: any) => {
+const SwitchCard = ({ title, desc, icon, type, color, delay = 0, onClick }: any) => {
   const colors: any = {
-    lime: 'hover:border-lime-500/50 hover:shadow-lime-500/10 text-lime-400',
-    indigo: 'hover:border-indigo-500/50 hover:shadow-indigo-500/10 text-indigo-400',
-    purple: 'hover:border-purple-500/50 hover:shadow-purple-500/10 text-purple-400',
-    blue: 'hover:border-blue-500/50 hover:shadow-blue-500/10 text-blue-400',
-    rose: 'hover:border-rose-500/50 hover:shadow-rose-500/10 text-rose-400',
+    lime: 'hover:border-lime-500/50 hover:shadow-lime-500/20 hover:shadow-lg text-lime-400',
+    indigo: 'hover:border-indigo-500/50 hover:shadow-indigo-500/20 hover:shadow-lg text-indigo-400',
+    purple: 'hover:border-purple-500/50 hover:shadow-purple-500/20 hover:shadow-lg text-purple-400',
+    blue: 'hover:border-blue-500/50 hover:shadow-blue-500/20 hover:shadow-lg text-blue-400',
+    rose: 'hover:border-rose-500/50 hover:shadow-rose-500/20 hover:shadow-lg text-rose-400',
   };
 
   return (
     <button
       onClick={onClick}
-      className={`group bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-8 text-center flex flex-col items-center transition-all duration-500 hover:-translate-y-2 ${colors[color]}`}
+      style={{ animationDelay: `${delay * 80}ms`, animationFillMode: 'both' }}
+      className={`group animate-enter bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-8 text-center flex flex-col items-center transition-all duration-500 hover:-translate-y-2 ${colors[color]}`}
     >
       <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-slate-500 mb-6 group-hover:text-white transition-colors">
         {type === 'Mobile' ? (

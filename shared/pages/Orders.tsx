@@ -587,17 +587,22 @@ export const Orders: React.FC = () => {
     try {
       const buyerName = user.name || '';
       const productName = selectedOrder.items?.[0]?.title || '';
-      // Use marketplace profile name if available for better matching
+      // Use marketplace reviewer name (provided during order creation) as primary match target
       const reviewerName = reviewerNameInput.trim() || selectedOrder.reviewerName || '';
 
       if (buyerName && productName) {
         const result = await api.orders.verifyRating(file, buyerName, productName, reviewerName || undefined, selectedOrder.id);
         setRatingVerification(result);
 
+        const hasReviewerName = !!(selectedOrder.reviewerName || reviewerNameInput.trim());
         if (!result.accountNameMatch && !result.productNameMatch) {
-          toast.warning('Account name and product name do not match. Please ensure the correct rating screenshot is uploaded.');
+          toast.error(hasReviewerName
+            ? `Reviewer name "${reviewerName}" and product do not match. Upload the correct screenshot.`
+            : 'Account name and product name do not match. Please ensure the correct rating screenshot is uploaded.');
         } else if (!result.accountNameMatch) {
-          toast.warning('Account name does not match. Please check that this rating was posted from the correct account.');
+          toast.error(hasReviewerName
+            ? `Reviewer name "${reviewerName}" not found in screenshot. ${result.detectedAccountName ? `Found "${result.detectedAccountName}" instead.` : ''}`
+            : 'Account name does not match. Please check that this rating was posted from the correct account.');
         } else if (!result.productNameMatch) {
           toast.warning('Product name does not match this order. Please check the screenshot.');
         } else {
@@ -622,9 +627,16 @@ export const Orders: React.FC = () => {
   const submitRatingScreenshot = async () => {
     if (!ratingFile || !selectedOrder || isUploading) return;
 
-    // Warn but don't block if account name mismatches — mediator will verify
-    if (ratingVerification && !ratingVerification.accountNameMatch && !ratingVerification.productNameMatch) {
-      // Both mismatch: still allow but warn clearly
+    const hasReviewerName = !!(selectedOrder.reviewerName || reviewerNameInput.trim());
+
+    // Block submission when reviewer name is provided but doesn't match
+    if (ratingVerification && !ratingVerification.accountNameMatch && hasReviewerName) {
+      toast.error(`Reviewer name "${selectedOrder.reviewerName || reviewerNameInput.trim()}" does not match the screenshot. Please upload the correct rating screenshot.`);
+      return;
+    }
+
+    // Warn but allow if both mismatch without reviewer name set
+    if (ratingVerification && !ratingVerification.accountNameMatch && !ratingVerification.productNameMatch && !hasReviewerName) {
       toast.warning('Account name and product mismatch detected. Your mediator will verify this manually.');
     }
 
@@ -929,7 +941,7 @@ export const Orders: React.FC = () => {
             return (
               <div
                 key={order.id}
-                className={`bg-white rounded-[1.5rem] p-5 shadow-sm border relative overflow-hidden group ${order.affiliateStatus === 'Frozen_Disputed' ? 'border-red-200' : 'border-slate-100'}`}
+                className={`bg-white rounded-[1.5rem] p-5 shadow-sm border relative overflow-hidden group transition-all duration-200 hover:shadow-md ${order.affiliateStatus === 'Frozen_Disputed' ? 'border-red-200' : 'border-slate-100'}`}
               >
                 {order.affiliateStatus === 'Frozen_Disputed' && (
                   <div className="absolute top-0 left-0 w-full bg-red-500 text-white text-[9px] font-black py-1 text-center uppercase tracking-widest z-20">
@@ -1792,8 +1804,8 @@ export const Orders: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Reviewer name — shown for all deal types after screenshot upload */}
-                  {formScreenshot && (
+                  {/* Reviewer name — only for Rating/Review deals (Discount deals don't need it) */}
+                  {formScreenshot && (selectedProduct?.dealType === 'Rating' || selectedProduct?.dealType === 'Review') && (
                     <div className="space-y-1 animate-enter">
                       <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">
                         Your Reviewer / Account Name <span className="text-zinc-300">(optional)</span>
@@ -1895,7 +1907,7 @@ export const Orders: React.FC = () => {
 
               {proofToView.items?.[0]?.dealType === 'Rating' && (
                 <div className="space-y-2">
-                  <div className="text-[10px] font-bold uppercase text-slate-400">Rating Proof</div>
+                  <div className="text-xs font-bold uppercase text-slate-400 tracking-wide">Rating Proof</div>
                   {proofToView.screenshots?.rating ? (
                     <ProofImage
                       orderId={proofToView.id}
@@ -1913,13 +1925,13 @@ export const Orders: React.FC = () => {
 
               {proofToView.items?.[0]?.dealType === 'Review' && (
                 <div className="space-y-2">
-                  <div className="text-[10px] font-bold uppercase text-slate-400">Review Link</div>
+                  <div className="text-xs font-bold uppercase text-slate-400 tracking-wide">Review Link</div>
                   {proofToView.reviewLink ? (
                     <a
                       href={proofToView.reviewLink}
                       target="_blank"
                       rel="noreferrer"
-                      className="block p-3 rounded-xl border border-slate-200 text-xs font-bold text-blue-600 bg-blue-50 break-all"
+                      className="block p-3 rounded-xl border border-blue-200 text-xs font-bold text-blue-600 bg-blue-50 break-all hover:bg-blue-100 transition-colors"
                     >
                       {proofToView.reviewLink}
                     </a>
@@ -1933,7 +1945,7 @@ export const Orders: React.FC = () => {
 
               {/* Return Window Proof */}
               <div className="space-y-2">
-                <div className="text-[10px] font-bold uppercase text-slate-400">Return Window Proof</div>
+                <div className="text-xs font-bold uppercase text-slate-400 tracking-wide">Return Window Proof</div>
                 {(proofToView.screenshots as any)?.returnWindow ? (
                   <ProofImage
                     orderId={proofToView.id}
@@ -2020,25 +2032,25 @@ export const Orders: React.FC = () => {
             ) : uploadType === 'rating' ? (
               /* Enhanced rating upload with AI pre-validation */
               <div className="space-y-4">
-                {/* Reviewer Name — ALWAYS visible, shown BEFORE screenshot upload */}
+                {/* Reviewer Name — pre-filled from order creation, locked if already set */}
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">
                     Marketplace Reviewer / Account Name
-                    {selectedOrder?.reviewerName && <span className="ml-1 text-green-600">(locked)</span>}
+                    {selectedOrder?.reviewerName && <span className="ml-1 text-green-600">(set during order)</span>}
                   </label>
                   <input
                     type="text"
                     value={reviewerNameInput}
                     onChange={(e) => { if (!selectedOrder?.reviewerName) setReviewerNameInput(e.target.value); }}
                     readOnly={!!selectedOrder?.reviewerName}
-                    className={`w-full p-2.5 rounded-xl border font-bold text-sm outline-none transition-all ${selectedOrder?.reviewerName ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' : 'bg-indigo-50 border-indigo-100 text-indigo-700 focus:ring-2 focus:ring-indigo-200'}`}
+                    className={`w-full p-2.5 rounded-xl border font-bold text-sm outline-none transition-all ${selectedOrder?.reviewerName ? 'bg-green-50 border-green-200 text-green-700 cursor-not-allowed' : 'bg-indigo-50 border-indigo-100 text-indigo-700 focus:ring-2 focus:ring-indigo-200'}`}
                     placeholder="e.g. Gaurav C. on Amazon"
                     maxLength={200}
                   />
                   <p className="text-[9px] text-slate-400 ml-1">
                     {selectedOrder?.reviewerName
-                      ? 'Locked from your first proof upload — must use the same marketplace account for all proofs.'
-                      : 'Name shown on the marketplace (Amazon, Flipkart, etc.) — must match the name in your rating screenshot.'}
+                      ? `This name was provided when filling the order form. Your rating screenshot must show this reviewer name: "${selectedOrder.reviewerName}".`
+                      : 'Enter your marketplace reviewer name (Amazon, Flipkart, etc.) — the name visible in your rating screenshot.'}
                   </p>
                 </div>
 
@@ -2115,13 +2127,17 @@ export const Orders: React.FC = () => {
                     {!ratingVerification.accountNameMatch && !ratingVerification.productNameMatch && (
                       <p className="text-[10px] text-red-600 font-bold bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
                         <AlertTriangle size={12} />
-                        Account name & product do not match. Upload the correct rating screenshot.
+                        {(selectedOrder?.reviewerName || reviewerNameInput.trim())
+                          ? `Reviewer name "${selectedOrder?.reviewerName || reviewerNameInput.trim()}" and product do not match. Upload the correct rating screenshot from the correct marketplace account.`
+                          : 'Account name & product do not match. Upload the correct rating screenshot.'}
                       </p>
                     )}
                     {!ratingVerification.accountNameMatch && ratingVerification.productNameMatch && (
-                      <p className="text-[10px] text-amber-600 font-bold bg-amber-50 p-2 rounded-lg flex items-center gap-1.5">
+                      <p className="text-[10px] text-red-600 font-bold bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
                         <AlertTriangle size={12} />
-                        Account name mismatch — please ensure the rating was posted from the correct marketplace account. You can still submit; your mediator will verify.
+                        {(selectedOrder?.reviewerName || reviewerNameInput.trim())
+                          ? `Reviewer name "${selectedOrder?.reviewerName || reviewerNameInput.trim()}" not found in screenshot. ${ratingVerification.detectedAccountName ? `Found "${ratingVerification.detectedAccountName}" instead.` : ''} Please upload a screenshot from the correct account.`
+                          : 'Account name mismatch — please ensure the rating was posted from the correct marketplace account.'}
                       </p>
                     )}
                     {ratingVerification.accountNameMatch && !ratingVerification.productNameMatch && (
@@ -2143,7 +2159,9 @@ export const Orders: React.FC = () => {
                   disabled={
                     isUploading ||
                     ratingAnalyzing ||
-                    !ratingFile
+                    !ratingFile ||
+                    // Block submit when reviewer name is provided but doesn't match in screenshot
+                    !!(ratingVerification && !ratingVerification.accountNameMatch && (selectedOrder?.reviewerName || reviewerNameInput.trim()))
                   }
                   className="w-full py-3.5 bg-black text-white font-bold rounded-2xl hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >

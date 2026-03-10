@@ -1038,7 +1038,16 @@ export function makeOrdersController(env: Env) {
                 durationMs: Date.now() - aiStart,
                 metadata: { orderId: order.mongoId, confidenceScore: ratingAiResult?.confidenceScore },
               });
-              // Block submission if both name AND product mismatch with high confidence (≥80 for fraud prevention, allows OCR margin)
+              // Block submission if reviewer name is set and doesn't match (strict enforcement)
+              if (ratingAiResult && reviewerName && !ratingAiResult.accountNameMatch
+                && ratingAiResult.confidenceScore >= 60) {
+                throw new AppError(422, 'RATING_VERIFICATION_FAILED',
+                  `Rating screenshot reviewer name does not match "${reviewerName}". ` +
+                  `Detected: "${ratingAiResult.detectedAccountName || 'unknown'}". ` +
+                  'Please upload a screenshot from the correct marketplace account. ' +
+                  (ratingAiResult.discrepancyNote || ''));
+              }
+              // Block submission if both name AND product mismatch with high confidence (fraud prevention)
               if (ratingAiResult && !ratingAiResult.accountNameMatch && !ratingAiResult.productNameMatch
                 && ratingAiResult.confidenceScore >= 80) {
                 throw new AppError(422, 'RATING_VERIFICATION_FAILED',
@@ -1096,14 +1105,14 @@ export function makeOrdersController(env: Env) {
             const expectedSoldBy = String(order.soldBy || '').trim();
             if (expectedOrderId) {
               const aiStart = Date.now();
-              const reviewerName = String(body.reviewerName || order.reviewerName || '').trim();
               returnWindowResult = await verifyReturnWindowWithAi(env, {
                 imageBase64: body.data,
                 expectedOrderId,
                 expectedProductName,
                 expectedAmount,
                 expectedSoldBy: expectedSoldBy || undefined,
-                expectedReviewerName: reviewerName || undefined,
+                // NOTE: Do NOT pass expectedReviewerName here — return window / delivery
+                // screenshots do not contain reviewer names, so checking it would always fail.
               });
               logPerformance({
                 operation: 'AI_RETURN_WINDOW_VERIFICATION',
