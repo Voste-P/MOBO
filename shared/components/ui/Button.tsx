@@ -13,13 +13,13 @@ type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    'bg-indigo-600 text-white hover:bg-indigo-500 focus-visible:ring-indigo-400/60 focus-visible:ring-offset-white',
+    'bg-indigo-600 text-white hover:bg-indigo-500 focus-visible:ring-indigo-400 focus-visible:ring-offset-white',
   secondary:
-    'bg-white text-zinc-900 border border-zinc-200 hover:bg-zinc-50 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-white',
+    'bg-white text-zinc-900 border border-zinc-200 hover:bg-zinc-50 focus-visible:ring-indigo-400 focus-visible:ring-offset-white',
   ghost:
-    'bg-transparent text-zinc-700 hover:bg-zinc-100 focus-visible:ring-indigo-400/40 focus-visible:ring-offset-white',
+    'bg-transparent text-zinc-700 hover:bg-zinc-100 focus-visible:ring-indigo-400 focus-visible:ring-offset-white',
   destructive:
-    'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500/40 focus-visible:ring-offset-white',
+    'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-400 focus-visible:ring-offset-white disabled:opacity-50',
 };
 
 const sizeClasses: Record<ButtonSize, string> = {

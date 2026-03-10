@@ -198,8 +198,8 @@ export const Explore: React.FC = () => {
               aria-pressed={selectedCategory === cat ? "true" : "false"}
               className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap ${
                 selectedCategory === cat
-                  ? 'bg-black text-white border-black shadow'
-                  : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                  ? 'bg-lime-500 text-white border-lime-500 shadow'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-lime-300'
               }`}
             >
               {cat}

@@ -78,7 +78,7 @@ export const Input = React.forwardRef<HTMLInputElement, Props>(function Input(
             tabIndex={-1}
             onClick={() => setShowPassword((v) => !v)}
             className={cn(
-              'absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-colors',
+              'absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-xl transition-colors',
               isDark
                 ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
                 : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100'

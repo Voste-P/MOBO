@@ -25,7 +25,7 @@ export function BetaBanner() {
 
   return (
     <div className="w-full bg-yellow-50 border-b border-yellow-300 text-yellow-900 text-[10px] sm:text-xs leading-tight z-50 flex items-center gap-2 px-3 py-1.5">
-      <span className="shrink-0 font-extrabold tracking-wider text-[9px] sm:text-[10px] bg-yellow-400 text-yellow-950 px-1.5 py-0.5 rounded leading-none uppercase select-none">
+      <span className="shrink-0 font-extrabold tracking-wider text-[9px] sm:text-[10px] bg-yellow-400 text-yellow-950 px-1.5 py-0.5 rounded leading-none uppercase select-none animate-beta-pulse">
         Beta Test
       </span>
       <span className="min-w-0 truncate">
@@ -40,6 +40,13 @@ export function BetaBanner() {
       >
         ✕
       </button>
+      <style>{`
+        @keyframes beta-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.7); }
+          50% { box-shadow: 0 0 8px 2px rgba(250, 204, 21, 0.5); }
+        }
+        .animate-beta-pulse { animation: beta-pulse 2s ease-in-out infinite; }
+      `}</style>
     </div>
   );
 }
