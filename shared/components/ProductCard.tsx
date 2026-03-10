@@ -19,6 +19,17 @@ type ProductCardComponentProps = React.Attributes & ProductCardProps;
 
 const sanitizeLabel = (value: unknown) => String(value || '').replace(/["\\]/g, '').trim();
 
+const sanitizeImageUrl = (url: unknown): string => {
+  const s = String(url || '').trim();
+  if (!s) return '';
+  try {
+    const u = new URL(s);
+    return /^https?:$/.test(u.protocol) ? u.href : '';
+  } catch {
+    return /^\/[^/]/.test(s) ? s : '';
+  }
+};
+
 const readFileAsDataUrl = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -34,8 +45,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const rawImage = sanitizeLabel(product.image);
-  const imageSrc = rawImage || placeholderImage;
+  const imageSrc = sanitizeImageUrl(product.image) || placeholderImage;
   const platformLabel = sanitizeLabel(product.platform) || 'DEAL';
   const brandLabel = sanitizeLabel(product.brandName) || 'PARTNER';
   const mediatorLabel = sanitizeLabel(product.mediatorName || product.mediatorCode) || 'PARTNER';
@@ -98,8 +108,8 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
           soldBy: result.soldBy || undefined,
           productName: result.productName || undefined,
         });
-        // Lock fields after successful AI extraction
-        if (result.orderId || result.amount) setFieldsLocked(true);
+        // Lock fields only when BOTH required fields are extracted
+        if (result.orderId && result.amount) setFieldsLocked(true);
       }
     } catch {
       // Extraction is optional — notify user gracefully

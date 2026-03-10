@@ -20,8 +20,11 @@ export function PullToRefreshIndicator({
 
   return (
     <div
-      className="flex items-center justify-center transition-[height] duration-200"
-      style={{ height: Math.max(distance, isRefreshing ? 40 : 0) }}
+      className="flex items-center justify-center transition-[height,opacity] duration-200"
+      style={{
+        height: Math.max(distance, isRefreshing ? 40 : 0),
+        opacity: isRefreshing || distance > 0 ? 1 : 0,
+      }}
       aria-hidden="true"
     >
       {isRefreshing ? (
