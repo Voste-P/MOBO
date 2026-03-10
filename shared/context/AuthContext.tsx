@@ -42,18 +42,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!user?.id) return;
     let timer: any = null;
     let inFlight = false;
+    let mounted = true;
 
     const scheduleRefresh = () => {
       // Debounce: always restart the timer so we fetch the latest state after a burst.
       if (timer) clearTimeout(timer);
       timer = setTimeout(async () => {
         timer = null;
-        if (inFlight) return;
+        if (inFlight || !mounted) return;
         inFlight = true;
         try {
           const me = await api.auth.me();
+          if (!mounted) return;
           setUser(me);
-          localStorage.setItem('mobo_session', JSON.stringify(me));
+          try { localStorage.setItem('mobo_session', JSON.stringify(me)); } catch { /* storage full */ }
           emitAuthChange();
         } catch {
           // If token became invalid, restoreSession() will handle on next load.
@@ -72,6 +74,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     return () => {
+      mounted = false;
       unsub();
       if (timer) clearTimeout(timer);
     };

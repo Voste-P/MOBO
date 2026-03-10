@@ -58,10 +58,9 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClos
   }, [issueTypes, prefilledOrderId]);
 
   const handleClose = useCallback(() => {
-    if (submitting) return;
     reset();
     onClose();
-  }, [submitting, reset, onClose]);
+  }, [reset, onClose]);
 
   const handleSubmit = useCallback(async () => {
     if (!user || !description.trim() || submitting) return;
@@ -162,9 +161,7 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClos
               className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-400 h-28 resize-none"
               placeholder="Please provide details about your issue..."
             />
-            {description.length > 0 && (
-              <p className="text-[10px] text-slate-400 text-right mt-1">{description.length}/2000</p>
-            )}
+            <p className="text-[10px] text-slate-400 text-right mt-1">{description.length}/2000</p>
           </div>
 
           <button
