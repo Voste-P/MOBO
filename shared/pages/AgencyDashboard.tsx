@@ -19,6 +19,7 @@ import { DesktopShell } from '../components/DesktopShell';
 import { formatCurrency } from '../utils/formatCurrency';
 import { getPrimaryOrderId } from '../utils/orderHelpers';
 import { csvSafe, downloadCsv } from '../utils/csvHelpers';
+import { maskMobile } from '../utils/mobiles';
 import {
   LayoutDashboard,
   Users,
@@ -311,7 +312,7 @@ const AgencyProfile = ({ user }: any) => {
               <input
                 type="tel"
                 disabled={!isEditing}
-                value={form.mobile}
+                value={isEditing ? form.mobile : maskMobile(form.mobile)}
                 onChange={(e) => setForm({ ...form, mobile: e.target.value })}
                 aria-label="Contact Number"
                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:opacity-70 disabled:bg-slate-50/50 transition-all"

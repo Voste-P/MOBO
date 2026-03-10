@@ -331,7 +331,7 @@ const BrandProfileView = () => {
                 <input
                   type="tel"
                   disabled
-                  value={form.mobile}
+                  value={maskMobile(form.mobile)}
                   onChange={(e) => setForm({ ...form, mobile: e.target.value })}
                   aria-label="Mobile number"
                   className="w-full pl-12 pr-4 py-4 bg-zinc-50 rounded-2xl font-bold text-zinc-900 outline-none focus:ring-4 focus:ring-lime-100 focus:bg-white transition-all disabled:opacity-70 disabled:bg-zinc-50/50"

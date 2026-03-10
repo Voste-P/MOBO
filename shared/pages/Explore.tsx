@@ -143,8 +143,8 @@ export const Explore: React.FC = () => {
       <div className="px-4 pt-10 pb-2 bg-white/95 backdrop-blur-md shadow-sm z-10 border-b border-gray-100 sticky top-0">
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-black tracking-widest text-lime-600 bg-lime-50 px-1.5 py-0.5 rounded border border-lime-200">BUZZMA</span>
-            <h1 className="text-lg font-extrabold text-slate-900">Explore Deals</h1>
+            <span className="text-[8px] font-black tracking-widest text-lime-600 bg-lime-50 px-1 py-px rounded border border-lime-200">BUZZMA</span>
+            <h1 className="text-sm font-extrabold text-slate-900">Explore Deals</h1>
           </div>
           <button
             onClick={() => setTicketOpen(true)}
