@@ -2591,7 +2591,7 @@ export function makeOpsController(env: Env) {
           (res.locals as any)?.requestId ||
           ''
         ).trim();
-        const idempotencySuffix = requestId || `MANUAL-${user.id}-${amountPaise}-${new Date().toISOString().slice(0, 10)}`;
+        const _idempotencySuffix = requestId || `MANUAL-${user.id}-${amountPaise}-${new Date().toISOString().slice(0, 10)}`;
 
         await db().$transaction(async (tx: any) => {
           const payoutDoc = await tx.payout.create({

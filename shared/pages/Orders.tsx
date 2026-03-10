@@ -2012,6 +2012,18 @@ export const Orders: React.FC = () => {
 
             {uploadType === 'review' ? (
               <div className="space-y-3">
+                {/* Reviewer Name — display for identity consistency */}
+                {selectedOrder?.reviewerName && (
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+                    <p className="text-[10px] font-bold text-green-700 flex items-center gap-1.5">
+                      <CheckCircle2 size={12} />
+                      Reviewer name: <span className="text-green-800">"{selectedOrder.reviewerName}"</span>
+                    </p>
+                    <p className="text-[9px] text-green-600 mt-1">
+                      Your review link must be from this marketplace account.
+                    </p>
+                  </div>
+                )}
                 <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">
                   Review Link
                 </label>
@@ -2162,6 +2174,18 @@ export const Orders: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-3">
+                {/* Reviewer Name — display for identity consistency on return window uploads */}
+                {uploadType === 'returnWindow' && selectedOrder?.reviewerName && (
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+                    <p className="text-[10px] font-bold text-green-700 flex items-center gap-1.5">
+                      <CheckCircle2 size={12} />
+                      Reviewer name: <span className="text-green-800">"{selectedOrder.reviewerName}"</span>
+                    </p>
+                    <p className="text-[9px] text-green-600 mt-1">
+                      All proofs are verified under this marketplace identity.
+                    </p>
+                  </div>
+                )}
                 <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">
                   {uploadType === 'returnWindow' ? 'Return Window Screenshot' : 'Proof'}
                 </label>

@@ -1219,9 +1219,23 @@ export function makeOrdersController(env: Env) {
         // Persist marketplace reviewer/profile name if provided alongside any proof upload.
         // Lock the name after first submission — buyer cannot change it between proof uploads
         // to prevent using different accounts for different proofs.
+        // Uses atomic conditional update to prevent race conditions from concurrent uploads.
         if (body.reviewerName) {
           if (!order.reviewerName) {
-            updateData.reviewerName = body.reviewerName;
+            // Atomic: only set if still null (prevents race where two concurrent uploads both see null)
+            const atomicResult = await db().order.updateMany({
+              where: { id: order.id, reviewerName: null },
+              data: { reviewerName: body.reviewerName },
+            });
+            if (atomicResult.count === 0) {
+              // Another request set it first — re-fetch and verify it matches
+              const freshOrder = await db().order.findUnique({ where: { id: order.id }, select: { reviewerName: true } });
+              if (freshOrder?.reviewerName && body.reviewerName.trim().toLowerCase() !== String(freshOrder.reviewerName).trim().toLowerCase()) {
+                throw new AppError(409, 'REVIEWER_NAME_LOCKED',
+                  `Reviewer name is locked to "${freshOrder.reviewerName}" from your first proof upload. Use the same marketplace account for all proofs.`);
+              }
+            }
+            // Don't set updateData.reviewerName — already persisted atomically above
           } else if (body.reviewerName.trim().toLowerCase() !== String(order.reviewerName).trim().toLowerCase()) {
             orderLog.warn('Reviewer name change attempt blocked', {
               orderId: order.mongoId,
