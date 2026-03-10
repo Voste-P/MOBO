@@ -398,7 +398,8 @@ export const Orders: React.FC = () => {
       if (!isValidReviewLink(inputValue)) {
         throw new Error('Please enter a valid HTTPS review link from a recognized marketplace (Amazon, Flipkart, Myntra, etc.).');
       }
-      await api.orders.submitClaim(selectedOrder.id, { type: 'review', data: inputValue });
+      const reviewerName = selectedOrder.reviewerName || '';
+      await api.orders.submitClaim(selectedOrder.id, { type: 'review', data: inputValue, ...(reviewerName ? { reviewerName } : {}) });
       toast.success('Link submitted!');
       setSelectedOrder(null);
       setInputValue('');

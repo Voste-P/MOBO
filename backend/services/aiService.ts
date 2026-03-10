@@ -1849,7 +1849,9 @@ export async function verifyReturnWindowWithAi(
               `3. Find the GRAND TOTAL / AMOUNT and compare to ₹${payload.expectedAmount} (±₹1 tolerance).`,
               `4. Find "Sold by" / "Seller" and compare to "${payload.expectedSoldBy || 'N/A'}". Normalize by ignoring suffixes like "Retail", "India", "Pvt Ltd", ".in", ".com" before comparing.`,
               `5. Check if the RETURN WINDOW is CLOSED/EXPIRED. Look for: "Return window closed", "No longer returnable", "Non-returnable", "Not eligible for return", "Exchange only", "Cannot be returned", "Return period expired", delivery date that is > 7 days ago, or any text indicating the item cannot be returned/replaced.`,
-              `6. reviewerNameMatch should always be set to true — delivery/return window screenshots do not contain reviewer/account names.`,
+              payload.expectedReviewerName
+                ? `6. Find the BUYER NAME / "Ship to" / "Deliver to" name in the screenshot and compare to "${payload.expectedReviewerName}". This is the marketplace account holder name. Set reviewerNameMatch=true if it matches (case-insensitive, partial/substring match OK — e.g. "chetan" matches "Chetan Chaudhari"). Set reviewerNameMatch=false if a clearly different name is shown.`
+                : `6. reviewerNameMatch should always be set to true — no specific reviewer name to verify.`,
               `7. Set confidenceScore 0-100 based on match quality.`,
               `8. Fill all detected fields with what you actually see in the image.`,
             ].join('\n') },

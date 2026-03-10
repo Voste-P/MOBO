@@ -1106,6 +1106,10 @@ export function makeOrdersController(env: Env) {
               (acc: number, it: any) => acc + (Number(it?.priceAtPurchasePaise) || 0) * (Number(it?.quantity) || 1), 0
             ) / 100;
             const expectedSoldBy = String(order.soldBy || '').trim();
+            // Reviewer name: delivery/return window screenshots often show "Ship to" / "Deliver to"
+            // which is the marketplace account holder's name. When buyer ordered from someone
+            // else's account, pass the reviewer name so AI can verify that name in the screenshot.
+            const rwReviewerName = String(body.reviewerName || order.reviewerName || '').trim();
             if (expectedOrderId) {
               const aiStart = Date.now();
               returnWindowResult = await verifyReturnWindowWithAi(env, {
@@ -1114,8 +1118,7 @@ export function makeOrdersController(env: Env) {
                 expectedProductName,
                 expectedAmount,
                 expectedSoldBy: expectedSoldBy || undefined,
-                // NOTE: Do NOT pass expectedReviewerName here — return window / delivery
-                // screenshots do not contain reviewer names, so checking it would always fail.
+                ...(rwReviewerName ? { expectedReviewerName: rwReviewerName } : {}),
               });
               logPerformance({
                 operation: 'AI_RETURN_WINDOW_VERIFICATION',
