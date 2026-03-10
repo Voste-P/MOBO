@@ -48,8 +48,8 @@ export const createOrderSchema = z
   reviewerName: z.string().max(200).transform(v => v.replace(/<[^>]*>/g, '').replace(/[\x00-\x1f]/g, '').trim()).optional(),
   // AI-extracted metadata from order screenshot
   orderDate: z.string().max(100).optional(),
-  soldBy: z.string().max(200).transform(v => v.replace(/<[^>]*>/g, '').trim()).optional(),
-  extractedProductName: z.string().max(500).transform(v => v.replace(/<[^>]*>/g, '').trim()).optional(),
+  soldBy: z.string().max(200).transform(v => v.replace(/<[^>]*>/g, '').replace(/[\x00-\x1f]/g, '').trim()).optional(),
+  extractedProductName: z.string().max(500).transform(v => v.replace(/<[^>]*>/g, '').replace(/[\x00-\x1f]/g, '').trim()).optional(),
 })
   .superRefine((value, ctx) => {
     if (value.reviewLink && !isHttpsUrl(value.reviewLink)) {

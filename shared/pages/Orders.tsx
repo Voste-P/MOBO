@@ -588,13 +588,13 @@ export const Orders: React.FC = () => {
       const buyerName = user.name || '';
       const productName = selectedOrder.items?.[0]?.title || '';
       // Use marketplace reviewer name (provided during order creation) as primary match target
-      const reviewerName = reviewerNameInput.trim() || selectedOrder.reviewerName || '';
+      const reviewerName = selectedOrder.reviewerName || '';
 
       if (buyerName && productName) {
         const result = await api.orders.verifyRating(file, buyerName, productName, reviewerName || undefined, selectedOrder.id);
         setRatingVerification(result);
 
-        const hasReviewerName = !!(selectedOrder.reviewerName || reviewerNameInput.trim());
+        const hasReviewerName = !!selectedOrder.reviewerName;
         if (!result.accountNameMatch && !result.productNameMatch) {
           toast.error(hasReviewerName
             ? `Reviewer name "${reviewerName}" and product do not match. Upload the correct screenshot.`
@@ -627,17 +627,18 @@ export const Orders: React.FC = () => {
   const submitRatingScreenshot = async () => {
     if (!ratingFile || !selectedOrder || isUploading) return;
 
-    const hasReviewerName = !!(selectedOrder.reviewerName || reviewerNameInput.trim());
+    const hasReviewerName = !!selectedOrder.reviewerName;
 
     // Block submission when reviewer name is provided but doesn't match
     if (ratingVerification && !ratingVerification.accountNameMatch && hasReviewerName) {
-      toast.error(`Reviewer name "${selectedOrder.reviewerName || reviewerNameInput.trim()}" does not match the screenshot. Please upload the correct rating screenshot.`);
+      toast.error(`Reviewer name "${selectedOrder.reviewerName}" does not match the screenshot. Please upload the correct rating screenshot.`);
       return;
     }
 
-    // Warn but allow if both mismatch without reviewer name set
-    if (ratingVerification && !ratingVerification.accountNameMatch && !ratingVerification.productNameMatch && !hasReviewerName) {
-      toast.warning('Account name and product mismatch detected. Your mediator will verify this manually.');
+    // Block submission when product name doesn't match
+    if (ratingVerification && !ratingVerification.productNameMatch) {
+      toast.error('Product name does not match this order. Please upload the correct rating screenshot.');
+      return;
     }
 
     setIsUploading(true);
@@ -648,7 +649,7 @@ export const Orders: React.FC = () => {
         reader.onerror = () => reject(new Error('Failed to read file'));
         reader.readAsDataURL(ratingFile);
       });
-      const reviewerName = reviewerNameInput.trim() || selectedOrder.reviewerName || '';
+      const reviewerName = selectedOrder.reviewerName || '';
       await api.orders.submitClaim(selectedOrder.id, { type: uploadType, data, ...(reviewerName ? { reviewerName } : {}) });
       toast.success('Proof uploaded!');
       setSelectedOrder(null);
@@ -1252,7 +1253,6 @@ export const Orders: React.FC = () => {
                         onClick={() => {
                           setSelectedOrder(order);
                           setUploadType('rating');
-                          setReviewerNameInput(order.reviewerName || '');
                         }}
                         className="text-[10px] font-bold uppercase text-purple-600"
                       >
@@ -2032,27 +2032,18 @@ export const Orders: React.FC = () => {
             ) : uploadType === 'rating' ? (
               /* Enhanced rating upload with AI pre-validation */
               <div className="space-y-4">
-                {/* Reviewer Name — pre-filled from order creation, locked if already set */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">
-                    Marketplace Reviewer / Account Name
-                    {selectedOrder?.reviewerName && <span className="ml-1 text-green-600">(set during order)</span>}
-                  </label>
-                  <input
-                    type="text"
-                    value={reviewerNameInput}
-                    onChange={(e) => { if (!selectedOrder?.reviewerName) setReviewerNameInput(e.target.value); }}
-                    readOnly={!!selectedOrder?.reviewerName}
-                    className={`w-full p-2.5 rounded-xl border font-bold text-sm outline-none transition-all ${selectedOrder?.reviewerName ? 'bg-green-50 border-green-200 text-green-700 cursor-not-allowed' : 'bg-indigo-50 border-indigo-100 text-indigo-700 focus:ring-2 focus:ring-indigo-200'}`}
-                    placeholder="e.g. Gaurav C. on Amazon"
-                    maxLength={200}
-                  />
-                  <p className="text-[9px] text-slate-400 ml-1">
-                    {selectedOrder?.reviewerName
-                      ? `This name was provided when filling the order form. Your rating screenshot must show this reviewer name: "${selectedOrder.reviewerName}".`
-                      : 'Enter your marketplace reviewer name (Amazon, Flipkart, etc.) — the name visible in your rating screenshot.'}
-                  </p>
-                </div>
+                {/* Reviewer Name — display only, set during order creation */}
+                {selectedOrder?.reviewerName && (
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+                    <p className="text-[10px] font-bold text-green-700 flex items-center gap-1.5">
+                      <CheckCircle2 size={12} />
+                      Reviewer name: <span className="text-green-800">"{selectedOrder.reviewerName}"</span>
+                    </p>
+                    <p className="text-[9px] text-green-600 mt-1">
+                      Your rating screenshot must show this reviewer name to be accepted.
+                    </p>
+                  </div>
+                )}
 
                 <label
                   className={`w-full aspect-[2/1] rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all group overflow-hidden relative ${ratingPreview ? 'border-lime-200' : 'border-gray-200'}`}
@@ -2095,7 +2086,7 @@ export const Orders: React.FC = () => {
                     <div className="grid grid-cols-2 gap-2">
                       <div className={`p-2.5 rounded-xl text-center ${ratingVerification.accountNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">
-                          {(selectedOrder?.reviewerName || reviewerNameInput.trim()) ? 'Reviewer Name' : 'Account Name'}
+                          {selectedOrder?.reviewerName ? 'Reviewer Name' : 'Account Name'}
                         </div>
                         <div className={`text-xs font-bold ${ratingVerification.accountNameMatch ? 'text-green-600' : 'text-red-600'}`}>
                           {ratingVerification.accountNameMatch ? '✓ Match' : '✗ Mismatch'}
@@ -2127,16 +2118,16 @@ export const Orders: React.FC = () => {
                     {!ratingVerification.accountNameMatch && !ratingVerification.productNameMatch && (
                       <p className="text-[10px] text-red-600 font-bold bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
                         <AlertTriangle size={12} />
-                        {(selectedOrder?.reviewerName || reviewerNameInput.trim())
-                          ? `Reviewer name "${selectedOrder?.reviewerName || reviewerNameInput.trim()}" and product do not match. Upload the correct rating screenshot from the correct marketplace account.`
+                        {selectedOrder?.reviewerName
+                          ? `Reviewer name "${selectedOrder.reviewerName}" and product do not match. Upload the correct rating screenshot from the correct marketplace account.`
                           : 'Account name & product do not match. Upload the correct rating screenshot.'}
                       </p>
                     )}
                     {!ratingVerification.accountNameMatch && ratingVerification.productNameMatch && (
                       <p className="text-[10px] text-red-600 font-bold bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
                         <AlertTriangle size={12} />
-                        {(selectedOrder?.reviewerName || reviewerNameInput.trim())
-                          ? `Reviewer name "${selectedOrder?.reviewerName || reviewerNameInput.trim()}" not found in screenshot. ${ratingVerification.detectedAccountName ? `Found "${ratingVerification.detectedAccountName}" instead.` : ''} Please upload a screenshot from the correct account.`
+                        {selectedOrder?.reviewerName
+                          ? `Reviewer name "${selectedOrder.reviewerName}" not found in screenshot. ${ratingVerification.detectedAccountName ? `Found "${ratingVerification.detectedAccountName}" instead.` : ''} Please upload a screenshot from the correct account.`
                           : 'Account name mismatch — please ensure the rating was posted from the correct marketplace account.'}
                       </p>
                     )}
@@ -2160,8 +2151,9 @@ export const Orders: React.FC = () => {
                     isUploading ||
                     ratingAnalyzing ||
                     !ratingFile ||
-                    // Block submit when reviewer name is provided but doesn't match in screenshot
-                    !!(ratingVerification && !ratingVerification.accountNameMatch && (selectedOrder?.reviewerName || reviewerNameInput.trim()))
+                    // Block submit when reviewer name doesn't match or product name doesn't match
+                    !!(ratingVerification && !ratingVerification.accountNameMatch && selectedOrder?.reviewerName) ||
+                    !!(ratingVerification && !ratingVerification.productNameMatch)
                   }
                   className="w-full py-3.5 bg-black text-white font-bold rounded-2xl hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
