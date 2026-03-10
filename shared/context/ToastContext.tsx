@@ -71,7 +71,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     (message: string, options?: { title?: string; variant?: ToastVariant; durationMs?: number }) => {
       const id = genId();
       const variant = options?.variant ?? 'info';
-      const durationMs = options?.durationMs ?? (variant === 'error' ? 8000 : variant === 'warning' ? 6000 : 3000);
+      const durationMs = options?.durationMs ?? (variant === 'error' ? 12000 : variant === 'warning' ? 6000 : 3000);
 
       const item: ToastItem = {
         id,

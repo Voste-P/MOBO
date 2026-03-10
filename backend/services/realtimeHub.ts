@@ -27,7 +27,12 @@ const emitter = new EventEmitter();
 emitter.setMaxListeners(500);
 
 export function publishRealtime(evt: RealtimeEvent) {
-  emitter.emit('event', evt);
+  try {
+    emitter.emit('event', evt);
+  } catch (err) {
+    // Prevent a listener error from crashing the whole process
+    console.error('[RealtimeHub] emit error:', err);
+  }
 }
 
 export function publishBroadcast(type: string, payload?: any) {

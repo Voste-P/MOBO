@@ -9,6 +9,7 @@ type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   size?: ButtonSize;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  loading?: boolean;
 };
 
 const variantClasses: Record<ButtonVariant, string> = {
@@ -36,6 +37,7 @@ export const Button = React.forwardRef<HTMLButtonElement, Props>(function Button
     size = 'md',
     leftIcon,
     rightIcon,
+    loading,
     children,
     disabled,
     ...props
@@ -43,11 +45,13 @@ export const Button = React.forwardRef<HTMLButtonElement, Props>(function Button
   ref
 ) {
   const isIcon = size === 'icon' && !children;
+  const isDisabled = disabled || loading;
 
   return (
     <button
       ref={ref}
-      disabled={disabled}
+      disabled={isDisabled}
+      aria-busy={loading || undefined}
       className={cn(
         'inline-flex items-center justify-center gap-2 font-bold transition-all active:scale-[0.98]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
@@ -59,9 +63,11 @@ export const Button = React.forwardRef<HTMLButtonElement, Props>(function Button
       )}
       {...props}
     >
-      {leftIcon}
+      {loading ? (
+        <span className="inline-block w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" aria-hidden="true" />
+      ) : leftIcon}
       {children}
-      {rightIcon}
+      {!loading && rightIcon}
     </button>
   );
 });

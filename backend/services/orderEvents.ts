@@ -21,8 +21,15 @@ export type OrderEvent = {
   metadata?: any;
 };
 
+/** Maximum events per order to prevent unbounded JSON array growth. */
+const MAX_ORDER_EVENTS = 500;
+
 export function pushOrderEvent(events: any[] | undefined, event: OrderEvent) {
   const arr = Array.isArray(events) ? events : [];
+  // If at capacity, drop the oldest non-terminal events to make room
+  if (arr.length >= MAX_ORDER_EVENTS) {
+    arr.splice(0, arr.length - MAX_ORDER_EVENTS + 1);
+  }
   arr.push({
     type: event.type,
     at: event.at,

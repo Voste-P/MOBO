@@ -65,6 +65,7 @@ export async function ensureWallet(ownerUserId: string) {
 export async function applyWalletCredit(input: WalletMutationInput) {
   if (input.amountPaise <= 0) throw new AppError(400, 'INVALID_AMOUNT', 'Amount must be positive');
   if (!Number.isInteger(input.amountPaise)) throw new AppError(400, 'INVALID_AMOUNT', 'Amount must be an integer (paise)');
+  if (input.amountPaise > Number.MAX_SAFE_INTEGER) throw new AppError(400, 'INVALID_AMOUNT', 'Amount exceeds safe integer limit');
 
   walletLog.info('Wallet credit initiated', { userId: input.ownerUserId, type: input.type, amountPaise: input.amountPaise, key: input.idempotencyKey, orderId: input.orderId, campaignId: input.campaignId });
 
@@ -99,20 +100,8 @@ export async function applyWalletCredit(input: WalletMutationInput) {
       },
     });
 
-    // Pre-check: total wallet value (available + locked + pending) must not exceed ceiling.
-    // This prevents circumventing the limit by accumulating funds in locked/pending state.
-    const walletSnapshot = await tx.wallet.findUnique({ where: { ownerUserId: input.ownerUserId } });
-    if (!walletSnapshot || walletSnapshot.isDeleted) {
-      throw new AppError(404, 'WALLET_NOT_FOUND', 'Wallet not found');
-    }
-    const totalAfterCredit = walletSnapshot.availablePaise + walletSnapshot.lockedPaise
-                           + walletSnapshot.pendingPaise + input.amountPaise;
-    if (totalAfterCredit > MAX_BALANCE_PAISE) {
-      logErrorEvent({ category: 'BUSINESS_LOGIC', severity: 'medium', message: 'Wallet credit failed — total balance limit exceeded', operation: 'applyWalletCredit', userId: input.ownerUserId, metadata: { type: input.type, amountPaise: input.amountPaise, totalAfterCredit, MAX_BALANCE_PAISE } });
-      throw new AppError(409, 'BALANCE_LIMIT_EXCEEDED', 'Wallet balance limit exceeded');
-    }
-
     // Atomic credit with max-balance ceiling check via raw SQL.
+    // The WHERE clause validates the ceiling atomically, so no pre-read is needed.
     // The WHERE clause validates that the TOTAL balance (available + locked + pending)
     // will not exceed the ceiling, preventing race conditions where two concurrent
     // credits both pass a read-then-write check.
@@ -181,6 +170,7 @@ export async function applyWalletCredit(input: WalletMutationInput) {
 export async function applyWalletDebit(input: WalletMutationInput) {
   if (input.amountPaise <= 0) throw new AppError(400, 'INVALID_AMOUNT', 'Amount must be positive');
   if (!Number.isInteger(input.amountPaise)) throw new AppError(400, 'INVALID_AMOUNT', 'Amount must be an integer (paise)');
+  if (input.amountPaise > Number.MAX_SAFE_INTEGER) throw new AppError(400, 'INVALID_AMOUNT', 'Amount exceeds safe integer limit');
 
   walletLog.info('Wallet debit initiated', { userId: input.ownerUserId, type: input.type, amountPaise: input.amountPaise, key: input.idempotencyKey, orderId: input.orderId, campaignId: input.campaignId });
 

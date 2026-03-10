@@ -32,6 +32,28 @@ export const MobileTabBar = React.memo(function MobileTabBar({
     }
     onChange(id);
   };
+
+  const handleKeyDown = (e: React.KeyboardEvent, idx: number) => {
+    let targetIdx = -1;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      targetIdx = (idx + 1) % items.length;
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      targetIdx = (idx - 1 + items.length) % items.length;
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      targetIdx = 0;
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      targetIdx = items.length - 1;
+    }
+    if (targetIdx >= 0) {
+      handleTap(items[targetIdx].id);
+      const btn = e.currentTarget.parentElement?.parentElement?.querySelectorAll('[role="tab"]')?.[targetIdx] as HTMLElement;
+      btn?.focus();
+    }
+  };
   const containerClass =
     variant === 'dark'
       ? 'bg-[#18181B] backdrop-blur-xl border border-white/5 px-5 py-2.5 rounded-[2rem] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.5)] flex items-center'
@@ -43,7 +65,7 @@ export const MobileTabBar = React.memo(function MobileTabBar({
 
   return (
     <div role="tablist" className={cn(containerClass, className)}>
-      {items.map((item) => {
+      {items.map((item, idx) => {
         const active = item.id === activeId;
 
         if (showLabels) {
@@ -52,6 +74,7 @@ export const MobileTabBar = React.memo(function MobileTabBar({
               role="tab"
               key={item.id}
               onClick={() => handleTap(item.id)}
+              onKeyDown={(e) => handleKeyDown(e, idx)}
               aria-label={item.ariaLabel || item.label}
               aria-selected={active ? "true" : "false"}
               className={cn(
@@ -94,6 +117,7 @@ export const MobileTabBar = React.memo(function MobileTabBar({
             <button
               role="tab"
               onClick={() => handleTap(item.id)}
+              onKeyDown={(e) => handleKeyDown(e, idx)}
               aria-label={item.ariaLabel || item.label}
               aria-selected={active ? "true" : "false"}
               className={cn(

@@ -1,12 +1,25 @@
 import React from 'react';
 import { cn } from './cn';
 
-type Props = React.HTMLAttributes<HTMLDivElement>;
+type CardVariant = 'default' | 'elevated' | 'outlined' | 'filled';
+type Props = React.HTMLAttributes<HTMLDivElement> & { variant?: CardVariant; interactive?: boolean };
 
-export function Card({ className, ...props }: Props) {
+const variantClasses: Record<CardVariant, string> = {
+  default: 'bg-white border border-zinc-100 shadow-sm',
+  elevated: 'bg-white border border-zinc-100 shadow-lg',
+  outlined: 'bg-transparent border border-zinc-200',
+  filled: 'bg-zinc-50 border border-zinc-100',
+};
+
+export function Card({ className, variant = 'default', interactive, ...props }: Props) {
   return (
     <div
-      className={cn('bg-white border border-zinc-100 rounded-[2rem] shadow-sm', className)}
+      className={cn(
+        'rounded-[2rem]',
+        variantClasses[variant],
+        interactive && 'cursor-pointer hover:shadow-md transition-shadow',
+        className
+      )}
       {...props}
     />
   );

@@ -65,7 +65,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
   // Resolve/reject: ticket owner can always resolve/reject their own, OR targeted role+ can for any in-network ticket
   const canResolve = isOpen && (isOwner || canManageTarget || isAdmin) && !(userRole === 'user' && !isOwner);
   const canReopen = isClosed && (canManageTarget || isAdmin || isOwner);
-  const canDelete = isClosed && (isAdmin || isOwner);
+  const canDelete = isClosed && isAdmin;
 
   const loadComments = useCallback(async () => {
     if (!ticket) return;
@@ -94,10 +94,10 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
     }
   }, [open, ticket, loadComments]);
 
-  // Auto-poll comments every 10 seconds when modal is open
+  // Auto-poll comments every 30 seconds when modal is open
   useEffect(() => {
     if (!open || !ticket) return;
-    const interval = setInterval(loadComments, 10000);
+    const interval = setInterval(loadComments, 30000);
     return () => clearInterval(interval);
   }, [open, ticket, loadComments]);
 

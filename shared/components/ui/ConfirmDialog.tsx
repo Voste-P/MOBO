@@ -115,7 +115,18 @@ function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const styles = variantStyles[variant];
+
+  // Trap focus & handle Escape
+  React.useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { onCancel(); return; }
+    };
+    document.addEventListener('keydown', handleKey);
+    cancelRef.current?.focus();
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [onCancel]);
 
   return (
     <div
@@ -162,6 +173,7 @@ function ConfirmDialog({
         {/* Actions */}
         <div className="flex gap-3">
           <button
+            ref={cancelRef}
             type="button"
             onClick={onCancel}
             className="flex-1 h-12 rounded-2xl border border-zinc-200 bg-white text-zinc-700 font-bold text-sm hover:bg-zinc-50 transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300"

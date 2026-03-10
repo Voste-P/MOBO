@@ -1,7 +1,7 @@
 ﻿import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Bot, ArrowRight, Lock, User, Phone, Hash, ChevronLeft } from 'lucide-react';
-import { Button, Input, Spinner } from '../components/ui';
+import { Button, Input } from '../components/ui';
 import { normalizeMobileTo10Digits } from '../utils/mobiles';
 import { formatErrorMessage } from '../utils/errors';
 
@@ -236,10 +236,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
         <Button
           type="submit"
           disabled={isLoading}
+          loading={isLoading}
           size="lg"
           className="mt-6 w-full"
           rightIcon={
-            isLoading ? <Spinner className="w-5 h-5 text-white" /> : <ArrowRight size={16} />
+            !isLoading ? <ArrowRight size={16} /> : undefined
           }
         >
           {view === 'login' ? 'Sign In' : 'Create Account'}

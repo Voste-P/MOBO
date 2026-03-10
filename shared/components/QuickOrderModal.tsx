@@ -144,8 +144,12 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
 
   if (!open || !product) return null;
 
+  const handleEscape = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') handleClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onKeyDown={handleEscape} role="dialog" aria-modal="true" aria-label="Order form">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleClose} />
 

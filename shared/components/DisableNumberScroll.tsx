@@ -7,9 +7,8 @@ export function DisableNumberScroll() {
     const onWheel = (e: WheelEvent) => {
       const el = document.activeElement;
       if (!el) return;
-      if (el instanceof HTMLInputElement && el.type === 'number') {
+      if (el instanceof HTMLInputElement && el.type === 'number' && !el.dataset.allowNumberScroll) {
         e.preventDefault();
-        el.blur();
       }
     };
 
