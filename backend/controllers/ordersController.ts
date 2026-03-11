@@ -1430,5 +1430,76 @@ export function makeOrdersController(env: Env) {
         next(err);
       }
     },
+
+    /** Set reviewer/marketplace account name on an existing order (one-time, cannot change after). */
+    setReviewerName: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const orderId = String(req.params.orderId || '').trim();
+        if (!orderId) throw new AppError(400, 'INVALID_ORDER_ID', 'Missing order ID');
+
+        const rawName = String(req.body?.reviewerName ?? '').replace(/<[^>]*>/g, '').replace(/[\x00-\x1f]/g, '').trim();
+        if (!rawName || rawName.length > 200) {
+          throw new AppError(400, 'INVALID_REVIEWER_NAME', 'Please enter a valid marketplace account name (1-200 characters).');
+        }
+
+        const requesterId = req.auth?.userId;
+        if (!requesterId) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
+
+        // Look up the order
+        const orderWhere = UUID_RE.test(orderId)
+          ? { OR: [{ id: orderId }, { mongoId: orderId }] as any, isDeleted: false }
+          : { mongoId: orderId, isDeleted: false };
+        const order = await db().order.findFirst({
+          where: orderWhere as any,
+          select: { id: true, mongoId: true, userId: true, reviewerName: true },
+        });
+        if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
+
+        // Only the order owner can set the reviewer name
+        if (String(order.userId) !== String(requesterId)) {
+          throw new AppError(403, 'FORBIDDEN', 'You can only update your own orders');
+        }
+
+        // Cannot change if already set (anti-cheat: reviewer name is immutable once committed)
+        if (order.reviewerName) {
+          throw new AppError(409, 'REVIEWER_NAME_ALREADY_SET', 'Marketplace account name is already set and cannot be changed.');
+        }
+
+        // Atomic conditional update: only set if still null
+        const updated = await db().order.updateMany({
+          where: { id: order.id, reviewerName: null, isDeleted: false },
+          data: { reviewerName: rawName },
+        });
+
+        if (!updated.count) {
+          throw new AppError(409, 'REVIEWER_NAME_ALREADY_SET', 'Marketplace account name was already set by another request.');
+        }
+
+        writeAuditLog({
+          req,
+          action: 'order.set_reviewer_name',
+          entityType: 'Order',
+          entityId: order.mongoId ?? order.id,
+          metadata: { reviewerName: rawName },
+        });
+
+        businessLog.info(`[Order] Reviewer name set for order ${order.mongoId}: "${rawName}"`, {
+          actorUserId: requesterId, orderId: order.mongoId, reviewerName: rawName,
+        });
+
+        res.json({ success: true, reviewerName: rawName });
+      } catch (err) {
+        logErrorEvent({
+          message: 'setReviewerName failed',
+          category: 'BUSINESS_LOGIC',
+          severity: 'medium',
+          userId: req.auth?.userId,
+          ip: req.ip,
+          requestId: String((res as any).locals?.requestId || ''),
+          metadata: { error: err instanceof Error ? err.message : String(err) },
+        });
+        next(err);
+      }
+    },
   };
 }

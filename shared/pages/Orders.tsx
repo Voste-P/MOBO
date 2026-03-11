@@ -243,6 +243,11 @@ export const Orders: React.FC = () => {
   } | null>(null);
   const [ratingFile, setRatingFile] = useState<File | null>(null);
 
+  // Inline reviewer name editing for old orders without one
+  const [editingReviewerNameOrderId, setEditingReviewerNameOrderId] = useState<string | null>(null);
+  const [inlineReviewerName, setInlineReviewerName] = useState('');
+  const [savingReviewerName, setSavingReviewerName] = useState(false);
+
   // Order list search & filter
   const [orderListSearch, setOrderListSearch] = useState('');
   const [orderListStatus, setOrderListStatus] = useState<string>('All');
@@ -592,30 +597,44 @@ export const Orders: React.FC = () => {
       // When buyer ordered from a different person's marketplace account, the reviewer name
       // is the name shown on that account — use it instead of the buyer's app account name.
       const reviewerName = selectedOrder.reviewerName || '';
-      const nameToVerify = reviewerName || buyerName;
+      const hasReviewerName = !!selectedOrder.reviewerName;
 
-      if (nameToVerify && productName) {
-        const result = await api.orders.verifyRating(file, nameToVerify, productName, reviewerName || undefined, selectedOrder.id);
-        setRatingVerification(result);
-
-        const hasReviewerName = !!selectedOrder.reviewerName;
-        if (!result.accountNameMatch && !result.productNameMatch) {
-          toast.error(hasReviewerName
-            ? `Reviewer name "${reviewerName}" and product do not match. Upload the correct screenshot.`
-            : 'Account name and product name do not match. Please ensure the correct rating screenshot is uploaded.');
-        } else if (!result.accountNameMatch) {
-          toast.error(hasReviewerName
-            ? `Reviewer name "${reviewerName}" not found in screenshot. ${result.detectedAccountName ? `Found "${result.detectedAccountName}" instead.` : ''}`
-            : 'Account name does not match. Please check that this rating was posted from the correct account.');
-        } else if (!result.productNameMatch) {
-          toast.warning('Product name does not match this order. Please check the screenshot.');
+      // For orders without a reviewer name, skip name verification to avoid
+      // confusing mismatches against the buyer's app account name.
+      if (!hasReviewerName) {
+        if (productName) {
+          const result = await api.orders.verifyRating(file, buyerName || 'unknown', productName, undefined, selectedOrder.id);
+          // Override account name match — we can't verify without a reviewer name
+          setRatingVerification({ ...result, accountNameMatch: true });
+          if (!result.productNameMatch) {
+            toast.warning('Product name does not match this order. Please check the screenshot.');
+          } else {
+            toast.success('Screenshot ready! Set your marketplace account name on the order for full name verification.');
+          }
         } else {
-          toast.success('Rating screenshot verified! Account and product match.');
+          setRatingVerification({ accountNameMatch: true, productNameMatch: true, confidenceScore: 50 });
+          toast.info('Screenshot ready for upload.');
         }
       } else {
-        // Can't verify without buyer name/product name, allow upload
-        setRatingVerification({ accountNameMatch: true, productNameMatch: true, confidenceScore: 50 });
-        toast.info('Screenshot ready for upload.');
+        const nameToVerify = reviewerName;
+
+        if (nameToVerify && productName) {
+          const result = await api.orders.verifyRating(file, nameToVerify, productName, reviewerName || undefined, selectedOrder.id);
+          setRatingVerification(result);
+
+          if (!result.accountNameMatch && !result.productNameMatch) {
+            toast.error(`Reviewer name "${reviewerName}" and product do not match. Upload the correct screenshot.`);
+          } else if (!result.accountNameMatch) {
+            toast.error(`Reviewer name "${reviewerName}" not found in screenshot. ${result.detectedAccountName ? `Found "${result.detectedAccountName}" instead.` : ''}`);
+          } else if (!result.productNameMatch) {
+            toast.warning('Product name does not match this order. Please check the screenshot.');
+          } else {
+            toast.success('Rating screenshot verified! Account and product match.');
+          }
+        } else {
+          setRatingVerification({ accountNameMatch: true, productNameMatch: true, confidenceScore: 50 });
+          toast.info('Screenshot ready for upload.');
+        }
       }
     } catch (err) {
       if (process.env.NODE_ENV !== 'production') console.error('Rating pre-validation failed:', err);
@@ -1016,6 +1035,68 @@ export const Orders: React.FC = () => {
                     })()}
                   </div>
                 </div>
+
+                {/* Reviewer / Marketplace Account Name for Rating & Review deals */}
+                {(isRating || isReview) && (
+                  <div className="mb-3">
+                    {order.reviewerName ? (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Account Name:</span>
+                        <span className="text-xs font-bold text-slate-700">{order.reviewerName}</span>
+                      </div>
+                    ) : editingReviewerNameOrderId === order.id ? (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-xl border border-amber-200">
+                        <input
+                          type="text"
+                          placeholder="Enter marketplace account name"
+                          value={inlineReviewerName}
+                          onChange={(e) => setInlineReviewerName(e.target.value)}
+                          maxLength={200}
+                          className="flex-1 text-xs font-medium border border-amber-300 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                          disabled={savingReviewerName}
+                        />
+                        <button
+                          onClick={async () => {
+                            const name = inlineReviewerName.trim();
+                            if (!name) { toast.error('Please enter a name.'); return; }
+                            setSavingReviewerName(true);
+                            try {
+                              await api.orders.setReviewerName(order.id, name);
+                              toast.success('Account name saved!');
+                              setEditingReviewerNameOrderId(null);
+                              setInlineReviewerName('');
+                              loadOrders();
+                            } catch (e: any) {
+                              toast.error(formatErrorMessage(e, 'Failed to save account name.'));
+                            } finally {
+                              setSavingReviewerName(false);
+                            }
+                          }}
+                          disabled={savingReviewerName || !inlineReviewerName.trim()}
+                          className="px-3 py-1.5 text-[10px] font-bold uppercase bg-amber-500 text-white rounded-lg disabled:opacity-50"
+                        >
+                          {savingReviewerName ? '...' : 'Save'}
+                        </button>
+                        <button
+                          onClick={() => { setEditingReviewerNameOrderId(null); setInlineReviewerName(''); }}
+                          className="text-[10px] font-bold text-slate-400 hover:text-slate-600"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-xl border border-amber-200">
+                        <span className="text-[10px] font-bold text-amber-700">Set your marketplace account name to enable rating verification</span>
+                        <button
+                          onClick={() => { setEditingReviewerNameOrderId(order.id); setInlineReviewerName(''); }}
+                          className="px-2.5 py-1 text-[10px] font-bold uppercase bg-amber-500 text-white rounded-lg shrink-0"
+                        >
+                          Set Name
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {(order.affiliateStatus === 'Pending_Cooling' || order.paymentStatus === 'Paid') &&
                   settlementDate &&

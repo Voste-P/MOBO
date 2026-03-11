@@ -37,6 +37,7 @@ export function ordersRoutes(env: Env): Router {
   router.get('/orders/user/:userId', requireAuth(env), ownerOrPrivileged, orders.getUserOrders);
   router.post('/orders', requireAuth(env), orderWriteLimiter, orders.createOrder);
   router.post('/orders/claim', requireAuth(env), orderWriteLimiter, orders.submitClaim);
+  router.patch('/orders/:orderId/reviewer-name', requireAuth(env), orderWriteLimiter, orders.setReviewerName);
   router.get('/orders/:orderId/proof/:type', requireAuth(env), (_req, res, next) => {
     // Proof screenshots are immutable once uploaded — cache aggressively
     res.setHeader('Cache-Control', 'private, max-age=3600, immutable');
