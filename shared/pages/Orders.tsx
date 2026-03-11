@@ -219,7 +219,6 @@ export const Orders: React.FC = () => {
     productName: 'match' | 'mismatch' | 'none';
   }>({ id: 'none', amount: 'none', productName: 'none' });
   const [orderIdLocked, setOrderIdLocked] = useState(false);
-  const [productNameOverridden, setProductNameOverridden] = useState(false);
 
   // Buyer ticket state
   const [myTickets, setMyTickets] = useState<Ticket[]>([]);
@@ -895,7 +894,6 @@ export const Orders: React.FC = () => {
       setExtractedDetails({ orderId: '', amount: '' });
       setMatchStatus({ id: 'none', amount: 'none', productName: 'none' });
       setOrderIdLocked(false);
-      setProductNameOverridden(false);
       loadOrders();
       toast.success('Order submitted successfully!');
     } catch (e: any) {
