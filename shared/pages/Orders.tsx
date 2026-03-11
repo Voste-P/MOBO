@@ -243,6 +243,22 @@ export const Orders: React.FC = () => {
   } | null>(null);
   const [ratingFile, setRatingFile] = useState<File | null>(null);
 
+  // Return window screenshot pre-validation state
+  const [rwPreview, setRwPreview] = useState<string | null>(null);
+  const [rwAnalyzing, setRwAnalyzing] = useState(false);
+  const [rwVerification, setRwVerification] = useState<{
+    orderIdMatch: boolean;
+    productNameMatch: boolean;
+    amountMatch: boolean;
+    soldByMatch: boolean;
+    returnWindowClosed: boolean;
+    reviewerNameMatch: boolean;
+    confidenceScore: number;
+    detectedReturnWindow?: string;
+    discrepancyNote?: string;
+  } | null>(null);
+  const [rwFile, setRwFile] = useState<File | null>(null);
+
   // Order list search & filter
   const [orderListSearch, setOrderListSearch] = useState('');
   const [orderListStatus, setOrderListStatus] = useState<string>('All');
@@ -674,6 +690,120 @@ export const Orders: React.FC = () => {
       setRatingPreview(null);
       setRatingFile(null);
       setRatingVerification(null);
+      loadOrders();
+    } catch (err: any) {
+      toast.error(formatErrorMessage(err, 'Failed to upload proof'));
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Return window screenshot pre-validation handler (mirrors handleRatingScreenshot)
+  const handleReturnWindowScreenshot = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedOrder) return;
+    if (!isValidImageFile(file)) {
+      const err = validateImageFile(file);
+      toast.error(err === 'too_large' ? 'Image too large (max 10 MB).' : 'Please upload a PNG, JPG, or WebP image.');
+      return;
+    }
+
+    // Show preview immediately
+    const reader = new FileReader();
+    reader.onload = () => setRwPreview(reader.result as string);
+    reader.readAsDataURL(file);
+
+    setRwFile(file);
+    setRwAnalyzing(true);
+    setRwVerification(null);
+
+    try {
+      const orderId = selectedOrder.externalOrderId || '';
+      const productName = selectedOrder.items?.[0]?.title || '';
+      const amount = (selectedOrder.items ?? []).reduce(
+        (sum: number, it: any) => sum + (Number(it.priceAtPurchase) || 0) * (Number(it.quantity) || 1), 0
+      );
+      const soldBy = selectedOrder.soldBy || '';
+      const reviewerName = selectedOrder.reviewerName || '';
+
+      if (orderId && productName && amount > 0) {
+        const result = await api.orders.verifyReturnWindow(
+          file, orderId, productName, amount,
+          soldBy || undefined,
+          reviewerName || undefined,
+        );
+        setRwVerification(result);
+
+        const issues: string[] = [];
+        if (!result.orderIdMatch) issues.push('Order ID');
+        if (!result.productNameMatch) issues.push('Product name');
+        if (!result.returnWindowClosed) issues.push('Return window not closed');
+        if (!result.reviewerNameMatch && reviewerName) issues.push('Reviewer name');
+
+        if (issues.length === 0) {
+          toast.success('Return window screenshot verified! All checks passed.');
+        } else if (!result.returnWindowClosed) {
+          toast.error('Return window is still open. Please wait until the return window closes before uploading.');
+        } else {
+          toast.warning(`Mismatch detected: ${issues.join(', ')}. Please check the screenshot.`);
+        }
+      } else {
+        // Not enough data to pre-validate — allow upload
+        setRwVerification({
+          orderIdMatch: true, productNameMatch: true, amountMatch: true,
+          soldByMatch: true, returnWindowClosed: true, reviewerNameMatch: true,
+          confidenceScore: 50,
+        });
+        toast.info('Screenshot ready for upload.');
+      }
+    } catch (err) {
+      if (process.env.NODE_ENV !== 'production') console.error('Return window pre-validation failed:', err);
+      setRwVerification(null);
+      toast.info('Screenshot ready. AI pre-check unavailable.');
+    } finally {
+      setRwAnalyzing(false);
+    }
+  };
+
+  // Submit the pre-validated return window screenshot
+  const submitReturnWindowScreenshot = async () => {
+    if (!rwFile || !selectedOrder || isUploading) return;
+
+    // Block submission when critical fields don't match
+    if (rwVerification) {
+      if (!rwVerification.orderIdMatch) {
+        toast.error('Order ID does not match. Please upload the correct return window screenshot.');
+        return;
+      }
+      if (!rwVerification.productNameMatch) {
+        toast.error('Product name does not match. Please upload the correct return window screenshot.');
+        return;
+      }
+      if (!rwVerification.returnWindowClosed) {
+        toast.error('Return window is still open. Please wait until it closes before uploading.');
+        return;
+      }
+      if (!rwVerification.reviewerNameMatch && selectedOrder.reviewerName) {
+        toast.error(`Reviewer name "${selectedOrder.reviewerName}" does not match. Please upload the correct screenshot.`);
+        return;
+      }
+    }
+
+    setIsUploading(true);
+    try {
+      const data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(rwFile);
+      });
+      const reviewerName = selectedOrder.reviewerName || '';
+      await api.orders.submitClaim(selectedOrder.id, { type: 'returnWindow', data, ...(reviewerName ? { reviewerName } : {}) });
+      toast.success('Return window proof uploaded!');
+      setSelectedOrder(null);
+      setRwPreview(null);
+      setRwFile(null);
+      setRwVerification(null);
       loadOrders();
     } catch (err: any) {
       toast.error(formatErrorMessage(err, 'Failed to upload proof'));
@@ -2025,6 +2155,9 @@ export const Orders: React.FC = () => {
             setRatingPreview(null);
             setRatingFile(null);
             setRatingVerification(null);
+            setRwPreview(null);
+            setRwFile(null);
+            setRwVerification(null);
           }}
         >
           <div
@@ -2038,6 +2171,9 @@ export const Orders: React.FC = () => {
                 setRatingPreview(null);
                 setRatingFile(null);
                 setRatingVerification(null);
+                setRwPreview(null);
+                setRwFile(null);
+                setRwVerification(null);
               }}
               aria-label="Close"
               className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20 focus-visible:ring-offset-2 focus-visible:ring-offset-white z-10"
@@ -2214,22 +2350,162 @@ export const Orders: React.FC = () => {
                   {isUploading ? 'Submitting...' : ratingAnalyzing ? 'Verifying...' : 'Submit Rating Proof'}
                 </button>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {/* Reviewer Name — display for identity consistency on return window uploads */}
-                {uploadType === 'returnWindow' && selectedOrder?.reviewerName && (
+            ) : uploadType === 'returnWindow' ? (
+              /* Enhanced return window upload with AI pre-validation */
+              <div className="space-y-4">
+                {/* Reviewer Name — display for identity consistency */}
+                {selectedOrder?.reviewerName && (
                   <div className="bg-green-50 border border-green-200 rounded-xl p-3">
                     <p className="text-[10px] font-bold text-green-700 flex items-center gap-1.5">
                       <CheckCircle2 size={12} />
                       Reviewer name: <span className="text-green-800">"{selectedOrder.reviewerName}"</span>
                     </p>
                     <p className="text-[9px] text-green-600 mt-1">
-                      All proofs are verified under this marketplace identity.
+                      Your return window screenshot must show this name to be accepted.
                     </p>
                   </div>
                 )}
+
+                <label
+                  className={`w-full aspect-[2/1] rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all group overflow-hidden relative ${rwPreview ? 'border-lime-200' : 'border-gray-200'}`}
+                >
+                  {rwPreview ? (
+                    <img loading="lazy" src={rwPreview} className="w-full h-full object-cover opacity-80" alt="Return window preview" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  ) : (
+                    <>
+                      <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                        <CalendarClock size={20} className="text-slate-400" />
+                      </div>
+                      <span className="text-xs font-bold text-slate-400">
+                        Upload Return Window Screenshot
+                      </span>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleReturnWindowScreenshot}
+                    disabled={isUploading || rwAnalyzing}
+                  />
+                  {rwAnalyzing && (
+                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center">
+                      <Loader2 size={24} className="animate-spin motion-reduce:animate-none text-lime-600 mb-2" />
+                      <span className="text-xs font-bold text-lime-600 animate-pulse motion-reduce:animate-none">
+                        AI Verifying Return Window...
+                      </span>
+                    </div>
+                  )}
+                </label>
+
+                {/* Sample Screenshot Guide */}
+                {!rwPreview && <SampleScreenshotGuide type="returnWindow" />}
+
+                {/* AI Verification Results */}
+                {rwVerification && (
+                  <div className="space-y-2 animate-enter">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className={`p-2.5 rounded-xl text-center ${rwVerification.orderIdMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Order ID</div>
+                        <div className={`text-xs font-bold ${rwVerification.orderIdMatch ? 'text-green-600' : 'text-red-600'}`}>
+                          {rwVerification.orderIdMatch ? '✓ Match' : '✗ Mismatch'}
+                        </div>
+                      </div>
+                      <div className={`p-2.5 rounded-xl text-center ${rwVerification.productNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Product</div>
+                        <div className={`text-xs font-bold ${rwVerification.productNameMatch ? 'text-green-600' : 'text-red-600'}`}>
+                          {rwVerification.productNameMatch ? '✓ Match' : '✗ Mismatch'}
+                        </div>
+                      </div>
+                      <div className={`p-2.5 rounded-xl text-center ${rwVerification.returnWindowClosed ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Return Window</div>
+                        <div className={`text-xs font-bold ${rwVerification.returnWindowClosed ? 'text-green-600' : 'text-red-600'}`}>
+                          {rwVerification.returnWindowClosed ? '✓ Closed' : '✗ Still Open'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className={`p-2.5 rounded-xl text-center ${rwVerification.amountMatch ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'}`}>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Amount</div>
+                        <div className={`text-xs font-bold ${rwVerification.amountMatch ? 'text-green-600' : 'text-amber-600'}`}>
+                          {rwVerification.amountMatch ? '✓ Match' : '~ Differs'}
+                        </div>
+                      </div>
+                      <div className={`p-2.5 rounded-xl text-center ${rwVerification.soldByMatch ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'}`}>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Seller</div>
+                        <div className={`text-xs font-bold ${rwVerification.soldByMatch ? 'text-green-600' : 'text-amber-600'}`}>
+                          {rwVerification.soldByMatch ? '✓ Match' : '~ Differs'}
+                        </div>
+                      </div>
+                      {selectedOrder?.reviewerName && (
+                        <div className={`p-2.5 rounded-xl text-center ${rwVerification.reviewerNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Reviewer</div>
+                          <div className={`text-xs font-bold ${rwVerification.reviewerNameMatch ? 'text-green-600' : 'text-red-600'}`}>
+                            {rwVerification.reviewerNameMatch ? '✓ Match' : '✗ Mismatch'}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {rwVerification.orderIdMatch && rwVerification.productNameMatch && rwVerification.returnWindowClosed && (
+                      <p className="text-[10px] text-green-600 font-bold bg-green-50 p-2 rounded-lg flex items-center gap-1.5">
+                        <CheckCircle2 size={12} /> Return window screenshot verified. Ready to submit.
+                      </p>
+                    )}
+                    {!rwVerification.returnWindowClosed && (
+                      <p className="text-[10px] text-red-600 font-bold bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
+                        <AlertTriangle size={12} />
+                        Return window is still open. Please wait until it closes before uploading.
+                        {rwVerification.detectedReturnWindow && ` (Detected: ${rwVerification.detectedReturnWindow})`}
+                      </p>
+                    )}
+                    {!rwVerification.orderIdMatch && (
+                      <p className="text-[10px] text-red-600 font-bold bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
+                        <AlertTriangle size={12} />
+                        Order ID does not match. Please upload the return window screenshot for this specific order.
+                      </p>
+                    )}
+                    {!rwVerification.productNameMatch && rwVerification.orderIdMatch && (
+                      <p className="text-[10px] text-amber-600 font-bold bg-amber-50 p-2 rounded-lg flex items-center gap-1.5">
+                        <AlertTriangle size={12} />
+                        Product name does not match this order. Please check the screenshot.
+                      </p>
+                    )}
+                    {!rwVerification.reviewerNameMatch && selectedOrder?.reviewerName && (
+                      <p className="text-[10px] text-red-600 font-bold bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
+                        <AlertTriangle size={12} />
+                        Reviewer name "{selectedOrder.reviewerName}" not found in screenshot.
+                      </p>
+                    )}
+                    {rwVerification.discrepancyNote && (
+                      <p className="text-[10px] text-slate-500 italic px-1">
+                        {rwVerification.discrepancyNote}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <button
+                  onClick={submitReturnWindowScreenshot}
+                  disabled={
+                    isUploading ||
+                    rwAnalyzing ||
+                    !rwFile ||
+                    // Block submit when critical checks fail
+                    !!(rwVerification && !rwVerification.orderIdMatch) ||
+                    !!(rwVerification && !rwVerification.productNameMatch) ||
+                    !!(rwVerification && !rwVerification.returnWindowClosed) ||
+                    !!(rwVerification && !rwVerification.reviewerNameMatch && selectedOrder?.reviewerName)
+                  }
+                  className="w-full py-3.5 bg-black text-white font-bold rounded-2xl hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isUploading ? 'Submitting...' : rwAnalyzing ? 'Verifying...' : 'Submit Return Window Proof'}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
                 <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">
-                  {uploadType === 'returnWindow' ? 'Return Window Screenshot' : 'Proof'}
+                  Proof
                 </label>
                 <label className="block w-full rounded-2xl border-2 border-dashed border-slate-200 p-6 text-center cursor-pointer hover:border-slate-300">
                   <div className="text-sm font-bold text-slate-700">Choose an image</div>
@@ -2242,8 +2518,6 @@ export const Orders: React.FC = () => {
                     disabled={isUploading}
                   />
                 </label>
-                {/* Sample Screenshot Guide for Return Window */}
-                {uploadType === 'returnWindow' && <SampleScreenshotGuide type="returnWindow" />}
                 {isUploading && (
                   <div className="text-xs font-bold text-slate-500 flex items-center gap-2">
                     <Loader2 size={14} className="animate-spin motion-reduce:animate-none" /> Uploading...

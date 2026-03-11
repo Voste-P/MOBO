@@ -10,6 +10,7 @@ import {
   isGeminiConfigured,
   verifyProofWithAi,
   verifyRatingScreenshotWithAi,
+  verifyReturnWindowWithAi,
 } from '../services/aiService.js';
 import { toUiDeal } from '../utils/uiMappers.js';
 import { normalizeMediatorCode } from '../utils/mediatorCode.js';
@@ -81,6 +82,15 @@ export function aiRoutes(env: Env): Router {
     expectedProductName: z.string().min(1).max(500),
     expectedReviewerName: z.string().max(200).optional(),
     orderId: z.string().max(200).optional(),
+  });
+
+  const verifyReturnWindowSchema = z.object({
+    imageBase64: z.string().min(1).max(env.AI_MAX_IMAGE_CHARS),
+    expectedOrderId: z.string().min(1).max(200),
+    expectedProductName: z.string().min(1).max(500),
+    expectedAmount: z.number().finite().positive(),
+    expectedSoldBy: z.string().max(300).optional(),
+    expectedReviewerName: z.string().max(200).optional(),
   });
 
   // Optional auth so the UI can call AI routes without sending a token,
@@ -711,6 +721,80 @@ export function aiRoutes(env: Env): Router {
       res.json(result);
     } catch (err) {
       logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'EXTERNAL_SERVICE', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'ai/verify-rating' } });
+      if (!sendKnownError(err, res)) next(err);
+    }
+  });
+
+  router.post('/verify-return-window', requireAuth(env), limiterVerifyProof, async (req, res, next) => {
+    try {
+      if (!ensureAiEnabled(res)) return;
+      const payload = verifyReturnWindowSchema.parse(req.body);
+
+      if (!enforceDailyLimit(req, res)) return;
+      if (!enforceMinInterval(req, res)) return;
+
+      // E2E deterministic bypass
+      if (env.NODE_ENV === 'test') {
+        res.json({
+          orderIdMatch: true,
+          productNameMatch: true,
+          amountMatch: true,
+          soldByMatch: true,
+          returnWindowClosed: true,
+          reviewerNameMatch: true,
+          confidenceScore: 95,
+          discrepancyNote: 'Test mode: AI verification bypassed.',
+        });
+        return;
+      }
+
+      // If expectedReviewerName not provided, look up from order
+      let reviewerName = payload.expectedReviewerName;
+      if (!reviewerName && payload.expectedOrderId && isPrismaAvailable()) {
+        const order = await prisma().order.findFirst({
+          where: { OR: [{ id: payload.expectedOrderId }, { mongoId: payload.expectedOrderId }], isDeleted: false },
+          select: { reviewerName: true },
+        });
+        if (order?.reviewerName) reviewerName = order.reviewerName;
+      }
+
+      const result = await verifyReturnWindowWithAi(env, {
+        imageBase64: payload.imageBase64,
+        expectedOrderId: payload.expectedOrderId,
+        expectedProductName: payload.expectedProductName,
+        expectedAmount: payload.expectedAmount,
+        ...(payload.expectedSoldBy ? { expectedSoldBy: payload.expectedSoldBy } : {}),
+        ...(reviewerName ? { expectedReviewerName: reviewerName } : {}),
+      });
+
+      writeAuditLog({
+        req,
+        action: 'ai.verify_return_window_preview',
+        entityType: 'return_window_verification',
+        metadata: {
+          orderIdMatch: result.orderIdMatch,
+          productNameMatch: result.productNameMatch,
+          amountMatch: result.amountMatch,
+          soldByMatch: result.soldByMatch,
+          returnWindowClosed: result.returnWindowClosed,
+          reviewerNameMatch: result.reviewerNameMatch,
+          confidenceScore: result.confidenceScore,
+        },
+      });
+
+      businessLog.info(`[AI] User ${req.auth?.userId} verified return window screenshot — orderId match: ${result.orderIdMatch}, product match: ${result.productNameMatch}, returnWindow closed: ${result.returnWindowClosed}, confidence: ${result.confidenceScore}`, { actorUserId: req.auth?.userId, orderIdMatch: result.orderIdMatch, productNameMatch: result.productNameMatch, returnWindowClosed: result.returnWindowClosed, confidence: result.confidenceScore, ip: req.ip });
+      logAccessEvent('RESOURCE_ACCESS', {
+        userId: req.auth?.userId,
+        roles: req.auth?.roles,
+        ip: req.ip,
+        resource: 'AI_VERIFY_RETURN_WINDOW',
+        requestId: String((res as any).locals?.requestId || ''),
+        metadata: { action: 'AI_VERIFY_RETURN_WINDOW', orderIdMatch: result.orderIdMatch, productNameMatch: result.productNameMatch, returnWindowClosed: result.returnWindowClosed, confidenceScore: result.confidenceScore },
+      });
+
+      res.json(result);
+    } catch (err) {
+      logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'EXTERNAL_SERVICE', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'ai/verify-return-window' } });
       if (!sendKnownError(err, res)) next(err);
     }
   });

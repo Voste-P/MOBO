@@ -622,6 +622,16 @@ export const api = {
         body: JSON.stringify({ imageBase64: compressed, expectedBuyerName, expectedProductName, ...(expectedReviewerName ? { expectedReviewerName } : {}), ...(orderId ? { orderId } : {}) }),
       });
     },
+    /** Pre-validate return window screenshot: checks order ID, product, amount, seller, return window closed */
+    verifyReturnWindow: async (file: File, expectedOrderId: string, expectedProductName: string, expectedAmount: number, expectedSoldBy?: string, expectedReviewerName?: string) => {
+      const rawBase64 = await readFileAsDataUrl(file);
+      const compressed = await compressImage(rawBase64, { maxDimension: 1600, quality: 0.8 });
+      return fetchJson('/ai/verify-return-window', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ imageBase64: compressed, expectedOrderId, expectedProductName, expectedAmount, ...(expectedSoldBy ? { expectedSoldBy } : {}), ...(expectedReviewerName ? { expectedReviewerName } : {}) }),
+      });
+    },
   },
   chat: {
     /** [FIX] Updated signature to 7 arguments to match call in Chatbot.tsx */
