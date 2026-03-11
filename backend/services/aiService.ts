@@ -1427,8 +1427,8 @@ async function verifyRatingWithOcr(
       detectedProductName: matchedTokens.length > 0 ? matchedTokens.join(' ') : undefined,
       discrepancyNote: [
         !accountNameMatch ? (expectedReviewerName
-          ? `Reviewer name "${expectedReviewerName}" not found in screenshot.`
-          : `Buyer name "${expectedBuyerName}" not found in screenshot.`) : '',
+          ? `Account name "${expectedBuyerName}" and reviewer name "${expectedReviewerName}" not found in screenshot.`
+          : `Account name "${expectedBuyerName}" not found in screenshot.`) : '',
         !productNameMatch ? `Product name not matching in screenshot.` : '',
         accountNameMatch && productNameMatch ? 'Account name and product matched via OCR.' : '',
       ].filter(Boolean).join(' '),

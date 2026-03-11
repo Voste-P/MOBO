@@ -677,12 +677,18 @@ export function aiRoutes(env: Env): Router {
 
       // When reviewer name exists, use it as the primary buyer name for matching.
       // The buyer may have ordered from a different marketplace account (e.g., brother's Amazon).
-      const nameToMatch = reviewerName || payload.expectedBuyerName;
+      let primaryName = payload.expectedBuyerName;
+      let fallbackName: string | undefined = reviewerName;
+      if (reviewerName && primaryName !== reviewerName) {
+        fallbackName = primaryName;
+        primaryName = reviewerName;
+      }
+
       const result = await verifyRatingScreenshotWithAi(env, {
         imageBase64: payload.imageBase64,
-        expectedBuyerName: nameToMatch,
+        expectedBuyerName: primaryName,
         expectedProductName: payload.expectedProductName,
-        ...(reviewerName ? { expectedReviewerName: reviewerName } : {}),
+        ...(fallbackName ? { expectedReviewerName: fallbackName } : {}),
       });
 
       writeAuditLog({

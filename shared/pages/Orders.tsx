@@ -398,7 +398,7 @@ export const Orders: React.FC = () => {
       if (!isValidReviewLink(inputValue)) {
         throw new Error('Please enter a valid HTTPS review link from a recognized marketplace (Amazon, Flipkart, Myntra, etc.).');
       }
-      const reviewerName = selectedOrder.reviewerName || '';
+      const reviewerName = reviewerNameInput?.trim() || selectedOrder.reviewerName || '';
       await api.orders.submitClaim(selectedOrder.id, { type: 'review', data: inputValue, ...(reviewerName ? { reviewerName } : {}) });
       toast.success('Link submitted!');
       setSelectedOrder(null);
@@ -1279,6 +1279,7 @@ export const Orders: React.FC = () => {
                         onClick={() => {
                           setSelectedOrder(order);
                           setUploadType('returnWindow');
+                          setReviewerNameInput(order.reviewerName || '');
                         }}
                         className="text-[10px] font-bold uppercase text-teal-600"
                       >
