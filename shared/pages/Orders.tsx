@@ -679,6 +679,12 @@ export const Orders: React.FC = () => {
       toast.error('The product in the screenshot does not match the selected deal. Please upload the correct order screenshot or use the override button.');
       return;
     }
+    // Require reviewer/account name for Rating & Review deals — it's used for
+    // AI screenshot verification and cannot be added later (prevents cheating).
+    if ((selectedProduct.dealType === 'Rating' || selectedProduct.dealType === 'Review') && !reviewerNameInput.trim()) {
+      toast.error('Please enter your marketplace account name. This is needed to verify your rating/review screenshots.');
+      return;
+    }
     submittingRef.current = true;
     const hasExtraction = Boolean(extractedDetails.orderId || extractedDetails.amount !== '');
     const isDiscountDeal = selectedProduct.dealType === 'Discount';
@@ -816,6 +822,7 @@ export const Orders: React.FC = () => {
               setOrderIdLocked(false);
               setSelectedProduct(null);
               setReviewLinkInput('');
+              setReviewerNameInput('');
               setFormSearch('');
               setIsNewOrderModalOpen(true);
             }}
@@ -1550,6 +1557,14 @@ export const Orders: React.FC = () => {
                           setMatchStatus({ id: 'none', amount: 'none', productName: 'none' });
                           setOrderIdLocked(false);
                           setSelectedProduct(p);
+                          // Pre-fill reviewer name with user's app name for Rating/Review deals.
+                          // Users who order from their own marketplace account get it auto-filled;
+                          // users who order from someone else's account (e.g., brother's Amazon) can change it.
+                          if ((p.dealType === 'Rating' || p.dealType === 'Review') && user?.name) {
+                            setReviewerNameInput(user.name);
+                          } else {
+                            setReviewerNameInput('');
+                          }
                         }}
                         className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-2xl hover:bg-gray-50 cursor-pointer active:scale-95 transition-transform"
                       >
@@ -1812,7 +1827,7 @@ export const Orders: React.FC = () => {
                   {formScreenshot && (selectedProduct?.dealType === 'Rating' || selectedProduct?.dealType === 'Review') && (
                     <div className="space-y-1 animate-enter">
                       <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">
-                        Your Reviewer / Account Name <span className="text-zinc-300">(optional)</span>
+                        Your Marketplace Account Name <span className="text-red-400">*</span>
                       </label>
                       <input
                         type="text"
@@ -1823,7 +1838,7 @@ export const Orders: React.FC = () => {
                         maxLength={200}
                       />
                       <p className="text-[9px] text-zinc-400 ml-1">
-                        Your name on the marketplace (Amazon, Flipkart, etc.) — helps verify your screenshots.
+                        Your name on the marketplace (Amazon, Flipkart, etc.) — used to verify your rating/review screenshots. Change it if you ordered from a different account.
                       </p>
                     </div>
                   )}
