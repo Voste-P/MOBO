@@ -1050,11 +1050,12 @@ export function makeOrdersController(env: Env) {
                   'Please upload a screenshot from the correct marketplace account. ' +
                   (ratingAiResult.discrepancyNote || ''));
               }
-              // Block submission if both name AND product mismatch with high confidence (fraud prevention)
-              if (ratingAiResult && !ratingAiResult.accountNameMatch && !ratingAiResult.productNameMatch
-                && ratingAiResult.confidenceScore >= 80) {
+              // Block submission if product name alone mismatches with good confidence
+              if (ratingAiResult && !ratingAiResult.productNameMatch
+                && ratingAiResult.confidenceScore >= 70) {
                 throw new AppError(422, 'RATING_VERIFICATION_FAILED',
-                  'Rating screenshot does not match: the account name and product must match your order. ' +
+                  'Rating screenshot product does not match this order. ' +
+                  'Please upload the correct rating screenshot. ' +
                   (ratingAiResult.discrepancyNote || ''));
               }
             }
@@ -1125,7 +1126,31 @@ export function makeOrdersController(env: Env) {
                 durationMs: Date.now() - aiStart,
                 metadata: { orderId: order.mongoId, confidenceScore: returnWindowResult?.confidenceScore },
               });
-              // Block submission if reviewer name is set and doesn't match (same logic as rating)
+              // Block submission if order ID doesn't match (hard block)
+              if (returnWindowResult && !returnWindowResult.orderIdMatch
+                && returnWindowResult.confidenceScore >= 70) {
+                throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
+                  'Return window screenshot order ID does not match this order. ' +
+                  'Please upload the correct return window screenshot. ' +
+                  (returnWindowResult.discrepancyNote || ''));
+              }
+              // Block submission if return window is still open
+              if (returnWindowResult && !returnWindowResult.returnWindowClosed
+                && returnWindowResult.confidenceScore >= 70) {
+                throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
+                  'Return window is still open. Please wait until the return window closes before uploading. ' +
+                  (returnWindowResult.detectedReturnWindow ? `Detected: ${returnWindowResult.detectedReturnWindow}. ` : '') +
+                  (returnWindowResult.discrepancyNote || ''));
+              }
+              // Block submission if product name doesn't match
+              if (returnWindowResult && !returnWindowResult.productNameMatch
+                && returnWindowResult.confidenceScore >= 70) {
+                throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
+                  'Return window screenshot product does not match this order. ' +
+                  'Please upload the correct return window screenshot. ' +
+                  (returnWindowResult.discrepancyNote || ''));
+              }
+              // Block submission if reviewer name is set and doesn't match
               if (returnWindowResult && rwReviewerName && !returnWindowResult.reviewerNameMatch
                 && returnWindowResult.confidenceScore >= 70) {
                 throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
@@ -1186,6 +1211,13 @@ export function makeOrdersController(env: Env) {
                 durationMs: Date.now() - aiStart,
                 metadata: { orderId: order.mongoId, confidenceScore: aiOrderVerification?.confidenceScore },
               });
+              // Block re-upload if order ID clearly doesn't match (fraud prevention)
+              if (aiOrderVerification && !aiOrderVerification.orderIdMatch
+                && aiOrderVerification.confidenceScore >= 75) {
+                throw new AppError(422, 'ORDER_VERIFICATION_FAILED',
+                  'Order screenshot does not match: the order ID in the screenshot does not match this order. ' +
+                  (aiOrderVerification.discrepancyNote || ''));
+              }
             }
           }
 
