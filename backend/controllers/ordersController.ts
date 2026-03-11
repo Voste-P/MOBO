@@ -1025,18 +1025,16 @@ export function makeOrdersController(env: Env) {
             const buyerName = String(buyerUser?.name || order.buyerName || '').trim();
             const productName = String((order.items?.[0] as any)?.title || order.extractedProductName || '').trim();
             const reviewerName = String(body.reviewerName || order.reviewerName || '').trim();
-            // When reviewer name is provided, the buyer ordered from someone else's
-            // marketplace account — the screenshot will show the REVIEWER's name,
-            // so use it as the primary expected account name.
-            const primaryExpectedName = reviewerName || buyerName;
-            const fallbackName = reviewerName ? buyerName : undefined;
-            if (primaryExpectedName && productName) {
+            // Pass buyer's app account name as expectedBuyerName (secondary), and the
+            // marketplace reviewer name as expectedReviewerName (PRIMARY match target).
+            // The AI service matches PRIMARILY against expectedReviewerName when provided.
+            if ((reviewerName || buyerName) && productName) {
               const aiStart = Date.now();
               ratingAiResult = await verifyRatingScreenshotWithAi(env, {
                 imageBase64: body.data,
-                expectedBuyerName: primaryExpectedName,
+                expectedBuyerName: buyerName,
                 expectedProductName: productName,
-                ...(fallbackName ? { expectedReviewerName: fallbackName } : {}),
+                ...(reviewerName ? { expectedReviewerName: reviewerName } : {}),
               });
               logPerformance({
                 operation: 'AI_RATING_VERIFICATION',

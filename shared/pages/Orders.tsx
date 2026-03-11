@@ -616,10 +616,10 @@ export const Orders: React.FC = () => {
           toast.info('Screenshot ready for upload.');
         }
       } else {
-        const nameToVerify = reviewerName;
-
-        if (nameToVerify && productName) {
-          const result = await api.orders.verifyRating(file, nameToVerify, productName, reviewerName || undefined, selectedOrder.id);
+        if (reviewerName && productName) {
+          // Pass buyer's app account name as expectedBuyerName (secondary),
+          // and reviewer name as expectedReviewerName (PRIMARY match target).
+          const result = await api.orders.verifyRating(file, buyerName || 'unknown', productName, reviewerName, selectedOrder.id);
           setRatingVerification(result);
 
           if (!result.accountNameMatch && !result.productNameMatch) {
