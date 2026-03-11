@@ -522,8 +522,8 @@ export const Orders: React.FC = () => {
             const bestMatchCount = Math.max(matchingWords.length, reverseMatchingWords.length);
             const denominator = Math.min(extractedWords.length, expectedWords.length);
             const overlapRatio = denominator > 0 ? bestMatchCount / denominator : 0;
-            // Require at least 2 matching words AND 35% overlap ratio (slightly relaxed for AI imprecision)
-            const hasEnoughOverlap = bestMatchCount >= 2 && overlapRatio >= 0.35;
+            // Require at least 2 matching words AND 50% overlap ratio (stricter matching to ensure correct product)
+            const hasEnoughOverlap = bestMatchCount >= 2 && overlapRatio >= 0.50;
             // Special case: if product name is very short (1-2 significant words), require exact word match
             const shortNameMatch = expectedWords.length <= 2 && bestMatchCount >= 1 && overlapRatio >= 0.5;
             // Special case: brand name match — if the FIRST word (brand) matches, give it credit
@@ -531,7 +531,7 @@ export const Orders: React.FC = () => {
               (extractedWords[0] === expectedWords[0] || 
                (extractedWords[0].length >= 4 && expectedWords[0].includes(extractedWords[0])) ||
                (expectedWords[0].length >= 4 && extractedWords[0].includes(expectedWords[0])));
-            const brandWithOverlap = brandMatch && bestMatchCount >= 1 && overlapRatio >= 0.25;
+            const brandWithOverlap = brandMatch && bestMatchCount >= 2 && overlapRatio >= 0.35;
             productNameStatus = (hasEnoughOverlap || shortNameMatch || brandWithOverlap) ? 'match' : 'mismatch';
           }
         }
@@ -548,7 +548,7 @@ export const Orders: React.FC = () => {
         }
 
         if (productNameStatus === 'mismatch') {
-          toast.error('Product name in screenshot may not match the selected deal. You can override if this is correct.');
+          toast.error('Product name in screenshot does not match the selected deal. Please upload the correct order screenshot.');
         } else if (hasId && hasAmount) {
           const extras = [details.productName && 'Product', details.soldBy && 'Seller', details.orderDate && 'Date'].filter(Boolean);
           const extraMsg = extras.length > 0 ? ` + ${extras.join(', ')}` : '';
@@ -649,9 +649,9 @@ export const Orders: React.FC = () => {
       }
     } catch (err) {
       if (process.env.NODE_ENV !== 'production') console.error('Rating pre-validation failed:', err);
-      // Allow upload even if pre-validation fails — backend will still validate
+      // Keep verification null — submit button stays disabled until user retries
       setRatingVerification(null);
-      toast.info('Screenshot ready. AI pre-check unavailable.');
+      toast.error('AI verification failed. Please try uploading the screenshot again.');
     } finally {
       setRatingAnalyzing(false);
     }
@@ -661,16 +661,22 @@ export const Orders: React.FC = () => {
   const submitRatingScreenshot = async () => {
     if (!ratingFile || !selectedOrder || isUploading) return;
 
+    // Block if AI verification hasn't completed yet (file uploaded but not verified)
+    if (!ratingVerification) {
+      toast.error('Please wait for AI verification to complete before submitting.');
+      return;
+    }
+
     const hasReviewerName = !!selectedOrder.reviewerName;
 
     // Block submission when reviewer name is provided but doesn't match
-    if (ratingVerification && !ratingVerification.accountNameMatch && hasReviewerName) {
+    if (!ratingVerification.accountNameMatch && hasReviewerName) {
       toast.error(`Reviewer name "${selectedOrder.reviewerName}" does not match the screenshot. Please upload the correct rating screenshot.`);
       return;
     }
 
     // Block submission when product name doesn't match
-    if (ratingVerification && !ratingVerification.productNameMatch) {
+    if (!ratingVerification.productNameMatch) {
       toast.error('Product name does not match this order. Please upload the correct rating screenshot.');
       return;
     }
@@ -758,8 +764,9 @@ export const Orders: React.FC = () => {
       }
     } catch (err) {
       if (process.env.NODE_ENV !== 'production') console.error('Return window pre-validation failed:', err);
+      // Keep verification null — submit button stays disabled until user retries
       setRwVerification(null);
-      toast.info('Screenshot ready. AI pre-check unavailable.');
+      toast.error('AI verification failed. Please try uploading the screenshot again.');
     } finally {
       setRwAnalyzing(false);
     }
@@ -769,24 +776,28 @@ export const Orders: React.FC = () => {
   const submitReturnWindowScreenshot = async () => {
     if (!rwFile || !selectedOrder || isUploading) return;
 
+    // Block if AI verification hasn't completed yet (file uploaded but not verified)
+    if (!rwVerification) {
+      toast.error('Please wait for AI verification to complete before submitting.');
+      return;
+    }
+
     // Block submission when critical fields don't match
-    if (rwVerification) {
-      if (!rwVerification.orderIdMatch) {
-        toast.error('Order ID does not match. Please upload the correct return window screenshot.');
-        return;
-      }
-      if (!rwVerification.productNameMatch) {
-        toast.error('Product name does not match. Please upload the correct return window screenshot.');
-        return;
-      }
-      if (!rwVerification.returnWindowClosed) {
-        toast.error('Return window is still open. Please wait until it closes before uploading.');
-        return;
-      }
-      if (!rwVerification.reviewerNameMatch && selectedOrder.reviewerName) {
-        toast.error(`Reviewer name "${selectedOrder.reviewerName}" does not match. Please upload the correct screenshot.`);
-        return;
-      }
+    if (!rwVerification.orderIdMatch) {
+      toast.error('Order ID does not match. Please upload the correct return window screenshot.');
+      return;
+    }
+    if (!rwVerification.productNameMatch) {
+      toast.error('Product name does not match. Please upload the correct return window screenshot.');
+      return;
+    }
+    if (!rwVerification.returnWindowClosed) {
+      toast.error('Return window is still open. Please wait until it closes before uploading.');
+      return;
+    }
+    if (!rwVerification.reviewerNameMatch && selectedOrder.reviewerName) {
+      toast.error(`Reviewer name "${selectedOrder.reviewerName}" does not match. Please upload the correct screenshot.`);
+      return;
     }
 
     setIsUploading(true);
@@ -819,8 +830,8 @@ export const Orders: React.FC = () => {
       return;
     }
     // Block if product name mismatch detected by AI AND user hasn't overridden
-    if (matchStatus.productName === 'mismatch' && !productNameOverridden) {
-      toast.error('The product in the screenshot does not match the selected deal. Please upload the correct order screenshot or use the override button.');
+    if (matchStatus.productName === 'mismatch') {
+      toast.error('The product in the screenshot does not match the selected deal. Please upload the correct order screenshot.');
       return;
     }
     // Require reviewer/account name for Rating & Review deals — it's used for
@@ -1877,27 +1888,12 @@ export const Orders: React.FC = () => {
                           <CheckCircle2 size={12} /> AI suggests this is a valid proof.
                         </p>
                       )}
-                      {matchStatus.productName === 'mismatch' && !productNameOverridden && (
+                      {matchStatus.productName === 'mismatch' && (
                         <div className="bg-red-50 p-2 rounded-lg animate-enter">
-                          <p className="text-[10px] text-red-600 font-bold flex items-center gap-1.5 mb-1.5">
-                            <AlertTriangle size={12} /> Product in screenshot may not match the selected deal.
+                          <p className="text-[10px] text-red-600 font-bold flex items-center gap-1.5">
+                            <AlertTriangle size={12} /> Product in screenshot does not match the selected deal. Please upload the correct order screenshot.
                           </p>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setProductNameOverridden(true);
-                              toast.success('Product name override applied. You can proceed.');
-                            }}
-                            className="text-[10px] font-bold text-red-600 underline hover:text-red-800 transition-colors"
-                          >
-                            Override — I confirm this is the correct order
-                          </button>
                         </div>
-                      )}
-                      {matchStatus.productName === 'mismatch' && productNameOverridden && (
-                        <p className="text-[10px] text-amber-600 font-bold bg-amber-50 p-2 rounded-lg flex items-center gap-1.5">
-                          <AlertTriangle size={12} /> Product name overridden by user.
-                        </p>
                       )}
                       {matchStatus.productName === 'match' && (
                         <p className="text-[10px] text-green-600 font-bold bg-green-50 p-2 rounded-lg flex items-center gap-1.5">
@@ -2015,7 +2011,7 @@ export const Orders: React.FC = () => {
                   !selectedProduct ||
                   !formScreenshot ||
                   isUploading ||
-                  (matchStatus.productName === 'mismatch' && !productNameOverridden) ||
+                  matchStatus.productName === 'mismatch' ||
                   !extractedDetails.orderId ||
                   !extractedDetails.amount
                 }
@@ -2335,12 +2331,21 @@ export const Orders: React.FC = () => {
                   </div>
                 )}
 
+                {/* Show retry hint when AI verification failed */}
+                {ratingFile && !ratingAnalyzing && !ratingVerification && (
+                  <p className="text-[10px] text-red-600 font-bold bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
+                    <AlertTriangle size={12} /> AI verification failed. Please re-upload the screenshot to try again.
+                  </p>
+                )}
+
                 <button
                   onClick={submitRatingScreenshot}
                   disabled={
                     isUploading ||
                     ratingAnalyzing ||
                     !ratingFile ||
+                    // Block submit until AI verification succeeds
+                    !ratingVerification ||
                     // Block submit when reviewer name doesn't match or product name doesn't match
                     !!(ratingVerification && !ratingVerification.accountNameMatch && selectedOrder?.reviewerName) ||
                     !!(ratingVerification && !ratingVerification.productNameMatch)
@@ -2485,17 +2490,26 @@ export const Orders: React.FC = () => {
                   </div>
                 )}
 
+                {/* Show retry hint when AI verification failed */}
+                {rwFile && !rwAnalyzing && !rwVerification && (
+                  <p className="text-[10px] text-red-600 font-bold bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
+                    <AlertTriangle size={12} /> AI verification failed. Please re-upload the screenshot to try again.
+                  </p>
+                )}
+
                 <button
                   onClick={submitReturnWindowScreenshot}
                   disabled={
                     isUploading ||
                     rwAnalyzing ||
                     !rwFile ||
+                    // Block submit until AI verification succeeds
+                    !rwVerification ||
                     // Block submit when critical checks fail
-                    !!(rwVerification && !rwVerification.orderIdMatch) ||
-                    !!(rwVerification && !rwVerification.productNameMatch) ||
-                    !!(rwVerification && !rwVerification.returnWindowClosed) ||
-                    !!(rwVerification && !rwVerification.reviewerNameMatch && selectedOrder?.reviewerName)
+                    !rwVerification.orderIdMatch ||
+                    !rwVerification.productNameMatch ||
+                    !rwVerification.returnWindowClosed ||
+                    (!rwVerification.reviewerNameMatch && !!selectedOrder?.reviewerName)
                   }
                   className="w-full py-3.5 bg-black text-white font-bold rounded-2xl hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -2507,6 +2521,11 @@ export const Orders: React.FC = () => {
                 <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">
                   Proof
                 </label>
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-2.5">
+                  <p className="text-[10px] text-blue-700 font-bold flex items-center gap-1.5">
+                    <CheckCircle2 size={12} /> AI will verify Order ID, Amount, and Product Name before accepting.
+                  </p>
+                </div>
                 <label className="block w-full rounded-2xl border-2 border-dashed border-slate-200 p-6 text-center cursor-pointer hover:border-slate-300">
                   <div className="text-sm font-bold text-slate-700">Choose an image</div>
                   <div className="text-[11px] text-slate-400 font-bold mt-1">PNG/JPG</div>

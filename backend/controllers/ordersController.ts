@@ -1196,6 +1196,7 @@ export function makeOrdersController(env: Env) {
             const expectedAmount = (order.items ?? []).reduce(
               (acc: number, it: any) => acc + (Number(it?.priceAtPurchasePaise) || 0) * (Number(it?.quantity) || 1), 0
             ) / 100;
+            const expectedProductName = String((order.items?.[0] as any)?.title || order.extractedProductName || '').trim();
             // Guard against NaN/Infinity from corrupted order data
             if (!Number.isFinite(expectedAmount) || expectedAmount <= 0) {
               orderLog.warn(`[ordersController] Skipping AI re-upload verification: invalid expectedAmount=${expectedAmount} for order=${order.mongoId}`);
@@ -1205,6 +1206,7 @@ export function makeOrdersController(env: Env) {
                 imageBase64: body.data,
                 expectedOrderId,
                 expectedAmount,
+                ...(expectedProductName ? { expectedProductName } : {}),
               });
               logPerformance({
                 operation: 'AI_ORDER_REUPLOAD_VERIFICATION',
@@ -1218,6 +1220,15 @@ export function makeOrdersController(env: Env) {
                   'Order screenshot does not match: the order ID in the screenshot does not match this order. ' +
                   (aiOrderVerification.discrepancyNote || ''));
               }
+              // Block re-upload if product name doesn't match (fraud prevention)
+              if (aiOrderVerification && expectedProductName
+                && aiOrderVerification.productNameMatch === false
+                && aiOrderVerification.confidenceScore >= 70) {
+                throw new AppError(422, 'ORDER_VERIFICATION_FAILED',
+                  'Order screenshot product does not match this order. ' +
+                  'Please upload the correct order screenshot. ' +
+                  (aiOrderVerification.discrepancyNote || ''));
+              }
             }
           }
 
@@ -1228,8 +1239,10 @@ export function makeOrdersController(env: Env) {
             updateData.orderAiVerification = {
               orderIdMatch: aiOrderVerification.orderIdMatch,
               amountMatch: aiOrderVerification.amountMatch,
+              productNameMatch: aiOrderVerification.productNameMatch,
               detectedOrderId: aiOrderVerification.detectedOrderId,
               detectedAmount: aiOrderVerification.detectedAmount,
+              detectedProductName: aiOrderVerification.detectedProductName,
               confidenceScore: aiOrderVerification.confidenceScore,
               discrepancyNote: aiOrderVerification.discrepancyNote,
             };
@@ -1251,6 +1264,7 @@ export function makeOrdersController(env: Env) {
               metadata: {
                 orderIdMatch: aiOrderVerification.orderIdMatch,
                 amountMatch: aiOrderVerification.amountMatch,
+                productNameMatch: aiOrderVerification.productNameMatch,
                 confidenceScore: aiOrderVerification.confidenceScore,
               },
             });
