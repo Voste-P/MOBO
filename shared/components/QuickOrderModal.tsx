@@ -98,6 +98,11 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
 
   const handleSubmit = async () => {
     if (!product || !user || !screenshot || submitting) return;
+    // Require reviewer name for Rating/Review deals to prevent cheating
+    if ((product.dealType === 'Rating' || product.dealType === 'Review') && !reviewerName.trim()) {
+      toast.error('Please enter the reviewer name — the marketplace account name used for this order.');
+      return;
+    }
     setSubmitting(true);
     try {
       const parsedAmount =
@@ -322,17 +327,19 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
               <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-1.5">
                 <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                   <UserCircle size={12} /> Reviewer / Account Name
+                  {(product.dealType === 'Rating' || product.dealType === 'Review') && <span className="text-red-400">*</span>}
                 </label>
                 <input
                   type="text"
                   value={reviewerName}
                   onChange={(e) => setReviewerName(e.target.value)}
-                  placeholder="e.g. Rahul S. on Amazon"
+                  placeholder="e.g. Chetan on Amazon"
                   maxLength={200}
                   className="w-full px-2.5 py-2 text-xs font-medium border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-lime-200 focus:border-lime-400 outline-none transition-all"
                 />
                 <p className="text-[9px] text-zinc-400 ml-0.5">
-                  Your marketplace profile name — helps verify review &amp; rating screenshots later.
+                  Enter the name shown on the marketplace account used for this order.
+                  {(product.dealType === 'Rating' || product.dealType === 'Review') && <span className="text-red-400 font-bold"> Required</span>}
                 </p>
               </div>
             </div>

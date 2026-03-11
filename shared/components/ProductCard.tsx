@@ -121,6 +121,11 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
 
   const handleInlineSubmit = useCallback(async () => {
     if (!user || !screenshot || submitting) return;
+    // Require reviewer name for Rating/Review deals to prevent cheating
+    if ((product.dealType === 'Rating' || product.dealType === 'Review') && !reviewerName.trim()) {
+      toast.error('Please enter the reviewer name — the marketplace account name used for this order.');
+      return;
+    }
     setSubmitting(true);
     try {
       const parsedAmount =
@@ -162,7 +167,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
     } finally {
       setSubmitting(false);
     }
-  }, [user, screenshot, submitting, extractedDetails, product, toast, resetForm]);
+  }, [user, screenshot, submitting, extractedDetails, product, reviewerName, toast, resetForm]);
 
   const handleLinkClick = () => {
     if (product.productUrl && /^https?:\/\//i.test(product.productUrl)) {
@@ -404,16 +409,20 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-2 space-y-1">
                 <label className="text-[8px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                   <UserCircle size={10} /> Reviewer / Account Name
+                  {(product.dealType === 'Rating' || product.dealType === 'Review') && <span className="text-red-400">*</span>}
                 </label>
                 <input
                   type="text"
                   value={reviewerName}
                   onChange={(e) => setReviewerName(e.target.value)}
-                  placeholder="e.g. Rahul S. on Amazon"
+                  placeholder="e.g. Chetan on Amazon"
                   maxLength={200}
                   className="w-full px-1.5 py-1 text-[10px] font-medium border border-gray-300 rounded bg-white focus:ring-1 focus:ring-lime-300 focus:border-lime-400 outline-none transition-all"
                 />
-                <p className="text-[8px] text-zinc-400">Your marketplace profile name for review verification.</p>
+                <p className="text-[8px] text-zinc-400">
+                  Enter the name shown on the marketplace account used for this order.
+                  {(product.dealType === 'Rating' || product.dealType === 'Review') && <span className="text-red-400 font-bold"> Required</span>}
+                </p>
               </div>
             </div>
           )}

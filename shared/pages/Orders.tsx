@@ -604,7 +604,7 @@ export const Orders: React.FC = () => {
           if (!result.productNameMatch) {
             toast.warning('Product name does not match this order. Please check the screenshot.');
           } else {
-            toast.success('Screenshot ready! Set reviewer name on the order card for full name verification.');
+            toast.success('Screenshot verified! Product matches.');
           }
         } else {
           setRatingVerification({ accountNameMatch: true, productNameMatch: true, confidenceScore: 50 });
@@ -1584,14 +1584,10 @@ export const Orders: React.FC = () => {
                           setMatchStatus({ id: 'none', amount: 'none', productName: 'none' });
                           setOrderIdLocked(false);
                           setSelectedProduct(p);
-                          // Pre-fill reviewer name with user's app name for Rating/Review deals.
-                          // Users who order from their own marketplace account get it auto-filled;
-                          // users who order from someone else's account (e.g., brother's Amazon) can change it.
-                          if ((p.dealType === 'Rating' || p.dealType === 'Review') && user?.name) {
-                            setReviewerNameInput(user.name);
-                          } else {
-                            setReviewerNameInput('');
-                          }
+                          // Don't auto-fill reviewer name — buyer must explicitly enter the
+                          // marketplace account name used for this order.  They may have ordered
+                          // from someone else's account (e.g. brother's Amazon).
+                          setReviewerNameInput('');
                         }}
                         className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-2xl hover:bg-gray-50 cursor-pointer active:scale-95 transition-transform"
                       >
