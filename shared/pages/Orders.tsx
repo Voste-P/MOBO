@@ -742,6 +742,8 @@ export const Orders: React.FC = () => {
         const issues: string[] = [];
         if (!result.orderIdMatch) issues.push('Order ID');
         if (!result.productNameMatch) issues.push('Product name');
+        if (!result.amountMatch) issues.push('Amount');
+        if (!result.soldByMatch && soldBy) issues.push('Seller name');
         if (!result.returnWindowClosed) issues.push('Return window not closed');
         if (!result.reviewerNameMatch && reviewerName) issues.push('Reviewer name');
 
@@ -788,6 +790,14 @@ export const Orders: React.FC = () => {
     }
     if (!rwVerification.productNameMatch) {
       toast.error('Product name does not match. Please upload the correct return window screenshot.');
+      return;
+    }
+    if (!rwVerification.amountMatch) {
+      toast.error('Amount does not match. Please upload the correct return window screenshot.');
+      return;
+    }
+    if (!rwVerification.soldByMatch && selectedOrder.soldBy) {
+      toast.error('Seller name does not match. Please upload the correct return window screenshot.');
       return;
     }
     if (!rwVerification.returnWindowClosed) {
@@ -2428,18 +2438,20 @@ export const Orders: React.FC = () => {
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
-                      <div className={`p-2.5 rounded-xl text-center ${rwVerification.amountMatch ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'}`}>
+                      <div className={`p-2.5 rounded-xl text-center ${rwVerification.amountMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Amount</div>
-                        <div className={`text-xs font-bold ${rwVerification.amountMatch ? 'text-green-600' : 'text-amber-600'}`}>
-                          {rwVerification.amountMatch ? '✓ Match' : '~ Differs'}
+                        <div className={`text-xs font-bold ${rwVerification.amountMatch ? 'text-green-600' : 'text-red-600'}`}>
+                          {rwVerification.amountMatch ? '✓ Match' : '✗ Mismatch'}
                         </div>
                       </div>
-                      <div className={`p-2.5 rounded-xl text-center ${rwVerification.soldByMatch ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'}`}>
+                      {selectedOrder?.soldBy && (
+                      <div className={`p-2.5 rounded-xl text-center ${rwVerification.soldByMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Seller</div>
-                        <div className={`text-xs font-bold ${rwVerification.soldByMatch ? 'text-green-600' : 'text-amber-600'}`}>
-                          {rwVerification.soldByMatch ? '✓ Match' : '~ Differs'}
+                        <div className={`text-xs font-bold ${rwVerification.soldByMatch ? 'text-green-600' : 'text-red-600'}`}>
+                          {rwVerification.soldByMatch ? '✓ Match' : '✗ Mismatch'}
                         </div>
                       </div>
+                      )}
                       {selectedOrder?.reviewerName && (
                         <div className={`p-2.5 rounded-xl text-center ${rwVerification.reviewerNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                           <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Reviewer</div>
@@ -2450,7 +2462,7 @@ export const Orders: React.FC = () => {
                       )}
                     </div>
 
-                    {rwVerification.orderIdMatch && rwVerification.productNameMatch && rwVerification.returnWindowClosed && (
+                    {rwVerification.orderIdMatch && rwVerification.productNameMatch && rwVerification.returnWindowClosed && rwVerification.amountMatch && (!selectedOrder?.soldBy || rwVerification.soldByMatch) && (!selectedOrder?.reviewerName || rwVerification.reviewerNameMatch) && (
                       <p className="text-[10px] text-green-600 font-bold bg-green-50 p-2 rounded-lg flex items-center gap-1.5">
                         <CheckCircle2 size={12} /> Return window screenshot verified. Ready to submit.
                       </p>
@@ -2480,6 +2492,18 @@ export const Orders: React.FC = () => {
                         Reviewer name "{selectedOrder.reviewerName}" not found in screenshot.
                       </p>
                     )}
+                    {!rwVerification.amountMatch && (
+                      <p className="text-[10px] text-red-600 font-bold bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
+                        <AlertTriangle size={12} />
+                        Amount does not match this order. Please check the screenshot.
+                      </p>
+                    )}
+                    {!rwVerification.soldByMatch && selectedOrder?.soldBy && (
+                      <p className="text-[10px] text-red-600 font-bold bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
+                        <AlertTriangle size={12} />
+                        Seller name does not match. Expected &quot;{selectedOrder.soldBy}&quot;.
+                      </p>
+                    )}
                     {rwVerification.discrepancyNote && (
                       <p className="text-[10px] text-slate-500 italic px-1">
                         {rwVerification.discrepancyNote}
@@ -2507,6 +2531,8 @@ export const Orders: React.FC = () => {
                     !rwVerification.orderIdMatch ||
                     !rwVerification.productNameMatch ||
                     !rwVerification.returnWindowClosed ||
+                    !rwVerification.amountMatch ||
+                    (!rwVerification.soldByMatch && !!selectedOrder?.soldBy) ||
                     (!rwVerification.reviewerNameMatch && !!selectedOrder?.reviewerName)
                   }
                   className="w-full py-3.5 bg-black text-white font-bold rounded-2xl hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"

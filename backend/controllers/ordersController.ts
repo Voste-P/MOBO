@@ -1158,6 +1158,22 @@ export function makeOrdersController(env: Env) {
                   'Please upload a screenshot from the correct marketplace order. ' +
                   (returnWindowResult.discrepancyNote || ''));
               }
+              // Block submission if seller/sold-by name doesn't match
+              if (returnWindowResult && expectedSoldBy && !returnWindowResult.soldByMatch
+                && returnWindowResult.confidenceScore >= 70) {
+                throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
+                  `Return window screenshot seller does not match "${expectedSoldBy}". ` +
+                  'Please upload the correct return window screenshot. ' +
+                  (returnWindowResult.discrepancyNote || ''));
+              }
+              // Block submission if amount doesn't match
+              if (returnWindowResult && !returnWindowResult.amountMatch
+                && returnWindowResult.confidenceScore >= 70) {
+                throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
+                  'Return window screenshot amount does not match this order. ' +
+                  'Please upload the correct return window screenshot. ' +
+                  (returnWindowResult.discrepancyNote || ''));
+              }
             }
           }
 
@@ -1175,6 +1191,7 @@ export function makeOrdersController(env: Env) {
                 orderIdMatch: returnWindowResult.orderIdMatch,
                 productNameMatch: returnWindowResult.productNameMatch,
                 amountMatch: returnWindowResult.amountMatch,
+                soldByMatch: returnWindowResult.soldByMatch,
                 reviewerNameMatch: returnWindowResult.reviewerNameMatch,
                 confidenceScore: returnWindowResult.confidenceScore,
               },
