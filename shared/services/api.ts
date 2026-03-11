@@ -550,14 +550,6 @@ export const api = {
         body: JSON.stringify({ orderId, ...proof }),
       });
     },
-    /** Set marketplace account/reviewer name on an existing order (one-time). */
-    setReviewerName: async (orderId: string, reviewerName: string) => {
-      return fetchJson(`/orders/${encodeURIComponent(orderId)}/reviewer-name`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ reviewerName }),
-      });
-    },
     /** Get audit trail / activity log for a specific order */
     getOrderAudit: async (orderId: string) => {
       return fetchJson(`/orders/${encodeURIComponent(orderId)}/audit`, {
