@@ -1125,6 +1125,14 @@ export function makeOrdersController(env: Env) {
                 durationMs: Date.now() - aiStart,
                 metadata: { orderId: order.mongoId, confidenceScore: returnWindowResult?.confidenceScore },
               });
+              // Block submission if reviewer name is set and doesn't match (same logic as rating)
+              if (returnWindowResult && rwReviewerName && !returnWindowResult.reviewerNameMatch
+                && returnWindowResult.confidenceScore >= 70) {
+                throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
+                  `Return window screenshot delivery name does not match "${rwReviewerName}". ` +
+                  'Please upload a screenshot from the correct marketplace order. ' +
+                  (returnWindowResult.discrepancyNote || ''));
+              }
             }
           }
 
@@ -1142,6 +1150,7 @@ export function makeOrdersController(env: Env) {
                 orderIdMatch: returnWindowResult.orderIdMatch,
                 productNameMatch: returnWindowResult.productNameMatch,
                 amountMatch: returnWindowResult.amountMatch,
+                reviewerNameMatch: returnWindowResult.reviewerNameMatch,
                 confidenceScore: returnWindowResult.confidenceScore,
               },
             });

@@ -1333,6 +1333,7 @@ export const Orders: React.FC = () => {
                         onClick={() => {
                           setSelectedOrder(order);
                           setUploadType('review');
+                          setReviewerNameInput(order.reviewerName || '');
                         }}
                         className="text-[10px] font-bold uppercase text-purple-600"
                       >
@@ -1345,6 +1346,7 @@ export const Orders: React.FC = () => {
                         onClick={() => {
                           setSelectedOrder(order);
                           setUploadType('rating');
+                          setReviewerNameInput(order.reviewerName || '');
                         }}
                         className="text-[10px] font-bold uppercase text-purple-600"
                       >
