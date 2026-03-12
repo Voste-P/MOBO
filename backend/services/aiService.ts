@@ -1773,7 +1773,6 @@ async function verifyReturnWindowWithOcr(
     const ocrNorm = ocrText.replace(/[\s\-]/g, '').toLowerCase();
     const orderIdMatch = ocrNorm.includes(orderIdNorm);
 
-    const PROOF_STOP_WORDS = new Set(['the','for','and','with','from','that','this','you','your','was','are','has','have','been','not','but','all','can','had','her','his','one','our','out','use','how','its','may','new','now','old','see','way','who','did','get','him','let','say','she','too','any','per','set','top','end','off','big','own','put','run','two','via','pro','free','pack','item','best','good','great','nice','mini','max','size','pair','home','made','full','high','low','day','box','buy','kit']);
     // Use shared robust product name matching (handles OCR misreads, fuzzy matching)
     const productNameMatch = isProductNameMatch(expected.expectedProductName, ocrText);
 

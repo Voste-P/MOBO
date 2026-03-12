@@ -684,7 +684,7 @@ export function aiRoutes(env: Env): Router {
             select: { reviewerName: true },
           });
           if (order?.reviewerName) reviewerName = order.reviewerName;
-        } catch (_lookupErr) {
+        } catch {
           // Non-critical: reviewer name lookup failed, proceed without it
         }
       }
@@ -763,7 +763,7 @@ export function aiRoutes(env: Env): Router {
             select: { reviewerName: true },
           });
           if (order?.reviewerName) reviewerName = order.reviewerName;
-        } catch (_lookupErr) {
+        } catch {
           // Non-critical: reviewer name lookup failed, proceed without it
         }
       }
