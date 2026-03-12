@@ -728,7 +728,7 @@ export const Orders: React.FC = () => {
       const productName = selectedOrder.items?.[0]?.title || '';
       const amount = (selectedOrder.items ?? []).reduce(
         (sum: number, it: any) => sum + (Number(it.priceAtPurchase) || 0) * (Number(it.quantity) || 1), 0
-      );
+      ) || selectedOrder.total || 0;
       const soldBy = selectedOrder.soldBy || '';
       const reviewerName = selectedOrder.reviewerName || '';
 

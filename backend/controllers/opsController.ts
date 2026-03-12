@@ -29,6 +29,8 @@ import {
   opsDealsQuerySchema,
   copyCampaignSchema,
   declineOfferSchema,
+  forceApproveOrderSchema,
+  cancelOrderSchema,
 } from '../validations/ops.js';
 import { rupeesToPaise } from '../utils/money.js';
 import { toUiCampaign, toUiDeal, toUiOrder, toUiOrderSummary, toUiUser, safeIso } from '../utils/uiMappers.js';
@@ -2991,6 +2993,153 @@ export function makeOpsController(env: Env) {
         res.json({ ok: true });
       } catch (err) {
         logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'BUSINESS_LOGIC', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'ops/declineOffer' } });
+        next(err);
+      }
+    },
+
+    forceApproveOrder: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = forceApproveOrderSchema.parse(req.body);
+        const { roles, user: requester } = getRequester(req);
+
+        const order = await db().order.findFirst({
+          where: { ...idWhere(body.orderId), isDeleted: false },
+          include: { items: { where: { isDeleted: false } } },
+        });
+        if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
+
+        const agencyCode = await assertOrderAccess(order, roles, requester);
+
+        const wf = String((order as any).workflowStatus || 'CREATED');
+        if (['REJECTED'].includes(wf)) {
+          throw new AppError(409, 'INVALID_WORKFLOW_STATE', `Cannot force approve in state ${wf}`);
+        }
+
+        if (order.affiliateStatus !== 'Pending_Cooling') {
+          const COOLING_PERIOD_DAYS = 14;
+          const settleDate = new Date();
+          settleDate.setDate(settleDate.getDate() + COOLING_PERIOD_DAYS);
+          const currentEvents = Array.isArray(order.events) ? (order.events as any[]) : [];
+
+          await db().order.update({
+            where: { id: order.id },
+            data: {
+              affiliateStatus: 'Pending_Cooling',
+              expectedSettlementDate: settleDate,
+              rejectionType: null,
+              rejectionReason: null,
+              rejectionAt: null,
+              rejectionBy: null,
+              events: pushOrderEvent(currentEvents, {
+                type: 'VERIFIED',
+                at: new Date(),
+                actorUserId: req.auth?.userId,
+                metadata: { step: 'force_approval', note: body.note },
+              }),
+            },
+          });
+
+          if (wf !== 'APPROVED') {
+            await transitionOrderWorkflow({
+              orderId: order.mongoId!,
+              from: wf as any,
+              to: 'APPROVED',
+              actorUserId: String(req.auth?.userId || ''),
+              metadata: { source: 'forceApproveOrder' },
+              env,
+            });
+          }
+        }
+
+        await writeAuditLog({ req, action: 'ORDER_FORCE_APPROVED', entityType: 'Order', entityId: order.mongoId!, metadata: { note: body.note } });
+        orderLog.info('Order force approved', { orderId: order.mongoId, note: body.note });
+        businessLog.info('Order force approved', { orderId: order.mongoId, approvedBy: req.auth?.userId, ip: req.ip });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Order', entityId: order.mongoId!, action: 'ORDER_CLAIM_VERIFIED', changedFields: ['affiliateStatus', 'expectedSettlementDate'], after: { affiliateStatus: 'Pending_Cooling' } });
+
+        const audience = await buildOrderAudience(order, agencyCode);
+        publishRealtime({ type: 'orders.changed', ts: new Date().toISOString(), audience });
+
+        res.json({ ok: true });
+      } catch (err) {
+        logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'BUSINESS_LOGIC', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'ops/forceApproveOrder' } });
+        next(err);
+      }
+    },
+
+    cancelOrder: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = cancelOrderSchema.parse(req.body);
+        const { roles, user: requester } = getRequester(req);
+
+        const order = await db().order.findFirst({
+          where: { ...idWhere(body.orderId), isDeleted: false },
+          include: { items: { where: { isDeleted: false } } },
+        });
+        if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
+
+        const agencyCode = await assertOrderAccess(order, roles, requester);
+
+        const affiliateStatus = String((order as any).affiliateStatus || '');
+        if (affiliateStatus === 'Approved_Settled' || affiliateStatus === 'Cap_Exceeded') {
+          throw new AppError(409, 'CANNOT_CANCEL_SETTLED', 'Cannot cancel an already settled order');
+        }
+
+        // Release campaign slot
+        const campaignId = order.items?.[0]?.campaignId;
+        if (campaignId) {
+          await db().$executeRaw`UPDATE "campaigns" SET "used_slots" = GREATEST("used_slots" - 1, 0) WHERE id = ${campaignId}::uuid AND "is_deleted" = false`;
+        }
+
+        const currentEvents = Array.isArray(order.events) ? (order.events as any[]) : [];
+        await db().order.update({
+          where: { id: order.id },
+          data: {
+            affiliateStatus: 'Rejected',
+            rejectionType: 'order',
+            rejectionReason: body.reason,
+            rejectionAt: new Date(),
+            rejectionBy: req.auth?.userId,
+            events: pushOrderEvent(currentEvents, {
+              type: 'REJECTED',
+              at: new Date(),
+              actorUserId: req.auth?.userId,
+              metadata: { step: 'order_cancelled', reason: body.reason },
+            }),
+          },
+        });
+
+        const wf = String((order as any).workflowStatus || 'CREATED');
+        if (!['REJECTED', 'FAILED', 'COMPLETED'].includes(wf)) {
+          await transitionOrderWorkflow({
+            orderId: order.mongoId!,
+            from: wf as any,
+            to: 'REJECTED',
+            actorUserId: String(req.auth?.userId || ''),
+            metadata: { source: 'cancelOrder', reason: body.reason },
+            env,
+          });
+        }
+
+        await writeAuditLog({ req, action: 'ORDER_CANCELLED', entityType: 'Order', entityId: order.mongoId!, metadata: { reason: body.reason } });
+        if (campaignId) {
+          writeAuditLog({ req, action: 'CAMPAIGN_SLOT_RELEASED', entityType: 'Campaign', entityId: String(campaignId), metadata: { orderId: order.mongoId ?? order.id, reason: 'order_cancelled' } }).catch(() => {});
+        }
+        orderLog.info('Order cancelled', { orderId: order.mongoId, reason: body.reason });
+        businessLog.info('Order cancelled', { orderId: order.mongoId, cancelledBy: req.auth?.userId, ip: req.ip });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Order', entityId: order.mongoId!, action: 'PROOF_REJECTED', changedFields: ['affiliateStatus', 'rejectionType', 'rejectionReason'], after: { affiliateStatus: 'Rejected' } });
+
+        const audience = await buildOrderAudience(order, agencyCode);
+        publishRealtime({ type: 'orders.changed', ts: new Date().toISOString(), audience });
+        publishRealtime({ type: 'notifications.changed', ts: new Date().toISOString(), audience });
+
+        const buyerId = audience.buyerMongoId;
+        if (buyerId) {
+          await sendPushToUser({ env, userId: buyerId, app: 'buyer', payload: { title: 'Order cancelled', body: body.reason || 'Your order has been cancelled.', url: '/orders' } }).catch((err: unknown) => { pushLog.warn('Push failed for cancelOrder', { err, buyerId }); });
+        }
+
+        res.json({ ok: true });
+      } catch (err) {
+        logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'BUSINESS_LOGIC', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'ops/cancelOrder' } });
         next(err);
       }
     },

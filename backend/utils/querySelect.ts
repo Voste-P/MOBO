@@ -252,7 +252,7 @@ export const orderListSelectLite = {
   createdAt: true,
   updatedAt: true,
   // Relations — items only need deal type / platform info for list view
-  items: { select: { dealType: true, platform: true, brandName: true, title: true, image: true, quantity: true } },
+  items: { select: { dealType: true, platform: true, brandName: true, title: true, image: true, quantity: true, priceAtPurchasePaise: true } },
 } as const;
 
 /**

@@ -793,6 +793,20 @@ export const api = {
         body: JSON.stringify({ orderId, type, note }),
       });
     },
+    forceApproveOrder: async (orderId: string, note?: string) => {
+      return fetchJson('/ops/orders/force-approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ orderId, note }),
+      });
+    },
+    cancelOrder: async (orderId: string, reason: string) => {
+      return fetchJson('/ops/orders/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ orderId, reason }),
+      });
+    },
     createCampaign: async (data: any) => {
       return fetchJson('/ops/campaigns', {
         method: 'POST',

@@ -158,3 +158,13 @@ export const copyCampaignSchema = z.object({
 export const declineOfferSchema = z.object({
   id: z.string().min(1, 'Valid campaign ID is required'),
 });
+
+export const forceApproveOrderSchema = z.object({
+  orderId: z.string().min(1),
+  note: z.string().max(500).optional(),
+});
+
+export const cancelOrderSchema = z.object({
+  orderId: z.string().min(1),
+  reason: z.string().min(5).max(500),
+});

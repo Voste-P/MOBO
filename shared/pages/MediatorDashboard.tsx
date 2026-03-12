@@ -1772,8 +1772,10 @@ export const MediatorDashboard: React.FC = () => {
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [rejectType, setRejectType] = useState<'order' | 'review' | 'rating' | 'returnWindow'>('order');
+  const [approveModalOpen, setApproveModalOpen] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
+  const [actionNote, setActionNote] = useState('');
+  const [actionReason, setActionReason] = useState('');
   const [dealBuilder, setDealBuilder] = useState<Campaign | null>(null);
   const [commission, setCommission] = useState('');
   const [selectedBuyer, setSelectedBuyer] = useState<User | null>(null);
@@ -2574,15 +2576,6 @@ export const MediatorDashboard: React.FC = () => {
             ) : null}
             <button
               onClick={() => {
-                setCancelReason('');
-                setCancelModalOpen(true);
-              }}
-              className="flex-1 py-4 bg-amber-500/20 text-amber-200 font-bold text-sm rounded-[1.2rem] hover:bg-amber-500/30 transition-colors"
-            >
-              Re-proof
-            </button>
-            <button
-              onClick={() => {
                 if (!proofModal) return;
                 const mv = proofModal.requirements?.missingVerifications ?? [];
                 const nextType: 'order' | 'review' | 'rating' | 'returnWindow' = !proofModal.verification?.orderVerified
@@ -2601,6 +2594,21 @@ export const MediatorDashboard: React.FC = () => {
               className="flex-1 py-4 bg-red-500/20 text-red-200 font-bold text-sm rounded-[1.2rem] hover:bg-red-500/30 transition-colors"
             >
               Reject
+            </button>
+            {/* Force Approve & Cancel */}
+            <button
+              onClick={() => { setActionNote(''); setApproveModalOpen(true); }}
+              className="flex-1 py-4 bg-emerald-500/20 text-emerald-200 font-bold text-sm rounded-[1.2rem] hover:bg-emerald-500/30 transition-colors"
+              title="Force approve order to cooling period"
+            >
+              Approve
+            </button>
+            <button
+              onClick={() => { setActionReason(''); setCancelModalOpen(true); }}
+              className="flex-1 py-4 bg-rose-500/20 text-rose-200 font-bold text-sm rounded-[1.2rem] hover:bg-rose-500/30 transition-colors"
+              title="Cancel order and release campaign slot"
+            >
+              Cancel Order
             </button>
             {!proofModal?.verification?.orderVerified ? (
               <button
@@ -2767,6 +2775,56 @@ export const MediatorDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* FORCE APPROVE MODAL */}
+      {approveModalOpen && proofModal && (
+        <div
+          className="absolute inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setApproveModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-[#18181B] border border-white/10 p-5 text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-bold text-base">Force Approve Order</h4>
+              <button aria-label="Close" onClick={() => setApproveModalOpen(false)} className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-xs text-zinc-400 mb-4">
+              Move order to <strong>Pending Cooling</strong> (14-day cooling period before settlement).
+            </p>
+            <label className="text-[10px] font-bold text-zinc-400 uppercase block mb-2">Optional Note</label>
+            <textarea
+              value={actionNote}
+              onChange={(e) => setActionNote(e.target.value)}
+              className="w-full rounded-xl bg-black/40 border border-white/10 p-3 text-sm font-bold text-white h-20 resize-none mb-4"
+              placeholder="Reason for manual approval..."
+            />
+            <div className="flex gap-2">
+              <button onClick={() => setApproveModalOpen(false)} className="flex-1 py-3 rounded-xl bg-white/10 text-white font-bold">Back</button>
+              <button
+                onClick={async () => {
+                  try {
+                    await api.ops.forceApproveOrder(proofModal.id, actionNote || undefined);
+                    toast.success('Order approved → Pending Cooling (14 days)');
+                    setApproveModalOpen(false);
+                    setProofModal(null);
+                    await loadData();
+                  } catch (err) {
+                    toast.error(formatErrorMessage(err, 'Failed to approve order'));
+                  }
+                }}
+                className="flex-1 py-3 rounded-xl bg-emerald-500 text-white font-bold"
+              >
+                Approve Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CANCEL ORDER MODAL */}
       {cancelModalOpen && proofModal && (
         <div
           className="absolute inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
@@ -2777,55 +2835,42 @@ export const MediatorDashboard: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
-              <h4 className="font-bold text-base">Request Re-proof</h4>
-              <button
-                aria-label="Close cancel modal"
-                onClick={() => setCancelModalOpen(false)}
-                className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20"
-              >
+              <h4 className="font-bold text-base">Cancel Order</h4>
+              <button aria-label="Close" onClick={() => setCancelModalOpen(false)} className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20">
                 <X size={16} />
               </button>
             </div>
             <p className="text-xs text-zinc-400 mb-4">
-              This will cancel all uploaded proofs and ask the buyer to re-upload everything from scratch.
+              Cancel this order and release the campaign slot. This cannot be undone.
             </p>
-
-            <label className="text-[10px] font-bold text-zinc-400 uppercase mt-2 block">
-              Reason for Re-proof
-            </label>
+            <label className="text-[10px] font-bold text-zinc-400 uppercase block mb-2">Cancellation Reason</label>
             <textarea
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-              className="mt-2 w-full rounded-xl bg-black/40 border border-white/10 p-3 text-sm font-bold text-white h-24 resize-none"
-              placeholder="Example: Screenshots are blurry, please re-upload clearer proofs"
+              value={actionReason}
+              onChange={(e) => setActionReason(e.target.value)}
+              className="w-full rounded-xl bg-black/40 border border-white/10 p-3 text-sm font-bold text-white h-24 resize-none mb-4"
+              placeholder="Example: Duplicate order, buyer request..."
             />
-
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={() => setCancelModalOpen(false)}
-                className="flex-1 py-3 rounded-xl bg-white/10 text-white font-bold"
-              >
-                Cancel
-              </button>
+            <div className="flex gap-2">
+              <button onClick={() => setCancelModalOpen(false)} className="flex-1 py-3 rounded-xl bg-white/10 text-white font-bold">Keep</button>
               <button
                 onClick={async () => {
                   try {
-                    if (!cancelReason.trim() || cancelReason.trim().length < 5) {
-                      toast.error('Reason must be at least 5 characters.');
+                    if (!actionReason.trim() || actionReason.trim().length < 5) {
+                      toast.error('Cancellation reason must be at least 5 characters.');
                       return;
                     }
-                    await api.ops.cancelOrderProofs(proofModal.id, cancelReason.trim());
-                    toast.success('Proofs cancelled. Buyer notified to re-upload.');
+                    await api.ops.cancelOrder(proofModal.id, actionReason.trim());
+                    toast.success('Order cancelled and slot released.');
                     setCancelModalOpen(false);
                     setProofModal(null);
                     await loadData();
                   } catch (err) {
-                    toast.error(formatErrorMessage(err, 'Failed to cancel proofs'));
+                    toast.error(formatErrorMessage(err, 'Failed to cancel order'));
                   }
                 }}
-                className="flex-1 py-3 rounded-xl bg-amber-500 text-black font-bold"
+                className="flex-1 py-3 rounded-xl bg-rose-500 text-white font-bold"
               >
-                Request Re-proof
+                Cancel Now
               </button>
             </div>
           </div>

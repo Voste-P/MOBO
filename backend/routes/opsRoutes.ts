@@ -51,6 +51,8 @@ export function opsRoutes(env: Env): Router {
   router.post('/orders/reject-proof', ops.rejectOrderProof);
   router.post('/orders/cancel-proofs', ops.cancelOrderProofs);
   router.post('/orders/request-proof', ops.requestMissingProof);
+  router.post('/orders/force-approve', ops.forceApproveOrder);
+  router.post('/orders/cancel', ops.cancelOrder);
   router.post('/campaigns', ops.createCampaign);
   router.post('/campaigns/copy', ops.copyCampaign);
   router.post('/campaigns/decline', ops.declineOffer);
