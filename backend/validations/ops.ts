@@ -23,6 +23,11 @@ export const rejectOrderProofSchema = z.object({
   reason: z.string().min(5).max(500),
 });
 
+export const cancelOrderProofsSchema = z.object({
+  orderId: z.string().min(1),
+  reason: z.string().min(5).max(500),
+});
+
 export const requestMissingProofSchema = z.object({
   orderId: z.string().min(1),
   type: z.enum(['review', 'rating', 'returnWindow']),

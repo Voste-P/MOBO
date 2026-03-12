@@ -779,6 +779,13 @@ export const api = {
         body: JSON.stringify({ orderId, type, reason }),
       });
     },
+    cancelOrderProofs: async (orderId: string, reason: string) => {
+      return fetchJson('/ops/orders/cancel-proofs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ orderId, reason }),
+      });
+    },
     requestMissingProof: async (orderId: string, type: 'review' | 'rating' | 'returnWindow', note?: string) => {
       return fetchJson('/ops/orders/request-proof', {
         method: 'POST',

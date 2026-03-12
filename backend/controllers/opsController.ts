@@ -3,6 +3,7 @@ import type { Env } from '../config/env.js';
 import { AppError } from '../middleware/errors.js';
 import type { Role } from '../middleware/auth.js';
 import { prisma as db } from '../database/prisma.js';
+import { Prisma } from '../generated/prisma/client.js';
 import { orderLog, pushLog, businessLog, walletLog } from '../config/logger.js';
 import { logChangeEvent, logAccessEvent, logErrorEvent } from '../config/appLogs.js';
 import { pgUser, pgOrder, pgCampaign, pgDeal, pgWallet } from '../utils/pgMappers.js';
@@ -10,6 +11,7 @@ import {
   approveByIdSchema,
   assignSlotsSchema,
   createCampaignSchema,
+  cancelOrderProofsSchema,
   payoutMediatorSchema,
   publishDealSchema,
   rejectByIdSchema,
@@ -1395,6 +1397,114 @@ export function makeOpsController(env: Env) {
         res.json({ ok: true });
       } catch (err) {
         logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'BUSINESS_LOGIC', severity: 'high', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'ops/rejectOrderProof' } });
+        next(err);
+      }
+    },
+
+    /**
+     * Cancel all proofs for an order and request the buyer to re-upload everything.
+     * Unlike reject (which is terminal), this resets the order back to ORDERED state
+     * so the buyer can start fresh with all proof uploads.
+     */
+    cancelOrderProofs: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = cancelOrderProofsSchema.parse(req.body);
+        const { roles, user: requester } = getRequester(req);
+
+        const order = await db().order.findFirst({
+          where: { ...idWhere(body.orderId), isDeleted: false },
+          include: { items: { where: { isDeleted: false } } },
+        });
+        if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
+
+        const agencyCode = await assertOrderAccess(order, roles, requester);
+
+        const wf = String((order as any).workflowStatus || 'CREATED');
+        if (wf !== 'UNDER_REVIEW' && wf !== 'PROOF_SUBMITTED') {
+          throw new AppError(409, 'INVALID_WORKFLOW_STATE', `Cannot cancel proofs in state ${wf}`);
+        }
+
+        const newEvents = pushOrderEvent(order.events as any, {
+          type: 'PROOFS_CANCELLED',
+          at: new Date(),
+          actorUserId: req.auth?.userId,
+          metadata: { reason: body.reason },
+        });
+
+        await db().order.update({
+          where: { id: order.id },
+          data: {
+            // Clear all proof screenshots
+            screenshotOrder: null,
+            screenshotRating: null,
+            screenshotReview: null,
+            screenshotReturnWindow: null,
+            reviewLink: null,
+            // Clear all verification data
+            verification: {},
+            // Clear AI verification data
+            ratingAiVerification: Prisma.DbNull,
+            returnWindowAiVerification: Prisma.DbNull,
+            orderAiVerification: Prisma.DbNull,
+            // Reset reviewer name so buyer can set a new one
+            reviewerName: null,
+            // Reset status
+            affiliateStatus: 'Unchecked' as any,
+            // Clear rejection fields
+            rejectionType: null,
+            rejectionReason: null,
+            rejectionAt: null,
+            rejectionBy: null,
+            // Clear missing proof requests
+            missingProofRequests: [],
+            // Store cancellation info
+            events: newEvents as any,
+          },
+        });
+
+        // Transition workflow back to ORDERED so buyer can re-upload
+        await transitionOrderWorkflow({
+          orderId: order.mongoId!,
+          from: wf as any,
+          to: 'ORDERED' as any,
+          actorUserId: String(req.auth?.userId || ''),
+          metadata: { source: 'cancelOrderProofs', reason: body.reason },
+          env,
+        });
+
+        await writeAuditLog({
+          req,
+          action: 'PROOFS_CANCELLED',
+          entityType: 'Order',
+          entityId: order.mongoId!,
+          metadata: { reason: body.reason, previousWorkflow: wf },
+        });
+        orderLog.info('Order proofs cancelled for re-upload', { orderId: order.mongoId, reason: body.reason });
+        businessLog.info('Order proofs cancelled for re-upload', { orderId: order.mongoId, reason: body.reason, cancelledBy: req.auth?.userId, ip: req.ip });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Order', entityId: order.mongoId!, action: 'PROOFS_CANCELLED', changedFields: ['affiliateStatus', 'workflowStatus', 'verification'], before: { affiliateStatus: order.affiliateStatus, workflowStatus: wf }, after: { affiliateStatus: 'Unchecked', workflowStatus: 'ORDERED' } });
+        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Order', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CANCEL_ORDER_PROOFS', orderId: order.mongoId } });
+
+        const audience = await buildOrderAudience(order, agencyCode);
+        publishRealtime({ type: 'orders.changed', ts: new Date().toISOString(), audience });
+        publishRealtime({ type: 'notifications.changed', ts: new Date().toISOString(), audience });
+
+        const buyerId = audience.buyerMongoId;
+        if (buyerId) {
+          await sendPushToUser({
+            env,
+            userId: buyerId,
+            app: 'buyer',
+            payload: {
+              title: 'Re-upload Required',
+              body: body.reason || 'Your proofs have been cancelled. Please re-upload all proofs.',
+              url: '/orders',
+            },
+          }).catch((err: unknown) => { pushLog.warn('Push failed for cancelOrderProofs', { err, buyerId }); });
+        }
+
+        res.json({ ok: true });
+      } catch (err) {
+        logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'BUSINESS_LOGIC', severity: 'high', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'ops/cancelOrderProofs' } });
         next(err);
       }
     },

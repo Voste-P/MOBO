@@ -1772,6 +1772,8 @@ export const MediatorDashboard: React.FC = () => {
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [rejectType, setRejectType] = useState<'order' | 'review' | 'rating' | 'returnWindow'>('order');
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
   const [dealBuilder, setDealBuilder] = useState<Campaign | null>(null);
   const [commission, setCommission] = useState('');
   const [selectedBuyer, setSelectedBuyer] = useState<User | null>(null);
@@ -2572,6 +2574,15 @@ export const MediatorDashboard: React.FC = () => {
             ) : null}
             <button
               onClick={() => {
+                setCancelReason('');
+                setCancelModalOpen(true);
+              }}
+              className="flex-1 py-4 bg-amber-500/20 text-amber-200 font-bold text-sm rounded-[1.2rem] hover:bg-amber-500/30 transition-colors"
+            >
+              Re-proof
+            </button>
+            <button
+              onClick={() => {
                 if (!proofModal) return;
                 const mv = proofModal.requirements?.missingVerifications ?? [];
                 const nextType: 'order' | 'review' | 'rating' | 'returnWindow' = !proofModal.verification?.orderVerified
@@ -2750,6 +2761,71 @@ export const MediatorDashboard: React.FC = () => {
                 className="flex-1 py-3 rounded-xl bg-red-500 text-white font-bold"
               >
                 Reject Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cancelModalOpen && proofModal && (
+        <div
+          className="absolute inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setCancelModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-[#18181B] border border-white/10 p-5 text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-bold text-base">Request Re-proof</h4>
+              <button
+                aria-label="Close cancel modal"
+                onClick={() => setCancelModalOpen(false)}
+                className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-xs text-zinc-400 mb-4">
+              This will cancel all uploaded proofs and ask the buyer to re-upload everything from scratch.
+            </p>
+
+            <label className="text-[10px] font-bold text-zinc-400 uppercase mt-2 block">
+              Reason for Re-proof
+            </label>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              className="mt-2 w-full rounded-xl bg-black/40 border border-white/10 p-3 text-sm font-bold text-white h-24 resize-none"
+              placeholder="Example: Screenshots are blurry, please re-upload clearer proofs"
+            />
+
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => setCancelModalOpen(false)}
+                className="flex-1 py-3 rounded-xl bg-white/10 text-white font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    if (!cancelReason.trim() || cancelReason.trim().length < 5) {
+                      toast.error('Reason must be at least 5 characters.');
+                      return;
+                    }
+                    await api.ops.cancelOrderProofs(proofModal.id, cancelReason.trim());
+                    toast.success('Proofs cancelled. Buyer notified to re-upload.');
+                    setCancelModalOpen(false);
+                    setProofModal(null);
+                    await loadData();
+                  } catch (err) {
+                    toast.error(formatErrorMessage(err, 'Failed to cancel proofs'));
+                  }
+                }}
+                className="flex-1 py-3 rounded-xl bg-amber-500 text-black font-bold"
+              >
+                Request Re-proof
               </button>
             </div>
           </div>
