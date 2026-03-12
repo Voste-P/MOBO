@@ -747,20 +747,16 @@ export const Orders: React.FC = () => {
       );
       setRwVerification(result);
 
-      const issues: string[] = [];
-      if (!result.orderIdMatch) issues.push('Order ID');
-      if (!result.productNameMatch) issues.push('Product name');
-      if (!result.amountMatch) issues.push('Amount');
-      if (!result.soldByMatch && soldBy) issues.push('Seller name');
-      if (!result.returnWindowClosed) issues.push('Return window not closed');
-      if (!result.reviewerNameMatch && reviewerName) issues.push('Reviewer name');
+      // Hard-block fields: order ID, product name, seller/sold by
+      const hardFails: string[] = [];
+      if (!result.orderIdMatch) hardFails.push('Order ID');
+      if (!result.productNameMatch) hardFails.push('Product name');
+      if (!result.soldByMatch && soldBy) hardFails.push('Seller name');
 
-      if (issues.length === 0) {
-        toast.success('Return window screenshot verified! All checks passed.');
-      } else if (!result.returnWindowClosed) {
-        toast.error('Return window is still open. Please wait until the return window closes before uploading.');
+      if (hardFails.length > 0) {
+        toast.error(`Mismatch: ${hardFails.join(', ')}. Please upload the correct return window screenshot.`);
       } else {
-        toast.warning(`Mismatch detected: ${issues.join(', ')}. Please check the screenshot.`);
+        toast.success(`Return window verified! Return window: ${result.returnWindowClosed ? 'Closed' : 'Open'}. You can submit.`);
       }
     } catch (err: any) {
       if (process.env.NODE_ENV !== 'production') console.error('Return window pre-validation failed:', err);
@@ -783,7 +779,7 @@ export const Orders: React.FC = () => {
       return;
     }
 
-    // Block submission when critical fields don't match
+    // Hard-block: order ID, product name, seller must match
     if (!rwVerification.orderIdMatch) {
       toast.error('Order ID does not match. Please upload the correct return window screenshot.');
       return;
@@ -792,20 +788,8 @@ export const Orders: React.FC = () => {
       toast.error('Product name does not match. Please upload the correct return window screenshot.');
       return;
     }
-    if (!rwVerification.amountMatch) {
-      toast.error('Amount does not match. Please upload the correct return window screenshot.');
-      return;
-    }
     if (!rwVerification.soldByMatch && selectedOrder.soldBy) {
-      toast.error('Seller name does not match. Please upload the correct return window screenshot.');
-      return;
-    }
-    if (!rwVerification.returnWindowClosed) {
-      toast.error('Return window is still open. Please wait until it closes before uploading.');
-      return;
-    }
-    if (!rwVerification.reviewerNameMatch && selectedOrder.reviewerName) {
-      toast.error(`Reviewer name "${selectedOrder.reviewerName}" does not match. Please upload the correct screenshot.`);
+      toast.error('Seller/Sold by name does not match. Please upload the correct return window screenshot.');
       return;
     }
 

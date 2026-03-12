@@ -678,11 +678,15 @@ export function aiRoutes(env: Env): Router {
       // If expectedReviewerName not provided but orderId is, look up the stored reviewer name
       let reviewerName = payload.expectedReviewerName;
       if (!reviewerName && payload.orderId && isPrismaAvailable()) {
-        const order = await prisma().order.findFirst({
-          where: { OR: [{ id: payload.orderId }, { mongoId: payload.orderId }], isDeleted: false },
-          select: { reviewerName: true },
-        });
-        if (order?.reviewerName) reviewerName = order.reviewerName;
+        try {
+          const order = await prisma().order.findFirst({
+            where: { OR: [{ id: payload.orderId }, { mongoId: payload.orderId }], isDeleted: false },
+            select: { reviewerName: true },
+          });
+          if (order?.reviewerName) reviewerName = order.reviewerName;
+        } catch (_lookupErr) {
+          // Non-critical: reviewer name lookup failed, proceed without it
+        }
       }
 
       // Pass buyer's app account name as expectedBuyerName (secondary), and the
@@ -749,13 +753,19 @@ export function aiRoutes(env: Env): Router {
       }
 
       // If expectedReviewerName not provided, look up from order
+      // NOTE: expectedOrderId is the EXTERNAL marketplace order ID (e.g. Amazon "408-xxx"),
+      // NOT a UUID/mongoId. Search by externalOrderId column.
       let reviewerName = payload.expectedReviewerName;
       if (!reviewerName && payload.expectedOrderId && isPrismaAvailable()) {
-        const order = await prisma().order.findFirst({
-          where: { OR: [{ id: payload.expectedOrderId }, { mongoId: payload.expectedOrderId }], isDeleted: false },
-          select: { reviewerName: true },
-        });
-        if (order?.reviewerName) reviewerName = order.reviewerName;
+        try {
+          const order = await prisma().order.findFirst({
+            where: { externalOrderId: payload.expectedOrderId, isDeleted: false },
+            select: { reviewerName: true },
+          });
+          if (order?.reviewerName) reviewerName = order.reviewerName;
+        } catch (_lookupErr) {
+          // Non-critical: reviewer name lookup failed, proceed without it
+        }
       }
 
       const result = await verifyReturnWindowWithAi(env, {

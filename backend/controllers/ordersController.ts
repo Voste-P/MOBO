@@ -1131,7 +1131,7 @@ export function makeOrdersController(env: Env) {
                 durationMs: Date.now() - aiStart,
                 metadata: { orderId: order.mongoId, confidenceScore: returnWindowResult?.confidenceScore },
               });
-              // Block submission if order ID doesn't match (hard block — any confidence > 0)
+              // Hard-block 1: Order ID must match
               if (returnWindowResult && !returnWindowResult.orderIdMatch
                 && returnWindowResult.confidenceScore > 0) {
                 throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
@@ -1139,15 +1139,7 @@ export function makeOrdersController(env: Env) {
                   'Please upload the correct return window screenshot. ' +
                   (returnWindowResult.discrepancyNote || ''));
               }
-              // Block submission if return window is still open
-              if (returnWindowResult && !returnWindowResult.returnWindowClosed
-                && returnWindowResult.confidenceScore > 0) {
-                throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
-                  'Return window is still open. Please wait until the return window closes before uploading. ' +
-                  (returnWindowResult.detectedReturnWindow ? `Detected: ${returnWindowResult.detectedReturnWindow}. ` : '') +
-                  (returnWindowResult.discrepancyNote || ''));
-              }
-              // Block submission if product name doesn't match
+              // Hard-block 2: Product name must match
               if (returnWindowResult && !returnWindowResult.productNameMatch
                 && returnWindowResult.confidenceScore > 0) {
                 throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
@@ -1155,15 +1147,7 @@ export function makeOrdersController(env: Env) {
                   'Please upload the correct return window screenshot. ' +
                   (returnWindowResult.discrepancyNote || ''));
               }
-              // Block submission if reviewer name is set and doesn't match
-              if (returnWindowResult && rwReviewerName && !returnWindowResult.reviewerNameMatch
-                && returnWindowResult.confidenceScore > 0) {
-                throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
-                  `Return window screenshot delivery name does not match "${rwReviewerName}". ` +
-                  'Please upload a screenshot from the correct marketplace order. ' +
-                  (returnWindowResult.discrepancyNote || ''));
-              }
-              // Block submission if seller/sold-by name doesn't match
+              // Hard-block 3: Seller/Sold by must match (when available)
               if (returnWindowResult && expectedSoldBy && !returnWindowResult.soldByMatch
                 && returnWindowResult.confidenceScore > 0) {
                 throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
@@ -1171,14 +1155,7 @@ export function makeOrdersController(env: Env) {
                   'Please upload the correct return window screenshot. ' +
                   (returnWindowResult.discrepancyNote || ''));
               }
-              // Block submission if amount doesn't match
-              if (returnWindowResult && !returnWindowResult.amountMatch
-                && returnWindowResult.confidenceScore > 0) {
-                throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
-                  'Return window screenshot amount does not match this order. ' +
-                  'Please upload the correct return window screenshot. ' +
-                  (returnWindowResult.discrepancyNote || ''));
-              }
+              // Return window open/closed, amount, reviewer — stored for mediator review, NOT blocking
             }
           }
 
