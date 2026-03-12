@@ -647,11 +647,12 @@ export const Orders: React.FC = () => {
           toast.info('Screenshot ready for upload.');
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       if (process.env.NODE_ENV !== 'production') console.error('Rating pre-validation failed:', err);
       // Keep verification null — submit button stays disabled until user retries
       setRatingVerification(null);
-      toast.error('AI verification failed. Please try uploading the screenshot again.');
+      const msg = err?.response?.data?.error || err?.message || 'AI verification failed. Please try uploading the screenshot again.';
+      toast.error(msg);
     } finally {
       setRatingAnalyzing(false);
     }
@@ -761,11 +762,12 @@ export const Orders: React.FC = () => {
       } else {
         toast.warning(`Mismatch detected: ${issues.join(', ')}. Please check the screenshot.`);
       }
-    } catch (err) {
+    } catch (err: any) {
       if (process.env.NODE_ENV !== 'production') console.error('Return window pre-validation failed:', err);
       // Keep verification null — submit button stays disabled until user retries
       setRwVerification(null);
-      toast.error('AI verification failed. Please try uploading the screenshot again.');
+      const msg = err?.response?.data?.error || err?.message || 'AI verification failed. Please try uploading the screenshot again.';
+      toast.error(msg);
     } finally {
       setRwAnalyzing(false);
     }

@@ -314,6 +314,14 @@ const GEMINI_MODEL_FALLBACKS = [
   'models/gemini-2.5-pro',
 ] as const;
 
+// Proof verification uses fewer models to stay under the 60s frontend timeout.
+// 3 models × 15s = 45s max, well within the 60s client timeout.
+const PROOF_MODEL_FALLBACKS = [
+  'models/gemini-2.5-flash',
+  'models/gemini-2.0-flash',
+  'models/gemini-2.0-flash-001',
+] as const;
+
 export function isGeminiConfigured(env: Env): boolean {
   return Boolean(env.GEMINI_API_KEY && String(env.GEMINI_API_KEY).trim());
 }
@@ -1128,7 +1136,7 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
   try {
     let lastError: unknown = null;
 
-    for (const model of GEMINI_MODEL_FALLBACKS) {
+    for (const model of PROOF_MODEL_FALLBACKS) {
       try {
         // eslint-disable-next-line no-await-in-loop
         const response = await withModelTimeout(ai.models.generateContent({
@@ -1520,7 +1528,7 @@ export async function verifyRatingScreenshotWithAi(
 
   try {
     let lastError: unknown = null;
-    for (const model of GEMINI_MODEL_FALLBACKS) {
+    for (const model of PROOF_MODEL_FALLBACKS) {
       try {
         const response = await withModelTimeout(ai.models.generateContent({
           model,
@@ -1766,11 +1774,8 @@ async function verifyReturnWindowWithOcr(
     const orderIdMatch = ocrNorm.includes(orderIdNorm);
 
     const PROOF_STOP_WORDS = new Set(['the','for','and','with','from','that','this','you','your','was','are','has','have','been','not','but','all','can','had','her','his','one','our','out','use','how','its','may','new','now','old','see','way','who','did','get','him','let','say','she','too','any','per','set','top','end','off','big','own','put','run','two','via','pro','free','pack','item','best','good','great','nice','mini','max','size','pair','home','made','full','high','low','day','box','buy','kit']);
-    const productTokens = expected.expectedProductName.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(t => t.length >= 3 && !PROOF_STOP_WORDS.has(t));
-    const matchedProd = productTokens.filter(t => lower.includes(t));
-    const productNameMatch = productTokens.length > 0
-      ? matchedProd.length >= Math.max(2, Math.ceil(productTokens.length * 0.8))
-      : false;
+    // Use shared robust product name matching (handles OCR misreads, fuzzy matching)
+    const productNameMatch = isProductNameMatch(expected.expectedProductName, ocrText);
 
     const expectedAmt = expected.expectedAmount;
     const amountStr = String(expectedAmt);
@@ -1852,11 +1857,7 @@ async function verifyReturnWindowWithOcr(
 
     let confidenceScore: number = CONFIDENCE.RETURN_WINDOW_BASE;
     if (orderIdMatch) confidenceScore += CONFIDENCE.RETURN_WINDOW_ORDER_BONUS;
-    // Graduated product confidence based on token match ratio
-    if (productNameMatch && productTokens.length > 0) {
-      const ratio = matchedProd.length / productTokens.length;
-      confidenceScore += Math.round(CONFIDENCE.RETURN_WINDOW_PRODUCT_WEIGHT * ratio);
-    }
+    if (productNameMatch) confidenceScore += CONFIDENCE.RETURN_WINDOW_PRODUCT_WEIGHT;
     if (amountMatch) confidenceScore += CONFIDENCE.RETURN_WINDOW_AMOUNT_BONUS;
     if (soldByMatch) confidenceScore += CONFIDENCE.RETURN_WINDOW_SOLD_BONUS;
     if (returnWindowClosed) confidenceScore += CONFIDENCE.RETURN_WINDOW_CLOSED_BONUS;
@@ -1906,7 +1907,7 @@ export async function verifyReturnWindowWithAi(
 
   try {
     let lastError: unknown = null;
-    for (const model of GEMINI_MODEL_FALLBACKS) {
+    for (const model of PROOF_MODEL_FALLBACKS) {
       try {
         const response = await withModelTimeout(ai.models.generateContent({
           model,
@@ -1961,6 +1962,44 @@ export async function verifyReturnWindowWithAi(
         const parsed = safeJsonParse<ReturnWindowVerificationResult>(response.text);
         if (!parsed) throw new Error('Failed to parse AI return window verification response');
         parsed.confidenceScore = Math.max(0, Math.min(100, parsed.confidenceScore ?? 0));
+
+        // ── Post-processing: validate productNameMatch with server-side logic ──
+        // Gemini is non-deterministic; our token matcher provides consistent results.
+        if ((parsed as any).detectedProductName && payload.expectedProductName) {
+          const serverMatch = isProductNameMatch(payload.expectedProductName, (parsed as any).detectedProductName);
+          if (serverMatch && !parsed.productNameMatch) {
+            parsed.productNameMatch = true; // override Gemini false-negative
+          } else if (!serverMatch && parsed.productNameMatch) {
+            // Only override if overlap is very low (possible hallucination)
+            const eTokens = payload.expectedProductName.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(t => t.length >= 3 && !PRODUCT_STOP_WORDS.has(t));
+            const dTokens = ((parsed as any).detectedProductName as string).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(t => t.length >= 3 && !PRODUCT_STOP_WORDS.has(t));
+            const overlap = eTokens.filter(et => dTokens.some(dt => dt === et || dt.includes(et) || et.includes(dt))).length;
+            if (eTokens.length > 0 && overlap / eTokens.length < 0.2) {
+              parsed.productNameMatch = false;
+            }
+          }
+        } else if (payload.expectedProductName && !parsed.productNameMatch) {
+          // Gemini couldn't detect product name — be lenient for return window (the product name
+          // may not be fully visible in delivery/return screenshots)
+        }
+
+        // ── Post-processing: validate soldByMatch with normalized comparison ──
+        if (payload.expectedSoldBy && (parsed as any).detectedSoldBy) {
+          const normSeller = (s: string) => s.toLowerCase().replace(/\b(retail|india|pvt|ltd|private|limited|inc|llp|seller|\.in|\.com)\b/g, '').replace(/[.\-_,]/g, ' ').replace(/\s+/g, ' ').trim();
+          const eSeller = normSeller(payload.expectedSoldBy);
+          const dSeller = normSeller((parsed as any).detectedSoldBy);
+          if (eSeller && dSeller) {
+            const directMatch = dSeller.includes(eSeller) || eSeller.includes(dSeller);
+            if (directMatch && !parsed.soldByMatch) parsed.soldByMatch = true;
+            const coreWords = eSeller.split(/\s+/).filter(w => w.length >= 3);
+            if (!directMatch && coreWords.length > 0 && coreWords.every(w => dSeller.includes(w)) && !parsed.soldByMatch) {
+              parsed.soldByMatch = true;
+            }
+          }
+        } else if (!payload.expectedSoldBy) {
+          parsed.soldByMatch = true; // no seller to verify
+        }
+
         recordGeminiSuccess();
         logPerformance({
           operation: 'AI_VERIFY_RETURN_WINDOW',
