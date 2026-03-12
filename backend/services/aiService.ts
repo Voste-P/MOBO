@@ -88,6 +88,50 @@ function editDistance(a: string, b: string): number {
   return matrix[a.length][b.length];
 }
 
+// ── Shared stop words for product name matching ──
+const PRODUCT_STOP_WORDS = new Set(['the','for','and','with','from','that','this','you','your','was','are','has','have','been','not','but','all','can','had','her','his','one','our','out','use','how','its','may','new','now','old','see','way','who','boy','did','get','him','let','say','she','too','any','per','set','top','end','off','big','own','put','run','two','via','free','pack','item','best','good','great','nice','size','pair','home','made','full','high','low','day','box','buy','kit']);
+
+/**
+ * Robust product name token matching.
+ * Tokenizes both expected and detected names, then checks overlap using
+ * substring containment and fuzzy edit distance. Returns true when enough
+ * significant tokens match (≥40% for 4+ tokens, ≥1 for short names).
+ * Also handles brand-first-word matching and partial OCR reads.
+ */
+function isProductNameMatch(expected: string, detected: string): boolean {
+  if (!expected || !detected) return false;
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const eNorm = norm(expected);
+  const dNorm = norm(detected);
+  // Direct substring: if either fully contains the other
+  if (eNorm.length >= 4 && dNorm.length >= 4 && (eNorm.includes(dNorm) || dNorm.includes(eNorm))) return true;
+
+  const tokenize = (s: string) => {
+    const all = s.split(/\s+/).filter(t => t.length >= 2);
+    const filtered = all.filter(t => !PRODUCT_STOP_WORDS.has(t) && t.length >= 3);
+    return filtered.length > 0 ? filtered : all;
+  };
+  const eTokens = tokenize(eNorm);
+  const dTokens = tokenize(dNorm);
+  if (eTokens.length === 0 || dTokens.length === 0) return false;
+
+  // Count how many expected tokens appear in the detected string (exact or fuzzy)
+  const matchedCount = eTokens.filter(et =>
+    dTokens.some(dt =>
+      dt === et ||
+      (et.length >= 4 && dt.includes(et)) ||
+      (dt.length >= 4 && et.includes(dt)) ||
+      (et.length >= 5 && dt.length >= 5 && editDistance(et, dt) <= 1)
+    )
+  ).length;
+
+  // Adaptive threshold: lenient for short product names, stricter for long names
+  const ratio = matchedCount / eTokens.length;
+  if (eTokens.length <= 2) return matchedCount >= 1;
+  if (eTokens.length <= 4) return ratio >= 0.4 || matchedCount >= 2;
+  return ratio >= 0.4;
+}
+
 // ── Confidence Score Constants ──
 // Named constants for AI confidence scoring thresholds used across all verification pipelines.
 const CONFIDENCE = {
@@ -1410,8 +1454,16 @@ async function verifyRatingWithOcr(
       .filter(t => t.length >= 3);
     const filteredProductTokens = allProductTokens.filter(t => !STOP_WORDS.has(t));
     const productTokens = filteredProductTokens.length > 0 ? filteredProductTokens : allProductTokens;
-    const matchedTokens = productTokens.filter(t => lower.includes(t));
-    const productNameMatch = matchedTokens.length >= Math.max(1, Math.ceil(productTokens.length * 0.6));
+    // Match tokens: exact substring OR fuzzy (1-char edit distance for tokens ≥5 chars, handles OCR misreads)
+    const matchedTokens = productTokens.filter(t =>
+      lower.includes(t) ||
+      (t.length >= 5 && lower.split(/\s+/).some(w => w.length >= t.length - 1 && w.length <= t.length + 1 && editDistance(w, t) <= 1))
+    );
+    // Adaptive threshold: lenient for short product names, moderate for longer ones
+    const productThreshold = productTokens.length <= 2 ? 1
+      : productTokens.length <= 4 ? Math.max(1, Math.ceil(productTokens.length * 0.4))
+      : Math.max(2, Math.ceil(productTokens.length * 0.4));
+    const productNameMatch = matchedTokens.length >= productThreshold;
 
     // Graduated confidence scoring — partial matches contribute proportionally
     let confidenceScore: number = CONFIDENCE.RATING_BASE;
@@ -1559,6 +1611,34 @@ export async function verifyRatingScreenshotWithAi(
             parsed.accountNameMatch = false;
             parsed.discrepancyNote = `Could not detect account name in screenshot to match reviewer "${payload.expectedReviewerName}".`;
           }
+        }
+
+        // Post-process: Validate productNameMatch using robust token matching.
+        // Gemini is non-deterministic and sometimes marks a correct product as mismatch.
+        // Our token-based algorithm provides consistent results.
+        if (parsed.detectedProductName && payload.expectedProductName) {
+          const serverMatch = isProductNameMatch(payload.expectedProductName, parsed.detectedProductName);
+          if (serverMatch && !parsed.productNameMatch) {
+            // Gemini said mismatch but our token matching says it matches — override
+            parsed.productNameMatch = true;
+            parsed.discrepancyNote = (parsed.discrepancyNote || '').replace(/Product name not matching.*\./i, '').trim();
+            if (!parsed.discrepancyNote) parsed.discrepancyNote = 'Product name matched via token verification.';
+          } else if (!serverMatch && parsed.productNameMatch) {
+            // Gemini said match but our token matching disagrees — trust Gemini when it says match
+            // since the AI can understand product context better than raw token overlap.
+            // Only override if the token overlap is very low (possible Gemini hallucination).
+            const eNorm = payload.expectedProductName.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+            const dNorm = parsed.detectedProductName.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+            const eTokens = eNorm.split(/\s+/).filter(t => t.length >= 3 && !PRODUCT_STOP_WORDS.has(t));
+            const dTokens = dNorm.split(/\s+/).filter(t => t.length >= 3 && !PRODUCT_STOP_WORDS.has(t));
+            const overlap = eTokens.filter(et => dTokens.some(dt => dt === et || dt.includes(et) || et.includes(dt))).length;
+            if (eTokens.length > 0 && overlap / eTokens.length < 0.2) {
+              parsed.productNameMatch = false;
+              parsed.discrepancyNote = `Product mismatch: expected "${payload.expectedProductName}", detected "${parsed.detectedProductName}".`;
+            }
+          }
+        } else if (!parsed.detectedProductName && payload.expectedProductName) {
+          // Gemini couldn't detect product name — be lenient, keep Gemini's verdict
         }
 
         recordGeminiSuccess();
