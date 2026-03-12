@@ -219,6 +219,7 @@ export const Orders: React.FC = () => {
     productName: 'match' | 'mismatch' | 'none';
   }>({ id: 'none', amount: 'none', productName: 'none' });
   const [orderIdLocked, setOrderIdLocked] = useState(false);
+  const [expandedTitles, setExpandedTitles] = useState<Set<string>>(new Set());
 
   // Buyer ticket state
   const [myTickets, setMyTickets] = useState<Ticket[]>([]);
@@ -731,37 +732,34 @@ export const Orders: React.FC = () => {
       const soldBy = selectedOrder.soldBy || '';
       const reviewerName = selectedOrder.reviewerName || '';
 
-      if (orderId && productName && amount > 0) {
-        const result = await api.orders.verifyReturnWindow(
-          file, orderId, productName, amount,
-          soldBy || undefined,
-          reviewerName || undefined,
-        );
-        setRwVerification(result);
+      if (!(orderId && productName && amount > 0)) {
+        // Missing order data — block verification instead of silently approving
+        setRwVerification(null);
+        toast.error('Order data incomplete — please re-upload the order screenshot first so we can verify this return window screenshot.');
+        return;
+      }
 
-        const issues: string[] = [];
-        if (!result.orderIdMatch) issues.push('Order ID');
-        if (!result.productNameMatch) issues.push('Product name');
-        if (!result.amountMatch) issues.push('Amount');
-        if (!result.soldByMatch && soldBy) issues.push('Seller name');
-        if (!result.returnWindowClosed) issues.push('Return window not closed');
-        if (!result.reviewerNameMatch && reviewerName) issues.push('Reviewer name');
+      const result = await api.orders.verifyReturnWindow(
+        file, orderId, productName, amount,
+        soldBy || undefined,
+        reviewerName || undefined,
+      );
+      setRwVerification(result);
 
-        if (issues.length === 0) {
-          toast.success('Return window screenshot verified! All checks passed.');
-        } else if (!result.returnWindowClosed) {
-          toast.error('Return window is still open. Please wait until the return window closes before uploading.');
-        } else {
-          toast.warning(`Mismatch detected: ${issues.join(', ')}. Please check the screenshot.`);
-        }
+      const issues: string[] = [];
+      if (!result.orderIdMatch) issues.push('Order ID');
+      if (!result.productNameMatch) issues.push('Product name');
+      if (!result.amountMatch) issues.push('Amount');
+      if (!result.soldByMatch && soldBy) issues.push('Seller name');
+      if (!result.returnWindowClosed) issues.push('Return window not closed');
+      if (!result.reviewerNameMatch && reviewerName) issues.push('Reviewer name');
+
+      if (issues.length === 0) {
+        toast.success('Return window screenshot verified! All checks passed.');
+      } else if (!result.returnWindowClosed) {
+        toast.error('Return window is still open. Please wait until the return window closes before uploading.');
       } else {
-        // Not enough data to pre-validate — allow upload
-        setRwVerification({
-          orderIdMatch: true, productNameMatch: true, amountMatch: true,
-          soldByMatch: true, returnWindowClosed: true, reviewerNameMatch: true,
-          confidenceScore: 50,
-        });
-        toast.info('Screenshot ready for upload.');
+        toast.warning(`Mismatch detected: ${issues.join(', ')}. Please check the screenshot.`);
       }
     } catch (err) {
       if (process.env.NODE_ENV !== 'production') console.error('Return window pre-validation failed:', err);
@@ -1158,7 +1156,11 @@ export const Orders: React.FC = () => {
                     />
                   </div>
                   <div className="flex-1 min-w-0 py-1">
-                    <h3 className="font-bold text-slate-900 text-base line-clamp-2 leading-tight mb-2">
+                    <h3
+                      className={`font-bold text-slate-900 text-base leading-tight mb-2 cursor-pointer ${expandedTitles.has(order.id) ? '' : 'line-clamp-2'}`}
+                      title={expandedTitles.has(order.id) ? undefined : firstItem.title}
+                      onClick={() => setExpandedTitles(prev => { const next = new Set(prev); if (next.has(order.id)) next.delete(order.id); else next.add(order.id); return next; })}
+                    >
                       {firstItem.title}
                     </h3>
                     <div className="flex items-center gap-3 text-xs font-bold text-slate-500">

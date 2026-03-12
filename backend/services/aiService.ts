@@ -1117,7 +1117,7 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
                 `4. For amount matching: ₹${payload.expectedAmount} should match even if displayed as ₹${payload.expectedAmount}.00 or with Indian comma formatting (e.g., ₹1,23,456). Allow ±₹2 tolerance for rounding or OCR errors.`,
                 `5. For order ID matching: Compare after removing spaces, hyphens, and case differences. Partial matches count as mismatches.`,
                 ...(payload.expectedProductName
-                  ? [`6. Find the PRODUCT NAME visible in the screenshot and compare to "${payload.expectedProductName}". The product must be the SAME product — all significant words (brand, model, type, variant) must match. Set productNameMatch=true only if it is clearly the same product. Set productNameMatch=false if a different product is shown.`]
+                  ? [`6. Find the PRODUCT NAME visible in the screenshot and compare to "${payload.expectedProductName}". The product must be the EXACT SAME product — ALL significant words (brand, model, type, variant name, fragrance/flavor, size, color, capacity) must match. CRITICAL: The same brand often has many DIFFERENT products with similar names (e.g. "Arabian Aroma Old Money" vs "Arabian Aroma Sovage" — DIFFERENT products). If even ONE distinguishing word differs, set productNameMatch=false. Default to false when uncertain.`]
                   : [`6. Also extract the PRODUCT NAME visible in the screenshot. Set productNameMatch=true (no expected product to compare).`]),
                 `7. Set confidenceScore 0-100: 90+ if all fields clearly visible and matched, 60-89 if partially matched or slightly unclear, below 60 if mismatched or unreadable.`,
                 `8. Always fill detectedOrderId, detectedAmount, and detectedProductName with what you actually see in the image, even if they don't match the expected values.`,
@@ -1489,8 +1489,8 @@ export async function verifyRatingScreenshotWithAi(
               ...(payload.expectedReviewerName
                 ? [`2. Compare the account name PRIMARILY with the marketplace reviewer name "${payload.expectedReviewerName}". The buyer may have ordered from a DIFFERENT marketplace account than their app account — this is acceptable. Only match against "${payload.expectedReviewerName}". Allow for nickname variations, case differences, and abbreviated names.`]
                 : [`2. Compare the account name with "${payload.expectedBuyerName}" — allow for nickname variations, case differences, and abbreviated names.`]),
-              `3. Find the PRODUCT NAME visible in the rating screenshot. Compare it to "${payload.expectedProductName}" — the product must be the SAME product. All significant words (brand, model, type, variant, color, size) must match. Minor differences like abbreviations or word order are OK, but a fundamentally different product must be flagged as mismatch.`,
-              `4. If the account name does not match the expected name or the product does not match, this is potential FRAUD (someone rating a different product or using a different account).`,
+              `3. Find the PRODUCT NAME visible in the rating screenshot. Compare it to "${payload.expectedProductName}" — the product must be the EXACT SAME product. ALL significant words (brand, model, variant name, fragrance/flavor, size, color, capacity) must match. CRITICAL: The same brand often has many DIFFERENT products with very similar names (e.g. "Arabian Aroma Old Money Eau de Parfum 50ml" vs "Arabian Aroma Sovage Perfume 50ml" — these are DIFFERENT products even though both are Arabian Aroma perfumes). If even ONE distinguishing word (like the product line name, model number, or variant) differs, set productNameMatch=false.`,
+              `4. If the account name does not match the expected name or the product does not match, this is potential FRAUD (someone rating a different product or using a different account). ALWAYS default to false when uncertain.`,
               `5. Set confidenceScore 0-100 based on how clearly visible and matching both fields are.`,
               `6. Always fill detectedAccountName and detectedProductName with what you actually see.`,
             ].join('\n') },
@@ -1688,7 +1688,9 @@ async function verifyReturnWindowWithOcr(
     const PROOF_STOP_WORDS = new Set(['the','for','and','with','from','that','this','you','your','was','are','has','have','been','not','but','all','can','had','her','his','one','our','out','use','how','its','may','new','now','old','see','way','who','did','get','him','let','say','she','too','any','per','set','top','end','off','big','own','put','run','two','via','pro','free','pack','item','best','good','great','nice','mini','max','size','pair','home','made','full','high','low','day','box','buy','kit']);
     const productTokens = expected.expectedProductName.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(t => t.length >= 3 && !PROOF_STOP_WORDS.has(t));
     const matchedProd = productTokens.filter(t => lower.includes(t));
-    const productNameMatch = matchedProd.length >= Math.max(1, Math.ceil(productTokens.length * 0.6));
+    const productNameMatch = productTokens.length > 0
+      ? matchedProd.length >= Math.max(2, Math.ceil(productTokens.length * 0.8))
+      : false;
 
     const expectedAmt = expected.expectedAmount;
     const amountStr = String(expectedAmt);
@@ -1727,18 +1729,6 @@ async function verifyReturnWindowWithOcr(
       }
     }
 
-    // Bare-number fallback (₹ may be OCR-ed as 2/%)
-    if (!amountMatch) {
-      const bareNums = ocrText.match(/\b\d[\d,\s]*(?:\.\d{1,2})?\b/g) || [];
-      for (const raw of bareNums) {
-        const val = Number(raw.replace(/[,\s]/g, ''));
-        if (Number.isFinite(val) && val > 10 && Math.abs(val - expectedAmt) <= rwAmountTolerance) {
-          amountMatch = true;
-          break;
-        }
-      }
-    }
-
     // Normalize seller name: strip common suffixes like ".in", "Retail", "India", "Pvt", "Ltd"
     // so "Amazon" matches "Amazon Retail", "amazon.in", "AMAZON INDIA PVT LTD", etc.
     const normSeller = (s: string) => s.toLowerCase().replace(/\b(retail|india|pvt|ltd|private|limited|inc|llp|seller|\.in|\.com)\b/g, '').replace(/[.\-_,]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -1748,11 +1738,11 @@ async function verifyReturnWindowWithOcr(
       const ocrNormSeller = normSeller(ocrText);
       // Direct substring match after normalization
       soldByMatch = ocrNormSeller.includes(sellerNorm);
-      // Fallback: check if the core seller word (first significant word) appears
+      // Fallback: require ALL core words (≥3 chars) to appear, not just any one
       if (!soldByMatch) {
         const coreWords = sellerNorm.split(/\s+/).filter(w => w.length >= 3);
         if (coreWords.length > 0) {
-          soldByMatch = coreWords.some(w => lower.includes(w));
+          soldByMatch = coreWords.every(w => lower.includes(w));
         }
       }
     }
@@ -1843,25 +1833,28 @@ export async function verifyReturnWindowWithAi(
           contents: [
             { inlineData: { mimeType, data: payload.imageBase64.split(',')[1] || payload.imageBase64 } },
             { text: [
-              `RETURN WINDOW / DELIVERY SCREENSHOT VERIFICATION — GOD-LEVEL ACCURACY REQUIRED`,
+              `RETURN WINDOW / DELIVERY SCREENSHOT VERIFICATION — STRICT COMPARISON MODE`,
               ``,
-              `Verify this delivery/return window screenshot against the order:`,
+              `You MUST compare the screenshot against EXACT expected values below.`,
+              `DEFAULT TO FALSE for any field you cannot confidently verify. Never assume a match.`,
+              ``,
               `  Expected Order ID: ${payload.expectedOrderId}`,
               `  Expected Product Name: ${payload.expectedProductName}`,
               `  Expected Grand Total: ₹${payload.expectedAmount}`,
               `  Expected Sold By: ${payload.expectedSoldBy || 'N/A'}`,
               ``,
-              `RULES:`,
-              `1. Find the ORDER ID in the screenshot and compare to "${payload.expectedOrderId}".`,
-              `2. Find the PRODUCT NAME and compare to "${payload.expectedProductName}". The product must be the SAME product — all significant words (brand, model, type, variant) must match. Minor abbreviations or word order differences are OK, but a different product must be flagged as mismatch.`,
-              `3. Find the GRAND TOTAL / AMOUNT and compare to ₹${payload.expectedAmount} (±₹1 tolerance).`,
-              `4. Find "Sold by" / "Seller" and compare to "${payload.expectedSoldBy || 'N/A'}". Normalize by ignoring suffixes like "Retail", "India", "Pvt Ltd", ".in", ".com" before comparing.`,
-              `5. Check if the RETURN WINDOW is CLOSED/EXPIRED. Look for: "Return window closed", "No longer returnable", "Non-returnable", "Not eligible for return", "Exchange only", "Cannot be returned", "Return period expired", delivery date that is > 7 days ago, or any text indicating the item cannot be returned/replaced.`,
+              `STRICT RULES — read carefully:`,
+              `1. Find the ORDER ID in the screenshot and compare character-by-character to "${payload.expectedOrderId}". If NOT found or different → orderIdMatch=false.`,
+              `2. Find the PRODUCT NAME and compare to "${payload.expectedProductName}". ALL significant words (brand, model, type, variant name, fragrance/flavor, size, color, capacity) must match. CRITICAL: The same brand often has many DIFFERENT products with very similar names (e.g. "Arabian Aroma Old Money Eau de Parfum 50ml" vs "Arabian Aroma Sovage Perfume 50ml" — these are DIFFERENT products even though both are Arabian Aroma perfumes). If even ONE distinguishing word differs, set productNameMatch=false. A different product MUST be false. If the product name is not visible → productNameMatch=false.`,
+              `3. Find the GRAND TOTAL / AMOUNT and compare to ₹${payload.expectedAmount} (±₹1 tolerance only). If NOT found or different → amountMatch=false.`,
+              `4. Find "Sold by" / "Seller" and compare to "${payload.expectedSoldBy || 'N/A'}". Ignore suffixes like "Retail", "India", "Pvt Ltd", ".in", ".com". If NOT found or different seller → soldByMatch=false.${payload.expectedSoldBy ? '' : ' If expected seller is N/A → soldByMatch=true.'}`,
+              `5. Check if the RETURN WINDOW is CLOSED/EXPIRED. Look for: "Return window closed", "No longer returnable", "Non-returnable", "Not eligible for return", "Exchange only", "Cannot be returned", "Return period expired", delivery date that is > 7 days ago, or any text indicating the item cannot be returned/replaced. If no such text found → returnWindowClosed=false.`,
               payload.expectedReviewerName
-                ? `6. Find the BUYER NAME / "Ship to" / "Deliver to" name in the screenshot and compare to "${payload.expectedReviewerName}". This is the marketplace account holder name. Set reviewerNameMatch=true if it matches (case-insensitive, partial/substring match OK — e.g. "chetan" matches "Chetan Chaudhari"). Set reviewerNameMatch=false if a clearly different name is shown.`
+                ? `6. Find the BUYER NAME / "Ship to" / "Deliver to" name in the screenshot and compare to "${payload.expectedReviewerName}". Set reviewerNameMatch=true ONLY if the name matches (case-insensitive, partial OK — e.g. "chetan" matches "Chetan Chaudhari"). If a clearly different name is shown or no name found → reviewerNameMatch=false.`
                 : `6. reviewerNameMatch should always be set to true — no specific reviewer name to verify.`,
-              `7. Set confidenceScore 0-100 based on match quality.`,
-              `8. Fill all detected fields with what you actually see in the image.`,
+              `7. Set confidenceScore 0-100 based on match quality. Low confidence if fields are hard to read.`,
+              `8. CRITICAL: If the screenshot appears to be from a DIFFERENT ORDER than expected, ALL match fields must be false. Do NOT guess or assume — if uncertain, set to false.`,
+              `9. CRITICAL PRODUCT NAME RULE: Same brand ≠ same product. "Brand X Product A" and "Brand X Product B" are DIFFERENT products. Compare the FULL product name including model/variant identifiers, not just the brand.`,
             ].join('\n') },
           ],
           config: {

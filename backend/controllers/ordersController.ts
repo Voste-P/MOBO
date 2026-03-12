@@ -1043,16 +1043,16 @@ export function makeOrdersController(env: Env) {
               });
               // Block submission if reviewer name is set and doesn't match (strict enforcement)
               if (ratingAiResult && reviewerName && !ratingAiResult.accountNameMatch
-                && ratingAiResult.confidenceScore >= 60) {
+                && ratingAiResult.confidenceScore > 0) {
                 throw new AppError(422, 'RATING_VERIFICATION_FAILED',
                   `Rating screenshot reviewer name does not match "${reviewerName}". ` +
                   `Detected: "${ratingAiResult.detectedAccountName || 'unknown'}". ` +
                   'Please upload a screenshot from the correct marketplace account. ' +
                   (ratingAiResult.discrepancyNote || ''));
               }
-              // Block submission if product name alone mismatches with good confidence
+              // Block submission if product name alone mismatches (strict — any confidence > 0)
               if (ratingAiResult && !ratingAiResult.productNameMatch
-                && ratingAiResult.confidenceScore >= 70) {
+                && ratingAiResult.confidenceScore > 0) {
                 throw new AppError(422, 'RATING_VERIFICATION_FAILED',
                   'Rating screenshot product does not match this order. ' +
                   'Please upload the correct rating screenshot. ' +
@@ -1126,9 +1126,9 @@ export function makeOrdersController(env: Env) {
                 durationMs: Date.now() - aiStart,
                 metadata: { orderId: order.mongoId, confidenceScore: returnWindowResult?.confidenceScore },
               });
-              // Block submission if order ID doesn't match (hard block)
+              // Block submission if order ID doesn't match (hard block — any confidence > 0)
               if (returnWindowResult && !returnWindowResult.orderIdMatch
-                && returnWindowResult.confidenceScore >= 70) {
+                && returnWindowResult.confidenceScore > 0) {
                 throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
                   'Return window screenshot order ID does not match this order. ' +
                   'Please upload the correct return window screenshot. ' +
@@ -1136,7 +1136,7 @@ export function makeOrdersController(env: Env) {
               }
               // Block submission if return window is still open
               if (returnWindowResult && !returnWindowResult.returnWindowClosed
-                && returnWindowResult.confidenceScore >= 70) {
+                && returnWindowResult.confidenceScore > 0) {
                 throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
                   'Return window is still open. Please wait until the return window closes before uploading. ' +
                   (returnWindowResult.detectedReturnWindow ? `Detected: ${returnWindowResult.detectedReturnWindow}. ` : '') +
@@ -1144,7 +1144,7 @@ export function makeOrdersController(env: Env) {
               }
               // Block submission if product name doesn't match
               if (returnWindowResult && !returnWindowResult.productNameMatch
-                && returnWindowResult.confidenceScore >= 70) {
+                && returnWindowResult.confidenceScore > 0) {
                 throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
                   'Return window screenshot product does not match this order. ' +
                   'Please upload the correct return window screenshot. ' +
@@ -1152,7 +1152,7 @@ export function makeOrdersController(env: Env) {
               }
               // Block submission if reviewer name is set and doesn't match
               if (returnWindowResult && rwReviewerName && !returnWindowResult.reviewerNameMatch
-                && returnWindowResult.confidenceScore >= 70) {
+                && returnWindowResult.confidenceScore > 0) {
                 throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
                   `Return window screenshot delivery name does not match "${rwReviewerName}". ` +
                   'Please upload a screenshot from the correct marketplace order. ' +
@@ -1160,7 +1160,7 @@ export function makeOrdersController(env: Env) {
               }
               // Block submission if seller/sold-by name doesn't match
               if (returnWindowResult && expectedSoldBy && !returnWindowResult.soldByMatch
-                && returnWindowResult.confidenceScore >= 70) {
+                && returnWindowResult.confidenceScore > 0) {
                 throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
                   `Return window screenshot seller does not match "${expectedSoldBy}". ` +
                   'Please upload the correct return window screenshot. ' +
@@ -1168,7 +1168,7 @@ export function makeOrdersController(env: Env) {
               }
               // Block submission if amount doesn't match
               if (returnWindowResult && !returnWindowResult.amountMatch
-                && returnWindowResult.confidenceScore >= 70) {
+                && returnWindowResult.confidenceScore > 0) {
                 throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
                   'Return window screenshot amount does not match this order. ' +
                   'Please upload the correct return window screenshot. ' +
@@ -1232,7 +1232,7 @@ export function makeOrdersController(env: Env) {
               });
               // Block re-upload if order ID clearly doesn't match (fraud prevention)
               if (aiOrderVerification && !aiOrderVerification.orderIdMatch
-                && aiOrderVerification.confidenceScore >= 75) {
+                && aiOrderVerification.confidenceScore > 0) {
                 throw new AppError(422, 'ORDER_VERIFICATION_FAILED',
                   'Order screenshot does not match: the order ID in the screenshot does not match this order. ' +
                   (aiOrderVerification.discrepancyNote || ''));
@@ -1240,7 +1240,7 @@ export function makeOrdersController(env: Env) {
               // Block re-upload if product name doesn't match (fraud prevention)
               if (aiOrderVerification && expectedProductName
                 && aiOrderVerification.productNameMatch === false
-                && aiOrderVerification.confidenceScore >= 70) {
+                && aiOrderVerification.confidenceScore > 0) {
                 throw new AppError(422, 'ORDER_VERIFICATION_FAILED',
                   'Order screenshot product does not match this order. ' +
                   'Please upload the correct order screenshot. ' +

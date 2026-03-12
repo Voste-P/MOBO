@@ -68,6 +68,8 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
   }>({ orderId: '', amount: '' });
   const [reviewerName, setReviewerName] = useState('');
   const [fieldsLocked, setFieldsLocked] = useState(false);
+  const [productNameMismatch, setProductNameMismatch] = useState(false);
+  const [titleExpanded, setTitleExpanded] = useState(false);
 
   const resetForm = useCallback(() => {
     setScreenshot(null);
@@ -78,6 +80,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
     setExtractedDetails({ orderId: '', amount: '' });
     setReviewerName('');
     setFieldsLocked(false);
+    setProductNameMismatch(false);
     setFormOpen(false);
   }, []);
 
@@ -98,6 +101,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
 
     // AI extraction
     setExtracting(true);
+    setProductNameMismatch(false);
     try {
       const result = await api.orders.extractDetails(file);
       if (result) {
@@ -110,6 +114,38 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
         });
         // Lock fields only when BOTH required fields are extracted
         if (result.orderId && result.amount) setFieldsLocked(true);
+
+        // ── Product name matching (same logic as Orders.tsx) ──
+        const extractedName = (typeof result.productName === 'string' ? result.productName : '').toLowerCase().trim();
+        const expectedName = (product.title || '').toLowerCase().trim();
+        if (extractedName && expectedName) {
+          const isUrl = /https?:\/\/|www\.|\.com\/|\.in\/|orderID=|order-details|ref=|utm_/i.test(extractedName);
+          const isDeliveryStatus = /^(arriving|shipped|delivered|dispatched|out\s*for\s*delivery|in\s*transit|order\s*(placed|confirmed))/i.test(extractedName);
+          if (isUrl || isDeliveryStatus) {
+            setProductNameMismatch(true);
+            toast.error('Product name in screenshot does not match this deal. Please upload the correct order screenshot.');
+          } else {
+            const noiseWords = new Set(['the', 'and', 'for', 'with', 'from', 'this', 'that', 'not', 'are', 'was', 'has', 'its', 'all', 'can', 'you', 'our', 'new', 'buy', 'get', 'set', 'pack', 'pcs', 'free', 'best', 'top', 'good', 'great', 'nice', 'off', 'upto', 'only', 'just', 'also', 'more', 'very', 'most', 'save', 'deal']);
+            const cleanWords = (text: string) => text.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w: string) => w.length > 2 && !noiseWords.has(w));
+            const extractedWords = cleanWords(extractedName);
+            const expectedWords = cleanWords(expectedName);
+            const matchingWords = extractedWords.filter((w: string) => expectedWords.some((ew: string) => w === ew || (w.length >= 4 && ew.includes(w)) || (ew.length >= 4 && w.includes(ew))));
+            const reverseMatchingWords = expectedWords.filter((ew: string) => extractedWords.some((w: string) => ew === w || (ew.length >= 4 && w.includes(ew)) || (w.length >= 4 && ew.includes(w))));
+            const bestMatchCount = Math.max(matchingWords.length, reverseMatchingWords.length);
+            const denominator = Math.min(extractedWords.length, expectedWords.length);
+            const overlapRatio = denominator > 0 ? bestMatchCount / denominator : 0;
+            const hasEnoughOverlap = bestMatchCount >= 2 && overlapRatio >= 0.50;
+            const shortNameMatch = expectedWords.length <= 2 && bestMatchCount >= 1 && overlapRatio >= 0.5;
+            const brandMatch = extractedWords.length > 0 && expectedWords.length > 0 &&
+              (extractedWords[0] === expectedWords[0] || (extractedWords[0].length >= 4 && expectedWords[0].includes(extractedWords[0])) || (expectedWords[0].length >= 4 && extractedWords[0].includes(expectedWords[0])));
+            const brandWithOverlap = brandMatch && bestMatchCount >= 2 && overlapRatio >= 0.35;
+            const isMatch = hasEnoughOverlap || shortNameMatch || brandWithOverlap;
+            if (!isMatch) {
+              setProductNameMismatch(true);
+              toast.error('Product name in screenshot does not match this deal. Please upload the correct order screenshot.');
+            }
+          }
+        }
       }
     } catch {
       // Extraction is optional — notify user gracefully
@@ -121,6 +157,11 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
 
   const handleInlineSubmit = useCallback(async () => {
     if (!user || !screenshot || submitting) return;
+    // Block if product name mismatch detected
+    if (productNameMismatch) {
+      toast.error('Product in screenshot does not match this deal. Upload the correct order screenshot.');
+      return;
+    }
     // Require reviewer name for Rating/Review deals to prevent cheating
     if ((product.dealType === 'Rating' || product.dealType === 'Review') && !reviewerName.trim()) {
       toast.error('Please enter the reviewer name — the marketplace account name used for this order.');
@@ -167,7 +208,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
     } finally {
       setSubmitting(false);
     }
-  }, [user, screenshot, submitting, extractedDetails, product, reviewerName, toast, resetForm]);
+  }, [user, screenshot, submitting, productNameMismatch, extractedDetails, product, reviewerName, toast, resetForm]);
 
   const handleLinkClick = () => {
     if (product.productUrl && /^https?:\/\//i.test(product.productUrl)) {
@@ -208,8 +249,9 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
         </div>
         <div className="flex-1 min-w-0 flex flex-col justify-center py-1">
           <h3
-            className="font-bold text-slate-900 text-sm leading-tight line-clamp-2 mb-2"
-            title={product.title}
+            className={`font-bold text-slate-900 text-sm leading-tight mb-2 cursor-pointer ${titleExpanded ? '' : 'line-clamp-2'}`}
+            title={titleExpanded ? undefined : product.title}
+            onClick={() => setTitleExpanded(!titleExpanded)}
           >
             {product.title}
           </h3>
@@ -432,6 +474,12 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
             {screenshot && !extracting && !extractedDetails.orderId && (
               <p className="text-[9px] text-red-500 font-semibold text-center">Order ID is required to submit</p>
             )}
+            {productNameMismatch && (
+              <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 rounded-lg px-2 py-1.5">
+                <AlertCircle size={11} className="text-red-500 flex-shrink-0" />
+                <p className="text-[9px] font-bold text-red-600">Product name mismatch — this screenshot is for a different product.</p>
+              </div>
+            )}
             <div className="flex gap-2">
               <button
                 type="button"
@@ -443,7 +491,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
               <button
                 type="button"
                 onClick={handleInlineSubmit}
-                disabled={!screenshot || submitting || extracting || !extractedDetails.orderId.trim()}
+                disabled={!screenshot || submitting || extracting || !extractedDetails.orderId.trim() || productNameMismatch}
                 className="flex-1 py-2.5 bg-black text-white font-extrabold rounded-xl text-xs uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition-all flex items-center justify-center gap-1.5"
               >
                 {submitting ? (
