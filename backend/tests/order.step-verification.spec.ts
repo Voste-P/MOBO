@@ -24,6 +24,8 @@ async function loginAdmin(app: any, username: string, password: string) {
 }
 
 const LARGE_DATA_URL = `data:image/png;base64,${'A'.repeat(14000)}`;
+const LARGE_DATA_URL_2 = `data:image/png;base64,${'B'.repeat(14000)}`;
+const LARGE_DATA_URL_3 = `data:image/png;base64,${'C'.repeat(14000)}`;
 
 describe('order step verification (purchase vs review/rating)', () => {
   it('keeps order UNDER_REVIEW when purchase verified but review proof missing, then approves after review verified', async () => {
@@ -119,7 +121,7 @@ describe('order step verification (purchase vs review/rating)', () => {
     const submitReturnWindowRes = await request(app)
       .post('/api/orders/claim')
       .set('Authorization', `Bearer ${shopper.token}`)
-      .send({ orderId, type: 'returnWindow', data: LARGE_DATA_URL });
+      .send({ orderId, type: 'returnWindow', data: LARGE_DATA_URL_2 });
     expect(submitReturnWindowRes.status).toBe(200);
 
     // Verify returnWindow
@@ -218,7 +220,7 @@ describe('order step verification (purchase vs review/rating)', () => {
     const submitRatingRes = await request(app)
       .post('/api/orders/claim')
       .set('Authorization', `Bearer ${shopper.token}`)
-      .send({ orderId, type: 'rating', data: LARGE_DATA_URL });
+      .send({ orderId, type: 'rating', data: LARGE_DATA_URL_2 });
 
     expect(submitRatingRes.status).toBe(200);
 
@@ -237,7 +239,7 @@ describe('order step verification (purchase vs review/rating)', () => {
     const submitReturnWindowRes = await request(app)
       .post('/api/orders/claim')
       .set('Authorization', `Bearer ${shopper.token}`)
-      .send({ orderId, type: 'returnWindow', data: LARGE_DATA_URL });
+      .send({ orderId, type: 'returnWindow', data: LARGE_DATA_URL_3 });
     expect(submitReturnWindowRes.status).toBe(200);
 
     // Verify returnWindow
