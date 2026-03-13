@@ -567,9 +567,9 @@ export const Orders: React.FC = () => {
             const bestMatchCount = Math.max(matchingWords.length, reverseMatchingWords.length);
             const denominator = Math.min(extractedWords.length, expectedWords.length);
             const overlapRatio = denominator > 0 ? bestMatchCount / denominator : 0;
-            // Tiered thresholds aligned with backend strictness to prevent same-brand different-product matches
+            // Tiered thresholds: 100% match required to prevent same-brand different-product matches
             const minWords = Math.min(extractedWords.length, expectedWords.length);
-            const requiredOverlap = minWords <= 2 ? 1.0 : minWords <= 4 ? 0.75 : 0.60;
+            const requiredOverlap = 1.0; // 100% match — ALL significant words must match
             const hasEnoughOverlap = bestMatchCount >= 2 && overlapRatio >= requiredOverlap;
             // Special case: if product name is very short (1-2 significant words), require ALL words to match
             const shortNameMatch = expectedWords.length <= 2 && bestMatchCount >= expectedWords.length;
@@ -1365,9 +1365,9 @@ export const Orders: React.FC = () => {
                                 ? 'bg-green-500 text-white'
                                 : rejectionType === 'returnWindow'
                                   ? 'bg-red-500 text-white'
-                                  : !missingProofs.includes('returnWindow') && (ratingVerified || !requiredSteps.includes('rating')) && (reviewVerified || !requiredSteps.includes('review'))
+                                  : !missingProofs.includes('returnWindow') && (!!order.screenshots?.rating || !requiredSteps.includes('rating')) && (!!order.reviewLink || !!order.screenshots?.review || !requiredSteps.includes('review'))
                                     ? 'bg-purple-500 text-white'
-                                    : (ratingVerified || !requiredSteps.includes('rating')) && (reviewVerified || !requiredSteps.includes('review'))
+                                    : (!!order.screenshots?.rating || !requiredSteps.includes('rating')) && (!!order.reviewLink || !!order.screenshots?.review || !requiredSteps.includes('review'))
                                       ? 'bg-yellow-400 text-yellow-900'
                                       : 'bg-slate-200 text-slate-400'
                             }`}>
@@ -1480,10 +1480,10 @@ export const Orders: React.FC = () => {
                         {rejectionType === 'rating' ? 'Reupload Rating' : 'Add Rating'}
                       </button>
                     )}
-                    {/* Return Window upload: ONLY shown after rating/review is verified */}
+                    {/* Return Window upload: shown after rating/review proof is UPLOADED (not verified) */}
                     {requiredSteps.includes('returnWindow') && purchaseVerified
-                      && (ratingVerified || !requiredSteps.includes('rating'))
-                      && (reviewVerified || !requiredSteps.includes('review'))
+                      && (!!order.screenshots?.rating || !requiredSteps.includes('rating'))
+                      && (!!order.reviewLink || !!order.screenshots?.review || !requiredSteps.includes('review'))
                       && (!order.screenshots?.returnWindow || rejectionType === 'returnWindow') && (
                       <button
                         onClick={() => {

@@ -101,9 +101,8 @@ const PRODUCT_STOP_WORDS = new Set(['the','for','and','with','from','that','this
  * significant tokens match. Thresholds are strict to prevent different
  * products from the same brand matching (e.g. "Arabian Aroma Old Money"
  * vs "Arabian Aroma Sovage" must NOT match).
- * Short names (≤2 tokens): all tokens must match.
- * Medium names (3-4 tokens): ≥80% tokens must match.
- * Long names (5+ tokens): ≥75% tokens must match.
+ * ALL significant tokens must match (100% match).
+ * Fuzzy matching (edit distance ≤1) absorbs minor OCR typos only.
  */
 function isProductNameMatch(expected: string, detected: string): boolean {
   if (!expected || !detected) return false;
@@ -138,13 +137,11 @@ function isProductNameMatch(expected: string, detected: string): boolean {
     )
   ).length;
 
-  // Strict thresholds: ALL significant tokens must match (100% match policy).
-  // Short names (≤2 tokens): ALL must match. 3-4 tokens: ≥80%. 5+ tokens: ≥75%.
-  // Fuzzy matching (edit distance ≤1) already absorbs minor OCR typos.
-  const ratio = matchedCount / eTokens.length;
-  if (eTokens.length <= 2) return matchedCount >= eTokens.length;
-  if (eTokens.length <= 4) return ratio >= 0.8;
-  return ratio >= 0.75;
+  // 100% match policy: ALL significant tokens from expected name must be found
+  // in the detected name. This prevents different products from the same brand
+  // matching (e.g. "Avimee Herbal Keshpallav Hair Oil" vs "Avimee Herbal Scalptone Hair Growth Serum").
+  // Fuzzy matching (edit distance ≤1) handles minor OCR errors like "Keshpallav" → "Keshpalav".
+  return matchedCount >= eTokens.length;
 }
 
 // ── Confidence Score Constants ──
@@ -1444,12 +1441,11 @@ async function verifyRatingWithOcr(
       if (reviewerLower.length >= 3 && (lower.includes(reviewerLower) || lowerStripped.includes(reviewerLower))) {
         accountNameMatch = true;
       }
-      // Strategy 2: reviewer name parts — for short names (≤2 parts) require at least 1 part
-      // (OCR/Gemini often only captures first name from greeting), or ≥60% for longer names.
+      // Strategy 2: reviewer name parts — ALL parts must match for strict verification.
+      // OCR often captures greeting like "Hello Chetan" — the greeting-stripped text handles this.
       if (!accountNameMatch && reviewerParts.length > 0) {
         const reviewerMatches = reviewerParts.filter(p => lower.includes(p) || lowerStripped.includes(p));
-        const threshold = reviewerParts.length <= 2 ? Math.max(1, reviewerParts.length - 1) : Math.ceil(reviewerParts.length * 0.6);
-        accountNameMatch = reviewerMatches.length >= threshold;
+        accountNameMatch = reviewerMatches.length >= reviewerParts.length;
       }
       // Strategy 3: fuzzy match for reviewer name parts (OCR misreads)
       if (!accountNameMatch) {
@@ -1633,7 +1629,7 @@ export async function verifyRatingScreenshotWithAi(
               parsed.accountNameMatch = true;
               parsed.discrepancyNote = 'Account name matched via marketplace reviewer name.';
             } else {
-              // Fuzzy: check name parts — scale edit distance tolerance with word length
+              // Fuzzy: check name parts — ALL parts must match for strict verification
               // Use greeting-stripped versions for fuzzy matching
               const revParts = revClean.split(/\s+/).filter(p => p.length >= 2);
               const detParts = detClean.split(/\s+/).filter(p => p.length >= 2);
@@ -1642,8 +1638,8 @@ export async function verifyRatingScreenshotWithAi(
                 const matchCount = revParts.filter(rp => detParts.some(dp =>
                   dp === rp || (rp.length >= 6 && editDistance(dp, rp) <= 1)
                 )).length;
-                const minRequired = revParts.length <= 2 ? 1 : Math.ceil(revParts.length * 0.6);
-                if (matchCount >= Math.max(1, minRequired)) {
+                // ALL parts must match — strict enforcement to catch wrong public names
+                if (matchCount >= revParts.length) {
                   fuzzyMatch = true;
                 }
               }

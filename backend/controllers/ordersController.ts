@@ -968,37 +968,45 @@ export function makeOrdersController(env: Env) {
           }
         }
 
-        // Return window step: gated behind rating verification for Rating/Review deals
+        // Return window step: gated behind purchase verification + rating/review proof upload
         if (body.type === 'returnWindow') {
           const purchaseVerified = !!verification?.order?.verifiedAt;
           if (!purchaseVerified) {
             throw new AppError(409, 'PURCHASE_NOT_VERIFIED',
               'Purchase proof must be verified before uploading return window proof.');
           }
-          // For Rating/Review deals, rating/review must be verified first
+          // For Rating/Review deals, rating/review proof must be UPLOADED (not necessarily verified)
           const dealTypes = (order.items ?? []).map((it: any) => String(it?.dealType || ''));
           const requiresRating = dealTypes.includes('Rating');
           const requiresReview = dealTypes.includes('Review');
-          if (requiresRating && !verification?.rating?.verifiedAt) {
-            throw new AppError(409, 'RATING_NOT_VERIFIED',
-              'Rating proof must be verified before uploading return window proof.');
+          if (requiresRating && !order.screenshotRating) {
+            throw new AppError(409, 'RATING_NOT_UPLOADED',
+              'Rating proof must be uploaded before uploading return window proof.');
           }
-          if (requiresReview && !verification?.review?.verifiedAt) {
-            throw new AppError(409, 'REVIEW_NOT_VERIFIED',
-              'Review proof must be verified before uploading return window proof.');
+          if (requiresReview && !order.reviewLink && !order.screenshotReview) {
+            throw new AppError(409, 'REVIEW_NOT_UPLOADED',
+              'Review proof must be uploaded before uploading return window proof.');
           }
         }
 
         // Duplicate screenshot detection: prevent buyer from submitting the same image
-        // for different proof types (e.g. using same order screenshot as return window proof).
-        // Only applies to image uploads (not review links).
+        // for different proof types. Only applies to image uploads (not review links).
+        // EXCEPTION: order & returnWindow MAY be the same screenshot (late fulfillment scenario
+        // where user fills order form late and return window is already visible in order screenshot).
         if (body.type !== 'review' && body.data) {
           const proofData = body.data.includes(',') ? body.data.split(',')[1]! : body.data;
           const existingScreenshots: Array<{ field: string; value: string | null }> = [
             { field: 'order', value: order.screenshotOrder },
             { field: 'rating', value: order.screenshotRating },
             { field: 'returnWindow', value: order.screenshotReturnWindow },
-          ].filter(s => s.field !== body.type && s.value); // only compare against OTHER proof types
+          ].filter(s => {
+            if (s.field === body.type) return false; // skip self
+            if (!s.value) return false;
+            // Allow order ↔ returnWindow to be the same screenshot
+            if ((s.field === 'order' && body.type === 'returnWindow') ||
+                (s.field === 'returnWindow' && body.type === 'order')) return false;
+            return true;
+          });
 
           for (const existing of existingScreenshots) {
             const existingData = existing.value!.includes(',') ? existing.value!.split(',')[1]! : existing.value!;
