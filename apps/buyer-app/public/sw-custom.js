@@ -1,17 +1,3 @@
-// Clear all caches when a new service worker activates (deploy = fresh code).
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys()
-      .then((cacheNames) => Promise.all(cacheNames.map((c) => caches.delete(c))))
-      .then(() => self.clients.claim())
-      .then(() =>
-        self.clients.matchAll({ type: 'window' }).then((clients) => {
-          clients.forEach((client) => client.postMessage({ type: 'SW_UPDATED' }));
-        })
-      )
-  );
-});
-
 self.addEventListener('sync', (event) => {
   if (event.tag === 'buzzma-background-sync') {
     event.waitUntil(Promise.resolve());
