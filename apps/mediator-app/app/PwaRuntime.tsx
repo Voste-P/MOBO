@@ -156,12 +156,11 @@ export function PwaRuntime({ app }: { app: 'buyer' | 'mediator' }) {
     (globalThis as any).__MOBO_PWA_APP__ = app;
 
     if ('serviceWorker' in navigator) {
-      const registerWorker = () => {
-        navigator.serviceWorker
-          .register('/service-worker.js', { scope: '/' })
+      // next-pwa handles registration via register:true in next.config.js.
+      // We only wait for the active SW to set up sync & push.
+      const setupWorker = () => {
+        navigator.serviceWorker.ready
           .then((registration) => {
-            registration.update?.();
-
             (registration as any).sync
               ?.register('buzzma-background-sync')
               .catch(() => undefined);
@@ -174,15 +173,13 @@ export function PwaRuntime({ app }: { app: 'buyer' | 'mediator' }) {
 
             ensurePushSubscription(app).catch(() => undefined);
           })
-          .catch(() => {
-            // Ignore registration failures (e.g., unsupported or blocked).
-          });
+          .catch(() => undefined);
       };
 
       if (document.readyState === 'complete') {
-        registerWorker();
+        setupWorker();
       } else {
-        window.addEventListener('load', registerWorker, { once: true });
+        window.addEventListener('load', setupWorker, { once: true });
       }
     }
 
