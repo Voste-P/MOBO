@@ -89,7 +89,7 @@ function editDistance(a: string, b: string): number {
 }
 
 // ── Shared stop words for product name matching ──
-const PRODUCT_STOP_WORDS = new Set(['the','for','and','with','from','that','this','you','your','was','are','has','have','been','not','but','all','can','had','her','his','one','our','out','use','how','its','may','new','now','old','see','way','who','boy','did','get','him','let','say','she','too','any','per','set','top','end','off','big','own','put','run','two','via','free','pack','item','best','good','great','nice','size','pair','home','made','full','high','low','day','box','buy','kit']);
+const PRODUCT_STOP_WORDS = new Set(['the','for','and','with','from','that','this','you','your','was','are','has','have','been','not','but','all','can','had','her','his','one','our','out','use','how','its','may','new','now','old','see','way','who','boy','did','get','him','let','say','she','too','any','per','set','top','end','off','big','own','put','run','two','via','free','pack','item','best','good','great','nice','size','pair','home','made','full','high','low','day','box','buy','kit','men','man','women','woman','long','lasting','eau','parfum','perfume','perfumes','spray','body','cream','lotion','gel','oil','water','100ml','50ml','200ml','ml','gm','kg','ltr','white','black','red','blue','green','pink','gold','silver','natural','pure','premium','original','genuine','quality','gift','type','style','brand','product','online','india','combo','super','ultra','pro','plus','lite','mini','max','extra']);
 
 /**
  * Robust product name token matching.
@@ -99,16 +99,22 @@ const PRODUCT_STOP_WORDS = new Set(['the','for','and','with','from','that','this
  * products from the same brand matching (e.g. "Arabian Aroma Old Money"
  * vs "Arabian Aroma Sovage" must NOT match).
  * Short names (≤2 tokens): all tokens must match.
- * Medium names (3-4 tokens): ≥60% tokens must match.
- * Long names (5+ tokens): ≥50% tokens must match.
+ * Medium names (3-4 tokens): ≥80% tokens must match.
+ * Long names (5+ tokens): ≥75% tokens must match.
  */
 function isProductNameMatch(expected: string, detected: string): boolean {
   if (!expected || !detected) return false;
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   const eNorm = norm(expected);
   const dNorm = norm(detected);
-  // Direct substring: if either fully contains the other
-  if (eNorm.length >= 4 && dNorm.length >= 4 && (eNorm.includes(dNorm) || dNorm.includes(eNorm))) return true;
+  // Direct substring: if either fully contains the other.
+  // Guard: the shorter string must be at least 40% the length of the longer
+  // to prevent short generic words (e.g. "perfume") from matching long product names.
+  if (eNorm.length >= 4 && dNorm.length >= 4) {
+    const shorter = Math.min(eNorm.length, dNorm.length);
+    const longer = Math.max(eNorm.length, dNorm.length);
+    if (shorter / longer >= 0.4 && (eNorm.includes(dNorm) || dNorm.includes(eNorm))) return true;
+  }
 
   const tokenize = (s: string) => {
     const all = s.split(/\s+/).filter(t => t.length >= 2);
@@ -129,11 +135,13 @@ function isProductNameMatch(expected: string, detected: string): boolean {
     )
   ).length;
 
-  // Strict thresholds: short names must fully match, longer names need ≥50-60%
+  // Strict thresholds: ALL significant tokens must match (100% match policy).
+  // Short names (≤2 tokens): ALL must match. 3-4 tokens: ≥80%. 5+ tokens: ≥75%.
+  // Fuzzy matching (edit distance ≤1) already absorbs minor OCR typos.
   const ratio = matchedCount / eTokens.length;
-  if (eTokens.length <= 2) return matchedCount >= eTokens.length; // ALL tokens must match for short names
-  if (eTokens.length <= 4) return ratio >= 0.6 || matchedCount >= 3;
-  return ratio >= 0.5;
+  if (eTokens.length <= 2) return matchedCount >= eTokens.length;
+  if (eTokens.length <= 4) return ratio >= 0.8;
+  return ratio >= 0.75;
 }
 
 // ── Confidence Score Constants ──
@@ -1216,6 +1224,23 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
         // Clamp confidenceScore to 0-100
         parsed.confidenceScore = Math.max(0, Math.min(100, parsed.confidenceScore ?? 0));
 
+        // Post-process: Validate productNameMatch using robust token matching.
+        if (payload.expectedProductName && parsed.detectedProductName) {
+          const serverMatch = isProductNameMatch(payload.expectedProductName, parsed.detectedProductName);
+          if (serverMatch && !parsed.productNameMatch) {
+            parsed.productNameMatch = true; // override Gemini false-negative
+          } else if (!serverMatch && parsed.productNameMatch) {
+            // Override Gemini false-positive when token overlap is very low
+            const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+            const eTokens = norm(payload.expectedProductName).split(/\s+/).filter(t => t.length >= 3 && !PRODUCT_STOP_WORDS.has(t));
+            const dTokens = norm(parsed.detectedProductName).split(/\s+/).filter(t => t.length >= 3 && !PRODUCT_STOP_WORDS.has(t));
+            const overlap = eTokens.filter(et => dTokens.some(dt => dt === et || (et.length >= 4 && dt.includes(et)) || (dt.length >= 4 && et.includes(dt)))).length;
+            if (eTokens.length > 0 && overlap / eTokens.length < 0.5) {
+              parsed.productNameMatch = false;
+            }
+          }
+        }
+
         aiLog.info('Gemini proof usage estimate', { model, estimatedTokens });
 
         recordGeminiSuccess();
@@ -1469,23 +1494,21 @@ async function verifyRatingWithOcr(
       }
     }
 
-    // Product name matching: check if significant keywords from product name appear
+    // Product name matching: use the same robust isProductNameMatch algorithm used
+    // by Gemini post-processing, ensuring consistent thresholds across AI and OCR paths.
+    // We also extract matched tokens for confidence scoring and discrepancy reporting.
+    const productNameMatch = isProductNameMatch(expectedProductName, ocrText);
+    // Extract matched tokens for confidence scoring
     const allProductTokens = expectedProductName.toLowerCase()
       .replace(/[^a-z0-9\s]/g, ' ')
       .split(/\s+/)
       .filter(t => t.length >= 3);
-    const filteredProductTokens = allProductTokens.filter(t => !STOP_WORDS.has(t));
+    const filteredProductTokens = allProductTokens.filter(t => !PRODUCT_STOP_WORDS.has(t));
     const productTokens = filteredProductTokens.length > 0 ? filteredProductTokens : allProductTokens;
-    // Match tokens: exact substring OR fuzzy (1-char edit distance for tokens ≥5 chars, handles OCR misreads)
     const matchedTokens = productTokens.filter(t =>
       lower.includes(t) ||
       (t.length >= 5 && lower.split(/\s+/).some(w => w.length >= t.length - 1 && w.length <= t.length + 1 && editDistance(w, t) <= 1))
     );
-    // Adaptive threshold: strict for short product names, moderate for longer ones
-    const productThreshold = productTokens.length <= 2 ? productTokens.length
-      : productTokens.length <= 4 ? Math.max(2, Math.ceil(productTokens.length * 0.6))
-      : Math.max(3, Math.ceil(productTokens.length * 0.5));
-    const productNameMatch = matchedTokens.length >= productThreshold;
 
     // Graduated confidence scoring — partial matches contribute proportionally
     let confidenceScore: number = CONFIDENCE.RATING_BASE;
@@ -1559,12 +1582,16 @@ export async function verifyRatingScreenshotWithAi(
               `  Expected Product Name: ${payload.expectedProductName}`,
               ``,
               `RULES:`,
-              `1. Find the REVIEWER / ACCOUNT NAME shown in the screenshot. This is the person who wrote the review or gave the rating. It may appear as "public name", "profile name", or at the top of the review.`,
+              `1. Find the REVIEWER / ACCOUNT NAME shown in the screenshot. Look in MULTIPLE locations:`,
+              `   a) At the TOP of the page — Amazon shows a greeting like "Hello, <Name>" or "Hi, <Name>" in the account/profile header area. Extract just the name part (strip "Hello", "Hi", etc.).`,
+              `   b) BESIDE "Edit public name" or "Public name" label — this shows the marketplace profile display name used for reviews (e.g., "Chetan Chaudhari"). This is the MOST RELIABLE name.`,
+              `   c) BELOW the review text — the reviewer name next to the review/rating stars.`,
+              `   The name from location (b) beside "Edit public name" is the MOST IMPORTANT. If it matches the expected name, set accountNameMatch=true even if the greeting name differs slightly.`,
               ...(payload.expectedReviewerName
-                ? [`2. Compare the account name PRIMARILY with the marketplace reviewer name "${payload.expectedReviewerName}". The buyer may have ordered from a DIFFERENT marketplace account than their app account — this is acceptable. Only match against "${payload.expectedReviewerName}". Allow for nickname variations, case differences, and abbreviated names.`]
+                ? [`2. Compare the account name PRIMARILY with the marketplace reviewer name "${payload.expectedReviewerName}". Check ALL name locations found above. If ANY matches "${payload.expectedReviewerName}" (allowing case differences, abbreviated names, or first-name-only match), set accountNameMatch=true. The buyer may have ordered from a DIFFERENT marketplace account than their app account — this is acceptable. Only match against "${payload.expectedReviewerName}".`]
                 : [`2. Compare the account name with "${payload.expectedBuyerName}" — allow for nickname variations, case differences, and abbreviated names.`]),
-              `3. Find the PRODUCT NAME visible in the rating screenshot. Compare it to "${payload.expectedProductName}" — the product must be the EXACT SAME product. ALL significant words (brand, model, variant name, fragrance/flavor, size, color, capacity) must match. CRITICAL: The same brand often has many DIFFERENT products with very similar names (e.g. "Arabian Aroma Old Money Eau de Parfum 50ml" vs "Arabian Aroma Sovage Perfume 50ml" — these are DIFFERENT products even though both are Arabian Aroma perfumes). If even ONE distinguishing word (like the product line name, model number, or variant) differs, set productNameMatch=false.`,
-              `4. If the account name does not match the expected name or the product does not match, this is potential FRAUD (someone rating a different product or using a different account). ALWAYS default to false when uncertain.`,
+              `3. Find the PRODUCT NAME visible in the rating screenshot. The product may only be PARTIALLY visible (truncated by the UI) — extract whatever product text IS visible. Compare it to "${payload.expectedProductName}" — ALL visible significant words (brand, model, variant name, fragrance/flavor, size, color) must match the corresponding parts of the expected name. CRITICAL: The same brand often has many DIFFERENT products with very similar names. If even ONE distinguishing word differs, set productNameMatch=false. But if the visible portion is a proper PREFIX/SUBSET of the expected name with no conflicting words, set productNameMatch=true.`,
+              `4. If the account name does not match the expected name or the product does not match, this is potential FRAUD. ALWAYS default to false when uncertain.`,
               `5. Set confidenceScore 0-100 based on how clearly visible and matching both fields are.`,
               `6. Always fill detectedAccountName and detectedProductName with what you actually see.`,
             ].join('\n') },
@@ -1663,7 +1690,7 @@ export async function verifyRatingScreenshotWithAi(
             const eTokens = eNorm.split(/\s+/).filter(t => t.length >= 3 && !PRODUCT_STOP_WORDS.has(t));
             const dTokens = dNorm.split(/\s+/).filter(t => t.length >= 3 && !PRODUCT_STOP_WORDS.has(t));
             const overlap = eTokens.filter(et => dTokens.some(dt => dt === et || dt.includes(et) || et.includes(dt))).length;
-            if (eTokens.length > 0 && overlap / eTokens.length < 0.3) {
+            if (eTokens.length > 0 && overlap / eTokens.length < 0.5) {
               parsed.productNameMatch = false;
               parsed.discrepancyNote = `Product mismatch: expected "${payload.expectedProductName}", detected "${parsed.detectedProductName}".`;
             }

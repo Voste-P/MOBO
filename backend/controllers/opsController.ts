@@ -3011,8 +3011,24 @@ export function makeOpsController(env: Env) {
         const agencyCode = await assertOrderAccess(order, roles, requester);
 
         const wf = String((order as any).workflowStatus || 'CREATED');
-        if (['REJECTED'].includes(wf)) {
+        if (!['UNDER_REVIEW', 'PROOF_SUBMITTED', 'APPROVED'].includes(wf)) {
           throw new AppError(409, 'INVALID_WORKFLOW_STATE', `Cannot force approve in state ${wf}`);
+        }
+
+        // Non-admin/ops users MUST have all required proofs uploaded before force approving.
+        // Only admin/ops can truly bypass proof requirements.
+        if (!isPrivileged(roles)) {
+          const required = getRequiredStepsForOrder(order);
+          const missingProofs = required.filter((t) => !hasProofForRequirement(order, t));
+          if (missingProofs.length) {
+            throw new AppError(409, 'MISSING_PROOFS',
+              `Cannot approve: buyer has not uploaded ${missingProofs.map(p => p === 'returnWindow' ? 'return window' : p).join(', ')} proof yet. Request the buyer to upload all required proofs first.`);
+          }
+          // Also require the order/purchase proof to exist
+          if (!order.screenshotOrder && !order.screenshotPayment) {
+            throw new AppError(409, 'MISSING_PROOFS',
+              'Cannot approve: buyer has not uploaded purchase proof yet.');
+          }
         }
 
         if (order.affiliateStatus !== 'Pending_Cooling') {

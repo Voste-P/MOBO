@@ -326,11 +326,50 @@ export const Orders: React.FC = () => {
     } catch { /* silently degrade — tickets are secondary */ }
   };
 
+  // Merge a submitClaim response (toUiOrder) into the orders list so the UI
+  // updates instantly without waiting for a full refetch. This ensures the
+  // next proof upload button appears immediately after a successful upload.
+  const mergeSubmitResponse = useCallback((updated: any) => {
+    if (!updated || !updated.id) return;
+    setOrders((prev: any) => {
+      if (!Array.isArray(prev)) return prev;
+      return prev.map((o: Order) => {
+        if (o.id !== updated.id) return o;
+        // Merge only the fields the list view needs from the full response
+        return {
+          ...o,
+          screenshots: {
+            order: updated.screenshots?.order ? 'exists' : o.screenshots?.order || null,
+            payment: updated.screenshots?.payment ? 'exists' : o.screenshots?.payment || null,
+            review: updated.screenshots?.review ? 'exists' : o.screenshots?.review || null,
+            rating: updated.screenshots?.rating ? 'exists' : o.screenshots?.rating || null,
+            returnWindow: updated.screenshots?.returnWindow ? 'exists' : o.screenshots?.returnWindow || null,
+          },
+          reviewLink: updated.reviewLink || o.reviewLink,
+          reviewerName: updated.reviewerName || o.reviewerName,
+          verification: updated.verification !== undefined ? updated.verification : o.verification,
+          requirements: updated.requirements !== undefined ? updated.requirements : o.requirements,
+          workflowStatus: updated.workflowStatus !== undefined ? updated.workflowStatus : o.workflowStatus,
+          status: updated.status !== undefined ? updated.status : o.status,
+          affiliateStatus: updated.affiliateStatus !== undefined ? updated.affiliateStatus : o.affiliateStatus,
+          rejection: updated.rejection !== undefined ? updated.rejection : o.rejection,
+          missingProofRequests: updated.missingProofRequests !== undefined ? updated.missingProofRequests : o.missingProofRequests,
+        };
+      });
+    });
+  }, []);
+
   const loadOrders = async () => {
     if (!user?.id) return;
     try {
       const data = await api.orders.getUserOrders(user.id);
       setOrders(data);
+      // Keep selectedOrder in sync with refreshed data
+      setSelectedOrder((prev) => {
+        if (!prev) return prev;
+        const refreshed = (data as Order[]).find((o: Order) => o.id === prev.id);
+        return refreshed || null;
+      });
       // Keep proof modal in sync with refreshed data
       setProofToView((prev) => {
         if (!prev) return prev;
@@ -378,7 +417,8 @@ export const Orders: React.FC = () => {
   }, [user]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.[0] || !selectedOrder) return;
+    if (!e.target.files?.[0] || !selectedOrder || isUploading || submittingRef.current) return;
+    submittingRef.current = true;
     setIsUploading(true);
     try {
       const file = e.target.files[0];
@@ -387,7 +427,7 @@ export const Orders: React.FC = () => {
         throw new Error(err === 'too_large' ? 'Image too large (max 10 MB).' : 'Please upload a PNG, JPG, or WebP image.');
       }
       const reviewerName = reviewerNameInput.trim() || selectedOrder.reviewerName || '';
-      await api.orders.submitClaim(selectedOrder.id, {
+      const resp = await api.orders.submitClaim(selectedOrder.id, {
         type: uploadType,
         data: await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
@@ -398,25 +438,29 @@ export const Orders: React.FC = () => {
         ...(reviewerName ? { reviewerName } : {}),
       });
       toast.success('Proof uploaded!');
+      mergeSubmitResponse(resp);
       setSelectedOrder(null);
       loadOrders();
     } catch (err: any) {
       toast.error(formatErrorMessage(err, 'Failed to upload proof'));
     } finally {
       setIsUploading(false);
+      submittingRef.current = false;
     }
   };
 
   const handleSubmitLink = async () => {
-    if (!inputValue || !selectedOrder) return;
+    if (!inputValue || !selectedOrder || isUploading || submittingRef.current) return;
+    submittingRef.current = true;
     setIsUploading(true);
     try {
       if (!isValidReviewLink(inputValue)) {
         throw new Error('Please enter a valid HTTPS review link from a recognized marketplace (Amazon, Flipkart, Myntra, etc.).');
       }
       const reviewerName = reviewerNameInput?.trim() || selectedOrder.reviewerName || '';
-      await api.orders.submitClaim(selectedOrder.id, { type: 'review', data: inputValue, ...(reviewerName ? { reviewerName } : {}) });
+      const resp = await api.orders.submitClaim(selectedOrder.id, { type: 'review', data: inputValue, ...(reviewerName ? { reviewerName } : {}) });
       toast.success('Link submitted!');
+      mergeSubmitResponse(resp);
       setSelectedOrder(null);
       setInputValue('');
       loadOrders();
@@ -424,6 +468,7 @@ export const Orders: React.FC = () => {
       toast.error(formatErrorMessage(e, 'Failed to submit link'));
     } finally {
       setIsUploading(false);
+      submittingRef.current = false;
     }
   };
 
@@ -651,7 +696,7 @@ export const Orders: React.FC = () => {
       if (process.env.NODE_ENV !== 'production') console.error('Rating pre-validation failed:', err);
       // Keep verification null — submit button stays disabled until user retries
       setRatingVerification(null);
-      const msg = err?.response?.data?.error || err?.message || 'AI verification failed. Please try uploading the screenshot again.';
+      const msg = err?.message || 'AI verification failed. Please try uploading the screenshot again.';
       toast.error(msg);
     } finally {
       setRatingAnalyzing(false);
@@ -660,7 +705,7 @@ export const Orders: React.FC = () => {
 
   // Submit the pre-validated rating screenshot
   const submitRatingScreenshot = async () => {
-    if (!ratingFile || !selectedOrder || isUploading) return;
+    if (!ratingFile || !selectedOrder || isUploading || submittingRef.current) return;
 
     // Block if AI verification hasn't completed yet (file uploaded but not verified)
     if (!ratingVerification) {
@@ -683,6 +728,7 @@ export const Orders: React.FC = () => {
     }
 
     setIsUploading(true);
+    submittingRef.current = true;
     try {
       const data = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -691,8 +737,9 @@ export const Orders: React.FC = () => {
         reader.readAsDataURL(ratingFile);
       });
       const reviewerName = selectedOrder.reviewerName || '';
-      await api.orders.submitClaim(selectedOrder.id, { type: uploadType, data, ...(reviewerName ? { reviewerName } : {}) });
+      const resp = await api.orders.submitClaim(selectedOrder.id, { type: 'rating', data, ...(reviewerName ? { reviewerName } : {}) });
       toast.success('Proof uploaded!');
+      mergeSubmitResponse(resp);
       setSelectedOrder(null);
       setRatingPreview(null);
       setRatingFile(null);
@@ -702,6 +749,7 @@ export const Orders: React.FC = () => {
       toast.error(formatErrorMessage(err, 'Failed to upload proof'));
     } finally {
       setIsUploading(false);
+      submittingRef.current = false;
     }
   };
 
@@ -762,7 +810,7 @@ export const Orders: React.FC = () => {
       if (process.env.NODE_ENV !== 'production') console.error('Return window pre-validation failed:', err);
       // Keep verification null — submit button stays disabled until user retries
       setRwVerification(null);
-      const msg = err?.response?.data?.error || err?.message || 'AI verification failed. Please try uploading the screenshot again.';
+      const msg = err?.message || 'AI verification failed. Please try uploading the screenshot again.';
       toast.error(msg);
     } finally {
       setRwAnalyzing(false);
@@ -771,7 +819,7 @@ export const Orders: React.FC = () => {
 
   // Submit the pre-validated return window screenshot
   const submitReturnWindowScreenshot = async () => {
-    if (!rwFile || !selectedOrder || isUploading) return;
+    if (!rwFile || !selectedOrder || isUploading || submittingRef.current) return;
 
     // Block if AI verification hasn't completed yet (file uploaded but not verified)
     if (!rwVerification) {
@@ -794,6 +842,7 @@ export const Orders: React.FC = () => {
     }
 
     setIsUploading(true);
+    submittingRef.current = true;
     try {
       const data = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -802,8 +851,9 @@ export const Orders: React.FC = () => {
         reader.readAsDataURL(rwFile);
       });
       const reviewerName = selectedOrder.reviewerName || '';
-      await api.orders.submitClaim(selectedOrder.id, { type: 'returnWindow', data, ...(reviewerName ? { reviewerName } : {}) });
+      const resp = await api.orders.submitClaim(selectedOrder.id, { type: 'returnWindow', data, ...(reviewerName ? { reviewerName } : {}) });
       toast.success('Return window proof uploaded!');
+      mergeSubmitResponse(resp);
       setSelectedOrder(null);
       setRwPreview(null);
       setRwFile(null);
@@ -813,6 +863,7 @@ export const Orders: React.FC = () => {
       toast.error(formatErrorMessage(err, 'Failed to upload proof'));
     } finally {
       setIsUploading(false);
+      submittingRef.current = false;
     }
   };
 
@@ -1318,9 +1369,9 @@ export const Orders: React.FC = () => {
                                 ? 'bg-green-500 text-white'
                                 : rejectionType === 'returnWindow'
                                   ? 'bg-red-500 text-white'
-                                  : !missingProofs.includes('returnWindow') && (ratingVerified || !requiredSteps.includes('rating'))
+                                  : !missingProofs.includes('returnWindow') && (ratingVerified || !requiredSteps.includes('rating')) && (reviewVerified || !requiredSteps.includes('review'))
                                     ? 'bg-purple-500 text-white'
-                                    : (ratingVerified || !requiredSteps.includes('rating'))
+                                    : (ratingVerified || !requiredSteps.includes('rating')) && (reviewVerified || !requiredSteps.includes('review'))
                                       ? 'bg-yellow-400 text-yellow-900'
                                       : 'bg-slate-200 text-slate-400'
                             }`}>
@@ -2108,6 +2159,7 @@ export const Orders: React.FC = () => {
               )}
 
               {/* Return Window Proof */}
+              {(proofToView.items?.[0]?.dealType === 'Rating' || proofToView.items?.[0]?.dealType === 'Review') && (
               <div className="space-y-2">
                 <div className="text-xs font-bold uppercase text-slate-400 tracking-wide">Return Window Proof</div>
                 {(proofToView.screenshots as any)?.returnWindow ? (
@@ -2130,6 +2182,7 @@ export const Orders: React.FC = () => {
                   />
                 )}
               </div>
+              )}
 
 
             </div>

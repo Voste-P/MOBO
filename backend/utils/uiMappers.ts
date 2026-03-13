@@ -178,10 +178,32 @@ export function toUiOrderSummary(o: any) {
   const requiresRating = dealTypes.includes('Rating');
   const requiresReturnWindow = requiresReview || requiresRating;
 
+  const hasReviewProof = !!(o.reviewLink || o.screenshots?.review);
+  const hasRatingProof = !!o.screenshots?.rating;
+  const hasReturnWindowProof = !!o.screenshots?.returnWindow;
+
   const orderVerifiedAt = verification.order?.verifiedAt ? new Date(verification.order.verifiedAt) : null;
   const reviewVerifiedAt = verification.review?.verifiedAt ? new Date(verification.review.verifiedAt) : null;
   const ratingVerifiedAt = verification.rating?.verifiedAt ? new Date(verification.rating.verifiedAt) : null;
   const returnWindowVerifiedAt = verification.returnWindow?.verifiedAt ? new Date(verification.returnWindow.verifiedAt) : null;
+
+  const requiredSteps: Array<'review' | 'rating' | 'returnWindow'> = [
+    ...(requiresReview ? (['review'] as const) : []),
+    ...(requiresRating ? (['rating'] as const) : []),
+    ...(requiresReturnWindow ? (['returnWindow'] as const) : []),
+  ];
+
+  const missingProofs: Array<'review' | 'rating' | 'returnWindow'> = [
+    ...(requiresReview && !hasReviewProof ? (['review'] as const) : []),
+    ...(requiresRating && !hasRatingProof ? (['rating'] as const) : []),
+    ...(requiresReturnWindow && !hasReturnWindowProof ? (['returnWindow'] as const) : []),
+  ];
+
+  const missingVerifications: Array<'review' | 'rating' | 'returnWindow'> = [
+    ...(requiresReview && !reviewVerifiedAt ? (['review'] as const) : []),
+    ...(requiresRating && !ratingVerifiedAt ? (['rating'] as const) : []),
+    ...(requiresReturnWindow && !returnWindowVerifiedAt ? (['returnWindow'] as const) : []),
+  ];
 
   return {
     id: String(o._id ?? o.id),
@@ -205,9 +227,9 @@ export function toUiOrderSummary(o: any) {
     affiliateStatus: o.affiliateStatus,
     externalOrderId: o.externalOrderId,
     hasOrderProof: !!(o.screenshots?.order || o.screenshots?.payment),
-    hasReviewProof: !!(o.reviewLink || o.screenshots?.review),
-    hasRatingProof: !!o.screenshots?.rating,
-    hasReturnWindowProof: !!o.screenshots?.returnWindow,
+    hasReviewProof,
+    hasRatingProof,
+    hasReturnWindowProof,
     // Lightweight screenshots flags (truthy markers, NOT base64 data)
     // Enables frontend proof indicators and ProofImage component checks
     screenshots: {
@@ -225,12 +247,13 @@ export function toUiOrderSummary(o: any) {
       returnWindowVerified: !!returnWindowVerifiedAt,
     },
     requirements: {
-      required: [
-        ...(requiresReview ? (['review'] as const) : []),
-        ...(requiresRating ? (['rating'] as const) : []),
-        ...(requiresReturnWindow ? (['returnWindow'] as const) : []),
-      ],
+      required: requiredSteps,
+      missingProofs,
+      missingVerifications,
     },
+    missingProofRequests: Array.isArray(o.missingProofRequests)
+      ? o.missingProofRequests.map((r: any) => ({ type: r?.type, note: r?.note }))
+      : [],
     rejection: o.rejection
       ? { type: o.rejection.type, reason: o.rejection.reason }
       : undefined,
@@ -258,10 +281,32 @@ export function toUiOrderSummaryForBrand(o: any) {
   const requiresRating = dealTypes.includes('Rating');
   const requiresReturnWindow = requiresReview || requiresRating;
 
+  const hasReviewProof = !!(o.reviewLink || o.screenshots?.review);
+  const hasRatingProof = !!o.screenshots?.rating;
+  const hasReturnWindowProof = !!o.screenshots?.returnWindow;
+
   const orderVerifiedAt = verification.order?.verifiedAt ? new Date(verification.order.verifiedAt) : null;
   const reviewVerifiedAt = verification.review?.verifiedAt ? new Date(verification.review.verifiedAt) : null;
   const ratingVerifiedAt = verification.rating?.verifiedAt ? new Date(verification.rating.verifiedAt) : null;
   const returnWindowVerifiedAt = verification.returnWindow?.verifiedAt ? new Date(verification.returnWindow.verifiedAt) : null;
+
+  const requiredSteps: Array<'review' | 'rating' | 'returnWindow'> = [
+    ...(requiresReview ? (['review'] as const) : []),
+    ...(requiresRating ? (['rating'] as const) : []),
+    ...(requiresReturnWindow ? (['returnWindow'] as const) : []),
+  ];
+
+  const missingProofs: Array<'review' | 'rating' | 'returnWindow'> = [
+    ...(requiresReview && !hasReviewProof ? (['review'] as const) : []),
+    ...(requiresRating && !hasRatingProof ? (['rating'] as const) : []),
+    ...(requiresReturnWindow && !hasReturnWindowProof ? (['returnWindow'] as const) : []),
+  ];
+
+  const missingVerifications: Array<'review' | 'rating' | 'returnWindow'> = [
+    ...(requiresReview && !reviewVerifiedAt ? (['review'] as const) : []),
+    ...(requiresRating && !ratingVerifiedAt ? (['rating'] as const) : []),
+    ...(requiresReturnWindow && !returnWindowVerifiedAt ? (['returnWindow'] as const) : []),
+  ];
 
   return {
     id: String(o._id ?? o.id),
@@ -281,9 +326,9 @@ export function toUiOrderSummaryForBrand(o: any) {
     affiliateStatus: o.affiliateStatus,
     externalOrderId: o.externalOrderId,
     hasOrderProof: !!(o.screenshots?.order || o.screenshots?.payment),
-    hasReviewProof: !!(o.reviewLink || o.screenshots?.review),
-    hasRatingProof: !!o.screenshots?.rating,
-    hasReturnWindowProof: !!o.screenshots?.returnWindow,
+    hasReviewProof,
+    hasRatingProof,
+    hasReturnWindowProof,
     // Lightweight screenshots flags (truthy markers, NOT base64 data)
     screenshots: {
       order: o.screenshots?.order ? 'exists' : null,
@@ -300,11 +345,9 @@ export function toUiOrderSummaryForBrand(o: any) {
       returnWindowVerified: !!returnWindowVerifiedAt,
     },
     requirements: {
-      required: [
-        ...(requiresReview ? (['review'] as const) : []),
-        ...(requiresRating ? (['rating'] as const) : []),
-        ...(requiresReturnWindow ? (['returnWindow'] as const) : []),
-      ],
+      required: requiredSteps,
+      missingProofs,
+      missingVerifications,
     },
     rejection: o.rejection
       ? { type: o.rejection.type, reason: o.rejection.reason }

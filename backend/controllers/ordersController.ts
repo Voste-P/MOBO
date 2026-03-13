@@ -989,6 +989,26 @@ export function makeOrdersController(env: Env) {
           }
         }
 
+        // Duplicate screenshot detection: prevent buyer from submitting the same image
+        // for different proof types (e.g. using same order screenshot as return window proof).
+        // Only applies to image uploads (not review links).
+        if (body.type !== 'review' && body.data) {
+          const proofData = body.data.includes(',') ? body.data.split(',')[1]! : body.data;
+          const existingScreenshots: Array<{ field: string; value: string | null }> = [
+            { field: 'order', value: order.screenshotOrder },
+            { field: 'rating', value: order.screenshotRating },
+            { field: 'returnWindow', value: order.screenshotReturnWindow },
+          ].filter(s => s.field !== body.type && s.value); // only compare against OTHER proof types
+
+          for (const existing of existingScreenshots) {
+            const existingData = existing.value!.includes(',') ? existing.value!.split(',')[1]! : existing.value!;
+            if (proofData === existingData) {
+              throw new AppError(422, 'DUPLICATE_SCREENSHOT',
+                `This screenshot is identical to your ${existing.field} proof. Please upload a different screenshot for ${body.type} proof.`);
+            }
+          }
+        }
+
         // Build the update payload incrementally
         const updateData: any = {};
         let aiOrderVerification: any = null;

@@ -199,12 +199,13 @@ export const orderListSelect = {
   updatedAt: true,
   // Relations — items needed for deal type / platform info
   items: true,
+  // missingProofRequests: small JSONB array needed for "Action Required" banners
+  missingProofRequests: true,
   // EXCLUDED (heavy):
   // - events (JSONB array, can be huge)
   // - orderAiVerification (JSONB)
   // - ratingAiVerification (JSONB)
   // - returnWindowAiVerification (JSONB)
-  // - missingProofRequests (JSONB array)
 } as const;
 
 /**
@@ -253,6 +254,8 @@ export const orderListSelectLite = {
   updatedAt: true,
   // Relations — items only need deal type / platform info for list view
   items: { select: { dealType: true, platform: true, brandName: true, title: true, image: true, quantity: true, priceAtPurchasePaise: true } },
+  // missingProofRequests: small JSONB array needed for "Action Required" banners
+  missingProofRequests: true,
 } as const;
 
 /**

@@ -2598,8 +2598,17 @@ export const MediatorDashboard: React.FC = () => {
             {/* Force Approve & Cancel */}
             <button
               onClick={() => { setActionNote(''); setApproveModalOpen(true); }}
-              className="flex-1 py-4 bg-emerald-500/20 text-emerald-200 font-bold text-sm rounded-[1.2rem] hover:bg-emerald-500/30 transition-colors"
-              title="Force approve order to cooling period"
+              disabled={!!(proofModal?.requirements?.missingProofs as string[] ?? []).length}
+              className={`flex-1 py-4 font-bold text-sm rounded-[1.2rem] transition-colors ${
+                (proofModal?.requirements?.missingProofs as string[] ?? []).length
+                  ? 'bg-slate-500/20 text-slate-400 cursor-not-allowed'
+                  : 'bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30'
+              }`}
+              title={
+                (proofModal?.requirements?.missingProofs as string[] ?? []).length
+                  ? `Buyer hasn't uploaded: ${(proofModal?.requirements?.missingProofs as string[] ?? []).join(', ')}`
+                  : 'Force approve order to cooling period'
+              }
             >
               Approve
             </button>
