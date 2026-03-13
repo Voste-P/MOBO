@@ -454,11 +454,14 @@ export function makeOrdersController(env: Env) {
           if (!Number.isFinite(expectedAmount) || expectedAmount <= 0) {
             throw new AppError(400, 'INVALID_ORDER_AMOUNT', 'Unable to process your order. Please check the order details and try again.');
           }
+          // Product name from deal/item for AI matching (user said 100% product name match required)
+          const expectedProductName = String(item.title || '').trim();
           const aiStart = Date.now();
           const verification = await verifyProofWithAi(env, {
             imageBase64: body.screenshots.order,
             expectedOrderId: resolvedExternalOrderId || body.externalOrderId || '',
             expectedAmount,
+            ...(expectedProductName ? { expectedProductName } : {}),
           });
           logPerformance({
             operation: 'AI_ORDER_PROOF_VERIFICATION',
@@ -472,6 +475,18 @@ export function makeOrdersController(env: Env) {
               422,
               'INVALID_ORDER_PROOF',
               'Your order proof could not be verified. Please upload a clear screenshot showing the order ID and amount.'
+            );
+          }
+          // Hard-block: product name must match when expected product name is available
+          if (expectedProductName && verification?.productNameMatch === false
+            && (verification?.confidenceScore ?? 0) > 0) {
+            throw new AppError(
+              422,
+              'PRODUCT_NAME_MISMATCH',
+              'The product in the screenshot does not match the selected deal. ' +
+              `Expected "${expectedProductName}"` +
+              (verification?.detectedProductName ? `, detected "${verification.detectedProductName}"` : '') +
+              '. Please upload the correct order screenshot.'
             );
           }
           aiOrderConfidence = verification?.confidenceScore ?? 0;

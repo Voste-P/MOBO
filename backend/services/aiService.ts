@@ -95,8 +95,12 @@ const PRODUCT_STOP_WORDS = new Set(['the','for','and','with','from','that','this
  * Robust product name token matching.
  * Tokenizes both expected and detected names, then checks overlap using
  * substring containment and fuzzy edit distance. Returns true when enough
- * significant tokens match (≥40% for 4+ tokens, ≥1 for short names).
- * Also handles brand-first-word matching and partial OCR reads.
+ * significant tokens match. Thresholds are strict to prevent different
+ * products from the same brand matching (e.g. "Arabian Aroma Old Money"
+ * vs "Arabian Aroma Sovage" must NOT match).
+ * Short names (≤2 tokens): all tokens must match.
+ * Medium names (3-4 tokens): ≥60% tokens must match.
+ * Long names (5+ tokens): ≥50% tokens must match.
  */
 function isProductNameMatch(expected: string, detected: string): boolean {
   if (!expected || !detected) return false;
@@ -125,11 +129,11 @@ function isProductNameMatch(expected: string, detected: string): boolean {
     )
   ).length;
 
-  // Adaptive threshold: lenient for short product names, stricter for long names
+  // Strict thresholds: short names must fully match, longer names need ≥50-60%
   const ratio = matchedCount / eTokens.length;
-  if (eTokens.length <= 2) return matchedCount >= 1;
-  if (eTokens.length <= 4) return ratio >= 0.4 || matchedCount >= 2;
-  return ratio >= 0.4;
+  if (eTokens.length <= 2) return matchedCount >= eTokens.length; // ALL tokens must match for short names
+  if (eTokens.length <= 4) return ratio >= 0.6 || matchedCount >= 3;
+  return ratio >= 0.5;
 }
 
 // ── Confidence Score Constants ──
@@ -894,6 +898,7 @@ async function verifyProofWithOcr(
   imageBase64: string,
   expectedOrderId: string,
   expectedAmount: number,
+  expectedProductName?: string,
 ): Promise<ProofVerificationResult> {
   try {
     const rawData = imageBase64.includes(',') ? imageBase64.split(',')[1]! : imageBase64;
@@ -1070,14 +1075,19 @@ async function verifyProofWithOcr(
     if (amountMatch) confidenceScore += CONFIDENCE.OCR_AMOUNT_BONUS;
     if (orderIdMatch && amountMatch) confidenceScore = Math.min(confidenceScore + CONFIDENCE.OCR_BOTH_BONUS, CONFIDENCE.OCR_MAX_CAP);
 
+    // Product name matching via OCR (when expected product name provided)
+    const productNameMatch = expectedProductName ? isProductNameMatch(expectedProductName, ocrText) : undefined;
+
     const detectedNotes: string[] = [];
     if (!orderIdMatch) detectedNotes.push(`Order ID "${expectedOrderId}" not found in screenshot.`);
     if (!amountMatch) detectedNotes.push(`Amount ₹${expectedAmount} not found in screenshot.`);
+    if (expectedProductName && productNameMatch === false) detectedNotes.push('Product name mismatch.');
     if (orderIdMatch && amountMatch) detectedNotes.push('Both order ID and amount matched via OCR.');
 
     return {
       orderIdMatch,
       amountMatch,
+      ...(productNameMatch !== undefined ? { productNameMatch } : {}),
       confidenceScore,
       discrepancyNote: detectedNotes.join(' ') || 'OCR fallback verification complete.',
     };
@@ -1125,7 +1135,7 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
 
   // If Gemini is not available or circuit breaker is open, fall back to OCR-based verification.
   if (!geminiAvailable || isGeminiCircuitOpen()) {
-    const ocrResult = await verifyProofWithOcr(payload.imageBase64, payload.expectedOrderId, payload.expectedAmount);
+    const ocrResult = await verifyProofWithOcr(payload.imageBase64, payload.expectedOrderId, payload.expectedAmount, payload.expectedProductName);
     return { ...ocrResult, verificationMethod: 'ocr' as const };
   }
 
@@ -1234,7 +1244,7 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
     });
     aiLog.error('Gemini proof verification error', { error });
     // Fall back to OCR when Gemini fails at runtime.
-    const ocrResult = await verifyProofWithOcr(payload.imageBase64, payload.expectedOrderId, payload.expectedAmount);
+    const ocrResult = await verifyProofWithOcr(payload.imageBase64, payload.expectedOrderId, payload.expectedAmount, payload.expectedProductName);
     logPerformance({
       operation: 'AI_VERIFY_PROOF',
       durationMs: Date.now() - _aiStart,
@@ -1391,17 +1401,21 @@ async function verifyRatingWithOcr(
     // When reviewerName is provided, it is the PRIMARY match target
     if (expectedReviewerName) {
       const reviewerLower = expectedReviewerName.toLowerCase().trim();
+      // Strip greeting prefixes from OCR text lines for better matching
+      // e.g. "Hello Chetan" → "Chetan" should match "Chetan Chaudhari"
+      const GREETING_OCR_RE = /\b(hello|hi|hey|dear|welcome|namaste|good\s*(morning|afternoon|evening))\s*,?\s*/gi;
+      const lowerStripped = lower.replace(GREETING_OCR_RE, ' ');
       const allReviewerParts = reviewerLower.split(/\s+/).filter(p => p.length >= 2);
       const filteredReviewerParts = allReviewerParts.filter(p => !STOP_WORDS.has(p));
       const reviewerParts = filteredReviewerParts.length > 0 ? filteredReviewerParts : allReviewerParts;
 
-      // Strategy 1: full reviewer name substring
-      if (reviewerLower.length >= 3 && lower.includes(reviewerLower)) {
+      // Strategy 1: full reviewer name substring (check both raw and greeting-stripped)
+      if (reviewerLower.length >= 3 && (lower.includes(reviewerLower) || lowerStripped.includes(reviewerLower))) {
         accountNameMatch = true;
       }
-      // Strategy 2: reviewer name parts
+      // Strategy 2: reviewer name parts (check both raw and greeting-stripped)
       if (!accountNameMatch && reviewerParts.length > 0) {
-        const reviewerMatches = reviewerParts.filter(p => lower.includes(p));
+        const reviewerMatches = reviewerParts.filter(p => lower.includes(p) || lowerStripped.includes(p));
         const threshold = reviewerParts.length <= 2 ? 1 : Math.ceil(reviewerParts.length * 0.4);
         accountNameMatch = reviewerMatches.length >= threshold;
       }
@@ -1467,10 +1481,10 @@ async function verifyRatingWithOcr(
       lower.includes(t) ||
       (t.length >= 5 && lower.split(/\s+/).some(w => w.length >= t.length - 1 && w.length <= t.length + 1 && editDistance(w, t) <= 1))
     );
-    // Adaptive threshold: lenient for short product names, moderate for longer ones
-    const productThreshold = productTokens.length <= 2 ? 1
-      : productTokens.length <= 4 ? Math.max(1, Math.ceil(productTokens.length * 0.4))
-      : Math.max(2, Math.ceil(productTokens.length * 0.4));
+    // Adaptive threshold: strict for short product names, moderate for longer ones
+    const productThreshold = productTokens.length <= 2 ? productTokens.length
+      : productTokens.length <= 4 ? Math.max(2, Math.ceil(productTokens.length * 0.6))
+      : Math.max(3, Math.ceil(productTokens.length * 0.5));
     const productNameMatch = matchedTokens.length >= productThreshold;
 
     // Graduated confidence scoring — partial matches contribute proportionally
@@ -1583,8 +1597,17 @@ export async function verifyRatingScreenshotWithAi(
           const detected = (parsed.detectedAccountName || '').toLowerCase().trim();
           const reviewer = payload.expectedReviewerName.toLowerCase().trim();
           if (detected && reviewer) {
-            // Check if detected name matches reviewer name
+            // Strip common greeting prefixes from detected name
+            // e.g. "Hello Chetan", "Hi Chetan", "Dear Chetan" → "Chetan"
+            const GREETING_RE = /^(hello|hi|hey|dear|welcome|namaste|good\s*(morning|afternoon|evening))\s*,?\s*/i;
+            const detClean = detected.replace(GREETING_RE, '').trim();
+            const revClean = reviewer.replace(GREETING_RE, '').trim();
+            // Check if detected name matches reviewer name (with greeting stripped)
             const reviewerMatched =
+              detClean === revClean ||
+              detClean.includes(revClean) ||
+              revClean.includes(detClean) ||
+              // Also check original in case greeting stripping was too aggressive
               detected === reviewer ||
               detected.includes(reviewer) ||
               reviewer.includes(detected);
@@ -1594,8 +1617,9 @@ export async function verifyRatingScreenshotWithAi(
               parsed.discrepancyNote = 'Account name matched via marketplace reviewer name.';
             } else {
               // Fuzzy: check name parts — scale edit distance tolerance with word length
-              const revParts = reviewer.split(/\s+/).filter(p => p.length >= 2);
-              const detParts = detected.split(/\s+/).filter(p => p.length >= 2);
+              // Use greeting-stripped versions for fuzzy matching
+              const revParts = revClean.split(/\s+/).filter(p => p.length >= 2);
+              const detParts = detClean.split(/\s+/).filter(p => p.length >= 2);
               let fuzzyMatch = false;
               if (revParts.length > 0 && detParts.length > 0) {
                 const matchCount = revParts.filter(rp => detParts.some(dp =>
@@ -1632,21 +1656,20 @@ export async function verifyRatingScreenshotWithAi(
             parsed.discrepancyNote = (parsed.discrepancyNote || '').replace(/Product name not matching.*\./i, '').trim();
             if (!parsed.discrepancyNote) parsed.discrepancyNote = 'Product name matched via token verification.';
           } else if (!serverMatch && parsed.productNameMatch) {
-            // Gemini said match but our token matching disagrees — trust Gemini when it says match
-            // since the AI can understand product context better than raw token overlap.
-            // Only override if the token overlap is very low (possible Gemini hallucination).
+            // Gemini said match but our token matching disagrees — override when overlap is low.
+            // This catches Gemini hallucinations where it matches different products from same brand.
             const eNorm = payload.expectedProductName.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
             const dNorm = parsed.detectedProductName.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
             const eTokens = eNorm.split(/\s+/).filter(t => t.length >= 3 && !PRODUCT_STOP_WORDS.has(t));
             const dTokens = dNorm.split(/\s+/).filter(t => t.length >= 3 && !PRODUCT_STOP_WORDS.has(t));
             const overlap = eTokens.filter(et => dTokens.some(dt => dt === et || dt.includes(et) || et.includes(dt))).length;
-            if (eTokens.length > 0 && overlap / eTokens.length < 0.2) {
+            if (eTokens.length > 0 && overlap / eTokens.length < 0.3) {
               parsed.productNameMatch = false;
               parsed.discrepancyNote = `Product mismatch: expected "${payload.expectedProductName}", detected "${parsed.detectedProductName}".`;
             }
           }
         } else if (!parsed.detectedProductName && payload.expectedProductName) {
-          // Gemini couldn't detect product name — be lenient, keep Gemini's verdict
+          // Gemini couldn't detect product name — keep Gemini's verdict
         }
 
         recordGeminiSuccess();
@@ -1831,17 +1854,20 @@ async function verifyReturnWindowWithOcr(
       }
     }
 
-    // Reviewer name match (same logic as rating verification — substring + fuzzy)
+    // Reviewer name match (same logic as rating verification — substring + fuzzy + greeting stripping)
     let reviewerNameMatch = !expected.expectedReviewerName; // true when not expected
     if (expected.expectedReviewerName) {
       const revName = expected.expectedReviewerName.toLowerCase().trim();
-      // Direct substring match
-      reviewerNameMatch = lower.includes(revName);
+      // Strip greeting prefixes from OCR text for better matching
+      const GREETING_RW_RE = /\b(hello|hi|hey|dear|welcome|namaste|good\s*(morning|afternoon|evening))\s*,?\s*/gi;
+      const lowerStripped = lower.replace(GREETING_RW_RE, ' ');
+      // Direct substring match (check both raw and greeting-stripped)
+      reviewerNameMatch = lower.includes(revName) || lowerStripped.includes(revName);
       // Partial name match: check individual name parts
       if (!reviewerNameMatch) {
         const nameParts = revName.split(/\s+/).filter(p => p.length >= 2);
         if (nameParts.length > 0) {
-          const matched = nameParts.filter(p => lower.includes(p));
+          const matched = nameParts.filter(p => lower.includes(p) || lowerStripped.includes(p));
           reviewerNameMatch = matched.length >= Math.max(1, Math.ceil(nameParts.length * 0.5));
         }
       }
@@ -1969,11 +1995,11 @@ export async function verifyReturnWindowWithAi(
           if (serverMatch && !parsed.productNameMatch) {
             parsed.productNameMatch = true; // override Gemini false-negative
           } else if (!serverMatch && parsed.productNameMatch) {
-            // Only override if overlap is very low (possible hallucination)
+            // Override when overlap is very low (possible hallucination)
             const eTokens = payload.expectedProductName.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(t => t.length >= 3 && !PRODUCT_STOP_WORDS.has(t));
             const dTokens = ((parsed as any).detectedProductName as string).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(t => t.length >= 3 && !PRODUCT_STOP_WORDS.has(t));
             const overlap = eTokens.filter(et => dTokens.some(dt => dt === et || dt.includes(et) || et.includes(dt))).length;
-            if (eTokens.length > 0 && overlap / eTokens.length < 0.2) {
+            if (eTokens.length > 0 && overlap / eTokens.length < 0.3) {
               parsed.productNameMatch = false;
             }
           }
