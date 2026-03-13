@@ -1224,7 +1224,9 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
         // Clamp confidenceScore to 0-100
         parsed.confidenceScore = Math.max(0, Math.min(100, parsed.confidenceScore ?? 0));
 
-        // Post-process: Validate productNameMatch using robust token matching.
+        // ── Post-processing: validate productNameMatch with server-side logic ──
+        // Gemini may false-positive on same-brand different-products (e.g. both "Avimee Herbal")
+        // because it sees shared brand/category words. Our token matcher is stricter.
         if (payload.expectedProductName && parsed.detectedProductName) {
           const serverMatch = isProductNameMatch(payload.expectedProductName, parsed.detectedProductName);
           if (serverMatch && !parsed.productNameMatch) {
@@ -1234,6 +1236,7 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
             // isProductNameMatch already handles fuzzy/substring matching, so if it says
             // no match, trust it over non-deterministic Gemini.
             parsed.productNameMatch = false;
+            parsed.discrepancyNote = `Product mismatch: expected "${payload.expectedProductName}", detected "${parsed.detectedProductName}".`;
           }
         } else if (payload.expectedProductName && !parsed.detectedProductName) {
           // Gemini couldn't detect product name — can't verify independently.

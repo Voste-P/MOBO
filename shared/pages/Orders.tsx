@@ -567,10 +567,10 @@ export const Orders: React.FC = () => {
             const bestMatchCount = Math.max(matchingWords.length, reverseMatchingWords.length);
             const denominator = Math.min(extractedWords.length, expectedWords.length);
             const overlapRatio = denominator > 0 ? bestMatchCount / denominator : 0;
-            // Tiered thresholds: 100% match required to prevent same-brand different-product matches
-            const minWords = Math.min(extractedWords.length, expectedWords.length);
-            const requiredOverlap = 1.0; // 100% match — ALL significant words must match
-            const hasEnoughOverlap = bestMatchCount >= 2 && overlapRatio >= requiredOverlap;
+            // STRICT: Same brand ≠ same product (e.g. "Avimee Herbal Keshpallav Hair Oil"
+            // vs "Avimee Herbal Scalptone Serum"). ALL words in the shorter name must match.
+            // min() denominator means truncated extractions still pass; WRONG words fail.
+            const hasEnoughOverlap = bestMatchCount >= 2 && overlapRatio >= 1.0;
             // Special case: if product name is very short (1-2 significant words), require ALL words to match
             const shortNameMatch = expectedWords.length <= 2 && bestMatchCount >= expectedWords.length;
             productNameStatus = (hasEnoughOverlap || shortNameMatch) ? 'match' : 'mismatch';
