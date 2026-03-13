@@ -543,18 +543,43 @@ export const Orders: React.FC = () => {
           if (isUrl || isDeliveryStatus) {
             productNameStatus = 'mismatch';
           } else {
-            // Strip common noise words for cleaner matching
-            const noiseWords = new Set(['the', 'and', 'for', 'with', 'from', 'this', 'that', 'not', 'are', 'was', 'has', 'its', 'all', 'can', 'you', 'our', 'new', 'buy', 'get', 'set', 'pack', 'pcs', 'free', 'best', 'top', 'good', 'great', 'nice', 'off', 'upto', 'only', 'just', 'also', 'more', 'very', 'most', 'save', 'deal']);
-            const cleanWords = (text: string) => Array.from(new Set(text
-              .replace(/[^a-z0-9\s]/g, ' ')
-              .split(/\s+/)
-              .filter((w: string) => w.length > 2 && !noiseWords.has(w))));
+            // Expanded noise words aligned with backend PRODUCT_STOP_WORDS
+            const noiseWords = new Set(['the', 'and', 'for', 'with', 'from', 'this', 'that', 'not', 'are', 'was', 'has', 'its', 'all', 'can', 'you', 'our', 'new', 'buy', 'get', 'set', 'pack', 'pcs', 'free', 'best', 'top', 'good', 'great', 'nice', 'off', 'upto', 'only', 'just', 'also', 'more', 'very', 'most', 'save', 'deal', 'per', 'via', 'too', 'any', 'use', 'how', 'may', 'now', 'old', 'own', 'put', 'run', 'two', 'end', 'big', 'day', 'box', 'kit', 'men', 'man', 'women', 'woman', 'long', 'lasting', 'item', 'size', 'pair', 'home', 'made', 'full', 'high', 'low', 'white', 'black', 'red', 'blue', 'pink', 'gold', 'silver', 'natural', 'pure', 'premium', 'original', 'genuine', 'quality', 'gift', 'type', 'style', 'brand', 'product', 'online', 'india', 'combo', 'super', 'ultra', 'pro', 'plus', 'lite', 'mini', 'max', 'extra']);
+            const cleanWords = (text: string) => {
+              const all = Array.from(new Set(text
+                .replace(/[^a-z0-9\s]/g, ' ')
+                .split(/\s+/)
+                .filter((w: string) => w.length >= 2)));
+              const filtered = all.filter((w: string) => w.length >= 3 && !noiseWords.has(w));
+              // Fallback to all tokens if everything was filtered (like backend)
+              return filtered.length > 0 ? filtered : all;
+            };
             const extractedWords = cleanWords(extractedName);
             const expectedWords = cleanWords(expectedName);
 
-            // Match: extracted words found in expected
+            // Levenshtein edit distance for OCR typo tolerance (same as backend)
+            const editDist = (a: string, b: string): number => {
+              if (a === b) return 0;
+              const m = a.length, n = b.length;
+              const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+              for (let i = 0; i <= m; i++) dp[i][0] = i;
+              for (let j = 0; j <= n; j++) dp[0][j] = j;
+              for (let i = 1; i <= m; i++)
+                for (let j = 1; j <= n; j++)
+                  dp[i][j] = a[i - 1] === b[j - 1]
+                    ? dp[i - 1][j - 1]
+                    : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+              return dp[m][n];
+            };
+
+            // Match: exact, substring (≥4 chars), or fuzzy (edit distance ≤1 for ≥5 chars)
             const wordMatch = (a: string, b: string) =>
-              a === b || (a.length >= 4 && b.includes(a)) || (b.length >= 4 && a.includes(b));
+              a === b
+              || (a.length >= 4 && b.includes(a))
+              || (b.length >= 4 && a.includes(b))
+              || (a.length >= 5 && b.length >= 5 && editDist(a, b) <= 1);
+
+            // Forward: extracted words found in expected
             const fwdMatches = extractedWords.filter((w: string) =>
               expectedWords.some((ew: string) => wordMatch(w, ew))
             );
@@ -562,18 +587,22 @@ export const Orders: React.FC = () => {
             const revMatches = expectedWords.filter((ew: string) =>
               extractedWords.some((w: string) => wordMatch(ew, w))
             );
-            // BIDIRECTIONAL: Both directions must pass to prevent truncated/generic
-            // extractions from falsely matching. E.g. "Avimee Herbal Hair Oil" (4 words,
-            // all in expected) would pass old Math.min() check but fail here because
-            // the REVERSE ratio (4/19 expected words matched) is too low.
             const fwdRatio = extractedWords.length > 0 ? fwdMatches.length / extractedWords.length : 0;
             const revRatio = expectedWords.length > 0 ? revMatches.length / expectedWords.length : 0;
-            // Forward: ALL extracted words must exist in expected (100%)
-            // Reverse: At least 50% of expected words must exist in extracted
+
+            // RULE 1: ALL extracted words must exist in expected (100%)
+            // Catches wrong products: "Scalptone" (not in expected) → fwdRatio < 1.0 → fail
             const fwdPass = fwdMatches.length >= 2 && fwdRatio >= 1.0;
-            const revPass = revMatches.length >= 2 && revRatio >= 0.5;
+
+            // RULE 2: Dynamic reverse threshold based on expected name length
+            // Short names (≤6 words): ALL expected words must be found (100%)
+            //   → "Avimee Herbal Hair Oil" won't match "Avimee Herbal Keshpallav Hair Oil"
+            // Long names (>6 words): 50% — lenient for truncated order page screenshots
+            const revThreshold = expectedWords.length <= 6 ? 1.0 : 0.5;
+            const revPass = revMatches.length >= Math.min(2, expectedWords.length) && revRatio >= revThreshold;
             const hasEnoughOverlap = fwdPass && revPass;
-            // Special case: if product name is very short (1-2 significant words), require ALL words to match
+
+            // Special: very short name (1-2 words) just needs all to match
             const shortNameMatch = expectedWords.length <= 2 && fwdMatches.length >= expectedWords.length;
             productNameStatus = (hasEnoughOverlap || shortNameMatch) ? 'match' : 'mismatch';
           }
@@ -1936,9 +1965,17 @@ export const Orders: React.FC = () => {
                         </p>
                       )}
                       {matchStatus.productName === 'mismatch' && (
-                        <div className="bg-red-50 p-2 rounded-lg animate-enter">
-                          <p className="text-[10px] text-red-600 font-bold flex items-center gap-1.5">
-                            <AlertTriangle size={12} /> Product in screenshot does not match the selected deal. Please upload the correct order screenshot.
+                        <div className="bg-red-50 border-2 border-red-300 p-3 rounded-lg animate-enter">
+                          <p className="text-[11px] text-red-700 font-bold flex items-center gap-1.5">
+                            <AlertTriangle size={14} /> WRONG PRODUCT — The product in this screenshot does not match the selected deal.
+                          </p>
+                          <p className="text-[10px] text-red-600 mt-1">Please upload a screenshot of the correct order.</p>
+                        </div>
+                      )}
+                      {matchStatus.productName === 'none' && extractedDetails.productName && (
+                        <div className="bg-amber-50 border-2 border-amber-300 p-3 rounded-lg animate-enter">
+                          <p className="text-[11px] text-amber-700 font-bold flex items-center gap-1.5">
+                            <AlertTriangle size={14} /> Could not verify product name. Please upload a clearer screenshot.
                           </p>
                         </div>
                       )}
@@ -1987,14 +2024,19 @@ export const Orders: React.FC = () => {
                         <ScanLine size={10} /> AI Extracted Details
                       </p>
                       <div className="space-y-0.5">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase ml-0.5">Product</label>
+                        <label className="text-[9px] font-bold text-slate-400 uppercase ml-0.5">Product Name</label>
                         <input
                           type="text"
                           value={extractedDetails.productName || ''}
-                          onChange={(e) => setExtractedDetails({ ...extractedDetails, productName: e.target.value || undefined })}
-                          className="w-full p-2 rounded-lg bg-white border border-blue-100 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                          readOnly
+                          className={`w-full p-2 rounded-lg text-xs outline-none transition-all cursor-default ${matchStatus.productName === 'match' ? 'bg-green-50 border border-green-200 text-green-800' : matchStatus.productName === 'mismatch' ? 'bg-red-50 border border-red-300 text-red-700 font-bold' : 'bg-amber-50 border border-amber-200 text-amber-700'}`}
                           placeholder="Product name"
                         />
+                        {selectedProduct && matchStatus.productName === 'mismatch' && (
+                          <p className="text-[9px] text-red-500 mt-0.5 ml-0.5">
+                            <strong>Expected:</strong> {selectedProduct.title}
+                          </p>
+                        )}
                       </div>
                       <div className="space-y-0.5">
                         <label className="text-[9px] font-bold text-slate-400 uppercase ml-0.5">Sold By</label>
@@ -2052,6 +2094,13 @@ export const Orders: React.FC = () => {
             </div>
 
             <div className="mt-6 pt-4 border-t border-gray-100">
+              {(matchStatus.productName === 'mismatch' || matchStatus.productName === 'none') && formScreenshot && (
+                <p className="text-[10px] text-red-600 font-bold text-center mb-2">
+                  {matchStatus.productName === 'mismatch'
+                    ? 'Submit blocked: product name does not match the deal.'
+                    : 'Submit blocked: product name could not be verified.'}
+                </p>
+              )}
               <button
                 onClick={submitNewOrder}
                 disabled={
@@ -2063,7 +2112,11 @@ export const Orders: React.FC = () => {
                   !extractedDetails.orderId ||
                   !extractedDetails.amount
                 }
-                className="w-full py-4 bg-black text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-lime-400 hover:text-black transition-all disabled:opacity-50 active:scale-95 shadow-lg"
+                className={`w-full py-4 font-bold rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg ${
+                  !selectedProduct || !formScreenshot || isUploading || matchStatus.productName === 'mismatch' || matchStatus.productName === 'none' || !extractedDetails.orderId || !extractedDetails.amount
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-black text-white hover:bg-lime-400 hover:text-black'
+                }`}
               >
                 {isUploading ? (
                   <Loader2 size={18} className="animate-spin motion-reduce:animate-none" />
