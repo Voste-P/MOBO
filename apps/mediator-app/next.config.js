@@ -82,13 +82,14 @@ const withPWA = withPWAInit({
       },
     },
 
-    // Next.js static build artifacts.
+    // Next.js static build artifacts — StaleWhileRevalidate ensures fresh code
+    // reaches users after deploys (CacheFirst would serve stale JS forever).
     {
       urlPattern: ({ url }) => url.pathname.startsWith('/_next/static/'),
-      handler: 'CacheFirst',
+      handler: 'StaleWhileRevalidate',
       options: {
         cacheName: 'next-static',
-        expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 },
+        expiration: { maxEntries: 200, maxAgeSeconds: 7 * 24 * 60 * 60 },
         cacheableResponse: { statuses: [0, 200] },
       },
     },
@@ -131,7 +132,7 @@ const withPWA = withPWAInit({
       handler: 'StaleWhileRevalidate',
       options: {
         cacheName: 'assets',
-        expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 },
+        expiration: { maxEntries: 200, maxAgeSeconds: 7 * 24 * 60 * 60 },
         cacheableResponse: { statuses: [0, 200] },
       },
     },
@@ -141,7 +142,7 @@ const withPWA = withPWAInit({
       handler: 'StaleWhileRevalidate',
       options: {
         cacheName: 'media',
-        expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 },
+        expiration: { maxEntries: 200, maxAgeSeconds: 7 * 24 * 60 * 60 },
         cacheableResponse: { statuses: [0, 200] },
       },
     },

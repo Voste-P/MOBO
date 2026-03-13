@@ -156,6 +156,22 @@ export function PwaRuntime({ app }: { app: 'buyer' | 'mediator' }) {
     (globalThis as any).__MOBO_PWA_APP__ = app;
 
     if ('serviceWorker' in navigator) {
+      // Auto-reload when a new service worker takes control (deploy = fresh code)
+      let reloading = false;
+      const onControllerChange = () => {
+        if (!reloading) { reloading = true; window.location.reload(); }
+      };
+      navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+
+      // Also listen for explicit SW_UPDATED message from sw-custom.js
+      const onMessage = (event: MessageEvent) => {
+        if (event.data?.type === 'SW_UPDATED' && !reloading) {
+          reloading = true;
+          window.location.reload();
+        }
+      };
+      navigator.serviceWorker.addEventListener('message', onMessage);
+
       const registerWorker = () => {
         navigator.serviceWorker
           .register('/service-worker.js', { scope: '/' })
@@ -193,6 +209,9 @@ export function PwaRuntime({ app }: { app: 'buyer' | 'mediator' }) {
 
     return () => {
       window.removeEventListener('mobo-auth-changed', handleAuthChange as EventListener);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('controllerchange', () => {});
+      }
     };
   }, [app]);
 
