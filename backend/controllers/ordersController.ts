@@ -477,9 +477,9 @@ export function makeOrdersController(env: Env) {
               'Your order proof could not be verified. Please upload a clear screenshot showing the order ID and amount.'
             );
           }
-          // Hard-block: product name must match when expected product name is available
-          if (expectedProductName && verification?.productNameMatch === false
-            && (verification?.confidenceScore ?? 0) > 0) {
+          // Hard-block: product name must POSITIVELY match when expected product name is available.
+          // Use !== true (not === false) so undefined/null also blocks — safety first.
+          if (expectedProductName && verification?.productNameMatch !== true) {
             throw new AppError(
               422,
               'PRODUCT_NAME_MISMATCH',
@@ -1264,8 +1264,7 @@ export function makeOrdersController(env: Env) {
               }
               // Block re-upload if product name doesn't match (fraud prevention)
               if (aiOrderVerification && expectedProductName
-                && aiOrderVerification.productNameMatch === false
-                && aiOrderVerification.confidenceScore > 0) {
+                && aiOrderVerification.productNameMatch !== true) {
                 throw new AppError(422, 'ORDER_VERIFICATION_FAILED',
                   'Order screenshot product does not match this order. ' +
                   'Please upload the correct order screenshot. ' +

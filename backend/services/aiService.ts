@@ -1240,11 +1240,17 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
           }
         } else if (payload.expectedProductName && !parsed.detectedProductName) {
           // Gemini couldn't detect product name — can't verify independently.
-          // Override any false positive as a safety measure.
-          if (parsed.productNameMatch) {
-            parsed.productNameMatch = false;
-            parsed.discrepancyNote = `Could not detect product name in screenshot to verify against "${payload.expectedProductName}". Please upload a clearer screenshot.`;
-          }
+          // Always set to false when we can't verify (safety measure).
+          parsed.productNameMatch = false;
+          parsed.discrepancyNote = parsed.discrepancyNote ||
+            `Could not detect product name in screenshot to verify against "${payload.expectedProductName}". Please upload a clearer screenshot.`;
+        }
+
+        // Final safety net: if expectedProductName was provided, ensure productNameMatch
+        // is always an explicit boolean (never undefined/null). This prevents === false
+        // checks in controllers from silently letting mismatches through.
+        if (payload.expectedProductName) {
+          parsed.productNameMatch = parsed.productNameMatch === true;
         }
 
         aiLog.info('Gemini proof usage estimate', { model, estimatedTokens });
