@@ -552,27 +552,29 @@ export const Orders: React.FC = () => {
             const extractedWords = cleanWords(extractedName);
             const expectedWords = cleanWords(expectedName);
 
-            // Match words that are equal or contain each other as substring (min 4 chars for substring)
-            const matchingWords = extractedWords.filter((w: string) =>
-              expectedWords.some((ew: string) =>
-                w === ew || (w.length >= 4 && ew.includes(w)) || (ew.length >= 4 && w.includes(ew))
-              )
+            // Match: extracted words found in expected
+            const wordMatch = (a: string, b: string) =>
+              a === b || (a.length >= 4 && b.includes(a)) || (b.length >= 4 && a.includes(b));
+            const fwdMatches = extractedWords.filter((w: string) =>
+              expectedWords.some((ew: string) => wordMatch(w, ew))
             );
-            // Also check reverse: expected words found in extracted
-            const reverseMatchingWords = expectedWords.filter((ew: string) =>
-              extractedWords.some((w: string) =>
-                ew === w || (ew.length >= 4 && w.includes(ew)) || (w.length >= 4 && ew.includes(w))
-              )
+            // Reverse: expected words found in extracted
+            const revMatches = expectedWords.filter((ew: string) =>
+              extractedWords.some((w: string) => wordMatch(ew, w))
             );
-            const bestMatchCount = Math.max(matchingWords.length, reverseMatchingWords.length);
-            const denominator = Math.min(extractedWords.length, expectedWords.length);
-            const overlapRatio = denominator > 0 ? bestMatchCount / denominator : 0;
-            // STRICT: Same brand ≠ same product (e.g. "Avimee Herbal Keshpallav Hair Oil"
-            // vs "Avimee Herbal Scalptone Serum"). ALL words in the shorter name must match.
-            // min() denominator means truncated extractions still pass; WRONG words fail.
-            const hasEnoughOverlap = bestMatchCount >= 2 && overlapRatio >= 1.0;
+            // BIDIRECTIONAL: Both directions must pass to prevent truncated/generic
+            // extractions from falsely matching. E.g. "Avimee Herbal Hair Oil" (4 words,
+            // all in expected) would pass old Math.min() check but fail here because
+            // the REVERSE ratio (4/19 expected words matched) is too low.
+            const fwdRatio = extractedWords.length > 0 ? fwdMatches.length / extractedWords.length : 0;
+            const revRatio = expectedWords.length > 0 ? revMatches.length / expectedWords.length : 0;
+            // Forward: ALL extracted words must exist in expected (100%)
+            // Reverse: At least 50% of expected words must exist in extracted
+            const fwdPass = fwdMatches.length >= 2 && fwdRatio >= 1.0;
+            const revPass = revMatches.length >= 2 && revRatio >= 0.5;
+            const hasEnoughOverlap = fwdPass && revPass;
             // Special case: if product name is very short (1-2 significant words), require ALL words to match
-            const shortNameMatch = expectedWords.length <= 2 && bestMatchCount >= expectedWords.length;
+            const shortNameMatch = expectedWords.length <= 2 && fwdMatches.length >= expectedWords.length;
             productNameStatus = (hasEnoughOverlap || shortNameMatch) ? 'match' : 'mismatch';
           }
         }
@@ -869,9 +871,11 @@ export const Orders: React.FC = () => {
       toast.error('Please upload a valid order image before submitting.');
       return;
     }
-    // Block if product name mismatch detected by AI AND user hasn't overridden
-    if (matchStatus.productName === 'mismatch') {
-      toast.error('The product in the screenshot does not match the selected deal. Please upload the correct order screenshot.');
+    // Block if product name mismatch or undetected by AI
+    if (matchStatus.productName === 'mismatch' || matchStatus.productName === 'none') {
+      toast.error(matchStatus.productName === 'none'
+        ? 'Could not detect the product name in the screenshot. Please upload a clearer order screenshot.'
+        : 'The product in the screenshot does not match the selected deal. Please upload the correct order screenshot.');
       return;
     }
     // Require reviewer/account name for Rating & Review deals — it's used for
@@ -2055,6 +2059,7 @@ export const Orders: React.FC = () => {
                   !formScreenshot ||
                   isUploading ||
                   matchStatus.productName === 'mismatch' ||
+                  matchStatus.productName === 'none' ||
                   !extractedDetails.orderId ||
                   !extractedDetails.amount
                 }
