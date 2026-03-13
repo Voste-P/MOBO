@@ -3037,6 +3037,21 @@ export function makeOpsController(env: Env) {
           settleDate.setDate(settleDate.getDate() + COOLING_PERIOD_DAYS);
           const currentEvents = Array.isArray(order.events) ? (order.events as any[]) : [];
 
+          // Populate verification trail for all required steps so audit records exist
+          const existingV = (order.verification && typeof order.verification === 'object')
+            ? { ...(order.verification as any) } : {} as any;
+          const now = new Date().toISOString();
+          // Always mark purchase proof step
+          if (!existingV.order?.verifiedAt) {
+            existingV.order = { ...(existingV.order || {}), verifiedAt: now, verifiedBy: req.auth?.userId, autoVerified: false };
+          }
+          const requiredSteps = getRequiredStepsForOrder(order);
+          for (const step of requiredSteps) {
+            if (!existingV[step]?.verifiedAt) {
+              existingV[step] = { ...(existingV[step] || {}), verifiedAt: now, verifiedBy: req.auth?.userId, autoVerified: false };
+            }
+          }
+
           await db().order.update({
             where: { id: order.id },
             data: {
@@ -3046,6 +3061,7 @@ export function makeOpsController(env: Env) {
               rejectionReason: null,
               rejectionAt: null,
               rejectionBy: null,
+              verification: existingV,
               events: pushOrderEvent(currentEvents, {
                 type: 'VERIFIED',
                 at: new Date(),

@@ -89,7 +89,10 @@ function editDistance(a: string, b: string): number {
 }
 
 // ── Shared stop words for product name matching ──
-const PRODUCT_STOP_WORDS = new Set(['the','for','and','with','from','that','this','you','your','was','are','has','have','been','not','but','all','can','had','her','his','one','our','out','use','how','its','may','new','now','old','see','way','who','boy','did','get','him','let','say','she','too','any','per','set','top','end','off','big','own','put','run','two','via','free','pack','item','best','good','great','nice','size','pair','home','made','full','high','low','day','box','buy','kit','men','man','women','woman','long','lasting','eau','parfum','perfume','perfumes','spray','body','cream','lotion','gel','oil','water','100ml','50ml','200ml','ml','gm','kg','ltr','white','black','red','blue','green','pink','gold','silver','natural','pure','premium','original','genuine','quality','gift','type','style','brand','product','online','india','combo','super','ultra','pro','plus','lite','mini','max','extra']);
+// Product-type words (oil, cream, gel, serum, spray, lotion, perfume, etc.) are intentionally
+// EXCLUDED from stop words because they distinguish different products from the same brand
+// (e.g. "Avimee Herbal Scalptone Hair Growth Serum" vs "Avimee Herbal Keshpallav Hair Oil").
+const PRODUCT_STOP_WORDS = new Set(['the','for','and','with','from','that','this','you','your','was','are','has','have','been','not','but','all','can','had','her','his','one','our','out','use','how','its','may','new','now','old','see','way','who','boy','did','get','him','let','say','she','too','any','per','set','top','end','off','big','own','put','run','two','via','free','pack','item','best','good','great','nice','size','pair','home','made','full','high','low','day','box','buy','kit','men','man','women','woman','long','lasting','100ml','50ml','200ml','ml','gm','kg','ltr','white','black','red','blue','green','pink','gold','silver','natural','pure','premium','original','genuine','quality','gift','type','style','brand','product','online','india','combo','super','ultra','pro','plus','lite','mini','max','extra']);
 
 /**
  * Robust product name token matching.
@@ -117,7 +120,7 @@ function isProductNameMatch(expected: string, detected: string): boolean {
   }
 
   const tokenize = (s: string) => {
-    const all = s.split(/\s+/).filter(t => t.length >= 2);
+    const all = [...new Set(s.split(/\s+/).filter(t => t.length >= 2))];
     const filtered = all.filter(t => !PRODUCT_STOP_WORDS.has(t) && t.length >= 3);
     return filtered.length > 0 ? filtered : all;
   };
@@ -1230,14 +1233,10 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
           if (serverMatch && !parsed.productNameMatch) {
             parsed.productNameMatch = true; // override Gemini false-negative
           } else if (!serverMatch && parsed.productNameMatch) {
-            // Override Gemini false-positive when token overlap is very low
-            const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-            const eTokens = norm(payload.expectedProductName).split(/\s+/).filter(t => t.length >= 3 && !PRODUCT_STOP_WORDS.has(t));
-            const dTokens = norm(parsed.detectedProductName).split(/\s+/).filter(t => t.length >= 3 && !PRODUCT_STOP_WORDS.has(t));
-            const overlap = eTokens.filter(et => dTokens.some(dt => dt === et || (et.length >= 4 && dt.includes(et)) || (dt.length >= 4 && et.includes(dt)))).length;
-            if (eTokens.length > 0 && overlap / eTokens.length < 0.5) {
-              parsed.productNameMatch = false;
-            }
+            // Our token matcher says no match — always override Gemini false-positive.
+            // isProductNameMatch already handles fuzzy/substring matching, so if it says
+            // no match, trust it over non-deterministic Gemini.
+            parsed.productNameMatch = false;
           }
         }
 
@@ -1438,22 +1437,14 @@ async function verifyRatingWithOcr(
       if (reviewerLower.length >= 3 && (lower.includes(reviewerLower) || lowerStripped.includes(reviewerLower))) {
         accountNameMatch = true;
       }
-      // Strategy 2: reviewer name parts (check both raw and greeting-stripped)
+      // Strategy 2: reviewer name parts — require ALL parts for short names (≤2 parts),
+      // or ≥60% for longer names, to prevent single first-name matches against common names.
       if (!accountNameMatch && reviewerParts.length > 0) {
         const reviewerMatches = reviewerParts.filter(p => lower.includes(p) || lowerStripped.includes(p));
-        const threshold = reviewerParts.length <= 2 ? 1 : Math.ceil(reviewerParts.length * 0.4);
+        const threshold = reviewerParts.length <= 2 ? reviewerParts.length : Math.ceil(reviewerParts.length * 0.6);
         accountNameMatch = reviewerMatches.length >= threshold;
       }
-      // Strategy 3: first/last name of reviewer
-      if (!accountNameMatch && reviewerParts.length >= 1) {
-        const firstName = reviewerParts[0] || '';
-        const lastName = reviewerParts[reviewerParts.length - 1] || '';
-        if ((firstName.length >= 3 && lower.includes(firstName)) ||
-            (lastName.length >= 3 && lower.includes(lastName))) {
-          accountNameMatch = true;
-        }
-      }
-      // Strategy 4: fuzzy match for reviewer name parts (OCR misreads)
+      // Strategy 3: fuzzy match for reviewer name parts (OCR misreads)
       if (!accountNameMatch) {
         for (const part of allReviewerParts) {
           if (part.length < 6) continue;
@@ -1467,23 +1458,15 @@ async function verifyRatingWithOcr(
       // Strategy 1: check full name as substring
       accountNameMatch = buyerLower.length >= 3 && lower.includes(buyerLower);
 
-      // Strategy 2: check individual name parts — match at least 1 part (or 40% for longer names)
+      // Strategy 2: check individual name parts — require ALL parts for short names (≤2 parts),
+      // or ≥60% for longer names.
       if (!accountNameMatch && buyerParts.length > 0) {
         const nameMatches = buyerParts.filter(p => lower.includes(p));
-        const threshold = buyerParts.length <= 2 ? 1 : Math.ceil(buyerParts.length * 0.4);
+        const threshold = buyerParts.length <= 2 ? buyerParts.length : Math.ceil(buyerParts.length * 0.6);
         accountNameMatch = nameMatches.length >= threshold;
       }
 
-      // Strategy 3: handle very short names or nicknames — accept if first or last name matches
-      if (!accountNameMatch && buyerLower.length >= 2) {
-        const firstName = buyerParts[0] || '';
-        const lastName = buyerParts[buyerParts.length - 1] || '';
-        if ((firstName.length >= 3 && lower.includes(firstName)) ||
-            (lastName.length >= 3 && lower.includes(lastName))) {
-          accountNameMatch = true;
-        }
-      }
-      // Strategy 4: fuzzy match — allow 1-char edit distance for names ≥6 chars (handles OCR misreads)
+      // Strategy 3: fuzzy match — allow 1-char edit distance for names ≥6 chars (handles OCR misreads)
       if (!accountNameMatch) {
         for (const part of allBuyerParts) {
           if (part.length < 6) continue;
@@ -1652,7 +1635,7 @@ export async function verifyRatingScreenshotWithAi(
                 const matchCount = revParts.filter(rp => detParts.some(dp =>
                   dp === rp || (rp.length >= 6 && editDistance(dp, rp) <= 1)
                 )).length;
-                if (matchCount >= Math.max(1, Math.ceil(revParts.length * 0.5))) {
+                if (matchCount >= Math.max(1, Math.ceil(revParts.length * 0.6))) {
                   fuzzyMatch = true;
                 }
               }
@@ -1683,17 +1666,9 @@ export async function verifyRatingScreenshotWithAi(
             parsed.discrepancyNote = (parsed.discrepancyNote || '').replace(/Product name not matching.*\./i, '').trim();
             if (!parsed.discrepancyNote) parsed.discrepancyNote = 'Product name matched via token verification.';
           } else if (!serverMatch && parsed.productNameMatch) {
-            // Gemini said match but our token matching disagrees — override when overlap is low.
-            // This catches Gemini hallucinations where it matches different products from same brand.
-            const eNorm = payload.expectedProductName.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
-            const dNorm = parsed.detectedProductName.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
-            const eTokens = eNorm.split(/\s+/).filter(t => t.length >= 3 && !PRODUCT_STOP_WORDS.has(t));
-            const dTokens = dNorm.split(/\s+/).filter(t => t.length >= 3 && !PRODUCT_STOP_WORDS.has(t));
-            const overlap = eTokens.filter(et => dTokens.some(dt => dt === et || dt.includes(et) || et.includes(dt))).length;
-            if (eTokens.length > 0 && overlap / eTokens.length < 0.5) {
-              parsed.productNameMatch = false;
-              parsed.discrepancyNote = `Product mismatch: expected "${payload.expectedProductName}", detected "${parsed.detectedProductName}".`;
-            }
+            // Our token matcher says no match — always override Gemini false-positive.
+            parsed.productNameMatch = false;
+            parsed.discrepancyNote = `Product mismatch: expected "${payload.expectedProductName}", detected "${parsed.detectedProductName}".`;
           }
         } else if (!parsed.detectedProductName && payload.expectedProductName) {
           // Gemini couldn't detect product name — keep Gemini's verdict
@@ -2022,13 +1997,8 @@ export async function verifyReturnWindowWithAi(
           if (serverMatch && !parsed.productNameMatch) {
             parsed.productNameMatch = true; // override Gemini false-negative
           } else if (!serverMatch && parsed.productNameMatch) {
-            // Override when overlap is very low (possible hallucination)
-            const eTokens = payload.expectedProductName.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(t => t.length >= 3 && !PRODUCT_STOP_WORDS.has(t));
-            const dTokens = ((parsed as any).detectedProductName as string).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(t => t.length >= 3 && !PRODUCT_STOP_WORDS.has(t));
-            const overlap = eTokens.filter(et => dTokens.some(dt => dt === et || dt.includes(et) || et.includes(dt))).length;
-            if (eTokens.length > 0 && overlap / eTokens.length < 0.3) {
-              parsed.productNameMatch = false;
-            }
+            // Our token matcher says no match — always override Gemini false-positive.
+            parsed.productNameMatch = false;
           }
         } else if (payload.expectedProductName && !parsed.productNameMatch) {
           // Gemini couldn't detect product name — be lenient for return window (the product name

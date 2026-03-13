@@ -659,7 +659,7 @@ export const Orders: React.FC = () => {
       // confusing mismatches against the buyer's app account name.
       if (!hasReviewerName) {
         if (productName) {
-          const result = await api.orders.verifyRating(file, buyerName || 'unknown', productName, undefined, selectedOrder.id);
+          const result = await api.orders.verifyRating(file, buyerName || '', productName, undefined, selectedOrder.id);
           // Override account name match — we can't verify without a reviewer name
           setRatingVerification({ ...result, accountNameMatch: true });
           if (!result.productNameMatch) {
@@ -675,7 +675,7 @@ export const Orders: React.FC = () => {
         if (reviewerName && productName) {
           // Pass buyer's app account name as expectedBuyerName (secondary),
           // and reviewer name as expectedReviewerName (PRIMARY match target).
-          const result = await api.orders.verifyRating(file, buyerName || 'unknown', productName, reviewerName, selectedOrder.id);
+          const result = await api.orders.verifyRating(file, buyerName || '', productName, reviewerName, selectedOrder.id);
           setRatingVerification(result);
 
           if (!result.accountNameMatch && !result.productNameMatch) {
