@@ -545,10 +545,10 @@ export const Orders: React.FC = () => {
           } else {
             // Strip common noise words for cleaner matching
             const noiseWords = new Set(['the', 'and', 'for', 'with', 'from', 'this', 'that', 'not', 'are', 'was', 'has', 'its', 'all', 'can', 'you', 'our', 'new', 'buy', 'get', 'set', 'pack', 'pcs', 'free', 'best', 'top', 'good', 'great', 'nice', 'off', 'upto', 'only', 'just', 'also', 'more', 'very', 'most', 'save', 'deal']);
-            const cleanWords = (text: string) => text
+            const cleanWords = (text: string) => Array.from(new Set(text
               .replace(/[^a-z0-9\s]/g, ' ')
               .split(/\s+/)
-              .filter((w: string) => w.length > 2 && !noiseWords.has(w));
+              .filter((w: string) => w.length > 2 && !noiseWords.has(w))));
             const extractedWords = cleanWords(extractedName);
             const expectedWords = cleanWords(expectedName);
 
@@ -567,17 +567,13 @@ export const Orders: React.FC = () => {
             const bestMatchCount = Math.max(matchingWords.length, reverseMatchingWords.length);
             const denominator = Math.min(extractedWords.length, expectedWords.length);
             const overlapRatio = denominator > 0 ? bestMatchCount / denominator : 0;
-            // Require at least 2 matching words AND 50% overlap ratio (stricter matching to ensure correct product)
-            const hasEnoughOverlap = bestMatchCount >= 2 && overlapRatio >= 0.50;
-            // Special case: if product name is very short (1-2 significant words), require exact word match
-            const shortNameMatch = expectedWords.length <= 2 && bestMatchCount >= 1 && overlapRatio >= 0.5;
-            // Special case: brand name match — if the FIRST word (brand) matches, give it credit
-            const brandMatch = extractedWords.length > 0 && expectedWords.length > 0 &&
-              (extractedWords[0] === expectedWords[0] || 
-               (extractedWords[0].length >= 4 && expectedWords[0].includes(extractedWords[0])) ||
-               (expectedWords[0].length >= 4 && extractedWords[0].includes(expectedWords[0])));
-            const brandWithOverlap = brandMatch && bestMatchCount >= 2 && overlapRatio >= 0.35;
-            productNameStatus = (hasEnoughOverlap || shortNameMatch || brandWithOverlap) ? 'match' : 'mismatch';
+            // Tiered thresholds aligned with backend strictness to prevent same-brand different-product matches
+            const minWords = Math.min(extractedWords.length, expectedWords.length);
+            const requiredOverlap = minWords <= 2 ? 1.0 : minWords <= 4 ? 0.75 : 0.60;
+            const hasEnoughOverlap = bestMatchCount >= 2 && overlapRatio >= requiredOverlap;
+            // Special case: if product name is very short (1-2 significant words), require ALL words to match
+            const shortNameMatch = expectedWords.length <= 2 && bestMatchCount >= expectedWords.length;
+            productNameStatus = (hasEnoughOverlap || shortNameMatch) ? 'match' : 'mismatch';
           }
         }
 

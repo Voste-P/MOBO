@@ -1238,6 +1238,13 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
             // no match, trust it over non-deterministic Gemini.
             parsed.productNameMatch = false;
           }
+        } else if (payload.expectedProductName && !parsed.detectedProductName) {
+          // Gemini couldn't detect product name — can't verify independently.
+          // Override any false positive as a safety measure.
+          if (parsed.productNameMatch) {
+            parsed.productNameMatch = false;
+            parsed.discrepancyNote = `Could not detect product name in screenshot to verify against "${payload.expectedProductName}". Please upload a clearer screenshot.`;
+          }
         }
 
         aiLog.info('Gemini proof usage estimate', { model, estimatedTokens });
@@ -1437,11 +1444,11 @@ async function verifyRatingWithOcr(
       if (reviewerLower.length >= 3 && (lower.includes(reviewerLower) || lowerStripped.includes(reviewerLower))) {
         accountNameMatch = true;
       }
-      // Strategy 2: reviewer name parts — require ALL parts for short names (≤2 parts),
-      // or ≥60% for longer names, to prevent single first-name matches against common names.
+      // Strategy 2: reviewer name parts — for short names (≤2 parts) require at least 1 part
+      // (OCR/Gemini often only captures first name from greeting), or ≥60% for longer names.
       if (!accountNameMatch && reviewerParts.length > 0) {
         const reviewerMatches = reviewerParts.filter(p => lower.includes(p) || lowerStripped.includes(p));
-        const threshold = reviewerParts.length <= 2 ? reviewerParts.length : Math.ceil(reviewerParts.length * 0.6);
+        const threshold = reviewerParts.length <= 2 ? Math.max(1, reviewerParts.length - 1) : Math.ceil(reviewerParts.length * 0.6);
         accountNameMatch = reviewerMatches.length >= threshold;
       }
       // Strategy 3: fuzzy match for reviewer name parts (OCR misreads)
@@ -1458,11 +1465,11 @@ async function verifyRatingWithOcr(
       // Strategy 1: check full name as substring
       accountNameMatch = buyerLower.length >= 3 && lower.includes(buyerLower);
 
-      // Strategy 2: check individual name parts — require ALL parts for short names (≤2 parts),
-      // or ≥60% for longer names.
+      // Strategy 2: check individual name parts — for short names (≤2 parts) require at least 1 part
+      // (screenshots often only show first name in greeting), or ≥60% for longer names.
       if (!accountNameMatch && buyerParts.length > 0) {
         const nameMatches = buyerParts.filter(p => lower.includes(p));
-        const threshold = buyerParts.length <= 2 ? buyerParts.length : Math.ceil(buyerParts.length * 0.6);
+        const threshold = buyerParts.length <= 2 ? Math.max(1, buyerParts.length - 1) : Math.ceil(buyerParts.length * 0.6);
         accountNameMatch = nameMatches.length >= threshold;
       }
 
@@ -1635,7 +1642,8 @@ export async function verifyRatingScreenshotWithAi(
                 const matchCount = revParts.filter(rp => detParts.some(dp =>
                   dp === rp || (rp.length >= 6 && editDistance(dp, rp) <= 1)
                 )).length;
-                if (matchCount >= Math.max(1, Math.ceil(revParts.length * 0.6))) {
+                const minRequired = revParts.length <= 2 ? 1 : Math.ceil(revParts.length * 0.6);
+                if (matchCount >= Math.max(1, minRequired)) {
                   fuzzyMatch = true;
                 }
               }
@@ -1671,7 +1679,13 @@ export async function verifyRatingScreenshotWithAi(
             parsed.discrepancyNote = `Product mismatch: expected "${payload.expectedProductName}", detected "${parsed.detectedProductName}".`;
           }
         } else if (!parsed.detectedProductName && payload.expectedProductName) {
-          // Gemini couldn't detect product name — keep Gemini's verdict
+          // Gemini couldn't detect product name — can't verify independently.
+          // Override any false positive as a safety measure.
+          if (parsed.productNameMatch) {
+            parsed.productNameMatch = false;
+            parsed.discrepancyNote = (parsed.discrepancyNote ? parsed.discrepancyNote + ' ' : '') +
+              'Could not detect product name in screenshot to verify against expected product.';
+          }
         }
 
         recordGeminiSuccess();
