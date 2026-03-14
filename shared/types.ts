@@ -182,6 +182,7 @@ export interface Order {
     accountNameMatch?: boolean;
     productNameMatch?: boolean;
     detectedAccountName?: string;
+    detectedPublicName?: string;
     detectedProductName?: string;
     confidenceScore?: number;
   };
@@ -343,6 +344,7 @@ export interface AiRatingVerificationResult {
   accountNameMatch: boolean;
   productNameMatch: boolean;
   detectedAccountName?: string;
+  detectedPublicName?: string;
   detectedProductName?: string;
   confidenceScore: number;
   discrepancyNote?: string;
@@ -354,8 +356,10 @@ export interface AiReturnWindowVerificationResult {
   amountMatch: boolean;
   soldByMatch: boolean;
   returnWindowClosed: boolean;
+  reviewerNameMatch: boolean;
   confidenceScore: number;
   detectedReturnWindow?: string;
+  detectedAccountName?: string;
   discrepancyNote?: string;
 }
 
@@ -365,6 +369,7 @@ export interface ExtractedOrderDetails {
   orderDate?: string | null;
   soldBy?: string | null;
   productName?: string | null;
+  accountName?: string | null;
   confidenceScore: number;
   notes?: string;
 }

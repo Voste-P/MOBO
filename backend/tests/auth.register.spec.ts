@@ -7,12 +7,14 @@ import { prisma } from '../database/prisma.js';
 import { seedE2E, E2E_ACCOUNTS } from '../seeds/e2e.js';
 
 // Unique suffix per test run to avoid collisions on re-run
-const RUN = Date.now().toString().slice(-6);
+const RUN = randomUUID().replace(/-/g, '').slice(0, 6);
 let inviteSeq = 0;
+let mobileSeq = 0;
 function uniqueInviteCode(prefix: string) { return `${prefix}_${RUN}_${++inviteSeq}`; }
 function uniqueMobile(base: string) {
-  // Replace last N digits with RUN-based suffix
-  const suffix = (parseInt(RUN, 10) + inviteSeq) % 1_000_000;
+  // Use random suffix to avoid collisions with prior runs on shared DB
+  const suffix = parseInt(randomUUID().replace(/-/g, '').slice(0, 6), 16) % 1_000_000;
+  ++mobileSeq;
   return base.slice(0, 4) + String(suffix).padStart(6, '0');
 }
 

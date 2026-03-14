@@ -2573,6 +2573,10 @@ export function makeOpsController(env: Env) {
 
         const payoutPaise = Number((slotAssignment as any)?.payout ?? campaign.payoutPaise ?? 0);
 
+        if (payoutPaise <= 0) {
+          throw new AppError(400, 'INVALID_PAYOUT', 'Cannot publish deal with zero or negative payout. Set a payout on the campaign or slot assignment first.');
+        }
+
         const netEarnings = payoutPaise + commissionPaise;
         if (netEarnings < 0) {
           throw new AppError(400, 'INVALID_ECONOMICS', 'Buyer discount cannot exceed your commission from agency');
@@ -3115,6 +3119,10 @@ export function makeOpsController(env: Env) {
         if (affiliateStatus === 'Approved_Settled' || affiliateStatus === 'Cap_Exceeded') {
           throw new AppError(409, 'CANNOT_CANCEL_SETTLED', 'Cannot cancel an already settled order');
         }
+        const wf = String((order as any).workflowStatus || 'CREATED');
+        if (wf === 'REJECTED' || affiliateStatus === 'Rejected') {
+          throw new AppError(409, 'ALREADY_CANCELLED', 'This order is already cancelled');
+        }
 
         // Release campaign slot
         const campaignId = order.items?.[0]?.campaignId;
@@ -3140,7 +3148,6 @@ export function makeOpsController(env: Env) {
           },
         });
 
-        const wf = String((order as any).workflowStatus || 'CREATED');
         if (!['REJECTED', 'FAILED', 'COMPLETED'].includes(wf)) {
           await transitionOrderWorkflow({
             orderId: order.mongoId!,

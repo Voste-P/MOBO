@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage, placeholderImage } from './ProxiedImage';
-import { checkProductNameMatch } from '../utils/productNameMatch';
+import { checkProductNameMatch, checkReviewerNameMatch } from '../utils/productNameMatch';
 
 interface QuickOrderModalProps {
   open: boolean;
@@ -42,9 +42,11 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
     orderDate?: string;
     soldBy?: string;
     productName?: string;
+    accountName?: string;
   }>({ orderId: '', amount: '' });
   const [reviewerName, setReviewerName] = useState('');
   const [productNameMismatch, setProductNameMismatch] = useState(false);
+  const [reviewerNameMismatch, setReviewerNameMismatch] = useState(false);
 
   const reset = useCallback(() => {
     setScreenshot(null);
@@ -55,6 +57,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
     setExtractedDetails({ orderId: '', amount: '' });
     setReviewerName('');
     setProductNameMismatch(false);
+    setReviewerNameMismatch(false);
   }, []);
 
   const handleClose = () => {
@@ -89,6 +92,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
           orderDate: result.orderDate || undefined,
           soldBy: result.soldBy || undefined,
           productName: result.productName || undefined,
+          accountName: result.accountName || undefined,
         });
 
         // ── Product name matching (shared strict algorithm) ──
@@ -96,6 +100,11 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
         if (nameMatchResult === 'mismatch') {
           setProductNameMismatch(true);
           toast.error('Product name in screenshot does not match this deal. Please upload the correct order screenshot.');
+        }
+        // ── Reviewer name matching against extracted account name ──
+        if (result.accountName && reviewerName.trim()) {
+          const rnMatch = checkReviewerNameMatch(reviewerName, result.accountName);
+          setReviewerNameMismatch(rnMatch === 'mismatch');
         }
       }
     } catch {
@@ -111,6 +120,11 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
     // Block if product name mismatch detected
     if (productNameMismatch) {
       toast.error('Product in screenshot does not match this deal. Upload the correct order screenshot.');
+      return;
+    }
+    // Block if reviewer name mismatch detected
+    if (reviewerNameMismatch) {
+      toast.error('Reviewer name does not match the account in screenshot. Please correct it.');
       return;
     }
     // Require reviewer name for Rating/Review deals to prevent cheating
@@ -359,11 +373,33 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
                 <input
                   type="text"
                   value={reviewerName}
-                  onChange={(e) => setReviewerName(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setReviewerName(val);
+                    if (extractedDetails.accountName && val.trim()) {
+                      setReviewerNameMismatch(checkReviewerNameMatch(val, extractedDetails.accountName) === 'mismatch');
+                    } else {
+                      setReviewerNameMismatch(false);
+                    }
+                  }}
                   placeholder="e.g. Chetan on Amazon"
                   maxLength={200}
-                  className="w-full px-2.5 py-2 text-xs font-medium border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-lime-200 focus:border-lime-400 outline-none transition-all"
+                  className={`w-full px-2.5 py-2 text-xs font-medium border rounded-lg bg-white focus:ring-2 outline-none transition-all ${
+                    reviewerNameMismatch
+                      ? 'border-red-400 focus:ring-red-200 focus:border-red-400'
+                      : extractedDetails.accountName && reviewerName.trim() && !reviewerNameMismatch
+                        ? 'border-green-400 focus:ring-green-200 focus:border-green-400'
+                        : 'border-gray-300 focus:ring-lime-200 focus:border-lime-400'
+                  }`}
                 />
+                {reviewerNameMismatch && (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <AlertCircle size={10} className="text-red-500 flex-shrink-0" />
+                    <p className="text-[9px] font-bold text-red-600">
+                      Account name mismatch — screenshot shows &quot;{extractedDetails.accountName}&quot;
+                    </p>
+                  </div>
+                )}
                 <p className="text-[9px] text-zinc-400 ml-0.5">
                   Enter the name shown on the marketplace account used for this order.
                   {(product.dealType === 'Rating' || product.dealType === 'Review') && <span className="text-red-400 font-bold"> Required</span>}
@@ -383,10 +419,16 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
               {screenshot && !extracting && !extractedDetails.orderId && (
                 <p className="text-[10px] text-red-500 font-semibold text-center">Order ID is required to submit</p>
               )}
+              {reviewerNameMismatch && (
+                <div className="flex items-center justify-center gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
+                  <AlertCircle size={11} className="text-amber-500 flex-shrink-0" />
+                  <p className="text-[10px] font-bold text-amber-700">Reviewer name doesn&apos;t match the account in screenshot.</p>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={!screenshot || submitting || extracting || !extractedDetails.orderId.trim() || productNameMismatch}
+                disabled={!screenshot || submitting || extracting || !extractedDetails.orderId.trim() || productNameMismatch || reviewerNameMismatch}
                 className="w-full py-3.5 bg-black text-white font-extrabold rounded-xl text-xs uppercase tracking-wider shadow-lg disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97] transition-all flex items-center justify-center gap-2"
               >
                 {submitting ? (

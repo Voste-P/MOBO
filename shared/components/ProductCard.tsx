@@ -6,7 +6,7 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
-import { checkProductNameMatch } from '../utils/productNameMatch';
+import { checkProductNameMatch, checkReviewerNameMatch } from '../utils/productNameMatch';
 
 interface ProductCardProps {
   product: Product;
@@ -66,10 +66,12 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
     orderDate?: string;
     soldBy?: string;
     productName?: string;
+    accountName?: string;
   }>({ orderId: '', amount: '' });
   const [reviewerName, setReviewerName] = useState('');
   const [fieldsLocked, setFieldsLocked] = useState(false);
   const [productNameMismatch, setProductNameMismatch] = useState(false);
+  const [reviewerNameMismatch, setReviewerNameMismatch] = useState(false);
   const [titleExpanded, setTitleExpanded] = useState(false);
 
   const resetForm = useCallback(() => {
@@ -82,6 +84,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
     setReviewerName('');
     setFieldsLocked(false);
     setProductNameMismatch(false);
+    setReviewerNameMismatch(false);
     setFormOpen(false);
   }, []);
 
@@ -103,6 +106,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
     // AI extraction
     setExtracting(true);
     setProductNameMismatch(false);
+    setReviewerNameMismatch(false);
     try {
       const result = await api.orders.extractDetails(file);
       if (result) {
@@ -112,6 +116,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
           orderDate: result.orderDate || undefined,
           soldBy: result.soldBy || undefined,
           productName: result.productName || undefined,
+          accountName: result.accountName || undefined,
         });
         // Lock fields only when BOTH required fields are extracted
         if (result.orderId && result.amount) setFieldsLocked(true);
@@ -121,6 +126,11 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
         if (nameMatchResult === 'mismatch') {
           setProductNameMismatch(true);
           toast.error('Product name in screenshot does not match this deal. Please upload the correct order screenshot.');
+        }
+        // ── Reviewer name matching against extracted account name ──
+        if (result.accountName && reviewerName.trim()) {
+          const rnMatch = checkReviewerNameMatch(reviewerName, result.accountName);
+          setReviewerNameMismatch(rnMatch === 'mismatch');
         }
       }
     } catch {
@@ -136,6 +146,11 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
     // Block if product name mismatch detected
     if (productNameMismatch) {
       toast.error('Product in screenshot does not match this deal. Upload the correct order screenshot.');
+      return;
+    }
+    // Block if reviewer name mismatch detected
+    if (reviewerNameMismatch) {
+      toast.error('Reviewer name does not match the account in screenshot. Please correct it.');
       return;
     }
     // Require reviewer name for Rating/Review deals to prevent cheating
@@ -184,7 +199,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
     } finally {
       setSubmitting(false);
     }
-  }, [user, screenshot, submitting, productNameMismatch, extractedDetails, product, reviewerName, toast, resetForm]);
+  }, [user, screenshot, submitting, productNameMismatch, reviewerNameMismatch, extractedDetails, product, reviewerName, toast, resetForm]);
 
   const handleLinkClick = () => {
     if (product.productUrl && /^https?:\/\//i.test(product.productUrl)) {
@@ -435,11 +450,33 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                 <input
                   type="text"
                   value={reviewerName}
-                  onChange={(e) => setReviewerName(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setReviewerName(val);
+                    if (extractedDetails.accountName && val.trim()) {
+                      setReviewerNameMismatch(checkReviewerNameMatch(val, extractedDetails.accountName) === 'mismatch');
+                    } else {
+                      setReviewerNameMismatch(false);
+                    }
+                  }}
                   placeholder="e.g. Chetan on Amazon"
                   maxLength={200}
-                  className="w-full px-1.5 py-1 text-[10px] font-medium border border-gray-300 rounded bg-white focus:ring-1 focus:ring-lime-300 focus:border-lime-400 outline-none transition-all"
+                  className={`w-full px-1.5 py-1 text-[10px] font-medium border rounded bg-white focus:ring-1 outline-none transition-all ${
+                    reviewerNameMismatch
+                      ? 'border-red-400 focus:ring-red-300 focus:border-red-400'
+                      : extractedDetails.accountName && reviewerName.trim() && !reviewerNameMismatch
+                        ? 'border-green-400 focus:ring-green-300 focus:border-green-400'
+                        : 'border-gray-300 focus:ring-lime-300 focus:border-lime-400'
+                  }`}
                 />
+                {reviewerNameMismatch && (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <AlertCircle size={9} className="text-red-500 flex-shrink-0" />
+                    <p className="text-[8px] font-bold text-red-600">
+                      Account name mismatch — screenshot shows &quot;{extractedDetails.accountName}&quot;
+                    </p>
+                  </div>
+                )}
                 <p className="text-[8px] text-zinc-400">
                   Enter the name shown on the marketplace account used for this order.
                   {(product.dealType === 'Rating' || product.dealType === 'Review') && <span className="text-red-400 font-bold"> Required</span>}
@@ -459,6 +496,12 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                 <p className="text-[9px] font-bold text-red-600">Product name mismatch — this screenshot is for a different product.</p>
               </div>
             )}
+            {reviewerNameMismatch && (
+              <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
+                <AlertCircle size={11} className="text-amber-500 flex-shrink-0" />
+                <p className="text-[9px] font-bold text-amber-700">Reviewer name doesn&apos;t match the account in screenshot.</p>
+              </div>
+            )}
             <div className="flex gap-2">
               <button
                 type="button"
@@ -470,7 +513,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
               <button
                 type="button"
                 onClick={handleInlineSubmit}
-                disabled={!screenshot || submitting || extracting || !extractedDetails.orderId.trim() || productNameMismatch}
+                disabled={!screenshot || submitting || extracting || !extractedDetails.orderId.trim() || productNameMismatch || reviewerNameMismatch}
                 className="flex-1 py-2.5 bg-black text-white font-extrabold rounded-xl text-xs uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition-all flex items-center justify-center gap-1.5"
               >
                 {submitting ? (

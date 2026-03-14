@@ -59,6 +59,25 @@ function wordMatch(a: string, b: string): boolean {
 export type ProductNameMatchStatus = 'match' | 'mismatch' | 'none';
 
 /**
+ * Strip trailing ellipsis and the truncated last word from an extracted name.
+ * Rating screenshots often show truncated product names like:
+ *   "Arabian Aroma Seduction Perfume For Men, Un..."
+ * The "Un..." is a truncated word that won't match anything — drop it.
+ */
+function stripTruncation(text: string): { cleaned: string; wasTruncated: boolean } {
+  // Detect trailing "..." or "…" (with optional whitespace)
+  const ellipsisMatch = text.match(/^(.*?)\s*(?:\.{2,}|…)\s*$/);
+  if (!ellipsisMatch) return { cleaned: text, wasTruncated: false };
+  let cleaned = ellipsisMatch[1].trim();
+  // The last word is likely truncated — remove it
+  const lastSpace = cleaned.lastIndexOf(' ');
+  if (lastSpace > 0) {
+    cleaned = cleaned.substring(0, lastSpace).trim();
+  }
+  return { cleaned, wasTruncated: true };
+}
+
+/**
  * Compare an extracted product name (from a screenshot) against the expected
  * deal product title.  Returns 'match', 'mismatch', or 'none' (when
  * either name is empty).
@@ -67,7 +86,7 @@ export function checkProductNameMatch(
   extractedProductName: string | undefined | null,
   expectedProductTitle: string | undefined | null,
 ): ProductNameMatchStatus {
-  const extractedName = (typeof extractedProductName === 'string' ? extractedProductName : '').toLowerCase().trim();
+  let extractedName = (typeof extractedProductName === 'string' ? extractedProductName : '').toLowerCase().trim();
   const expectedName = (typeof expectedProductTitle === 'string' ? expectedProductTitle : '').toLowerCase().trim();
 
   if (!extractedName || !expectedName) return 'none';
@@ -76,6 +95,12 @@ export function checkProductNameMatch(
   const isUrl = /https?:\/\/|www\.|\.com\/|\.in\/|orderID=|order-details|ref=|utm_/i.test(extractedName);
   const isDeliveryStatus = /^(arriving|shipped|delivered|dispatched|out\s*for\s*delivery|in\s*transit|order\s*(placed|confirmed))/i.test(extractedName);
   if (isUrl || isDeliveryStatus) return 'mismatch';
+
+  // Handle truncated product names (ending with "..." or "…")
+  const { cleaned: strippedName, wasTruncated } = stripTruncation(extractedName);
+  if (wasTruncated && strippedName.length >= 3) {
+    extractedName = strippedName;
+  }
 
   const extractedWords = cleanWords(extractedName);
   const expectedWords = cleanWords(expectedName);
@@ -92,11 +117,92 @@ export function checkProductNameMatch(
   const fwdPass = fwdMatches.length >= 2 && fwdRatio >= 1.0;
 
   // RULE 2: Dynamic reverse threshold based on expected name length
-  const revThreshold = expectedWords.length <= 6 ? 1.0 : 0.5;
+  // For truncated names, relax reverse threshold — we can't expect many matches
+  const revThreshold = wasTruncated ? 0.3 : (expectedWords.length <= 6 ? 1.0 : 0.5);
   const revPass = revMatches.length >= Math.min(2, expectedWords.length) && revRatio >= revThreshold;
 
   const hasEnoughOverlap = fwdPass && revPass;
   const shortNameMatch = expectedWords.length <= 2 && fwdMatches.length >= expectedWords.length;
 
   return (hasEnoughOverlap || shortNameMatch) ? 'match' : 'mismatch';
+}
+
+// ─── Reviewer / Account Name Matching ────────────────────
+export type ReviewerNameMatchStatus = 'match' | 'mismatch' | 'none';
+
+/**
+ * Compare an extracted account name (from a screenshot) against the
+ * user-entered reviewer name. Optionally also checks against a second
+ * name (publicName from the "Edit public name" area on Amazon).
+ *
+ * Flexible matching handles:
+ *  - First name only: "Ashok" matches "Ashok Rathore"
+ *  - Full name: "Ashok Rathore" matches "Ashok Rathore"
+ *  - Greeting-stripped: "Hello, Ashok" → "Ashok"
+ *  - Partial visibility: screenshot shows "Chetan" → reviewer "Chetan Chaudhari" matches
+ *  - Case insensitive
+ *  - Checks BOTH accountName and publicName — match on EITHER is accepted
+ */
+export function checkReviewerNameMatch(
+  reviewerName: string | undefined | null,
+  extractedAccountName: string | undefined | null,
+  extractedPublicName?: string | undefined | null,
+): ReviewerNameMatchStatus {
+  const reviewer = (typeof reviewerName === 'string' ? reviewerName : '').trim().toLowerCase();
+  if (!reviewer) return 'none';
+
+  // Check against both names — match on either is accepted
+  const names = [extractedAccountName, extractedPublicName].filter(
+    (n): n is string => typeof n === 'string' && n.trim().length > 0
+  );
+
+  if (names.length === 0) return 'none';
+
+  for (const rawName of names) {
+    const result = _matchSingleName(reviewer, rawName);
+    if (result === 'match') return 'match';
+  }
+
+  return 'mismatch';
+}
+
+/** Internal: match reviewer against a single detected name */
+function _matchSingleName(reviewer: string, rawAccount: string): ReviewerNameMatchStatus {
+  let account = rawAccount.trim().toLowerCase();
+  if (!account) return 'none';
+
+  // Strip greeting prefixes ("Hello, Ashok" → "Ashok", "Hi Chetan" → "Chetan")
+  account = account
+    .replace(/^(hello|hi|hey|welcome|dear)\s*[,!]?\s*/i, '')
+    .trim();
+
+  if (!account) return 'none';
+
+  // Direct match
+  if (reviewer === account) return 'match';
+  // Substring: "Ashok" in "Ashok Rathore" or vice versa
+  if (reviewer.includes(account) || account.includes(reviewer)) return 'match';
+
+  // Parts matching: at least one significant part from the extracted account
+  // name must exist in the reviewer name
+  const reviewerParts = reviewer.split(/\s+/).filter((p) => p.length >= 2);
+  const accountParts = account.split(/\s+/).filter((p) => p.length >= 2);
+
+  if (accountParts.length === 0 || reviewerParts.length === 0) return 'none';
+
+  // Check if any account part appears in reviewer parts (partial name visibility)
+  const anyAccountPartInReviewer = accountParts.some((ap) =>
+    reviewerParts.some((rp) => rp === ap || rp.includes(ap) || ap.includes(rp) ||
+      (rp.length >= 4 && ap.length >= 4 && editDist(rp, ap) <= 1)),
+  );
+  if (anyAccountPartInReviewer) return 'match';
+
+  // Check if any reviewer part appears in account parts (handles "chetan chaudhari" → "chetan")
+  const anyReviewerPartInAccount = reviewerParts.some((rp) =>
+    accountParts.some((ap) => ap === rp || ap.includes(rp) || rp.includes(ap) ||
+      (rp.length >= 4 && ap.length >= 4 && editDist(rp, ap) <= 1)),
+  );
+  if (anyReviewerPartInAccount) return 'match';
+
+  return 'mismatch';
 }

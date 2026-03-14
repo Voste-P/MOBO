@@ -838,6 +838,7 @@ export function aiRoutes(env: Env): Router {
           orderDate: null,
           soldBy: null,
           productName: null,
+          accountName: null,
           confidenceScore: 0,
           notes: `Extraction encountered an issue: ${errMsg.slice(0, 200)}. Please enter details manually.`,
         };
@@ -854,6 +855,7 @@ export function aiRoutes(env: Env): Router {
           orderDate: result.orderDate,
           soldBy: result.soldBy,
           productName: result.productName,
+          accountName: result.accountName,
           confidenceScore: result.confidenceScore,
         },
       });
@@ -881,6 +883,7 @@ export function aiRoutes(env: Env): Router {
           orderDate: null,
           soldBy: null,
           productName: null,
+          accountName: null,
           confidenceScore: 0,
           notes: 'An unexpected error occurred. Please enter your order details manually.',
         });

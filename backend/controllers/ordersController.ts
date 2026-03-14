@@ -470,11 +470,13 @@ export function makeOrdersController(env: Env) {
           });
 
           const confidenceThreshold = env.AI_PROOF_CONFIDENCE_THRESHOLD ?? 75;
-          if (!verification?.orderIdMatch || !verification?.amountMatch || (verification?.confidenceScore ?? 0) < confidenceThreshold) {
+          // Amount mismatch is expected (shipping, discounts, taxes) — don't hard-block.
+          // Only require orderIdMatch + confidence threshold.
+          if (!verification?.orderIdMatch || (verification?.confidenceScore ?? 0) < confidenceThreshold) {
             throw new AppError(
               422,
               'INVALID_ORDER_PROOF',
-              'Your order proof could not be verified. Please upload a clear screenshot showing the order ID and amount.'
+              'Your order proof could not be verified. Please upload a clear screenshot showing the order ID.'
             );
           }
           // Hard-block: product name must POSITIVELY match when expected product name is available.
@@ -1052,7 +1054,7 @@ export function makeOrdersController(env: Env) {
           // Auto-verify review links: URL validation already confirms it's from a known marketplace.
           // Set confidence so autoVerifyStep can pick it up.
           if (env.NODE_ENV !== 'test') {
-            claimAiConfidence = 95;
+            claimAiConfidence = env.AI_REVIEW_LINK_CONFIDENCE ?? 95;
           }
           if (order.rejectionType === 'review') {
             updateData.rejectionType = null;
@@ -1286,6 +1288,7 @@ export function makeOrdersController(env: Env) {
               detectedProductName: aiOrderVerification.detectedProductName,
               confidenceScore: aiOrderVerification.confidenceScore,
               discrepancyNote: aiOrderVerification.discrepancyNote,
+              verificationMethod: aiOrderVerification.verificationMethod,
             };
           }
           if (order.rejectionType === 'order') {
@@ -1307,6 +1310,7 @@ export function makeOrdersController(env: Env) {
                 amountMatch: aiOrderVerification.amountMatch,
                 productNameMatch: aiOrderVerification.productNameMatch,
                 confidenceScore: aiOrderVerification.confidenceScore,
+                verificationMethod: aiOrderVerification.verificationMethod,
               },
             });
           }
