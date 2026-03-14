@@ -1310,6 +1310,7 @@ export type RatingVerificationResult = {
   accountNameMatch: boolean;
   productNameMatch: boolean;
   detectedAccountName?: string;
+  detectedPublicName?: string;
   detectedProductName?: string;
   confidenceScore: number;
   discrepancyNote?: string;
@@ -1450,16 +1451,18 @@ async function verifyRatingWithOcr(
       if (reviewerLower.length >= 3 && (lower.includes(reviewerLower) || lowerStripped.includes(reviewerLower))) {
         accountNameMatch = true;
       }
-      // Strategy 2: reviewer name parts — ALL parts must match for strict verification.
-      // OCR often captures greeting like "Hello Chetan" — the greeting-stripped text handles this.
+      // Strategy 2: reviewer name parts — at least ONE significant part must match.
+      // The screenshot may only show a partial name (e.g. "Chetan" when full name is
+      // "Chetan Chaudhari"), so requiring ALL parts would cause false negatives.
       if (!accountNameMatch && reviewerParts.length > 0) {
         const reviewerMatches = reviewerParts.filter(p => lower.includes(p) || lowerStripped.includes(p));
-        accountNameMatch = reviewerMatches.length >= reviewerParts.length;
+        // For single-part names, require exact match; for multi-part, at least 1 part
+        accountNameMatch = reviewerMatches.length >= Math.max(1, Math.ceil(reviewerParts.length * 0.5));
       }
       // Strategy 3: fuzzy match for reviewer name parts (OCR misreads)
       if (!accountNameMatch) {
         for (const part of allReviewerParts) {
-          if (part.length < 6) continue;
+          if (part.length < 4) continue;
           const ocrWords = lower.split(/\s+/);
           const fuzzy = ocrWords.some(w => w.length >= part.length - 1 && w.length <= part.length + 1 && editDistance(w, part) <= 1);
           if (fuzzy) { accountNameMatch = true; break; }
@@ -1516,14 +1519,26 @@ async function verifyRatingWithOcr(
       confidenceScore += Math.round(CONFIDENCE.RATING_FIELD_WEIGHT * productRatio);
     }
 
-    // Try to detect the actual account name shown
-    const nameLineRe = /(?:public\s*name|profile|account|by|reviewer|reviewed|written\s*by|posted\s*by)\s*[:\-]?\s*(.{2,40})/i;
-    const nameMatch = ocrText.match(nameLineRe);
-    const detectedAccountName = nameMatch?.[1]?.trim() || undefined;
+    // Try to detect the actual account name and public name shown
+    // Account name: from header greeting like "Hello, Ashok"
+    const greetingNameRe = /(?:hello|hi|hey|welcome|dear)\s*,?\s*([a-zA-Z][a-zA-Z\s.]{1,39})/i;
+    const greetingMatch = ocrText.match(greetingNameRe);
+    const detectedAccountName = greetingMatch?.[1]?.trim() || undefined;
+    // Public name: from "Edit public name" area on Amazon rating pages
+    const publicNameRe = /([a-zA-Z][a-zA-Z\s.]{1,39})\s*(?:edit\s*public\s*name|public\s*name)/i;
+    const publicNameMatch2 = ocrText.match(publicNameRe);
+    let detectedPublicName = publicNameMatch2?.[1]?.trim() || undefined;
+    // Fallback: generic reviewer/profile name pattern
+    if (!detectedPublicName) {
+      const profileRe = /(?:public\s*name|profile|reviewer|reviewed|written\s*by|posted\s*by)\s*[:\-]?\s*(.{2,40})/i;
+      const profileMatch = ocrText.match(profileRe);
+      detectedPublicName = profileMatch?.[1]?.trim() || undefined;
+    }
 
     return {
       accountNameMatch, productNameMatch, confidenceScore,
-      detectedAccountName,
+      detectedAccountName: detectedAccountName || detectedPublicName,
+      detectedPublicName,
       detectedProductName: matchedTokens.length > 0 ? matchedTokens.join(' ') : undefined,
       discrepancyNote: [
         !accountNameMatch ? (expectedReviewerName
@@ -1588,7 +1603,8 @@ export async function verifyRatingScreenshotWithAi(
               `3. Find the PRODUCT NAME visible in the rating screenshot. The product may only be PARTIALLY visible (truncated by the UI) — extract whatever product text IS visible. Compare it to "${payload.expectedProductName}" — ALL visible significant words (brand, model, variant name, fragrance/flavor, size, color) must match the corresponding parts of the expected name. CRITICAL: The same brand often has many DIFFERENT products with very similar names. If even ONE distinguishing word differs, set productNameMatch=false. But if the visible portion is a proper PREFIX/SUBSET of the expected name with no conflicting words, set productNameMatch=true.`,
               `4. If the account name does not match the expected name or the product does not match, this is potential FRAUD. ALWAYS default to false when uncertain.`,
               `5. Set confidenceScore 0-100 based on how clearly visible and matching both fields are.`,
-              `6. Always fill detectedAccountName and detectedProductName with what you actually see.`,
+              `6. Always fill detectedAccountName with the greeting/header name (e.g. from "Hello, Ashok"), and detectedPublicName with the name shown beside "Edit public name" (if visible). Fill detectedProductName with the product text you see.`,
+              `7. PARTIAL NAME MATCHING: The name visible in the screenshot may be PARTIAL or truncated. For example, the screenshot may show only "Chetan" but the expected reviewer name is "Chetan Chaudhari". If any significant part of the expected name appears in the screenshot names, set accountNameMatch=true. Similarly, if the expected name is "Chetan" and the screenshot shows "Chetan Chaudhari", that should also match.`,
             ].join('\n') },
           ],
           config: {
@@ -1600,7 +1616,8 @@ export async function verifyRatingScreenshotWithAi(
                 accountNameMatch: { type: Type.BOOLEAN },
                 productNameMatch: { type: Type.BOOLEAN },
                 confidenceScore: { type: Type.INTEGER },
-                detectedAccountName: { type: Type.STRING },
+                detectedAccountName: { type: Type.STRING, description: 'Name from the header/greeting area (e.g. "Hello, Ashok" → "Ashok"). Strip greeting prefix.' },
+                detectedPublicName: { type: Type.STRING, description: 'Name shown beside "Edit public name" on the review/rating page. This is the marketplace public display name. Null if not visible.' },
                 detectedProductName: { type: Type.STRING },
                 discrepancyNote: { type: Type.STRING },
               },
@@ -1612,57 +1629,59 @@ export async function verifyRatingScreenshotWithAi(
         const parsed = safeJsonParse<RatingVerificationResult>(response.text);
         if (!parsed) throw new Error('Failed to parse AI rating verification response');
         parsed.confidenceScore = Math.max(0, Math.min(100, parsed.confidenceScore ?? 0));
+        // Sanitize string "null"/"undefined" from Gemini responses
+        if (parsed.detectedPublicName && /^(null|undefined|n\/a|none)$/i.test(parsed.detectedPublicName)) parsed.detectedPublicName = undefined;
+        if (parsed.detectedAccountName && /^(null|undefined|n\/a|none)$/i.test(parsed.detectedAccountName)) parsed.detectedAccountName = undefined;
+        if (parsed.discrepancyNote && /^(null|undefined)$/i.test(parsed.discrepancyNote)) parsed.discrepancyNote = undefined;
 
         // Post-process: When reviewerName is provided, it is the PRIMARY match target.
+        // Check BOTH detectedAccountName (header greeting) and detectedPublicName (beside "Edit public name").
         // Gemini may have matched against buyer name instead — we need to verify against reviewer name.
         if (payload.expectedReviewerName) {
           const detected = (parsed.detectedAccountName || '').toLowerCase().trim();
+          const detectedPublic = (parsed.detectedPublicName || '').toLowerCase().trim();
           const reviewer = payload.expectedReviewerName.toLowerCase().trim();
-          if (detected && reviewer) {
-            // Strip common greeting prefixes from detected name
-            // e.g. "Hello Chetan", "Hi Chetan", "Dear Chetan" → "Chetan"
-            const GREETING_RE = /^(hello|hi|hey|dear|welcome|namaste|good\s*(morning|afternoon|evening))\s*,?\s*/i;
-            const detClean = detected.replace(GREETING_RE, '').trim();
-            const revClean = reviewer.replace(GREETING_RE, '').trim();
-            // Check if detected name matches reviewer name (with greeting stripped)
-            const reviewerMatched =
-              detClean === revClean ||
-              detClean.includes(revClean) ||
-              revClean.includes(detClean) ||
-              // Also check original in case greeting stripping was too aggressive
-              detected === reviewer ||
-              detected.includes(reviewer) ||
-              reviewer.includes(detected);
 
-            if (reviewerMatched) {
-              parsed.accountNameMatch = true;
-              parsed.discrepancyNote = 'Account name matched via marketplace reviewer name.';
-            } else {
-              // Fuzzy: check name parts — ALL parts must match for strict verification
-              // Use greeting-stripped versions for fuzzy matching
-              const revParts = revClean.split(/\s+/).filter(p => p.length >= 2);
-              const detParts = detClean.split(/\s+/).filter(p => p.length >= 2);
-              let fuzzyMatch = false;
-              if (revParts.length > 0 && detParts.length > 0) {
-                const matchCount = revParts.filter(rp => detParts.some(dp =>
-                  dp === rp || (rp.length >= 6 && editDistance(dp, rp) <= 1)
-                )).length;
-                // ALL parts must match — strict enforcement to catch wrong public names
-                if (matchCount >= revParts.length) {
-                  fuzzyMatch = true;
-                }
-              }
-              if (fuzzyMatch) {
-                parsed.accountNameMatch = true;
-                parsed.discrepancyNote = 'Account name matched via marketplace reviewer name (fuzzy).';
-              } else {
-                // Reviewer name provided but NOT matched — override to false even if Gemini matched buyer name
-                parsed.accountNameMatch = false;
-                parsed.discrepancyNote = `Reviewer name "${payload.expectedReviewerName}" not found. Detected "${parsed.detectedAccountName || 'unknown'}".`;
-              }
+          // Helper: check if a detected name matches the reviewer name (with partial matching)
+          const GREETING_RE = /^(hello|hi|hey|dear|welcome|namaste|good\s*(morning|afternoon|evening))\s*,?\s*/i;
+          const checkNameMatch = (detName: string): boolean => {
+            if (!detName) return false;
+            const detClean = detName.replace(GREETING_RE, '').trim();
+            const revClean = reviewer.replace(GREETING_RE, '').trim();
+            // Direct match or substring containment (handles partial names)
+            if (detClean === revClean || detClean.includes(revClean) || revClean.includes(detClean)) return true;
+            if (detName === reviewer || detName.includes(reviewer) || reviewer.includes(detName)) return true;
+            // Parts matching: at least one significant part must match
+            const revParts = revClean.split(/\s+/).filter(p => p.length >= 2);
+            const detParts = detClean.split(/\s+/).filter(p => p.length >= 2);
+            if (revParts.length > 0 && detParts.length > 0) {
+              // Check if any reviewer part appears in detected name parts (or vice versa)
+              const matchCount = revParts.filter(rp => detParts.some(dp =>
+                dp === rp || dp.includes(rp) || rp.includes(dp) ||
+                (rp.length >= 4 && dp.length >= 4 && editDistance(dp, rp) <= 1)
+              )).length;
+              // Allow partial match: at least 1 significant part must match
+              if (matchCount >= Math.max(1, Math.ceil(revParts.length * 0.5))) return true;
             }
-          } else if (!detected && reviewer) {
-            // Could not detect account name from screenshot
+            return false;
+          };
+
+          // Check against BOTH detected names
+          const accountMatch = checkNameMatch(detected);
+          const publicMatch = checkNameMatch(detectedPublic);
+
+          if (accountMatch || publicMatch) {
+            parsed.accountNameMatch = true;
+            const matchSource = publicMatch && accountMatch ? 'account name and public name'
+              : publicMatch ? 'public name' : 'account name';
+            parsed.discrepancyNote = `Reviewer matched via ${matchSource}.`;
+          } else if (detected || detectedPublic) {
+            // Names detected but none matched
+            parsed.accountNameMatch = false;
+            const names = [detected && `account: "${parsed.detectedAccountName}"`, detectedPublic && `public: "${parsed.detectedPublicName}"`].filter(Boolean).join(', ');
+            parsed.discrepancyNote = `Reviewer name "${payload.expectedReviewerName}" not found. Detected ${names}.`;
+          } else {
+            // Could not detect any name from screenshot
             parsed.accountNameMatch = false;
             parsed.discrepancyNote = `Could not detect account name in screenshot to match reviewer "${payload.expectedReviewerName}".`;
           }
@@ -1741,6 +1760,7 @@ export type ReturnWindowVerificationResult = {
   reviewerNameMatch: boolean;
   confidenceScore: number;
   detectedReturnWindow?: string;
+  detectedAccountName?: string;
   discrepancyNote?: string;
 };
 
@@ -1884,12 +1904,21 @@ async function verifyReturnWindowWithOcr(
       const lowerStripped = lower.replace(GREETING_RW_RE, ' ');
       // Direct substring match (check both raw and greeting-stripped)
       reviewerNameMatch = lower.includes(revName) || lowerStripped.includes(revName);
-      // Partial name match: check individual name parts
+      // Partial name match: check individual name parts (at least 1 part for partial visibility)
       if (!reviewerNameMatch) {
         const nameParts = revName.split(/\s+/).filter(p => p.length >= 2);
         if (nameParts.length > 0) {
           const matched = nameParts.filter(p => lower.includes(p) || lowerStripped.includes(p));
           reviewerNameMatch = matched.length >= Math.max(1, Math.ceil(nameParts.length * 0.5));
+        }
+      }
+      // Fuzzy match for partial name visibility with OCR misreads
+      if (!reviewerNameMatch) {
+        const nameParts = revName.split(/\s+/).filter(p => p.length >= 4);
+        const ocrWords = lowerStripped.split(/\s+/);
+        for (const part of nameParts) {
+          const fuzzy = ocrWords.some((w: string) => w.length >= part.length - 1 && w.length <= part.length + 1 && editDistance(w, part) <= 1);
+          if (fuzzy) { reviewerNameMatch = true; break; }
         }
       }
     }
@@ -1977,7 +2006,7 @@ export async function verifyReturnWindowWithAi(
               `4. Find "Sold by" / "Seller" and compare to "${payload.expectedSoldBy || 'N/A'}". Ignore suffixes like "Retail", "India", "Pvt Ltd", ".in", ".com". If NOT found or different seller → soldByMatch=false.${payload.expectedSoldBy ? '' : ' If expected seller is N/A → soldByMatch=true.'}`,
               `5. Check if the RETURN WINDOW is CLOSED/EXPIRED. Look for: "Return window closed", "No longer returnable", "Non-returnable", "Not eligible for return", "Exchange only", "Cannot be returned", "Return period expired", delivery date that is > 7 days ago, or any text indicating the item cannot be returned/replaced. If no such text found → returnWindowClosed=false.`,
               payload.expectedReviewerName
-                ? `6. Find the BUYER NAME / "Ship to" / "Deliver to" name in the screenshot and compare to "${payload.expectedReviewerName}". Set reviewerNameMatch=true ONLY if the name matches (case-insensitive, partial OK — e.g. "chetan" matches "Chetan Chaudhari"). If a clearly different name is shown or no name found → reviewerNameMatch=false.`
+                ? `6. Find the BUYER NAME in MULTIPLE locations: (a) The header/greeting area at the top (e.g. "Hello, Ashok" → extract "Ashok"), (b) The "Ship to" / "Deliver to" name. Set reviewerNameMatch=true if EITHER location matches "${payload.expectedReviewerName}" (case-insensitive, partial OK — e.g. "chetan" matches "Chetan Chaudhari", and "hello chetan" should match "chetan"). Fill detectedAccountName with the header greeting name.`
                 : `6. reviewerNameMatch should always be set to true — no specific reviewer name to verify.`,
               `7. Set confidenceScore 0-100 based on match quality. Low confidence if fields are hard to read.`,
               `8. CRITICAL: If the screenshot appears to be from a DIFFERENT ORDER than expected, ALL match fields must be false. Do NOT guess or assume — if uncertain, set to false.`,
@@ -1998,6 +2027,7 @@ export async function verifyReturnWindowWithAi(
                 reviewerNameMatch: { type: Type.BOOLEAN },
                 confidenceScore: { type: Type.INTEGER },
                 detectedReturnWindow: { type: Type.STRING },
+                detectedAccountName: { type: Type.STRING, description: 'Name from the header/greeting area (e.g. "Hello, Ashok" → "Ashok"). Strip greeting prefix. Null if not visible.' },
                 discrepancyNote: { type: Type.STRING },
               },
               required: ['orderIdMatch', 'productNameMatch', 'amountMatch', 'soldByMatch', 'returnWindowClosed', 'reviewerNameMatch', 'confidenceScore'],
@@ -2008,6 +2038,9 @@ export async function verifyReturnWindowWithAi(
         const parsed = safeJsonParse<ReturnWindowVerificationResult>(response.text);
         if (!parsed) throw new Error('Failed to parse AI return window verification response');
         parsed.confidenceScore = Math.max(0, Math.min(100, parsed.confidenceScore ?? 0));
+        // Sanitize string "null"/"undefined" from Gemini responses
+        if (parsed.detectedAccountName && /^(null|undefined|n\/a|none)$/i.test(parsed.detectedAccountName)) parsed.detectedAccountName = undefined;
+        if (parsed.discrepancyNote && /^(null|undefined)$/i.test(parsed.discrepancyNote)) parsed.discrepancyNote = undefined;
 
         // ── Post-processing: validate productNameMatch with server-side logic ──
         // Gemini is non-deterministic; our token matcher provides consistent results.
@@ -2039,6 +2072,27 @@ export async function verifyReturnWindowWithAi(
           }
         } else if (!payload.expectedSoldBy) {
           parsed.soldByMatch = true; // no seller to verify
+        }
+
+        // ── Post-processing: validate reviewerNameMatch with fuzzy partial matching ──
+        if (payload.expectedReviewerName && parsed.detectedAccountName) {
+          const eName = payload.expectedReviewerName.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+          const dName = parsed.detectedAccountName.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/^(hello|hi|hey|dear|welcome)\s*,?\s*/i, '').trim();
+          if (eName && dName) {
+            // Direct substring match
+            if (dName.includes(eName) || eName.includes(dName)) {
+              parsed.reviewerNameMatch = true;
+            } else {
+              // Parts-based: at least 50% of expected name parts found in detected
+              const eParts = eName.split(/\s+/).filter(p => p.length >= 2);
+              const dParts = dName.split(/\s+/).filter(p => p.length >= 2);
+              const threshold = Math.max(1, Math.ceil(eParts.length * 0.5));
+              const foundParts = eParts.filter(ep => dParts.some(dp => dp.includes(ep) || ep.includes(dp)));
+              if (foundParts.length >= threshold) parsed.reviewerNameMatch = true;
+            }
+          }
+        } else if (!payload.expectedReviewerName) {
+          parsed.reviewerNameMatch = true; // no reviewer to verify
         }
 
         recordGeminiSuccess();
@@ -2075,6 +2129,7 @@ export async function extractOrderDetailsWithAi(
   orderDate?: string | null;
   soldBy?: string | null;
   productName?: string | null;
+  accountName?: string | null;
   confidenceScore: number;
   notes?: string;
 }> {
@@ -3989,6 +4044,16 @@ export async function extractOrderDetailsWithAi(
             '     * Order labels: "Order #OD...", "Order placed..."',
             '     * Price labels: "₹599", "Grand Total", "Listing price", "Selling price"',
             '',
+            '6. ACCOUNT NAME — The marketplace account holder name:',
+            '   - AMAZON: Look for "Hello, [Name]" in the top-right header area. Extract ONLY the name part (e.g., "Hello, Ashok" → "Ashok"). Also check "Deliver to [Name]" near top-left.',
+            '   - FLIPKART: Look for the account/profile name in the top header area, near the user icon or "My Account" section.',
+            '   - MYNTRA/AJIO/NYKAA: Look for the logged-in user name in the header/profile area.',
+            '   - MEESHO: Look for the account name in the header or profile section.',
+            '   - On rating/review pages: Look near "Edit public name" — the name displayed there is the reviewer display name.',
+            '   - CRITICAL: This is NOT the seller name, NOT the delivery address name — it is the LOGGED-IN account holder name shown in the website header.',
+            '   - Return ONLY the name, no greeting prefix (no "Hello", "Hi", "Dear").',
+            '   - If not visible, return null.',
+            '',
             'VALIDATION RULES:',
             '- Amount must be a plausible price (₹1 to ₹500000), NOT a pincode (6 digits like 411052), NOT a phone number (10 digits), NOT order ID digits.',
             '- Product name must describe a physical item, NOT navigation chrome or addresses.',
@@ -3998,7 +4063,7 @@ export async function extractOrderDetailsWithAi(
             '- Address text (city names, state names, pincodes, street names, "India") must NEVER be the product name.',
             '- Order ID must follow the exact platform format described above.',
             '',
-            'Return JSON with: orderId (string|null), amount (number|null), orderDate (string|null), soldBy (string|null), productName (string|null), confidenceScore (0-100 integer).',
+            'Return JSON with: orderId (string|null), amount (number|null), orderDate (string|null), soldBy (string|null), productName (string|null), accountName (string|null), confidenceScore (0-100 integer).',
             'If a field is not found, return null for that field. Do NOT return 0 for amount or empty string — use null.',
           ].join('\n') },
         ],
@@ -4014,6 +4079,7 @@ export async function extractOrderDetailsWithAi(
               orderDate: { type: Type.STRING, description: 'Date the order was placed (e.g. "13 February 2026"). Null if not found.', nullable: true },
               soldBy: { type: Type.STRING, description: 'Seller/merchant company name only (e.g. "Cocoblu Retail"). No button text. Null if not found.', nullable: true },
               productName: { type: Type.STRING, description: 'Full product title/name of the item ordered. Concatenate all lines if multi-line. Must NOT be navigation text or addresses. Null if not found.', nullable: true },
+              accountName: { type: Type.STRING, description: 'Marketplace account holder name from the website header (e.g. "Hello, Ashok" → "Ashok"). Not the seller or delivery address name. Null if not visible.', nullable: true },
               confidenceScore: { type: Type.INTEGER, description: 'Confidence 0-100 in the extraction accuracy.' },
             },
             required: ['confidenceScore'],
@@ -4618,6 +4684,7 @@ export async function extractOrderDetailsWithAi(
     let finalOrderDate = deterministic.orderDate;
     let finalSoldBy = deterministic.soldBy;
     let finalProductName = deterministic.productName;
+    let finalAccountName: string | null = null;
     let aiUsed = false;
 
     // ALWAYS run AI when available and circuit breaker is closed — for validation, gap-filling, and cross-checking
@@ -4934,6 +5001,17 @@ export async function extractOrderDetailsWithAi(
               }
             }
 
+            // Extract account name from AI vision result
+            if (!finalAccountName && directResult.accountName) {
+              const cleanedAccountName = directResult.accountName
+                .replace(/^(hello|hi|hey|welcome|dear)\s*[,!]?\s*/i, '')
+                .replace(/\s{2,}/g, ' ')
+                .trim();
+              if (cleanedAccountName.length >= 2) {
+                finalAccountName = cleanedAccountName;
+              }
+            }
+
             if (finalOrderId || finalAmount || directResult.productName || directResult.soldBy) {
               confidenceScore = Math.max(confidenceScore, directConfidence);
               aiUsed = true;
@@ -4942,6 +5020,7 @@ export async function extractOrderDetailsWithAi(
                 amount: directAmount,
                 productName: directResult.productName,
                 soldBy: directResult.soldBy,
+                accountName: directResult.accountName,
                 confidence: directConfidence,
               });
             }
@@ -5352,12 +5431,29 @@ export async function extractOrderDetailsWithAi(
       } catch { /* keep original */ }
     }
 
+    // 10. OCR-based fallback for account name (when Gemini didn't extract it)
+    if (!finalAccountName && ocrText) {
+      // Look for "Hello, Name" or "Hello Name" patterns in OCR text
+      const helloMatch = ocrText.match(/Hello[,\s]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})/);
+      if (helloMatch) {
+        const candidate = helloMatch[1].trim();
+        // Reject if it looks like a nav keyword
+        if (!/^(Ashok|Returns?|Orders?|Cart|Sign|Account|Explore|Search)/i.test(candidate) || /^[A-Z][a-z]{2,}$/.test(candidate)) {
+          if (candidate.length >= 3 && candidate.length <= 40) {
+            finalAccountName = candidate;
+            notes.push('Account name extracted from OCR text (Hello greeting).');
+          }
+        }
+      }
+    }
+
     aiLog.info('Order extract final', {
       orderId: finalOrderId,
       amount: finalAmount,
       orderDate: finalOrderDate,
       soldBy: finalSoldBy,
       productName: finalProductName,
+      accountName: finalAccountName,
       confidence: confidenceScore,
       aiUsed,
     });
@@ -5368,6 +5464,7 @@ export async function extractOrderDetailsWithAi(
       orderDate: finalOrderDate,
       soldBy: finalSoldBy,
       productName: finalProductName,
+      accountName: finalAccountName,
       confidenceScore,
       notes: notes.join(' '),
     };
@@ -5380,6 +5477,7 @@ export async function extractOrderDetailsWithAi(
       orderDate: null,
       soldBy: null,
       productName: null,
+      accountName: null,
       confidenceScore: 0,
       notes: `Extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
     };

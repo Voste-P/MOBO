@@ -74,6 +74,10 @@ const envSchema = z.object({
   // 90 strikes a good balance between speed and fraud safety.
   AI_AUTO_VERIFY_THRESHOLD: z.coerce.number().int().min(0).max(101).default(90),
 
+  // Confidence score assigned to review links from recognized marketplace domains.
+  // URL validation acts as the "AI" for review proofs — no screenshot analysis needed.
+  AI_REVIEW_LINK_CONFIDENCE: z.coerce.number().int().min(0).max(100).default(95),
+
   // Wallet safety limits
   WALLET_MAX_BALANCE_PAISE: z.coerce.number().int().positive().default(1_00_00_000), // ₹1,00,000
 

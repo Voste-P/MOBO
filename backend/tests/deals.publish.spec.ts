@@ -91,7 +91,7 @@ describe('ops deals: publish', () => {
         productUrl: 'https://example.com/product',
         originalPricePaise: 1000_00,
         pricePaise: 900_00,
-        payoutPaise: 0,
+        payoutPaise: 50_00,
         returnWindowDays: 14,
         dealType: 'Discount',
         totalSlots: 10,
@@ -167,6 +167,56 @@ describe('ops deals: publish', () => {
     // Net earnings (500 paise + (-1000 paise) = -500 paise) is negative; should be rejected.
     expect(res.status).toBe(400);
     expect(res.body?.error?.code).toBe('INVALID_ECONOMICS');
+
+    const deal = await db.deal.findFirst({ where: { campaignId: pgCampaign.id, mediatorCode, isDeleted: false } });
+    expect(deal).toBeFalsy();
+  });
+
+  it('rejects publishing when campaign and slot assignment both have zero payout', async () => {
+    const env = loadEnv({ NODE_ENV: 'test' });
+    const seeded = await seedE2E();
+
+    const app = createApp(env);
+    const db = prisma();
+
+    const _agency = await login(app, E2E_ACCOUNTS.agency.mobile, E2E_ACCOUNTS.agency.password);
+    const mediator = await login(app, E2E_ACCOUNTS.mediator.mobile, E2E_ACCOUNTS.mediator.password);
+
+    const mediatorCode = E2E_ACCOUNTS.mediator.mediatorCode;
+
+    const pgCampaign = await db.campaign.create({
+      data: {
+        mongoId: randomUUID(),
+        title: 'Zero Payout Campaign',
+        brandUserId: seeded.agency.id,
+        brandName: 'Agency Inventory',
+        platform: 'Amazon',
+        image: 'https://placehold.co/600x400',
+        productUrl: 'https://example.com/product',
+        originalPricePaise: 1000_00,
+        pricePaise: 900_00,
+        payoutPaise: 0,
+        returnWindowDays: 14,
+        dealType: 'Discount',
+        totalSlots: 10,
+        usedSlots: 0,
+        status: 'active',
+        allowedAgencyCodes: [],
+        assignments: { [mediatorCode]: { limit: 3 } },
+        createdBy: seeded.agency.id,
+      },
+    });
+
+    const res = await request(app)
+      .post('/api/ops/deals/publish')
+      .set('Authorization', `Bearer ${mediator.token}`)
+      .send({
+        id: pgCampaign.id,
+        mediatorCode,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body?.error?.code).toBe('INVALID_PAYOUT');
 
     const deal = await db.deal.findFirst({ where: { campaignId: pgCampaign.id, mediatorCode, isDeleted: false } });
     expect(deal).toBeFalsy();

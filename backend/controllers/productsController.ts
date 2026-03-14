@@ -45,6 +45,7 @@ export function makeProductsController() {
             orderBy: { createdAt: 'desc' },
             skip,
             take: limit,
+            include: { campaign: { select: { totalSlots: true, usedSlots: true, createdAt: true } } },
           }),
           db().deal.count({ where }),
           db().user.findFirst({
@@ -54,7 +55,20 @@ export function makeProductsController() {
         ]);
 
         const mediatorName = mediatorUser?.name || '';
-        res.json(paginatedResponse(deals.map(d => toUiDeal(pgDeal(d), mediatorName)), total, page, limit, isPaginated));
+        const enrichedDeals = deals.map((d: any) => {
+          const campaign = d.campaign;
+          const totalSlots = campaign?.totalSlots || 0;
+          const usedSlots = campaign?.usedSlots || 0;
+          const remainingSlots = Math.max(0, totalSlots - usedSlots);
+          let sellingSpeed = 0;
+          if (campaign?.createdAt && usedSlots > 0) {
+            const daysSinceCreation = Math.max(1, (Date.now() - new Date(campaign.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+            sellingSpeed = Math.round((usedSlots / daysSinceCreation) * 10) / 10;
+          }
+          const { campaign: _c, ...rest } = d;
+          return { ...rest, totalSlots, usedSlots, remainingSlots, sellingSpeed };
+        });
+        res.json(paginatedResponse(enrichedDeals.map((d: any) => toUiDeal(pgDeal(d), mediatorName)), total, page, limit, isPaginated));
 
         businessLog.info(`[Buyer] User ${req.auth?.userId} listed products — ${deals.length} deals, mediator: ${mediatorCode || 'none'}`, { actorUserId: req.auth?.userId, mediatorCode, resultCount: deals.length, total, ip: req.ip });
         logAccessEvent('RESOURCE_ACCESS', {

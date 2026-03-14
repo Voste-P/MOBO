@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
-import { checkProductNameMatch } from '../utils/productNameMatch';
+import { checkProductNameMatch, checkReviewerNameMatch } from '../utils/productNameMatch';
 import { subscribeRealtime } from '../services/realtime';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
@@ -211,6 +211,7 @@ export const Orders: React.FC = () => {
     orderDate?: string;
     soldBy?: string;
     productName?: string;
+    accountName?: string;
   }>({ orderId: '', amount: '' });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   // [AI] Smart Extraction UI State
@@ -218,7 +219,8 @@ export const Orders: React.FC = () => {
     id: 'match' | 'mismatch' | 'none';
     amount: 'match' | 'mismatch' | 'none';
     productName: 'match' | 'mismatch' | 'none';
-  }>({ id: 'none', amount: 'none', productName: 'none' });
+    reviewerName: 'match' | 'mismatch' | 'none';
+  }>({ id: 'none', amount: 'none', productName: 'none', reviewerName: 'none' });
   const [orderIdLocked, setOrderIdLocked] = useState(false);
   const [expandedTitles, setExpandedTitles] = useState<Set<string>>(new Set());
 
@@ -256,6 +258,7 @@ export const Orders: React.FC = () => {
     reviewerNameMatch: boolean;
     confidenceScore: number;
     detectedReturnWindow?: string;
+    detectedAccountName?: string;
     discrepancyNote?: string;
   } | null>(null);
   const [rwFile, setRwFile] = useState<File | null>(null);
@@ -495,7 +498,7 @@ export const Orders: React.FC = () => {
     reader.readAsDataURL(file);
 
     setIsAnalyzing(true);
-    setMatchStatus({ id: 'none', amount: 'none', productName: 'none' });
+    setMatchStatus({ id: 'none', amount: 'none', productName: 'none', reviewerName: 'none' });
     setOrderIdLocked(false);
     try {
       const details = await api.orders.extractDetails(file);
@@ -528,6 +531,7 @@ export const Orders: React.FC = () => {
         orderDate: typeof details.orderDate === 'string' ? details.orderDate : undefined,
         soldBy: typeof details.soldBy === 'string' ? details.soldBy : undefined,
         productName: typeof details.productName === 'string' ? details.productName : undefined,
+        accountName: typeof details.accountName === 'string' ? details.accountName : undefined,
       });
 
       // [AI] Smart Extraction Verification Logic
@@ -541,10 +545,16 @@ export const Orders: React.FC = () => {
         // Product name similarity check — strict matching to prevent fraud
         const productNameStatus = checkProductNameMatch(details.productName, capturedProduct.title);
 
+        // Reviewer name matching against extracted account name
+        const reviewerNameStatus = (details.accountName && reviewerNameInput.trim())
+          ? checkReviewerNameMatch(reviewerNameInput, details.accountName)
+          : 'none' as const;
+
         setMatchStatus({
           id: !hasId ? 'none' : idValid ? 'match' : 'mismatch',
           amount: !hasAmount ? 'none' : amountMatch ? 'match' : 'mismatch',
           productName: productNameStatus,
+          reviewerName: reviewerNameStatus,
         });
 
         // Lock the Order ID field if AI extracted a valid one
@@ -574,7 +584,7 @@ export const Orders: React.FC = () => {
       if (process.env.NODE_ENV !== 'production') console.error('[extraction error]', e);
       // Still allow manual entry by showing empty extraction fields
       setExtractedDetails({ orderId: '', amount: '' });
-      setMatchStatus({ id: 'none', amount: 'none', productName: 'none' });
+      setMatchStatus({ id: 'none', amount: 'none', productName: 'none', reviewerName: 'none' });
       setOrderIdLocked(false);
       // Surface meaningful error so users know what went wrong
       const msg =
@@ -840,6 +850,11 @@ export const Orders: React.FC = () => {
         : 'The product in the screenshot does not match the selected deal. Please upload the correct order screenshot.');
       return;
     }
+    // Block if reviewer name mismatch
+    if (matchStatus.reviewerName === 'mismatch') {
+      toast.error('Reviewer name does not match the account in screenshot. Please correct it.');
+      return;
+    }
     // Require reviewer/account name for Rating & Review deals — it's used for
     // AI screenshot verification and cannot be added later (prevents cheating).
     if ((selectedProduct.dealType === 'Rating' || selectedProduct.dealType === 'Review') && !reviewerNameInput.trim()) {
@@ -899,7 +914,7 @@ export const Orders: React.FC = () => {
       setReviewLinkInput('');
       setReviewerNameInput('');
       setExtractedDetails({ orderId: '', amount: '' });
-      setMatchStatus({ id: 'none', amount: 'none', productName: 'none' });
+      setMatchStatus({ id: 'none', amount: 'none', productName: 'none', reviewerName: 'none' });
       setOrderIdLocked(false);
       loadOrders();
       toast.success('Order submitted successfully!');
@@ -978,7 +993,7 @@ export const Orders: React.FC = () => {
               // Reset all form state to prevent screenshot/data leaking between orders
               setFormScreenshot(null);
               setExtractedDetails({ orderId: '', amount: '' });
-              setMatchStatus({ id: 'none', amount: 'none', productName: 'none' });
+              setMatchStatus({ id: 'none', amount: 'none', productName: 'none', reviewerName: 'none' });
               setOrderIdLocked(false);
               setSelectedProduct(null);
               setReviewLinkInput('');
@@ -1036,7 +1051,7 @@ export const Orders: React.FC = () => {
                 // Reset all form state to prevent screenshot/data leaking between orders
                 setFormScreenshot(null);
                 setExtractedDetails({ orderId: '', amount: '' });
-                setMatchStatus({ id: 'none', amount: 'none', productName: 'none' });
+                setMatchStatus({ id: 'none', amount: 'none', productName: 'none', reviewerName: 'none' });
                 setOrderIdLocked(false);
                 setSelectedProduct(null);
                 setReviewLinkInput('');
@@ -1634,7 +1649,7 @@ export const Orders: React.FC = () => {
             setIsNewOrderModalOpen(false);
             setFormScreenshot(null);
             setExtractedDetails({ orderId: '', amount: '' });
-            setMatchStatus({ id: 'none', amount: 'none', productName: 'none' });
+            setMatchStatus({ id: 'none', amount: 'none', productName: 'none', reviewerName: 'none' });
             setOrderIdLocked(false);
             setSelectedProduct(null);
             setReviewLinkInput('');
@@ -1650,7 +1665,7 @@ export const Orders: React.FC = () => {
                 setIsNewOrderModalOpen(false);
                 setFormScreenshot(null);
                 setExtractedDetails({ orderId: '', amount: '' });
-                setMatchStatus({ id: 'none', amount: 'none', productName: 'none' });
+                setMatchStatus({ id: 'none', amount: 'none', productName: 'none', reviewerName: 'none' });
                 setOrderIdLocked(false);
                 setSelectedProduct(null);
                 setReviewLinkInput('');
@@ -1673,7 +1688,7 @@ export const Orders: React.FC = () => {
                     // Reset all form state when switching deal type tab
                     setFormScreenshot(null);
                     setExtractedDetails({ orderId: '', amount: '' });
-                    setMatchStatus({ id: 'none', amount: 'none', productName: 'none' });
+                    setMatchStatus({ id: 'none', amount: 'none', productName: 'none', reviewerName: 'none' });
                     setOrderIdLocked(false);
                     setSelectedProduct(null);
                   }}
@@ -1731,7 +1746,7 @@ export const Orders: React.FC = () => {
                           // Reset screenshot state to prevent leak from previous product
                           setFormScreenshot(null);
                           setExtractedDetails({ orderId: '', amount: '' });
-                          setMatchStatus({ id: 'none', amount: 'none', productName: 'none' });
+                          setMatchStatus({ id: 'none', amount: 'none', productName: 'none', reviewerName: 'none' });
                           setOrderIdLocked(false);
                           setSelectedProduct(p);
                           // Don't auto-fill reviewer name — buyer must explicitly enter the
@@ -1780,7 +1795,7 @@ export const Orders: React.FC = () => {
                         // Reset all form state when clearing product selection
                         setFormScreenshot(null);
                         setExtractedDetails({ orderId: '', amount: '' });
-                        setMatchStatus({ id: 'none', amount: 'none', productName: 'none' });
+                        setMatchStatus({ id: 'none', amount: 'none', productName: 'none', reviewerName: 'none' });
                         setOrderIdLocked(false);
                         setSelectedProduct(null);
                       }}
@@ -2003,11 +2018,42 @@ export const Orders: React.FC = () => {
                       <input
                         type="text"
                         value={reviewerNameInput}
-                        onChange={(e) => setReviewerNameInput(e.target.value)}
-                        className="w-full p-3 rounded-xl bg-gray-50 border border-gray-100 font-bold text-sm outline-none focus:ring-2 focus:ring-lime-100 transition-all"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setReviewerNameInput(val);
+                          if (extractedDetails.accountName && val.trim()) {
+                            const rnStatus = checkReviewerNameMatch(val, extractedDetails.accountName);
+                            setMatchStatus((prev) => ({ ...prev, reviewerName: rnStatus }));
+                          } else {
+                            setMatchStatus((prev) => ({ ...prev, reviewerName: 'none' }));
+                          }
+                        }}
+                        className={`w-full p-3 rounded-xl bg-gray-50 border font-bold text-sm outline-none focus:ring-2 transition-all ${
+                          matchStatus.reviewerName === 'mismatch'
+                            ? 'border-red-300 focus:ring-red-100'
+                            : matchStatus.reviewerName === 'match'
+                              ? 'border-green-300 focus:ring-green-100'
+                              : 'border-gray-100 focus:ring-lime-100'
+                        }`}
                         placeholder="e.g. Chetan on Amazon"
                         maxLength={200}
                       />
+                      {matchStatus.reviewerName === 'mismatch' && (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <AlertTriangle size={11} className="text-red-500 flex-shrink-0" />
+                          <p className="text-[9px] font-bold text-red-600">
+                            Account name mismatch — screenshot shows &quot;{extractedDetails.accountName}&quot;
+                          </p>
+                        </div>
+                      )}
+                      {matchStatus.reviewerName === 'match' && (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <CheckCircle2 size={11} className="text-green-500 flex-shrink-0" />
+                          <p className="text-[9px] font-bold text-green-600">
+                            Account name matches screenshot
+                          </p>
+                        </div>
+                      )}
                       <p className="text-[9px] text-zinc-400 ml-1">
                         Enter the name shown on the marketplace account used for this order. If you ordered from someone else's account (e.g. brother, friend), enter their name — your rating/review screenshots will be verified against this name.
                       </p>
@@ -2034,6 +2080,11 @@ export const Orders: React.FC = () => {
                     : 'Submit blocked: product name could not be verified.'}
                 </p>
               )}
+              {matchStatus.reviewerName === 'mismatch' && formScreenshot && (
+                <p className="text-[10px] text-red-600 font-bold text-center mb-2">
+                  Submit blocked: reviewer name does not match the account in screenshot.
+                </p>
+              )}
               <button
                 onClick={submitNewOrder}
                 disabled={
@@ -2042,11 +2093,12 @@ export const Orders: React.FC = () => {
                   isUploading ||
                   matchStatus.productName === 'mismatch' ||
                   matchStatus.productName === 'none' ||
+                  matchStatus.reviewerName === 'mismatch' ||
                   !extractedDetails.orderId ||
                   !extractedDetails.amount
                 }
                 className={`w-full py-4 font-bold rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg ${
-                  !selectedProduct || !formScreenshot || isUploading || matchStatus.productName === 'mismatch' || matchStatus.productName === 'none' || !extractedDetails.orderId || !extractedDetails.amount
+                  !selectedProduct || !formScreenshot || isUploading || matchStatus.productName === 'mismatch' || matchStatus.productName === 'none' || matchStatus.reviewerName === 'mismatch' || !extractedDetails.orderId || !extractedDetails.amount
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : 'bg-black text-white hover:bg-lime-400 hover:text-black'
                 }`}
@@ -2315,7 +2367,7 @@ export const Orders: React.FC = () => {
                         </div>
                         {ratingVerification.detectedAccountName && (
                           <div className="text-[10px] text-slate-500 mt-0.5 truncate">
-                            Found: {ratingVerification.detectedAccountName}
+                            Detected: {ratingVerification.detectedAccountName}
                           </div>
                         )}
                       </div>
@@ -2517,7 +2569,7 @@ export const Orders: React.FC = () => {
                     {!rwVerification.reviewerNameMatch && selectedOrder?.reviewerName && (
                       <p className="text-[10px] text-red-600 font-bold bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
                         <AlertTriangle size={12} />
-                        Reviewer name "{selectedOrder.reviewerName}" not found in screenshot.
+                        Reviewer name "{selectedOrder.reviewerName}" not found in screenshot.{rwVerification.detectedAccountName ? ` Found "${rwVerification.detectedAccountName}" instead.` : ''}
                       </p>
                     )}
                     {!rwVerification.amountMatch && (
