@@ -3,6 +3,7 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
+import { checkProductNameMatch } from '../utils/productNameMatch';
 import { subscribeRealtime } from '../services/realtime';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
@@ -537,82 +538,8 @@ export const Orders: React.FC = () => {
         const amountMatch = hasAmount && Math.abs(safeAmount - capturedProduct.price) < 10;
         const idValid = hasId && safeOrderId.length > 5;
 
-        // Product name similarity check — stricter matching to prevent fraud
-        const extractedName = (typeof details.productName === 'string' ? details.productName : '').toLowerCase().trim();
-        const expectedName = (capturedProduct.title || '').toLowerCase().trim();
-        let productNameStatus: 'match' | 'mismatch' | 'none' = 'none';
-        if (extractedName && expectedName) {
-          // Filter out URLs and navigation chrome from extracted product name
-          const isUrl = /https?:\/\/|www\.|\.com\/|\.in\/|orderID=|order-details|ref=|utm_/i.test(extractedName);
-          // Filter out delivery status text
-          const isDeliveryStatus = /^(arriving|shipped|delivered|dispatched|out\s*for\s*delivery|in\s*transit|order\s*(placed|confirmed))/i.test(extractedName);
-          if (isUrl || isDeliveryStatus) {
-            productNameStatus = 'mismatch';
-          } else {
-            // Expanded noise words aligned with backend PRODUCT_STOP_WORDS
-            const noiseWords = new Set(['the', 'and', 'for', 'with', 'from', 'this', 'that', 'not', 'are', 'was', 'has', 'its', 'all', 'can', 'you', 'our', 'new', 'buy', 'get', 'set', 'pack', 'pcs', 'free', 'best', 'top', 'good', 'great', 'nice', 'off', 'upto', 'only', 'just', 'also', 'more', 'very', 'most', 'save', 'deal', 'per', 'via', 'too', 'any', 'use', 'how', 'may', 'now', 'old', 'own', 'put', 'run', 'two', 'end', 'big', 'day', 'box', 'kit', 'men', 'man', 'women', 'woman', 'long', 'lasting', 'item', 'size', 'pair', 'home', 'made', 'full', 'high', 'low', 'white', 'black', 'red', 'blue', 'pink', 'gold', 'silver', 'natural', 'pure', 'premium', 'original', 'genuine', 'quality', 'gift', 'type', 'style', 'brand', 'product', 'online', 'india', 'combo', 'super', 'ultra', 'pro', 'plus', 'lite', 'mini', 'max', 'extra']);
-            const cleanWords = (text: string) => {
-              const all = Array.from(new Set(text
-                .replace(/[^a-z0-9\s]/g, ' ')
-                .split(/\s+/)
-                .filter((w: string) => w.length >= 2)));
-              const filtered = all.filter((w: string) => w.length >= 3 && !noiseWords.has(w));
-              // Fallback to all tokens if everything was filtered (like backend)
-              return filtered.length > 0 ? filtered : all;
-            };
-            const extractedWords = cleanWords(extractedName);
-            const expectedWords = cleanWords(expectedName);
-
-            // Levenshtein edit distance for OCR typo tolerance (same as backend)
-            const editDist = (a: string, b: string): number => {
-              if (a === b) return 0;
-              const m = a.length, n = b.length;
-              const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-              for (let i = 0; i <= m; i++) dp[i][0] = i;
-              for (let j = 0; j <= n; j++) dp[0][j] = j;
-              for (let i = 1; i <= m; i++)
-                for (let j = 1; j <= n; j++)
-                  dp[i][j] = a[i - 1] === b[j - 1]
-                    ? dp[i - 1][j - 1]
-                    : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
-              return dp[m][n];
-            };
-
-            // Match: exact, substring (≥4 chars), or fuzzy (edit distance ≤1 for ≥5 chars)
-            const wordMatch = (a: string, b: string) =>
-              a === b
-              || (a.length >= 4 && b.includes(a))
-              || (b.length >= 4 && a.includes(b))
-              || (a.length >= 5 && b.length >= 5 && editDist(a, b) <= 1);
-
-            // Forward: extracted words found in expected
-            const fwdMatches = extractedWords.filter((w: string) =>
-              expectedWords.some((ew: string) => wordMatch(w, ew))
-            );
-            // Reverse: expected words found in extracted
-            const revMatches = expectedWords.filter((ew: string) =>
-              extractedWords.some((w: string) => wordMatch(ew, w))
-            );
-            const fwdRatio = extractedWords.length > 0 ? fwdMatches.length / extractedWords.length : 0;
-            const revRatio = expectedWords.length > 0 ? revMatches.length / expectedWords.length : 0;
-
-            // RULE 1: ALL extracted words must exist in expected (100%)
-            // Catches wrong products: "Scalptone" (not in expected) → fwdRatio < 1.0 → fail
-            const fwdPass = fwdMatches.length >= 2 && fwdRatio >= 1.0;
-
-            // RULE 2: Dynamic reverse threshold based on expected name length
-            // Short names (≤6 words): ALL expected words must be found (100%)
-            //   → "Avimee Herbal Hair Oil" won't match "Avimee Herbal Keshpallav Hair Oil"
-            // Long names (>6 words): 50% — lenient for truncated order page screenshots
-            const revThreshold = expectedWords.length <= 6 ? 1.0 : 0.5;
-            const revPass = revMatches.length >= Math.min(2, expectedWords.length) && revRatio >= revThreshold;
-            const hasEnoughOverlap = fwdPass && revPass;
-
-            // Special: very short name (1-2 words) just needs all to match
-            const shortNameMatch = expectedWords.length <= 2 && fwdMatches.length >= expectedWords.length;
-            productNameStatus = (hasEnoughOverlap || shortNameMatch) ? 'match' : 'mismatch';
-          }
-        }
+        // Product name similarity check — strict matching to prevent fraud
+        const productNameStatus = checkProductNameMatch(details.productName, capturedProduct.title);
 
         setMatchStatus({
           id: !hasId ? 'none' : idValid ? 'match' : 'mismatch',

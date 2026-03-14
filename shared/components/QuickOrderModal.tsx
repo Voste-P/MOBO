@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage, placeholderImage } from './ProxiedImage';
+import { checkProductNameMatch } from '../utils/productNameMatch';
 
 interface QuickOrderModalProps {
   open: boolean;
@@ -43,6 +44,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
     productName?: string;
   }>({ orderId: '', amount: '' });
   const [reviewerName, setReviewerName] = useState('');
+  const [productNameMismatch, setProductNameMismatch] = useState(false);
 
   const reset = useCallback(() => {
     setScreenshot(null);
@@ -52,6 +54,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
     setSubmitted(false);
     setExtractedDetails({ orderId: '', amount: '' });
     setReviewerName('');
+    setProductNameMismatch(false);
   }, []);
 
   const handleClose = () => {
@@ -87,6 +90,13 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
           soldBy: result.soldBy || undefined,
           productName: result.productName || undefined,
         });
+
+        // ── Product name matching (shared strict algorithm) ──
+        const nameMatchResult = checkProductNameMatch(result.productName, product?.title);
+        if (nameMatchResult === 'mismatch') {
+          setProductNameMismatch(true);
+          toast.error('Product name in screenshot does not match this deal. Please upload the correct order screenshot.');
+        }
       }
     } catch {
       // Extraction is optional — notify user gracefully
@@ -98,6 +108,11 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
 
   const handleSubmit = async () => {
     if (!product || !user || !screenshot || submitting) return;
+    // Block if product name mismatch detected
+    if (productNameMismatch) {
+      toast.error('Product in screenshot does not match this deal. Upload the correct order screenshot.');
+      return;
+    }
     // Require reviewer name for Rating/Review deals to prevent cheating
     if ((product.dealType === 'Rating' || product.dealType === 'Review') && !reviewerName.trim()) {
       toast.error('Please enter the reviewer name — the marketplace account name used for this order.');
@@ -292,11 +307,23 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
                   <label className="text-[9px] font-bold text-slate-500 uppercase">Product Name</label>
                   <input
                     type="text"
+                    readOnly
                     value={extractedDetails.productName || ''}
-                    onChange={(e) => setExtractedDetails((d) => ({ ...d, productName: e.target.value }))}
-                    placeholder="e.g. Samsung Galaxy M34 5G"
-                    className="w-full mt-0.5 px-2.5 py-2 text-xs font-medium border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-lime-200 focus:border-lime-400 outline-none transition-all"
+                    placeholder="Auto-detected from screenshot"
+                    className={`w-full mt-0.5 px-2.5 py-2 text-xs font-medium border rounded-lg outline-none transition-all cursor-default ${
+                      !extractedDetails.productName ? 'border-gray-300 bg-white' :
+                      productNameMismatch ? 'border-red-400 bg-red-50 text-red-700 ring-2 ring-red-200' :
+                      'border-emerald-400 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-200'
+                    }`}
                   />
+                  {productNameMismatch && (
+                    <div className="mt-1.5 flex items-start gap-1.5 px-2.5 py-2 bg-red-50 border border-red-200 rounded-lg">
+                      <AlertCircle size={13} className="text-red-500 mt-0.5 flex-shrink-0" />
+                      <p className="text-[10px] font-bold text-red-600">
+                        Product name mismatch — this screenshot is for a different product.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -359,7 +386,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={!screenshot || submitting || extracting || !extractedDetails.orderId.trim()}
+                disabled={!screenshot || submitting || extracting || !extractedDetails.orderId.trim() || productNameMismatch}
                 className="w-full py-3.5 bg-black text-white font-extrabold rounded-xl text-xs uppercase tracking-wider shadow-lg disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97] transition-all flex items-center justify-center gap-2"
               >
                 {submitting ? (

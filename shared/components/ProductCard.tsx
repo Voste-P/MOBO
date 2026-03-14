@@ -6,6 +6,7 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
+import { checkProductNameMatch } from '../utils/productNameMatch';
 
 interface ProductCardProps {
   product: Product;
@@ -115,36 +116,11 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
         // Lock fields only when BOTH required fields are extracted
         if (result.orderId && result.amount) setFieldsLocked(true);
 
-        // ── Product name matching (same logic as Orders.tsx) ──
-        const extractedName = (typeof result.productName === 'string' ? result.productName : '').toLowerCase().trim();
-        const expectedName = (product.title || '').toLowerCase().trim();
-        if (extractedName && expectedName) {
-          const isUrl = /https?:\/\/|www\.|\.com\/|\.in\/|orderID=|order-details|ref=|utm_/i.test(extractedName);
-          const isDeliveryStatus = /^(arriving|shipped|delivered|dispatched|out\s*for\s*delivery|in\s*transit|order\s*(placed|confirmed))/i.test(extractedName);
-          if (isUrl || isDeliveryStatus) {
-            setProductNameMismatch(true);
-            toast.error('Product name in screenshot does not match this deal. Please upload the correct order screenshot.');
-          } else {
-            const noiseWords = new Set(['the', 'and', 'for', 'with', 'from', 'this', 'that', 'not', 'are', 'was', 'has', 'its', 'all', 'can', 'you', 'our', 'new', 'buy', 'get', 'set', 'pack', 'pcs', 'free', 'best', 'top', 'good', 'great', 'nice', 'off', 'upto', 'only', 'just', 'also', 'more', 'very', 'most', 'save', 'deal']);
-            const cleanWords = (text: string) => text.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w: string) => w.length > 2 && !noiseWords.has(w));
-            const extractedWords = cleanWords(extractedName);
-            const expectedWords = cleanWords(expectedName);
-            const matchingWords = extractedWords.filter((w: string) => expectedWords.some((ew: string) => w === ew || (w.length >= 4 && ew.includes(w)) || (ew.length >= 4 && w.includes(ew))));
-            const reverseMatchingWords = expectedWords.filter((ew: string) => extractedWords.some((w: string) => ew === w || (ew.length >= 4 && w.includes(ew)) || (w.length >= 4 && ew.includes(w))));
-            const bestMatchCount = Math.max(matchingWords.length, reverseMatchingWords.length);
-            const denominator = Math.min(extractedWords.length, expectedWords.length);
-            const overlapRatio = denominator > 0 ? bestMatchCount / denominator : 0;
-            const hasEnoughOverlap = bestMatchCount >= 2 && overlapRatio >= 0.50;
-            const shortNameMatch = expectedWords.length <= 2 && bestMatchCount >= 1 && overlapRatio >= 0.5;
-            const brandMatch = extractedWords.length > 0 && expectedWords.length > 0 &&
-              (extractedWords[0] === expectedWords[0] || (extractedWords[0].length >= 4 && expectedWords[0].includes(extractedWords[0])) || (expectedWords[0].length >= 4 && extractedWords[0].includes(expectedWords[0])));
-            const brandWithOverlap = brandMatch && bestMatchCount >= 2 && overlapRatio >= 0.35;
-            const isMatch = hasEnoughOverlap || shortNameMatch || brandWithOverlap;
-            if (!isMatch) {
-              setProductNameMismatch(true);
-              toast.error('Product name in screenshot does not match this deal. Please upload the correct order screenshot.');
-            }
-          }
+        // ── Product name matching (shared strict algorithm) ──
+        const nameMatchResult = checkProductNameMatch(result.productName, product.title);
+        if (nameMatchResult === 'mismatch') {
+          setProductNameMismatch(true);
+          toast.error('Product name in screenshot does not match this deal. Please upload the correct order screenshot.');
         }
       }
     } catch {
@@ -413,11 +389,14 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                   <label className="text-[8px] font-bold text-slate-500 uppercase">Product Name</label>
                   <input
                     type="text"
+                    readOnly
                     value={extractedDetails.productName || ''}
-                    onChange={(e) => setExtractedDetails((d) => ({ ...d, productName: e.target.value }))}
-                    disabled={fieldsLocked}
-                    placeholder="e.g. Samsung Galaxy M34 5G"
-                    className={`w-full mt-0.5 px-1.5 py-1 text-[10px] font-medium border rounded outline-none transition-all ${fieldsLocked ? 'bg-emerald-50 border-emerald-200 text-emerald-800 cursor-not-allowed' : 'bg-white border-gray-300 focus:ring-1 focus:ring-lime-300 focus:border-lime-400'}`}
+                    placeholder="Auto-detected from screenshot"
+                    className={`w-full mt-0.5 px-1.5 py-1 text-[10px] font-medium border rounded outline-none transition-all cursor-default ${
+                      !extractedDetails.productName ? 'bg-white border-gray-300' :
+                      productNameMismatch ? 'bg-red-50 border-red-400 text-red-700 ring-1 ring-red-200' :
+                      'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    }`}
                   />
                 </div>
 
