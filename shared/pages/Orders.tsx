@@ -481,6 +481,11 @@ export const Orders: React.FC = () => {
       return;
     }
 
+    // Capture selectedProduct BEFORE async operations to prevent race condition:
+    // if user switches product while extraction is in-flight, matching would
+    // compare against the WRONG product without this snapshot.
+    const capturedProduct = selectedProduct;
+
     const reader = new FileReader();
     reader.onload = () => {
       const raw = reader.result as string;
@@ -525,15 +530,16 @@ export const Orders: React.FC = () => {
       });
 
       // [AI] Smart Extraction Verification Logic
-      if (selectedProduct) {
+      // Use capturedProduct (snapshot before await) — NOT selectedProduct which may have changed
+      if (capturedProduct) {
         const hasId = Boolean(safeOrderId);
         const hasAmount = typeof safeAmount === 'number';
-        const amountMatch = hasAmount && Math.abs(safeAmount - selectedProduct.price) < 10;
+        const amountMatch = hasAmount && Math.abs(safeAmount - capturedProduct.price) < 10;
         const idValid = hasId && safeOrderId.length > 5;
 
         // Product name similarity check — stricter matching to prevent fraud
         const extractedName = (typeof details.productName === 'string' ? details.productName : '').toLowerCase().trim();
-        const expectedName = (selectedProduct.title || '').toLowerCase().trim();
+        const expectedName = (capturedProduct.title || '').toLowerCase().trim();
         let productNameStatus: 'match' | 'mismatch' | 'none' = 'none';
         if (extractedName && expectedName) {
           // Filter out URLs and navigation chrome from extracted product name
