@@ -172,7 +172,7 @@ describe('ops deals: publish', () => {
     expect(deal).toBeFalsy();
   });
 
-  it('rejects publishing when campaign and slot assignment both have zero payout', async () => {
+  it('allows publishing when campaign and slot assignment both have zero payout', async () => {
     const env = loadEnv({ NODE_ENV: 'test' });
     const seeded = await seedE2E();
 
@@ -215,10 +215,11 @@ describe('ops deals: publish', () => {
         mediatorCode,
       });
 
-    expect(res.status).toBe(400);
-    expect(res.body?.error?.code).toBe('INVALID_PAYOUT');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('ok', true);
 
     const deal = await db.deal.findFirst({ where: { campaignId: pgCampaign.id, mediatorCode, isDeleted: false } });
-    expect(deal).toBeFalsy();
+    expect(deal).toBeTruthy();
+    expect(deal!.payoutPaise).toBe(0);
   });
 });
