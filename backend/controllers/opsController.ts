@@ -2573,8 +2573,8 @@ export function makeOpsController(env: Env) {
 
         const payoutPaise = Number((slotAssignment as any)?.payout ?? campaign.payoutPaise ?? 0);
 
-        if (payoutPaise <= 0) {
-          throw new AppError(400, 'INVALID_PAYOUT', 'Cannot publish deal with zero or negative payout. Set a payout on the campaign or slot assignment first.');
+        if (payoutPaise < 0) {
+          throw new AppError(400, 'INVALID_PAYOUT', 'Cannot publish deal with negative payout.');
         }
 
         const netEarnings = payoutPaise + commissionPaise;
