@@ -1200,7 +1200,16 @@ export function makeOrdersController(env: Env) {
                   'Please upload the correct return window screenshot. ' +
                   (returnWindowResult.discrepancyNote || ''));
               }
-              // Return window open/closed, amount, reviewer — stored for mediator review, NOT blocking
+              // Hard-block 4: Reviewer name must match (when provided)
+              if (returnWindowResult && rwReviewerName && !returnWindowResult.reviewerNameMatch
+                && returnWindowResult.confidenceScore > 0) {
+                throw new AppError(422, 'RETURN_WINDOW_VERIFICATION_FAILED',
+                  `Return window screenshot account name does not match reviewer "${rwReviewerName}". ` +
+                  `Detected: "${returnWindowResult.detectedAccountName || 'unknown'}". ` +
+                  'Please upload a screenshot from the correct marketplace account. ' +
+                  (returnWindowResult.discrepancyNote || ''));
+              }
+              // Return window open/closed, amount — stored for mediator review, NOT blocking
             }
           }
 

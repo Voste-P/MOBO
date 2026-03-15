@@ -1535,6 +1535,36 @@ async function verifyRatingWithOcr(
       detectedPublicName = profileMatch?.[1]?.trim() || undefined;
     }
 
+    // STRICT: When BOTH account name (greeting) and public name (beside "Edit public name")
+    // are detected via OCR, BOTH must match the reviewer name. This catches fraud where
+    // someone uses a different marketplace account (e.g. "Hello, Ashok" + public name "Gaurav"
+    // but reviewer claims to be "Chetan Chaudhari").
+    if (expectedReviewerName && detectedAccountName && detectedPublicName) {
+      const reviewerLower2 = expectedReviewerName.toLowerCase().trim();
+      const GREETING_CHECK_RE = /^(hello|hi|hey|dear|welcome|namaste)\s*,?\s*/i;
+      const checkOcrNameMatch = (rawName: string): boolean => {
+        const cleaned = rawName.toLowerCase().trim().replace(GREETING_CHECK_RE, '').trim();
+        if (!cleaned) return false;
+        if (cleaned === reviewerLower2 || cleaned.includes(reviewerLower2) || reviewerLower2.includes(cleaned)) return true;
+        const revParts2 = reviewerLower2.split(/\s+/).filter(p => p.length >= 2);
+        const detParts2 = cleaned.split(/\s+/).filter(p => p.length >= 2);
+        if (revParts2.length > 0 && detParts2.length > 0) {
+          const matchCount2 = revParts2.filter(rp => detParts2.some(dp =>
+            dp === rp || dp.includes(rp) || rp.includes(dp) ||
+            (rp.length >= 4 && dp.length >= 4 && editDistance(dp, rp) <= 1)
+          )).length;
+          if (matchCount2 >= Math.max(1, Math.ceil(revParts2.length * 0.5))) return true;
+        }
+        return false;
+      };
+      const acctOcrMatch = checkOcrNameMatch(detectedAccountName);
+      const pubOcrMatch = checkOcrNameMatch(detectedPublicName);
+      // Both detected — require BOTH to match
+      if (!(acctOcrMatch && pubOcrMatch)) {
+        accountNameMatch = false;
+      }
+    }
+
     return {
       accountNameMatch, productNameMatch, confidenceScore,
       detectedAccountName: detectedAccountName || detectedPublicName,
@@ -1670,10 +1700,29 @@ export async function verifyRatingScreenshotWithAi(
           const accountMatch = checkNameMatch(detected);
           const publicMatch = checkNameMatch(detectedPublic);
 
-          if (accountMatch || publicMatch) {
+          // STRICT: When BOTH account name (header greeting) and public name
+          // (beside "Edit public name") are visible, BOTH must match the reviewer.
+          // This catches fraud where someone uses a different marketplace account
+          // (e.g. account says "Ashok" but public name says "Gaurav" — neither
+          // consistent with the claimed reviewer name).
+          const bothDetected = !!detected && !!detectedPublic;
+          if (bothDetected) {
+            // Both names visible — require BOTH to match
+            if (accountMatch && publicMatch) {
+              parsed.accountNameMatch = true;
+              parsed.discrepancyNote = 'Reviewer matched via account name and public name.';
+            } else {
+              parsed.accountNameMatch = false;
+              const failParts = [
+                !accountMatch && `account name "${parsed.detectedAccountName}" does not match`,
+                !publicMatch && `public name "${parsed.detectedPublicName}" does not match`,
+              ].filter(Boolean).join(' and ');
+              parsed.discrepancyNote = `Reviewer "${payload.expectedReviewerName}" verification failed: ${failParts}.`;
+            }
+          } else if (accountMatch || publicMatch) {
+            // Only one name visible and it matches — accept
             parsed.accountNameMatch = true;
-            const matchSource = publicMatch && accountMatch ? 'account name and public name'
-              : publicMatch ? 'public name' : 'account name';
+            const matchSource = publicMatch ? 'public name' : 'account name';
             parsed.discrepancyNote = `Reviewer matched via ${matchSource}.`;
           } else if (detected || detectedPublic) {
             // Names detected but none matched
