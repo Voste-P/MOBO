@@ -9,6 +9,7 @@ import { prisma } from '../database/prisma.js';
 import { sendPushToUser } from '../services/pushNotifications.js';
 import { createTicketSchema, updateTicketSchema, TICKET_TARGET_ROLE, ESCALATION_PATH, ROLE_ISSUE_TYPES, ROLE_LEVEL } from '../validations/tickets.js';
 import { toUiTicket, toUiTicketForBrand } from '../utils/uiMappers.js';
+import { paiseToRupees } from '../utils/money.js';
 import { pgTicket } from '../utils/pgMappers.js';
 import { getRequester, isPrivileged } from '../services/authz.js';
 import { getAgencyCodeForMediatorCode, listMediatorCodesForAgency } from '../services/lineage.js';
@@ -298,8 +299,23 @@ async function canManageTicketByRole(params: {
       }
     }
 
-    // ── Brand: can manage tickets from connected agencies + their downstream ──
+    // ── Brand: can manage tickets targeted to brand OR linked to brand orders ──
     if (roles.includes('brand')) {
+      // Brands should only manage tickets with targetRole='brand' or order-linked tickets
+      const ticketTarget = String(ticket.targetRole || '').toLowerCase();
+      if (ticketTarget && ticketTarget !== 'brand') {
+        // If this ticket is explicitly targeted to another role, brand cannot manage it
+        // (unless they own the ticket — handled by the owner check above)
+        // Fall through to order-linkage check only
+        if (ticket.orderId) {
+          const order = await db.order.findFirst({
+            where: { ...idWhere(ticket.orderId), brandUserId: pgUserId, isDeleted: false },
+            select: { id: true },
+          });
+          if (order) return true;
+        }
+        // Not brand-targeted and not linked to brand's order — deny
+      } else {
       const brand = await db.brand.findFirst({
         where: { ownerUserId: pgUserId, isDeleted: false },
         select: { connectedAgencyCodes: true },
@@ -354,6 +370,7 @@ async function canManageTicketByRole(params: {
           where: { brandUserId: pgUserId, userId: ticket.userId, isDeleted: false },
         });
         if (hasAnyBrandOrders > 0) return true;
+      }
       }
     }
 
@@ -480,7 +497,7 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
             const item = order.items?.[0];
             orderDetails = {
               externalOrderId: order.externalOrderId || null,
-              total: order.totalPaise,
+              total: order.totalPaise != null ? paiseToRupees(order.totalPaise) : null,
               workflowStatus: order.workflowStatus,
               affiliateStatus: order.affiliateStatus,
               paymentStatus: order.paymentStatus,
@@ -490,9 +507,9 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
               product: item?.title || null,
               platform: item?.platform || null,
               brand: item?.brandName || null,
-              unitPrice: item?.priceAtPurchasePaise ?? null,
+              unitPrice: item?.priceAtPurchasePaise != null ? paiseToRupees(item.priceAtPurchasePaise) : null,
               quantity: item?.quantity ?? null,
-              commission: item?.commissionPaise ?? null,
+              commission: item?.commissionPaise != null ? paiseToRupees(item.commissionPaise) : null,
               dealType: item?.dealType || null,
             };
           }
@@ -760,16 +777,8 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
               cascadeTargets.push({ targetRole: 'brand', userId: { in: allBrandNetworkIds } });
             }
 
-            // Oversight: tickets at agency level from mediators + buyers
-            const agencyLevelIds = [...new Set([...mediatorUserIds, ...buyerUserIds])];
-            if (agencyLevelIds.length) {
-              cascadeTargets.push({ targetRole: 'agency', userId: { in: agencyLevelIds } });
-            }
-
-            // Oversight: tickets at mediator level from buyers
-            if (buyerUserIds.length) {
-              cascadeTargets.push({ targetRole: 'mediator', userId: { in: buyerUserIds } });
-            }
+            // Brand privacy: brands should NOT see buyer/mediator-level tickets.
+            // They only see tickets explicitly targeted to 'brand' (from agencies).
           }
         }
 

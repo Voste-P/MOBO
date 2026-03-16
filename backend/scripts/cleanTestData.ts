@@ -20,6 +20,11 @@ const TEST_NAME_PREFIXES = ['E2E ', 'Dev ', 'Test '];
 const REAL_ADMIN_USERNAME = 'chetan'; // NEVER delete this
 
 async function main() {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('❌ cleanTestData is DISABLED in production. Aborting.');
+    process.exit(1);
+  }
+
   const dryRun = !process.argv.includes('--apply');
   if (dryRun) {
     console.log('\n══════════════════════════════════════════════════════════════');

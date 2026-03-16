@@ -77,7 +77,8 @@ export function getRequiredStepsForOrder(order: any): Array<'review' | 'rating' 
     .filter(Boolean);
   const requiresReview = dealTypes.includes('Review');
   const requiresRating = dealTypes.includes('Rating');
-  const requiresReturnWindow = requiresReview || requiresRating;
+  // All deal types (including Discount/purchase) require return window proof
+  const requiresReturnWindow = true;
   return [
     ...(requiresReview ? (['review'] as const) : []),
     ...(requiresRating ? (['rating'] as const) : []),
@@ -159,8 +160,9 @@ export async function finalizeApprovalIfReady(order: any, actorUserId: string, e
   settleDate.setDate(settleDate.getDate() + COOLING_PERIOD_DAYS);
   const currentEvents = Array.isArray(order.events) ? (order.events as any[]) : [];
 
-  await db().order.update({
-    where: { id: order.id },
+  // Use updateMany with workflowStatus guard to prevent duplicate events on concurrent verify
+  const updated = await db().order.updateMany({
+    where: { id: order.id, workflowStatus: 'UNDER_REVIEW' },
     data: {
       affiliateStatus: 'Pending_Cooling',
       expectedSettlementDate: settleDate,
@@ -172,6 +174,10 @@ export async function finalizeApprovalIfReady(order: any, actorUserId: string, e
       }),
     },
   });
+
+  if (updated.count === 0) {
+    return { approved: false, reason: 'CONCURRENT_UPDATE' };
+  }
 
   await transitionOrderWorkflow({
     orderId: order.mongoId!,

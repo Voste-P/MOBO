@@ -633,7 +633,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     }
   };
 
-  const handleExport = (reportType: 'orders' | 'finance') => {
+  const handleExport = async (reportType: 'orders' | 'finance') => {
     const dataToExport = filteredOrders;
     if (!dataToExport || dataToExport.length === 0) {
       toast.info('No data available to export.');
@@ -641,7 +641,18 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     }
 
     const apiBase = getApiBaseAbsolute();
-    const buildProofUrl = (orderId: string, type: 'order' | 'payment' | 'rating' | 'review' | 'returnWindow') => {
+
+    // Fetch signed proof tokens so Excel/Sheets can open proof images without auth
+    let proofTokens: Record<string, Record<string, string | null>> = {};
+    try {
+      proofTokens = await api.orders.batchProofUrls(dataToExport.map((o: any) => o.id));
+    } catch {
+      // Fallback: use old auth-required URLs if batch fails
+    }
+
+    const buildSignedProofUrl = (orderId: string, type: string) => {
+      const token = proofTokens[orderId]?.[type];
+      if (token) return `${apiBase}/orders/proof/signed/${token}`;
       return `${apiBase}/orders/${encodeURIComponent(orderId)}/proof/${type}`;
     };
 
@@ -718,14 +729,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         csvSafe(order.extractedProductName || ''),
         csvSafe(order.settlementRef || ''),
         csvSafe(order.settlementMode || ''),
-        order.screenshots?.order ? hyperlinkYes(buildProofUrl(order.id, 'order')) : 'No',
-        order.screenshots?.payment ? hyperlinkYes(buildProofUrl(order.id, 'payment')) : 'No',
-        order.screenshots?.rating ? hyperlinkYes(buildProofUrl(order.id, 'rating')) : 'No',
+        order.screenshots?.order ? hyperlinkYes(buildSignedProofUrl(order.id, 'order')) : 'No',
+        order.screenshots?.payment ? hyperlinkYes(buildSignedProofUrl(order.id, 'payment')) : 'No',
+        order.screenshots?.rating ? hyperlinkYes(buildSignedProofUrl(order.id, 'rating')) : 'No',
         (order.reviewLink || order.screenshots?.review)
-          ? hyperlinkYes(buildProofUrl(order.id, 'review'))
+          ? hyperlinkYes(buildSignedProofUrl(order.id, 'review'))
           : 'No',
         (order.screenshots as any)?.returnWindow
-          ? hyperlinkYes(buildProofUrl(order.id, 'returnWindow'))
+          ? hyperlinkYes(buildSignedProofUrl(order.id, 'returnWindow'))
           : 'No',
       ];
       csvRows.push(row.join(','));
@@ -1220,8 +1231,10 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
             {/* SUPPORT VIEW */}
             {view === 'support' && (() => {
               const supportTickets = tickets.filter((t) => t.issueType !== 'Feedback');
+              // Normalize role for filtering: backend sends 'user' for shoppers, 'admin' for ops
+              const normalizeRole = (r: string) => { const l = (r || '').toLowerCase(); return l === 'user' || l === 'shopper' ? 'shopper' : l === 'ops' ? 'admin' : l; };
               const filteredTickets = supportTickets.filter((t) => {
-                if (ticketRoleFilter !== 'All' && (t.role || '').toLowerCase() !== ticketRoleFilter.toLowerCase()) return false;
+                if (ticketRoleFilter !== 'All' && normalizeRole(t.role) !== ticketRoleFilter.toLowerCase()) return false;
                 if (ticketStatusFilter !== 'All' && t.status !== ticketStatusFilter) return false;
                 if (ticketSearch.trim()) {
                   const q = ticketSearch.trim().toLowerCase();
@@ -1237,10 +1250,11 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
               });
               const roleCounts = {
                 All: supportTickets.length,
-                Shopper: supportTickets.filter((t) => (t.role || '').toLowerCase() === 'shopper').length,
-                Mediator: supportTickets.filter((t) => (t.role || '').toLowerCase() === 'mediator').length,
-                Agency: supportTickets.filter((t) => (t.role || '').toLowerCase() === 'agency').length,
-                Brand: supportTickets.filter((t) => (t.role || '').toLowerCase() === 'brand').length,
+                Shopper: supportTickets.filter((t) => normalizeRole(t.role) === 'shopper').length,
+                Mediator: supportTickets.filter((t) => normalizeRole(t.role) === 'mediator').length,
+                Agency: supportTickets.filter((t) => normalizeRole(t.role) === 'agency').length,
+                Brand: supportTickets.filter((t) => normalizeRole(t.role) === 'brand').length,
+                Admin: supportTickets.filter((t) => normalizeRole(t.role) === 'admin').length,
               };
               return (
               <div className="space-y-6 animate-enter">
@@ -1277,7 +1291,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
 
                 {/* Role Filter Tabs */}
                 <div className="flex flex-wrap gap-2">
-                  {(['All', 'Shopper', 'Mediator', 'Agency', 'Brand'] as const).map((role) => (
+                  {(['All', 'Shopper', 'Mediator', 'Agency', 'Brand', 'Admin'] as const).map((role) => (
                     <button
                       key={role}
                       type="button"
@@ -1376,7 +1390,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                             </div>
                             <div className="text-[10px]">
                               <p className="font-bold text-slate-900">{t.userName}</p>
-                              <p className="text-slate-400 font-mono capitalize">{t.role || 'User'} → {(t as any).targetRole || 'admin'}</p>
+                              <p className="text-slate-400 font-mono capitalize">{normalizeRole(t.role)} → {normalizeRole((t as any).targetRole || 'admin')}</p>
                             </div>
                           </div>
 

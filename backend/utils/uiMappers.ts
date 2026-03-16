@@ -176,7 +176,8 @@ export function toUiOrderSummary(o: any) {
   const dealTypes = (o.items ?? []).map((it: any) => String(it?.dealType || '')).filter(Boolean);
   const requiresReview = dealTypes.includes('Review');
   const requiresRating = dealTypes.includes('Rating');
-  const requiresReturnWindow = requiresReview || requiresRating;
+  // All deal types (including Discount/purchase) require return window proof
+  const requiresReturnWindow = true;
 
   const hasReviewProof = !!(o.reviewLink || o.screenshots?.review);
   const hasRatingProof = !!o.screenshots?.rating;
@@ -279,7 +280,8 @@ export function toUiOrderSummaryForBrand(o: any) {
   const dealTypes = (o.items ?? []).map((it: any) => String(it?.dealType || '')).filter(Boolean);
   const requiresReview = dealTypes.includes('Review');
   const requiresRating = dealTypes.includes('Rating');
-  const requiresReturnWindow = requiresReview || requiresRating;
+  // All deal types (including Discount/purchase) require return window proof
+  const requiresReturnWindow = true;
 
   const hasReviewProof = !!(o.reviewLink || o.screenshots?.review);
   const hasRatingProof = !!o.screenshots?.rating;
@@ -369,7 +371,8 @@ export function toUiOrder(o: any) {
   const dealTypes = (o.items ?? []).map((it: any) => String(it?.dealType || '')).filter(Boolean);
   const requiresReview = dealTypes.includes('Review');
   const requiresRating = dealTypes.includes('Rating');
-  const requiresReturnWindow = requiresReview || requiresRating;
+  // All deal types (including Discount/purchase) require return window proof
+  const requiresReturnWindow = true;
 
   const hasReviewProof = !!(o.reviewLink || o.screenshots?.review);
   const hasRatingProof = !!o.screenshots?.rating;
@@ -514,7 +517,8 @@ export function toUiOrderForBrand(o: any) {
   const dealTypes = (o.items ?? []).map((it: any) => String(it?.dealType || '')).filter(Boolean);
   const requiresReview = dealTypes.includes('Review');
   const requiresRating = dealTypes.includes('Rating');
-  const requiresReturnWindow = requiresReview || requiresRating;
+  // All deal types (including Discount/purchase) require return window proof
+  const requiresReturnWindow = true;
 
   const hasReviewProof = !!(o.reviewLink || o.screenshots?.review);
   const hasRatingProof = !!o.screenshots?.rating;

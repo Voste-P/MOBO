@@ -6,6 +6,10 @@ import { connectPrisma, disconnectPrisma } from '../database/prisma.js';
 import { seedDev, DEV_ACCOUNTS } from '../seeds/dev.js';
 
 async function main() {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('❌ seedDev is DISABLED in production. Aborting.');
+    process.exit(1);
+  }
   await connectPrisma();
 
   const seeded = await seedDev();

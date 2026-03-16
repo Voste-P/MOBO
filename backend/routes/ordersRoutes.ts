@@ -43,7 +43,25 @@ export function ordersRoutes(env: Env): Router {
     res.setHeader('Cache-Control', 'private, max-age=3600, immutable');
     next();
   }, orders.getOrderProof);
-  // Public proof endpoint removed — use authenticated endpoint above.
+
+  // Signed proof URL generation (authenticated — used by CSV/Excel export)
+  router.get('/orders/:orderId/proof-urls', requireAuth(env), orders.getSignedProofUrls);
+  router.post('/orders/proof-urls/batch', requireAuth(env), orders.batchSignedProofUrls);
+
+  // Public signed proof endpoint — validates HMAC token, no auth needed.
+  // Used by Excel/Google Sheets HYPERLINK formulas.
+  const signedProofLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: env.NODE_ENV === 'production' ? 120 : 5000,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  router.get('/orders/proof/signed/:token', signedProofLimiter, (_req, res, next) => {
+    res.setHeader('Cache-Control', 'private, max-age=3600, immutable');
+    next();
+  }, orders.getProofBySigned);
+
+  // Public proof endpoint removed — use authenticated or signed endpoint above.
   // Old: router.get('/public/orders/:orderId/proof/:type', publicProofLimiter, orders.getOrderProofPublic);
 
   // Audit trail for a specific order — privileged roles or the order owner (buyer)

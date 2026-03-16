@@ -550,6 +550,15 @@ export const api = {
         body: JSON.stringify({ orderId, ...proof }),
       });
     },
+    /** Get batch signed proof URLs for CSV/Excel export */
+    batchProofUrls: async (orderIds: string[]): Promise<Record<string, Record<string, string | null>>> => {
+      const data = await fetchJson('/orders/proof-urls/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ orderIds }),
+      });
+      return data?.tokens ?? {};
+    },
     /** Get audit trail / activity log for a specific order */
     getOrderAudit: async (orderId: string) => {
       return fetchJson(`/orders/${encodeURIComponent(orderId)}/audit`, {
