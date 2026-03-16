@@ -68,7 +68,6 @@ describe('order extraction (Tesseract fallback)', () => {
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
 
-    console.log('Amazon extraction result:', JSON.stringify(result, null, 2));
 
     // The pipeline should extract order ID and/or amount
     expect(result).toHaveProperty('confidenceScore');
@@ -100,7 +99,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Flipkart extraction result:', JSON.stringify(result, null, 2));
 
     expect(result.confidenceScore).toBeGreaterThan(0);
 
@@ -125,7 +123,6 @@ describe('order extraction (Tesseract fallback)', () => {
     const imageBase64 = `data:image/jpeg;base64,${buf.toString('base64')}`;
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Blank image result:', JSON.stringify(result, null, 2));
 
     // Should not crash and should report low confidence
     expect(result.confidenceScore).toBeLessThanOrEqual(30);
@@ -154,11 +151,8 @@ describe('order extraction (Tesseract fallback)', () => {
     ];
 
     const imageBase64 = await renderTextToImage(lines, width, 32);
-    const sizeKB = Math.round(imageBase64.length / 1024);
-    console.log(`Large image size: ${sizeKB} KB (${imageBase64.length} chars)`);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Large image result:', JSON.stringify(result, null, 2));
 
     expect(result.notes).not.toContain('too large');
     expect(result.notes).not.toContain('unavailable');
@@ -181,7 +175,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Meesho result:', JSON.stringify(result, null, 2));
 
     expect(result.confidenceScore).toBeGreaterThan(0);
     expect(result.orderId).toMatch(/MEESHO\d+/i);
@@ -200,7 +193,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Myntra result:', JSON.stringify(result, null, 2));
 
     expect(result.confidenceScore).toBeGreaterThan(0);
     expect(result.orderId).toMatch(/MYN\d+/i);
@@ -227,7 +219,6 @@ describe('order extraction (Tesseract fallback)', () => {
     );
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Desktop result:', JSON.stringify(result, null, 2));
 
     expect(result.confidenceScore).toBeGreaterThan(0);
     // Should extract order ID
@@ -255,7 +246,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Amount priority result:', JSON.stringify(result, null, 2));
 
     expect(result.orderId).toMatch(/\d{3}-\d{7}-\d{7}/);
     // Should pick "Amount Paid" (29999) as priority over MRP (45999)
@@ -281,7 +271,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Amazon product name result:', JSON.stringify(result, null, 2));
 
     expect(result.confidenceScore).toBeGreaterThan(0);
     if (result.productName) {
@@ -307,7 +296,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Nykaa product name result:', JSON.stringify(result, null, 2));
 
     expect(result.confidenceScore).toBeGreaterThan(0);
     if (result.orderId) {
@@ -339,7 +327,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Blinkit product name result:', JSON.stringify(result, null, 2));
 
     expect(result.confidenceScore).toBeGreaterThan(0);
     if (result.productName) {
@@ -364,7 +351,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('AJIO product name result:', JSON.stringify(result, null, 2));
 
     expect(result.confidenceScore).toBeGreaterThan(0);
     if (result.orderId) {
@@ -386,7 +372,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('URL rejection result:', JSON.stringify(result, null, 2));
 
     // Product name should NOT be a URL
     if (result.productName) {
@@ -406,7 +391,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Delivery status rejection result:', JSON.stringify(result, null, 2));
 
     if (result.productName) {
       expect(result.productName).not.toMatch(/^arriving/i);
@@ -425,7 +409,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Category list rejection result:', JSON.stringify(result, null, 2));
 
     if (result.productName) {
       // Should NOT be the category list
@@ -450,7 +433,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Meesho product name result:', JSON.stringify(result, null, 2));
 
     expect(result.confidenceScore).toBeGreaterThan(0);
     if (result.productName) {
@@ -474,7 +456,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Address rejection result:', JSON.stringify(result, null, 2));
 
     if (result.productName) {
       expect(result.productName).not.toMatch(/koramangala|bangalore|karnataka|560034/i);
@@ -495,7 +476,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Nav chrome rejection result:', JSON.stringify(result, null, 2));
 
     // Product name must NOT be the navigation chrome
     if (result.productName) {
@@ -521,7 +501,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Concatenated nav rejection result:', JSON.stringify(result, null, 2));
 
     if (result.productName) {
       expect(result.productName).not.toMatch(/Deliver\s*to\s*ABHILASH/i);
@@ -542,7 +521,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('SoldBy button strip result:', JSON.stringify(result, null, 2));
 
     if (result.soldBy) {
       expect(result.soldBy).not.toMatch(/Ask\s*Product\s*Question/i);
@@ -566,7 +544,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Flipkart date result:', JSON.stringify(result, null, 2));
 
     if (result.orderDate) {
       expect(result.orderDate).toMatch(/Sep.*30.*2022|30.*Sep.*2022/i);
@@ -598,7 +575,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Flipkart price breakdown result:', JSON.stringify(result, null, 2));
 
     // Amount MUST be 1408, not 2299 or 1399 or 9
     if (result.amount) {
@@ -625,7 +601,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Flipkart refund result:', JSON.stringify(result, null, 2));
 
     if (result.amount) {
       expect(result.amount).toBe(41990);
@@ -654,7 +629,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Amazon Grand Total result:', JSON.stringify(result, null, 2));
 
     // Must be Grand Total, not subtotal or shipping
     if (result.amount) {
@@ -683,7 +657,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Amazon pincode vs amount result:', JSON.stringify(result, null, 2));
 
     // Must NOT pick 560034 as amount
     if (result.amount) {
@@ -712,7 +685,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('dd-MMM-yyyy date result:', JSON.stringify(result, null, 2));
 
     if (result.orderDate) {
       expect(result.orderDate).toMatch(/18.*Mar.*2022|Mar.*18.*2022/i);
@@ -739,7 +711,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Brand seller extraction result:', JSON.stringify(result, null, 2));
 
     if (result.soldBy) {
       expect(result.soldBy.toLowerCase()).toMatch(/samsung/i);
@@ -765,7 +736,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Delivered date result:', JSON.stringify(result, null, 2));
 
     if (result.orderDate) {
       expect(result.orderDate).toMatch(/Oct.*19.*2025|19.*Oct.*2025/i);
@@ -791,7 +761,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Total vs selling price result:', JSON.stringify(result, null, 2));
 
     if (result.amount) {
       expect(result.amount).toBe(10048);
@@ -829,7 +798,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 1 result:', JSON.stringify(result, null, 2));
 
     // Amount must be 704 (Total amount), NOT 2499 (Listing), 799 (Selling), or 7768014471 (phone)
     if (result.amount) {
@@ -877,7 +845,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 2 result:', JSON.stringify(result, null, 2));
 
     if (result.amount) {
       expect(result.amount).toBe(183);
@@ -923,7 +890,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 3 result:', JSON.stringify(result, null, 2));
 
     if (result.amount) {
       expect(result.amount).toBe(1408);
@@ -968,7 +934,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 4 result:', JSON.stringify(result, null, 2));
 
     if (result.amount) {
       expect(result.amount).toBe(41990);
@@ -1019,7 +984,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 5 result:', JSON.stringify(result, null, 2));
 
     // Grand Total must be 1390, NOT subtotal 1385, shipping 40, total 1430, or pincode 411027
     if (result.amount) {
@@ -1076,7 +1040,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 6 result:', JSON.stringify(result, null, 2));
 
     if (result.amount) {
       expect(result.amount).toBe(6003);
@@ -1132,7 +1095,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 7 result:', JSON.stringify(result, null, 2));
 
     // Grand Total ₹340.02 — NOT subtotal 339, COD fee 7, total 346, promotion 5.98, or pincode 305001
     if (result.amount) {
@@ -1187,7 +1149,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 8 result:', JSON.stringify(result, null, 2));
 
     // Grand Total ₹678 — NOT subtotal 713, marketplace fee 5, total 718, promotion 40, or pincode 305001
     if (result.amount) {
@@ -1238,7 +1199,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 9 result:', JSON.stringify(result, null, 2));
 
     if (result.amount) {
       expect(result.amount).toBe(1030);
@@ -1288,7 +1248,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 10 result:', JSON.stringify(result, null, 2));
 
     // Grand Total ₹1,044.20 (decimal) — NOT subtotal 1110, COD 17, total 1127, promotion 82.80
     if (result.amount) {
@@ -1333,7 +1292,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 11 result:', JSON.stringify(result, null, 2));
 
     if (result.amount) {
       expect(result.amount).toBe(429);
@@ -1368,7 +1326,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 12 result:', JSON.stringify(result, null, 2));
 
     if (result.amount) {
       expect(result.amount).toBe(354);
@@ -1411,7 +1368,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 13 result:', JSON.stringify(result, null, 2));
 
     if (result.amount) {
       expect(result.amount).toBe(68);
@@ -1455,7 +1411,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 14 result:', JSON.stringify(result, null, 2));
 
     if (result.amount) {
       expect(result.amount).toBe(205);
@@ -1497,7 +1452,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 15 result:', JSON.stringify(result, null, 2));
 
     if (result.amount) {
       expect(result.amount).toBe(403);
@@ -1540,7 +1494,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 16 result:', JSON.stringify(result, null, 2));
 
     if (result.amount) {
       expect(result.amount).toBe(426);
@@ -1578,7 +1531,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 17 result:', JSON.stringify(result, null, 2));
 
     if (result.amount) {
       expect(result.amount).toBe(403);
@@ -1629,7 +1581,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 18 result:', JSON.stringify(result, null, 2));
 
     if (result.amount) {
       expect(result.amount).toBe(654);
@@ -1687,7 +1638,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 19 result:', JSON.stringify(result, null, 2));
 
     if (result.amount) {
       expect(result.amount).toBe(317.44);
@@ -1746,7 +1696,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 20 result:', JSON.stringify(result, null, 2));
 
     // Amount must be 195 (Grand Total) — not rejected as order ID digit overlap
     expect(result.amount).toBe(195);
@@ -1804,7 +1753,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 21 result:', JSON.stringify(result, null, 2));
 
     if (result.amount) {
       expect(result.amount).toBe(445.02);
@@ -1873,7 +1821,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 22 result:', JSON.stringify(result, null, 2));
 
     // Grand Total must be 1030, NOT 1070 or 1273 from recommendations
     if (result.amount) {
@@ -1921,7 +1868,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 23 result:', JSON.stringify(result, null, 2));
 
     // Only visible price is the item price 665
     if (result.amount) {
@@ -1967,7 +1913,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 24 result:', JSON.stringify(result, null, 2));
 
     if (result.amount) {
       expect(result.amount).toBe(613);
@@ -2020,7 +1965,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 25 result:', JSON.stringify(result, null, 2));
 
     if (result.amount) {
       expect(result.amount).toBe(1044.2);
@@ -2066,7 +2010,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 26 result:', JSON.stringify(result, null, 2));
 
     // "4089" appears as substring at positions 7-10 in digit string "40467594089041956"
     // but it MUST still be extracted as a valid price
@@ -2098,7 +2041,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 27 result:', JSON.stringify(result, null, 2));
 
     // "6695" exists in Flipkart order ID digits at positions 10-13
     // but must NOT be rejected — it's a valid total amount
@@ -2129,7 +2071,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 28 (multiline name) result:', JSON.stringify(result, null, 2));
 
     expect(result.amount).toBe(1299);
     if (result.productName) {
@@ -2151,7 +2092,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 29 (leading zeros) result:', JSON.stringify(result, null, 2));
 
     expect(result.amount).toBe(199);
     if (result.productName) {
@@ -2174,7 +2114,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 30 (color variant) result:', JSON.stringify(result, null, 2));
 
     expect(result.amount).toBe(1499);
     if (result.productName) {
@@ -2200,7 +2139,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 31 (pincode vs amount) result:', JSON.stringify(result, null, 2));
 
     // Should extract 24900 not 411001
     if (result.amount) {
@@ -2243,7 +2181,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 32 (₹ as 2) result:', JSON.stringify(result, null, 2));
 
     // Order ID must be extracted
     if (result.orderId) {
@@ -2299,7 +2236,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 33 (pincode rejection) result:', JSON.stringify(result, null, 2));
 
     // Amount MUST be 6003 (Grand Total), NOT 411027 (pincode), NOT 5998 (subtotal)
     if (result.amount) {
@@ -2332,7 +2268,6 @@ describe('order extraction (Tesseract fallback)', () => {
     ]);
 
     const result = await extractOrderDetailsWithAi(env, { imageBase64 });
-    console.log('Screenshot 34 (garbled product) result:', JSON.stringify(result, null, 2));
 
     // Product name should be rejected (too garbled) or at least not contain @ symbols
     if (result.productName) {

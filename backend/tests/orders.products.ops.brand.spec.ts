@@ -204,6 +204,20 @@ describe('core flows: products -> redirect -> order -> claim -> ops verify/settl
     expect(verifyReturnWindowRes.body).toHaveProperty('ok', true);
     expect(verifyReturnWindowRes.body).toHaveProperty('approved', true);
 
+    // Force-reset brand wallet to a known balance right before settlement to
+    // avoid contamination from other test files sharing the same database.
+    await db.wallet.updateMany({
+      where: { ownerUserId: campaignBrandUserId, isDeleted: false },
+      data: { availablePaise: WALLET_START, pendingPaise: 0, lockedPaise: 0 },
+    });
+
+    // Also clean any stale settlement transactions for THIS specific order
+    // (in case a previous full-suite run left them behind)
+    const thisOrderMongoId = (await db.order.findFirst({ where: { id: orderId }, select: { mongoId: true } }))?.mongoId;
+    if (thisOrderMongoId) {
+      try { await db.transaction.deleteMany({ where: { idempotencyKey: { in: [`order-settlement-debit-${thisOrderMongoId}`, `order-commission-${thisOrderMongoId}`, `order-margin-${thisOrderMongoId}`] } } }); } catch { /* ignore */ }
+    }
+
     // Snapshot wallet balance immediately BEFORE settling
     const walletSnap = await db.wallet.findFirst({ where: { ownerUserId: campaignBrandUserId, isDeleted: false } });
     expect(walletSnap).toBeTruthy();

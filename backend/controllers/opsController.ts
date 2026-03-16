@@ -109,12 +109,12 @@ async function assertOrderAccess(order: any, roles: string[], requester: any): P
 
   if (!isPrivileged(roles)) {
     if (roles.includes('mediator')) {
-      if (String(order.managerName) !== String(requester?.mediatorCode)) {
+      if (String(order.managerName).trim() !== String(requester?.mediatorCode).trim()) {
         throw new AppError(403, 'FORBIDDEN', 'Cannot verify orders outside your network');
       }
     } else if (roles.includes('agency')) {
-      const allowed = await listMediatorCodesForAgency(String(requester?.mediatorCode || ''));
-      if (!allowed.includes(String(order.managerName))) {
+      const allowed = await listMediatorCodesForAgency(String(requester?.mediatorCode || '').trim());
+      if (!allowed.includes(String(order.managerName).trim())) {
         throw new AppError(403, 'FORBIDDEN', 'Cannot verify orders outside your network');
       }
     } else {
@@ -155,10 +155,18 @@ export async function finalizeApprovalIfReady(order: any, actorUserId: string, e
     return { approved: false, reason: 'MISSING_VERIFICATIONS', missingVerifications };
   }
 
-  const COOLING_PERIOD_DAYS = 14;
+  const COOLING_PERIOD_DAYS = env.COOLING_PERIOD_DAYS ?? 14;
   const settleDate = new Date();
   settleDate.setDate(settleDate.getDate() + COOLING_PERIOD_DAYS);
   const currentEvents = Array.isArray(order.events) ? (order.events as any[]) : [];
+
+  orderLog.info('All proofs verified — approving order', {
+    orderId: order.mongoId,
+    coolingDays: COOLING_PERIOD_DAYS,
+    settlementDate: settleDate.toISOString(),
+    verifiedSteps: required,
+    actorUserId,
+  });
 
   // Use updateMany with workflowStatus guard to prevent duplicate events on concurrent verify
   const updated = await db().order.updateMany({
@@ -3042,7 +3050,7 @@ export function makeOpsController(env: Env) {
         }
 
         if (order.affiliateStatus !== 'Pending_Cooling') {
-          const COOLING_PERIOD_DAYS = 14;
+          const COOLING_PERIOD_DAYS = env.COOLING_PERIOD_DAYS ?? 14;
           const settleDate = new Date();
           settleDate.setDate(settleDate.getDate() + COOLING_PERIOD_DAYS);
           const currentEvents = Array.isArray(order.events) ? (order.events as any[]) : [];

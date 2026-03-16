@@ -78,6 +78,13 @@ const envSchema = z.object({
   // URL validation acts as the "AI" for review proofs — no screenshot analysis needed.
   AI_REVIEW_LINK_CONFIDENCE: z.coerce.number().int().min(0).max(100).default(95),
 
+  // Cooling period (days) before an approved order can be settled.
+  // 14 days provides chargeback protection for marketplace purchases.
+  COOLING_PERIOD_DAYS: z.coerce.number().int().min(1).max(90).default(14),
+
+  // Maximum number of times a rejected order can be re-submitted for proof.
+  MAX_REPROOF_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),
+
   // Wallet safety limits
   WALLET_MAX_BALANCE_PAISE: z.coerce.number().int().positive().default(1_00_00_000), // ₹1,00,000
 
