@@ -24,7 +24,9 @@ async function main() {
 
   const client = new Client({
     connectionString: url,
-    ssl: { rejectUnauthorized: false },
+    ssl: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'false'
+      ? { rejectUnauthorized: false }
+      : true,
   });
 
   await client.connect();
@@ -34,7 +36,12 @@ async function main() {
   const urlObj = new URL(url);
   const schemaFromUrl = urlObj.searchParams.get("search_path");
   if (schemaFromUrl) {
-    await client.query("SET search_path TO " + schemaFromUrl);
+    // Validate schema name: only allow alphanumeric, underscores, and commas (for multiple schemas)
+    if (!/^[a-zA-Z_][a-zA-Z0-9_,\s]*$/.test(schemaFromUrl)) {
+      console.error("Invalid search_path value:", schemaFromUrl);
+      process.exit(1);
+    }
+    await client.query(`SET search_path TO ${schemaFromUrl}`);
     console.log("Set search_path to:", schemaFromUrl);
   }
 

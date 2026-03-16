@@ -1220,8 +1220,10 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
             {/* SUPPORT VIEW */}
             {view === 'support' && (() => {
               const supportTickets = tickets.filter((t) => t.issueType !== 'Feedback');
+              // Normalize role for filtering: backend sends 'user' for shoppers, 'admin' for ops
+              const normalizeRole = (r: string) => { const l = (r || '').toLowerCase(); return l === 'user' || l === 'shopper' ? 'shopper' : l === 'ops' ? 'admin' : l; };
               const filteredTickets = supportTickets.filter((t) => {
-                if (ticketRoleFilter !== 'All' && (t.role || '').toLowerCase() !== ticketRoleFilter.toLowerCase()) return false;
+                if (ticketRoleFilter !== 'All' && normalizeRole(t.role) !== ticketRoleFilter.toLowerCase()) return false;
                 if (ticketStatusFilter !== 'All' && t.status !== ticketStatusFilter) return false;
                 if (ticketSearch.trim()) {
                   const q = ticketSearch.trim().toLowerCase();
@@ -1237,10 +1239,11 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
               });
               const roleCounts = {
                 All: supportTickets.length,
-                Shopper: supportTickets.filter((t) => (t.role || '').toLowerCase() === 'shopper').length,
-                Mediator: supportTickets.filter((t) => (t.role || '').toLowerCase() === 'mediator').length,
-                Agency: supportTickets.filter((t) => (t.role || '').toLowerCase() === 'agency').length,
-                Brand: supportTickets.filter((t) => (t.role || '').toLowerCase() === 'brand').length,
+                Shopper: supportTickets.filter((t) => normalizeRole(t.role) === 'shopper').length,
+                Mediator: supportTickets.filter((t) => normalizeRole(t.role) === 'mediator').length,
+                Agency: supportTickets.filter((t) => normalizeRole(t.role) === 'agency').length,
+                Brand: supportTickets.filter((t) => normalizeRole(t.role) === 'brand').length,
+                Admin: supportTickets.filter((t) => normalizeRole(t.role) === 'admin').length,
               };
               return (
               <div className="space-y-6 animate-enter">
@@ -1277,7 +1280,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
 
                 {/* Role Filter Tabs */}
                 <div className="flex flex-wrap gap-2">
-                  {(['All', 'Shopper', 'Mediator', 'Agency', 'Brand'] as const).map((role) => (
+                  {(['All', 'Shopper', 'Mediator', 'Agency', 'Brand', 'Admin'] as const).map((role) => (
                     <button
                       key={role}
                       type="button"

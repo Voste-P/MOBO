@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { randomUUID } from 'node:crypto';
 
 import { createApp } from '../app.js';
 import { loadEnv } from '../config/env.js';
@@ -7,7 +8,7 @@ import { prisma } from '../database/prisma.js';
 import { applyWalletCredit } from '../services/walletService.js';
 
 // Unique suffix per test run to avoid idempotencyKey collisions
-const RUN = Date.now().toString();
+const RUN = randomUUID();
 
 async function login(app: any, mobile: string, password: string) {
   const res = await request(app).post('/api/auth/login').send({ mobile, password });

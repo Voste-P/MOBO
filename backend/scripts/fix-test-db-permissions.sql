@@ -1,7 +1,7 @@
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- Fix test DB permissions for buzzma_app_test_user
 -- ═══════════════════════════════════════════════════════════════════════════════
--- Run this against the remote PostgreSQL (159.195.35.137:5443/buzzma) 
+-- Run this against the remote PostgreSQL test database
 -- as a superuser / database owner to fix "permission denied for table ..." errors.
 --
 -- The test user needs full CRUD on all tables in buzzma_test schema.
