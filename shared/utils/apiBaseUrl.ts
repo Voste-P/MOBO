@@ -81,8 +81,8 @@ export function getApiBaseUrl(): string {
 
 /**
  * Like `getApiBaseUrl()` but guarantees an absolute URL (with origin) when
- * running in the browser.  This is needed for CSV export hyperlinks and
- * image-proxy `src` attributes where a relative `/api` path won't work.
+ * running in the browser.  This is needed for image-proxy `src` attributes
+ * where a relative `/api` path won't work.
  */
 export function getApiBaseAbsolute(): string {
   let base = getApiBaseUrl();
@@ -90,4 +90,42 @@ export function getApiBaseAbsolute(): string {
     base = `${window.location.origin}${base}`;
   }
   return base.replace(/\/$/, '');
+}
+
+/**
+ * Returns the direct backend API URL (bypassing Vercel/Next.js proxy).
+ *
+ * This is required for URLs that will be opened outside the browser session,
+ * e.g. Excel HYPERLINK formulas, Google Sheets links, or email links.
+ * Vercel rewrites only work for same-origin browser requests; external apps
+ * like Excel cannot follow the proxy chain.
+ *
+ * Resolution order:
+ *  1. `NEXT_PUBLIC_API_PROXY_TARGET` + `/api`  (the actual backend origin)
+ *  2. `NEXT_PUBLIC_API_URL`                    (direct URL if set)
+ *  3. Falls back to `getApiBaseAbsolute()`     (same-origin proxy as last resort)
+ */
+export function getDirectBackendUrl(): string {
+  const proxyTarget =
+    typeof process !== 'undefined' &&
+    (process as any).env?.NEXT_PUBLIC_API_PROXY_TARGET
+      ? String((process as any).env.NEXT_PUBLIC_API_PROXY_TARGET).trim()
+      : '';
+
+  if (proxyTarget) {
+    const base = proxyTarget.endsWith('/') ? proxyTarget.slice(0, -1) : proxyTarget;
+    return base.endsWith('/api') ? base : `${base}/api`;
+  }
+
+  const directUrl =
+    typeof process !== 'undefined' &&
+    (process as any).env?.NEXT_PUBLIC_API_URL
+      ? String((process as any).env.NEXT_PUBLIC_API_URL).trim()
+      : '';
+
+  if (directUrl) {
+    return directUrl.endsWith('/') ? directUrl.slice(0, -1) : directUrl;
+  }
+
+  return getApiBaseAbsolute();
 }

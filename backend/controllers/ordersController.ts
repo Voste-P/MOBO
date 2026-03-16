@@ -1505,7 +1505,25 @@ export function makeOrdersController(env: Env) {
         // If order is already APPROVED (e.g. during cooling period), save the proof
         // without rewinding the workflow. This handles orders approved before
         // returnWindow was required, and late proof uploads for already-approved orders.
+        // Also auto-verify the proof step if AI passed hard-block validation.
         if (wf === 'APPROVED') {
+          // Auto-verify the submitted proof step for audit trail completeness
+          if (claimAiConfidence > 0) {
+            const v = (order.verification && typeof order.verification === 'object')
+              ? { ...(order.verification as any) } : {} as any;
+            const vKey = body.type === 'order' ? 'order' : body.type;
+            if (!v[vKey]?.verifiedAt) {
+              v[vKey] = v[vKey] ?? {};
+              v[vKey].verifiedAt = new Date().toISOString();
+              v[vKey].verifiedBy = 'SYSTEM_AI';
+              v[vKey].autoVerified = true;
+              v[vKey].aiConfidenceScore = claimAiConfidence;
+              await db().order.update({
+                where: { id: order.id },
+                data: { verification: v },
+              });
+            }
+          }
           const refreshed = await db().order.findFirst({ where: { id: order.id, isDeleted: false }, include: { items: { where: { isDeleted: false } } } });
           res.json(toUiOrder(pgOrder(refreshed)));
           try {

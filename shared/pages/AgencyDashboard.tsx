@@ -8,7 +8,7 @@ import { RaiseTicketModal } from '../components/RaiseTicketModal';
 import TicketDetailModal from '../components/TicketDetailModal';
 import { FeedbackCard } from '../components/FeedbackCard';
 import { api, asArray } from '../services/api';
-import { getApiBaseAbsolute } from '../utils/apiBaseUrl';
+import { getDirectBackendUrl } from '../utils/apiBaseUrl';
 import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
@@ -524,7 +524,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
 
   const handleExport = async () => {
     if (ledger.length === 0) { toast.info('No orders to export'); return; }
-    const apiBase = getApiBaseAbsolute();
+    const apiBase = getDirectBackendUrl();
 
     // Fetch signed proof tokens so Excel/Sheets can open proof images without auth
     let proofTokens: Record<string, Record<string, string | null>> = {};

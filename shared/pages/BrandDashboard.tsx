@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { getApiBaseAbsolute } from '../utils/apiBaseUrl';
+import { getDirectBackendUrl } from '../utils/apiBaseUrl';
 import { maskMobile } from '../utils/mobiles';
 import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage } from '../components/ProxiedImage';
@@ -723,7 +723,7 @@ const OrdersView = ({ user }: any) => {
 
   const handleExport = async () => {
     if (filtered.length === 0) { toast.info('No orders to export'); return; }
-    const apiBase = getApiBaseAbsolute();
+    const apiBase = getDirectBackendUrl();
 
     // Fetch signed proof tokens so Excel/Sheets can open proof images without auth
     let proofTokens: Record<string, Record<string, string | null>> = {};
