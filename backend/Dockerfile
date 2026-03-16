@@ -59,6 +59,13 @@ COPY --chown=mobo:mobo --from=builder /app/backend/generated backend/generated
 COPY --chown=mobo:mobo --from=builder /app/backend/prisma backend/prisma
 COPY --chown=mobo:mobo --from=builder /app/backend/prisma.config.ts backend/prisma.config.ts
 
+# Copy OCR trained data for Tesseract (avoids runtime download latency)
+COPY --chown=mobo:mobo backend/eng.traineddata backend/eng.traineddata
+
+# Copy deploy migration runner
+COPY --chown=mobo:mobo backend/scripts/deploy-migrate.cjs backend/scripts/deploy-migrate.cjs
+COPY --chown=mobo:mobo backend/scripts/check-migration-safety.sh backend/scripts/check-migration-safety.sh
+
 # Copy shared (needed at runtime for type imports resolved via dist)
 COPY --chown=mobo:mobo --from=builder /app/shared shared/
 

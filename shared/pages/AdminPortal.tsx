@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../components/ui/ConfirmDialog';
 import { api, asArray } from '../services/api';
-import { getApiBaseAbsolute } from '../utils/apiBaseUrl';
+import { getDirectBackendUrl } from '../utils/apiBaseUrl';
 import { maskMobile } from '../utils/mobiles';
 import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage } from '../components/ProxiedImage';
@@ -640,7 +640,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       return;
     }
 
-    const apiBase = getApiBaseAbsolute();
+    const apiBase = getDirectBackendUrl();
 
     // Fetch signed proof tokens so Excel/Sheets can open proof images without auth
     let proofTokens: Record<string, Record<string, string | null>> = {};
