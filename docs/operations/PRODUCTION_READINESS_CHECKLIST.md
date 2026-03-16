@@ -62,6 +62,6 @@ Optional:
 
 See also:
 
-- `docs/DEPLOYMENT.md`
-- `docs/DEPLOYMENT_RENDER_VERCEL_NO_DOMAIN.md`
+- `docs/operations/DEPLOYMENT.md`
+- `docs/operations/DEPLOYMENT_RENDER_VERCEL_NO_DOMAIN.md`
 - `docs/REALTIME.md`

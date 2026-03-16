@@ -1,12 +1,20 @@
-﻿# BUZZMA ECOSYSTEM V1
+﻿# BUZZMA Ecosystem
 
-[![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
+[![CI / CD](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 
-BUZZMA is a monorepo for a multi-portal commerce + operations system:
+Multi-portal commerce + operations platform — monorepo with 5 Next.js portals, Express API, and automated E2E testing.
 
-- Backend API: Express + TypeScript + PostgreSQL (Prisma)
-- Portals (Next.js): Buyer, Mediator, Agency, Brand, Admin
-- Tests: Vitest (backend) + Playwright (E2E)
+### Tech Stack
+
+| Layer      | Technology                                           |
+| ---------- | ---------------------------------------------------- |
+| Backend    | Express 5 · TypeScript · PostgreSQL · Prisma ORM     |
+| Frontend   | Next.js 15 · React 19 · Tailwind CSS                |
+| Auth       | JWT (access + refresh tokens) · RBAC                 |
+| AI         | Google Gemini (proof verification, OCR via Tesseract)|
+| Testing    | Vitest (unit) · Playwright (E2E)                     |
+| CI/CD      | GitHub Actions · Render (backend) · Vercel (portals) |
+| Realtime   | Server-Sent Events (SSE)                             |
 
 ## System diagram
 
@@ -54,34 +62,53 @@ erDiagram
 
 ## Repo layout
 
-- `backend/` Express API, Prisma schema, services, seeds, tests
-- `apps/buyer-app/` Buyer portal (dev port 3001)
-- `apps/mediator-app/` Mediator portal (dev port 3002)
-- `apps/agency-web/` Agency portal (dev port 3003)
-- `apps/brand-web/` Brand portal (dev port 3004)
-- `apps/admin-web/` Admin portal (dev port 3005)
-- `shared/` shared utilities/types used by portals
-- `e2e/` Playwright end-to-end tests
-- `docs/` architecture + API + deployment docs
+```
+├── backend/         Express API, Prisma schema, services, seeds, tests
+├── apps/
+│   ├── buyer-app/   Buyer portal (dev port 3001)
+│   ├── mediator-app/Mediator portal (dev port 3002)
+│   ├── agency-web/  Agency portal (dev port 3003)
+│   ├── brand-web/   Brand portal (dev port 3004)
+│   └── admin-web/   Admin portal (dev port 3005)
+├── shared/          Shared components, hooks, utils, types
+├── e2e/             Playwright end-to-end tests
+├── scripts/         Dev tooling (stack launcher, cleanup, health checks)
+└── docs/
+    ├── operations/  Deployment and production checklists
+    └── audits/      Security and codebase audits
+```
 
 ## Docs
 
-| Document                                     | Description                               |
-| -------------------------------------------- | ----------------------------------------- |
-| `docs/ARCHITECTURE.md`                       | System diagram, auth model, ER diagram    |
-| `docs/API.md`                                | Complete API surface — 83 endpoints       |
-| `docs/BACKEND_API_SURFACE.md`                | Detailed endpoint behavior notes          |
-| `docs/DOMAIN_MODEL.md`                       | 20 Prisma models, 22 enums, relationships |
-| `docs/RBAC_MATRIX.md`                        | Role-based access matrix                  |
-| `docs/MONEY_FLOW.md`                         | Wallet, transaction, payout flows         |
-| `docs/REALTIME.md`                           | SSE contract and event types              |
-| `docs/DEPLOYMENT.md`                         | Quick deployment guide                    |
-| `docs/DEPLOYMENT_RENDER_VERCEL_NO_DOMAIN.md` | Full Render + Vercel setup                |
-| `docs/PRODUCTION_READINESS_CHECKLIST.md`     | Pre-launch checklist                      |
-| `docs/PRODUCTION_AUDIT.md`                   | Security and production audit             |
-| `docs/LOGGING_AUDIT.md`                      | Controller logging coverage               |
-| `docs/SHARED_DIRECTORY_AUDIT.md`             | Shared package audit                      |
-| `docs/CLEANUP.md`                            | Safe deletion rules                       |
+**Architecture & Design**
+
+| Document                        | Description                               |
+| ------------------------------- | ----------------------------------------- |
+| `docs/ARCHITECTURE.md`         | System diagram, auth model, ER diagram    |
+| `docs/API.md`                  | Complete API surface — 83 endpoints       |
+| `docs/BACKEND_API_SURFACE.md`  | Detailed endpoint behavior notes          |
+| `docs/DOMAIN_MODEL.md`        | 20 Prisma models, 22 enums, relationships |
+| `docs/RBAC_MATRIX.md`         | Role-based access matrix                  |
+| `docs/MONEY_FLOW.md`          | Wallet, transaction, payout flows         |
+| `docs/REALTIME.md`            | SSE contract and event types              |
+| `docs/SYSTEM_FLOW.md`         | End-to-end system workflows               |
+
+**Operations & Deployment** (`docs/operations/`)
+
+| Document                                                | Description              |
+| ------------------------------------------------------- | ------------------------ |
+| `docs/operations/DEPLOYMENT.md`                         | Quick deployment guide   |
+| `docs/operations/DEPLOYMENT_RENDER_VERCEL_NO_DOMAIN.md` | Full Render + Vercel setup |
+| `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`     | Pre-launch checklist     |
+
+**Audits** (`docs/audits/`)
+
+| Document                                | Description                   |
+| --------------------------------------- | ----------------------------- |
+| `docs/audits/PRODUCTION_AUDIT.md`       | Security and production audit |
+| `docs/audits/LOGGING_AUDIT.md`          | Controller logging coverage   |
+| `docs/audits/SHARED_DIRECTORY_AUDIT.md` | Shared package audit          |
+| `docs/audits/CLEANUP.md`               | Safe deletion rules           |
 
 ## Prerequisites
 
@@ -190,7 +217,7 @@ To remove generated artifacts (build outputs, caches, Playwright traces):
 npm run clean
 ```
 
-Details and safe deletion criteria: `docs/CLEANUP.md`.
+Details and safe deletion criteria: `docs/audits/CLEANUP.md`.
 
 ## Deployment
 
@@ -199,8 +226,8 @@ Details and safe deletion criteria: `docs/CLEANUP.md`.
 
 Start here:
 
-- `docs/DEPLOYMENT.md`
-- `docs/DEPLOYMENT_RENDER_VERCEL_NO_DOMAIN.md`
+- `docs/operations/DEPLOYMENT.md`
+- `docs/operations/DEPLOYMENT_RENDER_VERCEL_NO_DOMAIN.md`
 
 ## Troubleshooting
 

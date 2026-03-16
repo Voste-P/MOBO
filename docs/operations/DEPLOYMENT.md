@@ -2,7 +2,7 @@
 
 This doc is the minimal, copy/paste oriented setup.
 
-If you do not have custom domains yet, use: `docs/DEPLOYMENT_RENDER_VERCEL_NO_DOMAIN.md`.
+If you do not have custom domains yet, use: `docs/operations/DEPLOYMENT_RENDER_VERCEL_NO_DOMAIN.md`.
 
 Before deploying, verify locally from repo root:
 
