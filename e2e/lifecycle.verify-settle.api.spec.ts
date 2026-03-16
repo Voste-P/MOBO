@@ -161,14 +161,42 @@ test('order lifecycle: buyer create -> ops verify -> ops settle -> wallets credi
 
   // Verify (ops/admin) - only valid from UNDER_REVIEW.
   if (currentWorkflow === 'UNDER_REVIEW') {
-    await expectOk(
+    const verifyRes = await expectOk(
       await request.post('/api/ops/verify', {
         headers: authHeaders(ops.tokens.accessToken),
         data: { orderId },
       }),
       'Verify order',
     );
-    currentWorkflow = 'APPROVED';
+
+    // With returnWindow required for all deals, purchase verification alone
+    // does NOT approve.  We must submit + verify the returnWindow proof too.
+    if (verifyRes?.approved === true) {
+      currentWorkflow = 'APPROVED';
+    } else {
+      // Submit returnWindow proof (purchase must already be verified).
+      await expectOk(
+        await request.post('/api/orders/claim', {
+          headers: authHeaders(buyer.tokens.accessToken),
+          data: {
+            orderId,
+            type: 'returnWindow',
+            data: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMTAwIj48dGV4dCB4PSIxMCIgeT0iNTAiPkUyRSBSZXR1cm4gV2luZG93PC90ZXh0Pjwvc3ZnPg==',
+          },
+        }),
+        'Submit returnWindow proof',
+      );
+
+      // Verify the returnWindow proof (ops).
+      const rwVerifyRes = await expectOk(
+        await request.post('/api/ops/orders/verify-requirement', {
+          headers: authHeaders(ops.tokens.accessToken),
+          data: { orderId, type: 'returnWindow' },
+        }),
+        'Verify returnWindow requirement',
+      );
+      currentWorkflow = rwVerifyRes?.approved === true ? 'APPROVED' : String(rwVerifyRes?.order?.workflowStatus ?? 'UNDER_REVIEW');
+    }
   }
 
   // Settle (ops/admin) - only valid from APPROVED.
