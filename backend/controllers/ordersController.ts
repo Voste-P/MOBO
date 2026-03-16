@@ -1058,7 +1058,7 @@ export function makeOrdersController(env: Env) {
         }
 
         const wf = String(order.workflowStatus || 'CREATED');
-        if (wf !== 'ORDERED' && wf !== 'UNDER_REVIEW' && wf !== 'PROOF_SUBMITTED') {
+        if (wf !== 'ORDERED' && wf !== 'UNDER_REVIEW' && wf !== 'PROOF_SUBMITTED' && wf !== 'APPROVED') {
           throw new AppError(409, 'INVALID_WORKFLOW_STATE', `Cannot submit proof in state ${wf}`);
         }
 
@@ -1501,6 +1501,43 @@ export function makeOrdersController(env: Env) {
         });
 
         await db().order.update({ where: { id: order.id }, data: updateData });
+
+        // If order is already APPROVED (e.g. during cooling period), save the proof
+        // without rewinding the workflow. This handles orders approved before
+        // returnWindow was required, and late proof uploads for already-approved orders.
+        if (wf === 'APPROVED') {
+          const refreshed = await db().order.findFirst({ where: { id: order.id, isDeleted: false }, include: { items: { where: { isDeleted: false } } } });
+          res.json(toUiOrder(pgOrder(refreshed)));
+          try {
+            const privilegedRoles: Role[] = ['admin', 'ops'];
+            const managerCode = String(order.managerName || '').trim();
+            const mediatorUser = managerCode
+              ? await db().user.findFirst({
+                where: { roles: { has: 'mediator' as any }, mediatorCode: managerCode, isDeleted: false },
+                select: { parentCode: true },
+              })
+              : null;
+            const upstreamAgencyCode = String(mediatorUser?.parentCode || '').trim();
+            const [orderUser, brandUser] = await Promise.all([
+              db().user.findUnique({ where: { id: order.userId }, select: { mongoId: true } }),
+              order.brandUserId
+                ? db().user.findUnique({ where: { id: order.brandUserId }, select: { mongoId: true } })
+                : null,
+            ]);
+            const audience = {
+              roles: privilegedRoles,
+              userIds: [orderUser?.mongoId ?? '', brandUser?.mongoId ?? ''].filter(Boolean),
+              mediatorCodes: managerCode ? [managerCode] : undefined,
+              agencyCodes: upstreamAgencyCode ? [upstreamAgencyCode] : undefined,
+            };
+            publishRealtime({ type: 'orders.changed', ts: new Date().toISOString(), audience });
+            await writeAuditLog({ req, action: 'PROOF_SUBMITTED', entityType: 'Order', entityId: order.mongoId!, metadata: { proofType: body.type, approvedLateUpload: true } });
+            logChangeEvent({ actorUserId: req.auth?.userId, actorRoles: req.auth?.roles, actorIp: req.ip, entityType: 'Order', entityId: order.mongoId!, action: 'STATUS_CHANGE', requestId: String((res as any).locals?.requestId || ''), metadata: { proofType: body.type, action: 'PROOF_SUBMITTED_AFTER_APPROVAL' } });
+          } catch (postErr) {
+            orderLog.warn('Post-response notification failed (approved late upload)', { error: postErr instanceof Error ? postErr.message : String(postErr) });
+          }
+          return;
+        }
 
         // Strict state machine progression for first proof submission:
         // ORDERED -> PROOF_SUBMITTED -> UNDER_REVIEW
