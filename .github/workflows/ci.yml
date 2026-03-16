@@ -214,7 +214,7 @@ jobs:
   test-e2e:
     name: '🎭 E2E Tests'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     needs: [test-backend, build-apps]
     permissions:
       contents: read
@@ -275,10 +275,12 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.pw-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 8
         run: npx playwright install --with-deps
 
       - name: Install Playwright OS dependencies
         if: steps.pw-cache.outputs.cache-hit == 'true'
+        timeout-minutes: 5
         run: npx playwright install-deps
 
       # ⛔  NO continue-on-error — E2E failures BLOCK the pipeline

@@ -29,7 +29,7 @@ export async function loginAndGetAccessToken(request: APIRequestContext, args: {
     const isJson = contentType.toLowerCase().includes('application/json');
     const payload = isJson ? await res.json().catch(() => null) : null;
 
-    if (!res.ok) {
+    if (!res.ok()) {
       const msg = payload?.error?.message || payload?.message || `Login failed: ${res.status()}`;
       lastError = new Error(String(msg));
     } else {
