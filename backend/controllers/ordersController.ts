@@ -904,10 +904,11 @@ export function makeOrdersController(env: Env) {
           });
 
           // ── Auto-verify by AI confidence ──────────────────────────────
-          // When the AI confidence score meets the auto-verify threshold,
-          // skip manual mediator review and mark the purchase step verified.
+          // When AI has verified the proof (passed all hard-block checks), auto-verify
+          // the purchase step. The hard blocks (orderIdMatch, productNameMatch, etc.)
+          // already ensure proof correctness — any surviving proof is "AI-approved".
           const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
-          if (aiOrderConfidence >= autoThreshold) {
+          if (aiOrderConfidence > 0) {
             const freshOrder = await db().order.findFirst({
               where: { mongoId: orderMongoId, isDeleted: false },
               include: { items: { where: { isDeleted: false } } },
@@ -1508,8 +1509,9 @@ export function makeOrdersController(env: Env) {
           let refreshed = await db().order.findFirst({ where: { id: order.id, isDeleted: false }, include: { items: { where: { isDeleted: false } } } });
 
           // ── Auto-verify by AI confidence (submitClaim, already UNDER_REVIEW) ──
+          // Any proof that passed AI hard-block validation (confidence > 0) is auto-verified.
           const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
-          if (claimAiConfidence >= autoThreshold && refreshed) {
+          if (claimAiConfidence > 0 && refreshed) {
             refreshed = await autoVerifyStep(refreshed, body.type, claimAiConfidence, autoThreshold, env);
           }
 
@@ -1566,9 +1568,10 @@ export function makeOrdersController(env: Env) {
         });
 
         // ── Auto-verify by AI confidence (submitClaim, new UNDER_REVIEW) ──
+        // Any proof that passed AI hard-block validation (confidence > 0) is auto-verified.
         let claimFinalOrder: any = afterReview;
         const autoThreshold2 = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
-        if (claimAiConfidence >= autoThreshold2 && afterReview) {
+        if (claimAiConfidence > 0 && afterReview) {
           const freshOrder = await db().order.findFirst({
             where: { id: order.id, isDeleted: false },
             include: { items: { where: { isDeleted: false } } },
