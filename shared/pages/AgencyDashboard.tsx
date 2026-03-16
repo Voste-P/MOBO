@@ -2781,7 +2781,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
               ) : (
                 activeMediatorsForAssign.map((m: User) => {
                   const mediatorOrders = allOrders
-                    ? allOrders.filter((o: Order) => o.managerName === m.mediatorCode)
+                    ? allOrders.filter((o: Order) => (o.mediatorCode || o.managerName) === m.mediatorCode)
                     : [];
                   const salesCount = mediatorOrders.length;
                   const salesRevenue = mediatorOrders.reduce(
@@ -3347,7 +3347,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
   // Filter orders for selected mediator (Sanitized for Privacy)
   const mediatorOrders = useMemo(() => {
     if (!selectedMediator) return [];
-    return allOrders.filter((o: Order) => o.managerName === selectedMediator.mediatorCode);
+    return allOrders.filter((o: Order) => (o.mediatorCode || o.managerName) === selectedMediator.mediatorCode);
   }, [selectedMediator, allOrders]);
 
   const generateInvite = async () => {
@@ -3565,7 +3565,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                     </td>
                     <td className="p-5 text-center">
                       <div className="text-xs font-bold text-slate-600">
-                        {allOrders.filter((o: Order) => o.managerName === m.mediatorCode).length}{' '}
+                        {allOrders.filter((o: Order) => (o.mediatorCode || o.managerName) === m.mediatorCode).length}{' '}
                         Orders
                       </div>
                     </td>

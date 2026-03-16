@@ -9,12 +9,12 @@ import { seedE2E, E2E_ACCOUNTS } from '../seeds/e2e.js';
 // Unique suffix per test run to avoid collisions on re-run
 const RUN = randomUUID().replace(/-/g, '').slice(0, 6);
 let inviteSeq = 0;
-let mobileSeq = 0;
+let _mobileSeq = 0;
 function uniqueInviteCode(prefix: string) { return `${prefix}_${RUN}_${++inviteSeq}`; }
 function uniqueMobile(base: string) {
   // Use random suffix to avoid collisions with prior runs on shared DB
   const suffix = parseInt(randomUUID().replace(/-/g, '').slice(0, 6), 16) % 1_000_000;
-  ++mobileSeq;
+  ++_mobileSeq;
   return base.slice(0, 4) + String(suffix).padStart(6, '0');
 }
 
