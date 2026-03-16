@@ -57,6 +57,9 @@ export type SeededE2E = {
  * NEVER deletes any data. All operations are create-or-update only.
  */
 export async function seedE2E(): Promise<SeededE2E> {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('seedE2E() is disabled in production');
+  }
   await connectPrisma();
   const db = prisma();
 

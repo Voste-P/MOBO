@@ -174,7 +174,7 @@ describe('core flows: products -> redirect -> order -> claim -> ops verify/settl
     expect(claimRes.status).toBe(200);
     expect(claimRes.body).toHaveProperty('id', orderId);
 
-    // Ops verify (privileged)
+    // Ops verify purchase (privileged)
     const verifyRes = await request(app)
       .post('/api/ops/verify')
       .set('Authorization', `Bearer ${admin.token}`)
@@ -182,6 +182,27 @@ describe('core flows: products -> redirect -> order -> claim -> ops verify/settl
 
     expect(verifyRes.status).toBe(200);
     expect(verifyRes.body).toHaveProperty('ok', true);
+    // Discount deals now also require returnWindow proof
+    expect(verifyRes.body).toHaveProperty('approved', false);
+    expect(verifyRes.body.missingProofs).toContain('returnWindow');
+
+    // Submit returnWindow proof (required for ALL deal types)
+    const submitReturnWindowRes = await request(app)
+      .post('/api/orders/claim')
+      .set('Authorization', `Bearer ${shopper.token}`)
+      .send({ orderId, type: 'returnWindow', data: LARGE_DATA_URL });
+
+    expect(submitReturnWindowRes.status).toBe(200);
+
+    // Verify returnWindow
+    const verifyReturnWindowRes = await request(app)
+      .post('/api/ops/orders/verify-requirement')
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ orderId, type: 'returnWindow' });
+
+    expect(verifyReturnWindowRes.status).toBe(200);
+    expect(verifyReturnWindowRes.body).toHaveProperty('ok', true);
+    expect(verifyReturnWindowRes.body).toHaveProperty('approved', true);
 
     // Snapshot wallet balance immediately BEFORE settling
     const walletSnap = await db.wallet.findFirst({ where: { ownerUserId: campaignBrandUserId, isDeleted: false } });
