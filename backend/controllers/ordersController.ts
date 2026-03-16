@@ -18,6 +18,7 @@ import { publishRealtime } from '../services/realtimeHub.js';
 import { getRequester, isPrivileged } from '../services/authz.js';
 import { isGeminiConfigured, verifyProofWithAi, verifyRatingScreenshotWithAi, verifyReturnWindowWithAi } from '../services/aiService.js';
 import { finalizeApprovalIfReady } from './opsController.js';
+import { createProofToken, verifyProofToken } from '../utils/signedProofUrl.js';
 
 // UUID v4 regex — 8-4-4-4-12 hex with dashes.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -278,6 +279,122 @@ export function makeOrdersController(env: Env) {
           category: 'BUSINESS_LOGIC',
           severity: 'medium',
           userId: req.auth?.userId,
+          ip: req.ip,
+          requestId: String((res as any).locals?.requestId || ''),
+          metadata: { error: err instanceof Error ? err.message : String(err) },
+        });
+        next(err);
+      }
+    },
+    /**
+     * Generate signed proof URLs for an order (used by CSV/Excel export).
+     * Authenticated endpoint — returns signed tokens that can be opened without auth.
+     */
+    getSignedProofUrls: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const orderId = String(req.params.orderId || '').trim();
+        if (!orderId) throw new AppError(400, 'INVALID_ORDER_ID', 'Invalid order id');
+
+        const order = await findOrderForProof(orderId);
+        if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
+
+        const proofTypes = ['order', 'payment', 'rating', 'review', 'returnWindow'] as const;
+        const urls: Record<string, string | null> = {};
+
+        for (const pt of proofTypes) {
+          const val = resolveProofValue(order, pt.toLowerCase());
+          if (val) {
+            const token = createProofToken(orderId, pt.toLowerCase(), env);
+            urls[pt] = token;
+          } else {
+            urls[pt] = null;
+          }
+        }
+
+        res.json({ urls });
+      } catch (err) {
+        next(err);
+      }
+    },
+    /**
+     * Batch generate signed proof URLs for multiple orders.
+     * POST body: { orderIds: string[] }
+     * Returns: { tokens: Record<orderId, Record<proofType, string | null>> }
+     */
+    batchSignedProofUrls: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const orderIds: string[] = Array.isArray(req.body?.orderIds) ? req.body.orderIds : [];
+        if (orderIds.length === 0) throw new AppError(400, 'MISSING_ORDER_IDS', 'orderIds array required');
+        if (orderIds.length > 500) throw new AppError(400, 'TOO_MANY_ORDERS', 'Max 500 orders per batch');
+
+        const proofTypes = ['order', 'payment', 'rating', 'review', 'returnwindow'] as const;
+        const tokens: Record<string, Record<string, string | null>> = {};
+
+        // Fetch all orders in one query
+        const orders = await db().order.findMany({
+          where: {
+            OR: orderIds.map(id => UUID_RE.test(id) ? { id } : { mongoId: id }),
+            isDeleted: false,
+          },
+          include: { items: { where: { isDeleted: false } } },
+        });
+
+        // Map by both id and mongoId for quick lookup
+        const orderMap = new Map<string, any>();
+        for (const o of orders) {
+          const mapped = pgOrder(o);
+          orderMap.set(String(o.id), mapped);
+          if (o.mongoId) orderMap.set(String(o.mongoId), mapped);
+        }
+
+        for (const oid of orderIds) {
+          const order = orderMap.get(oid);
+          if (!order) { tokens[oid] = {}; continue; }
+          const entry: Record<string, string | null> = {};
+          for (const pt of proofTypes) {
+            const val = resolveProofValue(order, pt);
+            if (val) {
+              entry[pt === 'returnwindow' ? 'returnWindow' : pt] = createProofToken(order.id || oid, pt, env);
+            } else {
+              entry[pt === 'returnwindow' ? 'returnWindow' : pt] = null;
+            }
+          }
+          tokens[oid] = entry;
+        }
+
+        res.json({ tokens });
+      } catch (err) {
+        next(err);
+      }
+    },
+    /**
+     * Serve proof by signed token — no auth required.
+     * Used by Excel/Google Sheets HYPERLINK formulas.
+     */
+    getProofBySigned: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const token = String(req.params.token || '').trim();
+        if (!token) throw new AppError(400, 'INVALID_TOKEN', 'Missing token');
+
+        const parsed = verifyProofToken(token, env);
+        if (!parsed) throw new AppError(403, 'INVALID_OR_EXPIRED_TOKEN', 'Invalid or expired proof token');
+
+        const order = await findOrderForProof(parsed.orderId);
+        if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
+
+        const proofValue = resolveProofValue(order, parsed.proofType);
+
+        businessLog.info('Order proof viewed (signed)', {
+          orderId: parsed.orderId,
+          proofType: parsed.proofType,
+        });
+
+        sendProofResponse(res, proofValue);
+      } catch (err) {
+        logErrorEvent({
+          message: 'getProofBySigned failed',
+          category: 'BUSINESS_LOGIC',
+          severity: 'medium',
           ip: req.ip,
           requestId: String((res as any).locals?.requestId || ''),
           metadata: { error: err instanceof Error ? err.message : String(err) },

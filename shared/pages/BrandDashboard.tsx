@@ -721,10 +721,21 @@ const OrdersView = ({ user }: any) => {
     return textMatch;
   }), [orders, search, statusFilter, dealTypeFilter, mediatorFilter, productFilter]);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (filtered.length === 0) { toast.info('No orders to export'); return; }
     const apiBase = getApiBaseAbsolute();
-    const buildProofUrl = (orderId: string, type: 'order' | 'payment' | 'rating' | 'review' | 'returnWindow') => {
+
+    // Fetch signed proof tokens so Excel/Sheets can open proof images without auth
+    let proofTokens: Record<string, Record<string, string | null>> = {};
+    try {
+      proofTokens = await api.orders.batchProofUrls(filtered.map(o => o.id));
+    } catch {
+      // Fallback: use old auth-required URLs if batch fails
+    }
+
+    const buildSignedProofUrl = (orderId: string, type: string) => {
+      const token = proofTokens[orderId]?.[type];
+      if (token) return `${apiBase}/orders/proof/signed/${token}`;
       return `${apiBase}/orders/${encodeURIComponent(orderId)}/proof/${type}`;
     };
 
@@ -821,14 +832,14 @@ const OrdersView = ({ user }: any) => {
         csvSafe(o.extractedProductName || ''),
         csvSafe(o.settlementRef || ''),
         csvSafe(o.settlementMode || ''),
-        o.screenshots?.order ? hyperlinkYes(buildProofUrl(o.id, 'order')) : 'No',
-        o.screenshots?.payment ? hyperlinkYes(buildProofUrl(o.id, 'payment')) : 'No',
-        o.screenshots?.rating ? hyperlinkYes(buildProofUrl(o.id, 'rating')) : 'No',
+        o.screenshots?.order ? hyperlinkYes(buildSignedProofUrl(o.id, 'order')) : 'No',
+        o.screenshots?.payment ? hyperlinkYes(buildSignedProofUrl(o.id, 'payment')) : 'No',
+        o.screenshots?.rating ? hyperlinkYes(buildSignedProofUrl(o.id, 'rating')) : 'No',
         (o.reviewLink || o.screenshots?.review)
-          ? hyperlinkYes(buildProofUrl(o.id, 'review'))
+          ? hyperlinkYes(buildSignedProofUrl(o.id, 'review'))
           : 'No',
         o.screenshots?.returnWindow
-          ? hyperlinkYes(buildProofUrl(o.id, 'returnWindow'))
+          ? hyperlinkYes(buildSignedProofUrl(o.id, 'returnWindow'))
           : 'No',
       ];
       csvRows.push(row.join(','));

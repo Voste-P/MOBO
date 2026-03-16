@@ -77,7 +77,8 @@ export function getRequiredStepsForOrder(order: any): Array<'review' | 'rating' 
     .filter(Boolean);
   const requiresReview = dealTypes.includes('Review');
   const requiresRating = dealTypes.includes('Rating');
-  const requiresReturnWindow = requiresReview || requiresRating;
+  // All deal types (including Discount/purchase) require return window proof
+  const requiresReturnWindow = true;
   return [
     ...(requiresReview ? (['review'] as const) : []),
     ...(requiresRating ? (['rating'] as const) : []),

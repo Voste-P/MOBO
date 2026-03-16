@@ -633,7 +633,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     }
   };
 
-  const handleExport = (reportType: 'orders' | 'finance') => {
+  const handleExport = async (reportType: 'orders' | 'finance') => {
     const dataToExport = filteredOrders;
     if (!dataToExport || dataToExport.length === 0) {
       toast.info('No data available to export.');
@@ -641,7 +641,18 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     }
 
     const apiBase = getApiBaseAbsolute();
-    const buildProofUrl = (orderId: string, type: 'order' | 'payment' | 'rating' | 'review' | 'returnWindow') => {
+
+    // Fetch signed proof tokens so Excel/Sheets can open proof images without auth
+    let proofTokens: Record<string, Record<string, string | null>> = {};
+    try {
+      proofTokens = await api.orders.batchProofUrls(dataToExport.map((o: any) => o.id));
+    } catch {
+      // Fallback: use old auth-required URLs if batch fails
+    }
+
+    const buildSignedProofUrl = (orderId: string, type: string) => {
+      const token = proofTokens[orderId]?.[type];
+      if (token) return `${apiBase}/orders/proof/signed/${token}`;
       return `${apiBase}/orders/${encodeURIComponent(orderId)}/proof/${type}`;
     };
 
@@ -718,14 +729,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         csvSafe(order.extractedProductName || ''),
         csvSafe(order.settlementRef || ''),
         csvSafe(order.settlementMode || ''),
-        order.screenshots?.order ? hyperlinkYes(buildProofUrl(order.id, 'order')) : 'No',
-        order.screenshots?.payment ? hyperlinkYes(buildProofUrl(order.id, 'payment')) : 'No',
-        order.screenshots?.rating ? hyperlinkYes(buildProofUrl(order.id, 'rating')) : 'No',
+        order.screenshots?.order ? hyperlinkYes(buildSignedProofUrl(order.id, 'order')) : 'No',
+        order.screenshots?.payment ? hyperlinkYes(buildSignedProofUrl(order.id, 'payment')) : 'No',
+        order.screenshots?.rating ? hyperlinkYes(buildSignedProofUrl(order.id, 'rating')) : 'No',
         (order.reviewLink || order.screenshots?.review)
-          ? hyperlinkYes(buildProofUrl(order.id, 'review'))
+          ? hyperlinkYes(buildSignedProofUrl(order.id, 'review'))
           : 'No',
         (order.screenshots as any)?.returnWindow
-          ? hyperlinkYes(buildProofUrl(order.id, 'returnWindow'))
+          ? hyperlinkYes(buildSignedProofUrl(order.id, 'returnWindow'))
           : 'No',
       ];
       csvRows.push(row.join(','));
@@ -1379,7 +1390,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                             </div>
                             <div className="text-[10px]">
                               <p className="font-bold text-slate-900">{t.userName}</p>
-                              <p className="text-slate-400 font-mono capitalize">{t.role || 'User'} → {(t as any).targetRole || 'admin'}</p>
+                              <p className="text-slate-400 font-mono capitalize">{normalizeRole(t.role)} → {normalizeRole((t as any).targetRole || 'admin')}</p>
                             </div>
                           </div>
 
