@@ -2179,6 +2179,7 @@ export async function extractOrderDetailsWithAi(
   soldBy?: string | null;
   productName?: string | null;
   accountName?: string | null;
+  platform?: string | null;
   confidenceScore: number;
   notes?: string;
 }> {
@@ -4730,6 +4731,9 @@ export async function extractOrderDetailsWithAi(
     let confidenceScore = deterministicConfidence;
     const notes: string[] = [...deterministic.notes];
 
+    // Detect platform from OCR text so the frontend can flag platform mismatches
+    const detectedPlatform = detectPlatform(ocrText) || null;
+
     let finalOrderDate = deterministic.orderDate;
     let finalSoldBy = deterministic.soldBy;
     let finalProductName = deterministic.productName;
@@ -5514,6 +5518,7 @@ export async function extractOrderDetailsWithAi(
       soldBy: finalSoldBy,
       productName: finalProductName,
       accountName: finalAccountName,
+      platform: detectedPlatform === 'unknown' ? null : detectedPlatform,
       confidenceScore,
       notes: notes.join(' '),
     };
@@ -5527,6 +5532,7 @@ export async function extractOrderDetailsWithAi(
       soldBy: null,
       productName: null,
       accountName: null,
+      platform: null,
       confidenceScore: 0,
       notes: `Extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
     };

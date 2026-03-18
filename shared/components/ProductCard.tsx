@@ -71,6 +71,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
   const [reviewerName, setReviewerName] = useState('');
   const [fieldsLocked, setFieldsLocked] = useState(false);
   const [productNameMismatch, setProductNameMismatch] = useState(false);
+  const [platformMismatch, setPlatformMismatch] = useState(false);
   const [reviewerNameMismatch, setReviewerNameMismatch] = useState(false);
   const [titleExpanded, setTitleExpanded] = useState(false);
 
@@ -106,6 +107,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
     // AI extraction
     setExtracting(true);
     setProductNameMismatch(false);
+    setPlatformMismatch(false);
     setReviewerNameMismatch(false);
     try {
       const result = await api.orders.extractDetails(file);
@@ -127,6 +129,15 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
           setProductNameMismatch(true);
           toast.error('Product name in screenshot does not match this deal. Please upload the correct order screenshot.');
         }
+        // ── Platform matching ──
+        if (result.platform && product?.platform) {
+          const extractedPlatform = String(result.platform).toLowerCase().trim();
+          const expectedPlatform = String(product.platform).toLowerCase().trim();
+          if (extractedPlatform && expectedPlatform && extractedPlatform !== 'unknown' && extractedPlatform !== expectedPlatform) {
+            setPlatformMismatch(true);
+            toast.error(`Screenshot appears to be from ${result.platform}, but this deal is for ${product.platform}. Please upload the correct screenshot.`);
+          }
+        }
         // ── Reviewer name matching against extracted account name ──
         if (result.accountName && reviewerName.trim()) {
           const rnMatch = checkReviewerNameMatch(reviewerName, result.accountName);
@@ -146,6 +157,11 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
     // Block if product name mismatch detected
     if (productNameMismatch) {
       toast.error('Product in screenshot does not match this deal. Upload the correct order screenshot.');
+      return;
+    }
+    // Block if platform mismatch detected
+    if (platformMismatch) {
+      toast.error('Screenshot is from a different platform. Upload the correct order screenshot.');
       return;
     }
     // Block if reviewer name mismatch detected
@@ -496,6 +512,12 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                 <p className="text-[9px] font-bold text-red-600">Product name mismatch — this screenshot is for a different product.</p>
               </div>
             )}
+            {platformMismatch && (
+              <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 rounded-lg px-2 py-1.5">
+                <AlertCircle size={11} className="text-red-500 flex-shrink-0" />
+                <p className="text-[9px] font-bold text-red-600">Platform mismatch — this screenshot is from a different platform.</p>
+              </div>
+            )}
             {reviewerNameMismatch && (
               <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
                 <AlertCircle size={11} className="text-amber-500 flex-shrink-0" />
@@ -513,7 +535,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
               <button
                 type="button"
                 onClick={handleInlineSubmit}
-                disabled={!screenshot || submitting || extracting || !extractedDetails.orderId.trim() || productNameMismatch || reviewerNameMismatch}
+                disabled={!screenshot || submitting || extracting || !extractedDetails.orderId.trim() || productNameMismatch || platformMismatch || reviewerNameMismatch}
                 className="flex-1 py-2.5 bg-black text-white font-extrabold rounded-xl text-xs uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition-all flex items-center justify-center gap-1.5"
               >
                 {submitting ? (

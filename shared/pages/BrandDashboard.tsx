@@ -904,9 +904,9 @@ const OrdersView = ({ user }: any) => {
 
   return (
     <>
-      <div className="max-w-7xl mx-auto animate-enter pb-12">
+      <div className="max-w-7xl mx-auto animate-enter pb-12 px-2">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <h2 className="text-3xl font-extrabold text-zinc-900">Order Intelligence</h2>
+          <h2 className="text-3xl font-extrabold text-zinc-900 shrink-0">Order Intelligence</h2>
           <div className="flex flex-wrap gap-3 w-full md:w-auto">
             <div className="relative group flex-1 min-w-[200px] md:w-80">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
