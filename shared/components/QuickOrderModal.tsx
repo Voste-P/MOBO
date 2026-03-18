@@ -47,6 +47,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
   const [reviewerName, setReviewerName] = useState('');
   const [productNameMismatch, setProductNameMismatch] = useState(false);
   const [reviewerNameMismatch, setReviewerNameMismatch] = useState(false);
+  const [platformMismatch, setPlatformMismatch] = useState(false);
 
   const reset = useCallback(() => {
     setScreenshot(null);
@@ -58,6 +59,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
     setReviewerName('');
     setProductNameMismatch(false);
     setReviewerNameMismatch(false);
+    setPlatformMismatch(false);
   }, []);
 
   const handleClose = () => {
@@ -101,6 +103,15 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
           setProductNameMismatch(true);
           toast.error('Product name in screenshot does not match this deal. Please upload the correct order screenshot.');
         }
+        // ── Platform matching ──
+        if (result.platform && product?.platform) {
+          const extractedPlatform = String(result.platform).toLowerCase().trim();
+          const expectedPlatform = String(product.platform).toLowerCase().trim();
+          if (extractedPlatform && expectedPlatform && extractedPlatform !== 'unknown' && extractedPlatform !== expectedPlatform) {
+            setPlatformMismatch(true);
+            toast.error(`Screenshot appears to be from ${result.platform}, but this deal is for ${product.platform}. Please upload the correct screenshot.`);
+          }
+        }
         // ── Reviewer name matching against extracted account name ──
         if (result.accountName && reviewerName.trim()) {
           const rnMatch = checkReviewerNameMatch(reviewerName, result.accountName);
@@ -120,6 +131,11 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
     // Block if product name mismatch detected
     if (productNameMismatch) {
       toast.error('Product in screenshot does not match this deal. Upload the correct order screenshot.');
+      return;
+    }
+    // Block if platform mismatch detected
+    if (platformMismatch) {
+      toast.error(`Screenshot is from the wrong platform. This deal requires ${product.platform}.`);
       return;
     }
     // Block if reviewer name mismatch detected
@@ -338,6 +354,14 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
                       </p>
                     </div>
                   )}
+                  {platformMismatch && (
+                    <div className="mt-1.5 flex items-start gap-1.5 px-2.5 py-2 bg-red-50 border border-red-200 rounded-lg">
+                      <AlertCircle size={13} className="text-red-500 mt-0.5 flex-shrink-0" />
+                      <p className="text-[10px] font-bold text-red-600">
+                        Platform mismatch — this screenshot is not from {product?.platform || 'the required platform'}.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -428,7 +452,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={!screenshot || submitting || extracting || !extractedDetails.orderId.trim() || productNameMismatch || reviewerNameMismatch}
+                disabled={!screenshot || submitting || extracting || !extractedDetails.orderId.trim() || productNameMismatch || platformMismatch || reviewerNameMismatch}
                 className="w-full py-3.5 bg-black text-white font-extrabold rounded-xl text-xs uppercase tracking-wider shadow-lg disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97] transition-all flex items-center justify-center gap-2"
               >
                 {submitting ? (

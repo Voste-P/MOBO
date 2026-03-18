@@ -68,6 +68,7 @@ import { formatCurrency } from '../utils/formatCurrency';
 import { getPrimaryOrderId } from '../utils/orderHelpers';
 import { csvSafe, downloadCsv } from '../utils/csvHelpers';
 import { DesktopShell } from '../components/DesktopShell';
+import { BetaLock } from '../components/BetaLock';
 import {
   AreaChart,
   Area,
@@ -906,8 +907,8 @@ const OrdersView = ({ user }: any) => {
       <div className="max-w-7xl mx-auto animate-enter pb-12">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <h2 className="text-3xl font-extrabold text-zinc-900">Order Intelligence</h2>
-          <div className="flex gap-3 w-full md:w-auto">
-            <div className="relative group flex-1 md:w-80">
+          <div className="flex flex-wrap gap-3 w-full md:w-auto">
+            <div className="relative group flex-1 min-w-[200px] md:w-80">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <Search
                   size={18}
@@ -1720,14 +1721,15 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
                     <label className="text-xs font-bold text-zinc-400 uppercase ml-1 mb-2 block">
                       Platform
                     </label>
-                    <input
-                      type="text"
+                    <select
                       className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 focus:ring-2 focus:ring-lime-400 outline-none"
-                      placeholder="e.g. Amazon"
                       value={form.platform}
                       onChange={(e) => setForm({ ...form, platform: e.target.value })}
                       required
-                    />
+                    >
+                      <option value="">Select Platform</option>
+                      <option value="Amazon">Amazon</option>
+                    </select>
                   </div>
                   <div>
                     <label className="text-xs font-bold text-zinc-400 uppercase ml-1 mb-2 block">
@@ -3093,6 +3095,7 @@ export const BrandDashboard: React.FC = () => {
               </div>
 
               {/* Payment Action */}
+              <BetaLock>
               <div className="pt-2">
                 <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-4">
                   Record Payment
@@ -3132,6 +3135,7 @@ export const BrandDashboard: React.FC = () => {
                   </button>
                 </div>
               </div>
+              </BetaLock>
             </div>
           </div>
         </div>

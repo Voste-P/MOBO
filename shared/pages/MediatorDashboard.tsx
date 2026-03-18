@@ -14,6 +14,7 @@ import { getPrimaryOrderId } from '../utils/orderHelpers';
 import { csvSafe, downloadCsv as downloadCsvFile } from '../utils/csvHelpers';
 import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage } from '../components/ProxiedImage';
+import { BetaLock } from '../components/BetaLock';
 import { User, Campaign, Order, Product, Ticket } from '../types';
 import {
   LayoutGrid,
@@ -1315,6 +1316,7 @@ const MediatorProfileView = () => {
           </div>
         </div>
 
+        <BetaLock>
         <div className="bg-white p-6 rounded-[2rem] border border-zinc-100 shadow-sm space-y-4">
           <h3 className="font-bold text-zinc-900 flex items-center gap-2 mb-2">
             <Wallet size={16} /> Banking & Payments
@@ -1367,6 +1369,7 @@ const MediatorProfileView = () => {
             />
           </div>
         </div>
+        </BetaLock>
 
         {isEditing ? (
           <button
@@ -1633,6 +1636,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
                       </span>
                     </div>
 
+                    <BetaLock>
                     {viewMode === 'pending' && (
                       <button
                         type="button"
@@ -1658,9 +1662,11 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
                         </button>
                       </div>
                     )}
+                    </BetaLock>
                   </div>
 
                   {settleId === o.id && (
+                    <BetaLock>
                     <div className="mt-3 p-3 bg-zinc-50 rounded-xl animate-enter">
                       <input
                         autoFocus
@@ -1687,6 +1693,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
                         </button>
                       </div>
                     </div>
+                    </BetaLock>
                   )}
                 </div>
               ))

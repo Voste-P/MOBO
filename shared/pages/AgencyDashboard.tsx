@@ -20,6 +20,7 @@ import { formatCurrency } from '../utils/formatCurrency';
 import { getPrimaryOrderId } from '../utils/orderHelpers';
 import { csvSafe, downloadCsv } from '../utils/csvHelpers';
 import { maskMobile } from '../utils/mobiles';
+import { BetaLock } from '../components/BetaLock';
 import {
   LayoutDashboard,
   Users,
@@ -1086,6 +1087,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
               className="bg-white p-6 rounded-3xl w-full max-w-sm shadow-2xl animate-slide-up"
               onClick={(e) => e.stopPropagation()}
             >
+              <BetaLock>
               <h3 className="text-lg font-extrabold text-slate-900 mb-2">Update Ledger Entry</h3>
               <p className="text-xs text-slate-500 mb-6 font-mono">
                 Order {getPrimaryOrderId(editingOrder)}
@@ -1115,6 +1117,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
               >
                 {isUpdating ? 'Updating...' : 'Confirm Update'}
               </button>
+              </BetaLock>
             </div>
           </div>
         )}
@@ -1941,8 +1944,6 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
   };
 
   const handleDelete = async (campaign: Campaign) => {
-    const isOwner = String(campaign.brandId || '') === String(user?.id || '');
-    if (!isOwner) return;
     const confirmed = await confirm({ message: 'Delete this campaign? This cannot be undone.', confirmLabel: 'Delete', variant: 'destructive' });
     if (!confirmed) return;
     setDeletingId(campaign.id);
@@ -2233,17 +2234,15 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                                   : 'Resume Campaign'}
                             </button>
                           )}
-                          {String(c.brandId || '') === String(user.id || '') && (
-                            <button
-                              onClick={() => handleDelete(c)}
-                              disabled={deletingId === c.id}
-                              className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all flex items-center gap-2 mx-auto shadow-sm active:scale-95 bg-red-50 text-red-600 border-red-200 hover:bg-red-100 ${
-                                deletingId === c.id ? 'opacity-60 cursor-not-allowed' : ''
-                              }`}
-                            >
-                              {deletingId === c.id ? 'Deleting...' : 'Delete Campaign'}
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleDelete(c)}
+                            disabled={deletingId === c.id}
+                            className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all flex items-center gap-2 mx-auto shadow-sm active:scale-95 bg-red-50 text-red-600 border-red-200 hover:bg-red-100 ${
+                              deletingId === c.id ? 'opacity-60 cursor-not-allowed' : ''
+                            }`}
+                          >
+                            {deletingId === c.id ? 'Deleting...' : 'Delete Campaign'}
+                          </button>
                           <button
                             onClick={async () => {
                               setCopyingId(c.id);
@@ -2430,13 +2429,14 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                   <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">
                     Platform
                   </label>
-                  <input
-                    type="text"
+                  <select
                     className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-sm outline-none focus:border-purple-200 focus:bg-white focus:ring-4 focus:ring-purple-50 transition-all"
                     value={newCampaign.platform}
                     onChange={(e) => setNewCampaign({ ...newCampaign, platform: e.target.value })}
-                    placeholder="e.g. Amazon"
-                  />
+                  >
+                    <option value="">Select Platform</option>
+                    <option value="Amazon">Amazon</option>
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">
@@ -2952,6 +2952,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
   const [rejectModal, setRejectModal] = useState<{ order: Order; type: 'order' | 'review' | 'rating' | 'returnWindow' } | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
 
   useEffect(() => {
     setProofOrder((prev) => {
@@ -2997,6 +2998,19 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
       toast.error(formatErrorMessage(e, 'Failed to reject proof'));
     } finally {
       setRejecting(false);
+    }
+  };
+
+  const handleForceApprove = async (order: Order) => {
+    setApprovingId(order.id);
+    try {
+      await api.ops.forceApproveOrder(order.id, 'Agency approved');
+      toast.success('Order approved — moved to cooling period');
+      onRefresh();
+    } catch (e: any) {
+      toast.error(formatErrorMessage(e, 'Failed to approve order'));
+    } finally {
+      setApprovingId(null);
     }
   };
 
@@ -3142,14 +3156,33 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
                             <Eye size={12} /> Proof
                           </button>
                           {wf === 'UNDER_REVIEW' && (
+                            <>
+                              <button
+                                onClick={() => handleForceApprove(o)}
+                                disabled={approvingId === o.id}
+                                className="text-[10px] font-bold text-green-600 hover:text-green-700 bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50"
+                              >
+                                <CheckCircle size={12} /> {approvingId === o.id ? 'Approving…' : 'Approve'}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const v = (o as any).verification;
+                                  const proofType = !v?.order?.verifiedAt ? 'order'
+                                    : o.items?.[0]?.dealType === 'Review' && !v?.review?.verifiedAt ? 'review'
+                                    : o.items?.[0]?.dealType === 'Rating' && !v?.rating?.verifiedAt ? 'rating'
+                                    : 'order';
+                                  setRejectModal({ order: o, type: proofType });
+                                }}
+                                className="text-[10px] font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                              >
+                                <AlertTriangle size={12} /> Reject
+                              </button>
+                            </>
+                          )}
+                          {wf === 'APPROVED' && (
                             <button
                               onClick={() => {
-                                const v = (o as any).verification;
-                                const proofType = !v?.order?.verifiedAt ? 'order'
-                                  : o.items?.[0]?.dealType === 'Review' && !v?.review?.verifiedAt ? 'review'
-                                  : o.items?.[0]?.dealType === 'Rating' && !v?.rating?.verifiedAt ? 'rating'
-                                  : 'order';
-                                setRejectModal({ order: o, type: proofType });
+                                setRejectModal({ order: o, type: 'order' });
                               }}
                               className="text-[10px] font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
                             >
@@ -3362,8 +3395,13 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
   }, [selectedMediator, allOrders]);
 
   const generateInvite = async () => {
-    const code = await api.ops.generateMediatorInvite(user.id);
-    setInviteCode(code);
+    try {
+      const code = await api.ops.generateMediatorInvite(user.id);
+      if (!code) throw new Error('No invite code returned');
+      setInviteCode(code);
+    } catch (err) {
+      toast.error(formatErrorMessage(err, 'Failed to generate invite'));
+    }
   };
 
   const handleApproval = async (e: React.MouseEvent, id: string, action: 'approve' | 'reject') => {
@@ -3720,7 +3758,8 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
               </div>
 
               {/* Payout Action Side */}
-              <div className="w-full md:w-[28rem] bg-white p-6 flex flex-col shadow-[inset_10px_0_20px_-15px_rgba(0,0,0,0.05)] min-h-0">
+              <BetaLock className="w-full md:w-[28rem]">
+              <div className="w-full bg-white p-6 flex flex-col shadow-[inset_10px_0_20px_-15px_rgba(0,0,0,0.05)] min-h-0">
                 <div className="flex-1 min-h-0 overflow-y-auto scrollbar-styled">
                   <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
                     <Wallet size={18} /> Quick Payout
@@ -3854,6 +3893,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                   </button>
                 </div>
               </div>
+              </BetaLock>
             </div>
           </div>
         </div>

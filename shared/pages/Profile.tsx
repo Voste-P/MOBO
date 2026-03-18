@@ -5,6 +5,7 @@ import { formatErrorMessage } from '../utils/errors';
 import { maskMobile } from '../utils/mobiles';
 import { ProxiedImage } from '../components/ProxiedImage';
 import { api } from '../services/api';
+import { BetaLock } from '../components/BetaLock';
 import { subscribeRealtime } from '../services/realtime';
 import {
   Camera,
@@ -347,6 +348,7 @@ export const Profile: React.FC = () => {
           </div>
 
           <div className="space-y-3">
+            <BetaLock>
             {qrCode ? (
               <button
                 type="button"
@@ -396,6 +398,7 @@ export const Profile: React.FC = () => {
               aria-label="Upload payment QR code"
               onChange={(e) => handleImageUpload(e, 'qr')}
             />
+            </BetaLock>
 
             {/* Stats Row */}
             <div className="grid grid-cols-2 gap-3 pt-2">
