@@ -4204,7 +4204,7 @@ export async function extractOrderDetailsWithAi(
             '- Address text (city names, state names, pincodes, street names, "India") must NEVER be the product name.',
             '- Order ID must follow the exact platform format described above.',
             '',
-            'Return JSON with: orderId (string|null), amount (number|null), orderDate (string|null), soldBy (string|null), productName (string|null), accountName (string|null), confidenceScore (0-100 integer).',
+            'Return JSON with: orderId (string|null), amount (number|null), orderDate (string|null), soldBy (string|null), productName (string|null), accountName (string|null), detectedPlatform (string|null), confidenceScore (0-100 integer).',
             'If a field is not found, return null for that field. Do NOT return 0 for amount or empty string — use null.',
           ].join('\n') },
         ],
@@ -4221,6 +4221,7 @@ export async function extractOrderDetailsWithAi(
               soldBy: { type: Type.STRING, description: 'Seller/merchant company name only (e.g. "Cocoblu Retail"). No button text. Null if not found.', nullable: true },
               productName: { type: Type.STRING, description: 'Full product title/name of the item ordered. Concatenate all lines if multi-line. Must NOT be navigation text or addresses. Null if not found.', nullable: true },
               accountName: { type: Type.STRING, description: 'Marketplace account holder name from the website header (e.g. "Hello, Ashok" → "Ashok"). Not the seller or delivery address name. Null if not visible.', nullable: true },
+              detectedPlatform: { type: Type.STRING, description: 'The e-commerce platform this screenshot is from (e.g. "Amazon", "Flipkart", "Myntra", "Meesho", "Blinkit", "Nykaa", "AJIO"). Null if not identifiable.', nullable: true },
               confidenceScore: { type: Type.INTEGER, description: 'Confidence 0-100 in the extraction accuracy.' },
             },
             required: ['confidenceScore'],
@@ -4420,6 +4421,7 @@ export async function extractOrderDetailsWithAi(
     // It avoids the expensive multi-variant OCR loop entirely for successful cases.
     // This is the #1 latency optimization — takes ~2-5s vs 20-60s for multi-crop OCR.
     let fastPathSuccess = false;
+    let fastPathDetectedPlatform: string | null = null;
     if (ai && !isGeminiCircuitOpen()) {
       for (const model of GEMINI_MODEL_FALLBACKS.slice(0, 2)) {
         try {
@@ -4506,10 +4508,14 @@ export async function extractOrderDetailsWithAi(
             ocrText = '[Gemini Vision direct extraction — no OCR text]';
             ocrLabel = 'gemini-vision-fast';
             fastPathSuccess = true;
+            if (directResult.detectedPlatform) {
+              fastPathDetectedPlatform = String(directResult.detectedPlatform).toLowerCase().trim() || null;
+            }
             recordGeminiSuccess();
             aiLog.info('Order extract FAST PATH success', {
               model, orderId: directOrderId, amount: directAmount,
               confidence: directConfidence, productName: accumulatedProductName,
+              detectedPlatform: fastPathDetectedPlatform,
             });
             break;
           }
@@ -4529,8 +4535,11 @@ export async function extractOrderDetailsWithAi(
             && !/https?:\/\/|Deliver\s*to|Hello[,\s]|Returns?\s/i.test(directResult.productName)) {
             accumulatedProductName = directResult.productName;
           }
+          if (directResult.detectedPlatform && !fastPathDetectedPlatform) {
+            fastPathDetectedPlatform = String(directResult.detectedPlatform).toLowerCase().trim() || null;
+          }
           recordGeminiSuccess();
-          aiLog.info('Order extract fast path partial', { model, orderId: directOrderId, amount: directAmount });
+          aiLog.info('Order extract fast path partial', { model, orderId: directOrderId, amount: directAmount, detectedPlatform: fastPathDetectedPlatform });
           break;
         } catch (err) {
           aiLog.warn('[Extract] Fast path model error', { model, error: err instanceof Error ? err.message : err });
@@ -4823,7 +4832,11 @@ export async function extractOrderDetailsWithAi(
     const notes: string[] = [...deterministic.notes];
 
     // Detect platform from OCR text so the frontend can flag platform mismatches
-    const detectedPlatform = detectPlatform(ocrText) || null;
+    // Use FAST PATH Gemini-detected platform as fallback when OCR text is unavailable
+    const ocrDetectedPlatform = detectPlatform(ocrText);
+    const detectedPlatform = (ocrDetectedPlatform && ocrDetectedPlatform !== 'unknown' ? ocrDetectedPlatform : null)
+      || fastPathDetectedPlatform
+      || null;
 
     let finalOrderDate = deterministic.orderDate;
     let finalSoldBy = deterministic.soldBy;
