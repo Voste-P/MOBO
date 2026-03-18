@@ -21,7 +21,7 @@ const ALLOWED: Record<OrderWorkflowStatus, OrderWorkflowStatus[]> = {
   ORDERED: ['PROOF_SUBMITTED'],
   PROOF_SUBMITTED: ['UNDER_REVIEW', 'ORDERED'], // ORDERED for cancel/re-proof
   UNDER_REVIEW: ['APPROVED', 'REJECTED', 'PROOF_SUBMITTED', 'ORDERED'], // ORDERED for cancel/re-proof
-  APPROVED: ['REWARD_PENDING'],
+  APPROVED: ['REWARD_PENDING', 'ORDERED'], // ORDERED for agency reject/cancel re-proof
   REJECTED: ['FAILED', 'PROOF_SUBMITTED'], // allow re-proof submission after rejection
   REWARD_PENDING: ['COMPLETED', 'FAILED'],
   COMPLETED: [],

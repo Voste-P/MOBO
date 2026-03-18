@@ -1299,9 +1299,12 @@ export function makeOpsController(env: Env) {
         const agencyCode = await assertOrderAccess(order, roles, requester);
 
         const wf = String((order as any).workflowStatus || 'CREATED');
-        if (wf !== 'UNDER_REVIEW') {
+        const rejectableStates = ['UNDER_REVIEW', 'APPROVED'];
+        if (!rejectableStates.includes(wf)) {
           throw new AppError(409, 'INVALID_WORKFLOW_STATE', `Cannot reject in state ${wf}`);
         }
+
+        const wasApproved = wf === 'APPROVED';
 
         const pgMapped = pgOrder(order);
         const v = (order.verification && typeof order.verification === 'object') ? { ...(order.verification as any) } : {} as any;
@@ -1347,7 +1350,12 @@ export function makeOpsController(env: Env) {
         updateData.rejectionReason = body.reason;
         updateData.rejectionAt = new Date();
         updateData.rejectionBy = req.auth?.userId;
-        updateData.affiliateStatus = 'Rejected';
+        // When rejecting from APPROVED, reset to Unchecked so buyer can re-upload;
+        // from UNDER_REVIEW the status is terminal Rejected (mediator can still cancel later).
+        updateData.affiliateStatus = wasApproved ? 'Unchecked' : 'Rejected';
+        if (wasApproved) {
+          updateData.expectedSettlementDate = null;
+        }
         updateData.verification = v;
 
         // Release campaign slot when order proof (purchase) is rejected
@@ -1367,6 +1375,19 @@ export function makeOpsController(env: Env) {
         updateData.events = newEvents;
 
         await db().order.update({ where: { id: order.id }, data: updateData });
+
+        // When rejecting from APPROVED, transition back to ORDERED so buyer can re-upload
+        if (wasApproved) {
+          await transitionOrderWorkflow({
+            orderId: order.mongoId!,
+            from: 'APPROVED' as any,
+            to: 'ORDERED' as any,
+            actorUserId: String(req.auth?.userId || ''),
+            metadata: { source: 'rejectOrderProof', reason: body.reason, proofType: body.type },
+            env,
+          });
+        }
+
         await writeAuditLog({
           req,
           action: 'ORDER_REJECTED',
@@ -1376,7 +1397,7 @@ export function makeOpsController(env: Env) {
         });
         orderLog.info('Order proof rejected', { orderId: order.mongoId, proofType: body.type, reason: body.reason });
         businessLog.info('Order proof rejected', { orderId: order.mongoId, proofType: body.type, reason: body.reason, rejectedBy: req.auth?.userId, ip: req.ip });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Order', entityId: order.mongoId!, action: 'PROOF_REJECTED', changedFields: ['affiliateStatus', 'rejectionType', 'rejectionReason'], before: { affiliateStatus: order.affiliateStatus }, after: { affiliateStatus: 'Rejected', rejectionType: body.type, rejectionReason: body.reason } });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Order', entityId: order.mongoId!, action: 'PROOF_REJECTED', changedFields: ['affiliateStatus', 'rejectionType', 'rejectionReason'], before: { affiliateStatus: order.affiliateStatus }, after: { affiliateStatus: wasApproved ? 'Unchecked' : 'Rejected', rejectionType: body.type, rejectionReason: body.reason } });
         logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Order', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'REJECT_ORDER_PROOF', orderId: order.mongoId, proofType: body.type } });
 
         if (body.type === 'order') {
@@ -1403,11 +1424,27 @@ export function makeOpsController(env: Env) {
             userId: buyerId,
             app: 'buyer',
             payload: {
-              title: 'Proof rejected',
+              title: wasApproved ? 'Proof recalled — re-upload needed' : 'Proof rejected',
               body: body.reason || 'Please re-upload the required proof.',
               url: '/orders',
             },
           }).catch((err: unknown) => { pushLog.warn('Push failed for rejectProof', { err, buyerId }); });
+        }
+
+        // Notify mediator when proof is rejected from APPROVED state
+        if (wasApproved && audience.mediatorCodes?.length) {
+          for (const code of audience.mediatorCodes) {
+            sendPushToUser({
+              env,
+              userId: code,
+              app: 'mediator',
+              payload: {
+                title: 'Approved order recalled',
+                body: `Proof rejected after approval: ${body.reason || 'Re-upload requested'}`,
+                url: '/orders',
+              },
+            }).catch((err: unknown) => { pushLog.warn('Push failed for mediator rejectProof', { err, mediatorCode: code }); });
+          }
         }
 
         res.json({ ok: true });
@@ -1436,7 +1473,7 @@ export function makeOpsController(env: Env) {
         const agencyCode = await assertOrderAccess(order, roles, requester);
 
         const wf = String((order as any).workflowStatus || 'CREATED');
-        if (wf !== 'UNDER_REVIEW' && wf !== 'PROOF_SUBMITTED') {
+        if (wf !== 'UNDER_REVIEW' && wf !== 'PROOF_SUBMITTED' && wf !== 'APPROVED') {
           throw new AppError(409, 'INVALID_WORKFLOW_STATE', `Cannot cancel proofs in state ${wf}`);
         }
 
@@ -1473,6 +1510,8 @@ export function makeOpsController(env: Env) {
             rejectionBy: null,
             // Clear missing proof requests
             missingProofRequests: [],
+            // Clear settlement date if cancelling from APPROVED
+            ...(wf === 'APPROVED' ? { expectedSettlementDate: null } : {}),
             // Store cancellation info
             events: newEvents as any,
           },
