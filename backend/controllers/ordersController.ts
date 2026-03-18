@@ -1163,6 +1163,38 @@ export function makeOrdersController(env: Env) {
                 throw new AppError(400, 'UNKNOWN_REVIEW_PLATFORM',
                   'Review link must be from a recognized marketplace (Amazon, Flipkart, Myntra, etc.)');
               }
+              // Validate review link domain matches the order's platform (e.g. Amazon deal → amazon.in link)
+              const orderPlatform = String((order.items?.[0] as any)?.platform || '').trim().toLowerCase();
+              if (orderPlatform) {
+                const PLATFORM_DOMAIN_MAP: Record<string, string[]> = {
+                  amazon: ['amazon.in', 'amazon.com'],
+                  flipkart: ['flipkart.com'],
+                  myntra: ['myntra.com'],
+                  meesho: ['meesho.com'],
+                  ajio: ['ajio.com'],
+                  jiomart: ['jiomart.com'],
+                  nykaa: ['nykaa.com'],
+                  blinkit: ['blinkit.com'],
+                  zepto: ['zepto.co'],
+                  snapdeal: ['snapdeal.com'],
+                  lenskart: ['lenskart.com'],
+                  croma: ['croma.com'],
+                  purplle: ['purplle.com'],
+                  bigbasket: ['bigbasket.com'],
+                  swiggy: ['swiggy.com'],
+                  pharmeasy: ['pharmeasy.in'],
+                };
+                const expectedDomains = PLATFORM_DOMAIN_MAP[orderPlatform]
+                  ?? Object.entries(PLATFORM_DOMAIN_MAP).find(([k]) => orderPlatform.includes(k))?.[1];
+                if (expectedDomains) {
+                  const domainPlatformMatch = expectedDomains.some(d => host === d || host.endsWith('.' + d));
+                  if (!domainPlatformMatch) {
+                    throw new AppError(422, 'REVIEW_PLATFORM_MISMATCH',
+                      `Review link is from "${host}" but this order is for ${(order.items?.[0] as any)?.platform || orderPlatform}. ` +
+                      'Please submit a review link from the correct platform.');
+                  }
+                }
+              }
             } catch (urlErr) {
               if (urlErr instanceof AppError) throw urlErr;
               throw new AppError(400, 'INVALID_REVIEW_LINK', 'Review link is not a valid URL');
@@ -1368,6 +1400,7 @@ export function makeOrdersController(env: Env) {
               (acc: number, it: any) => acc + (Number(it?.priceAtPurchasePaise) || 0) * (Number(it?.quantity) || 1), 0
             ) / 100;
             const expectedProductName = String((order.items?.[0] as any)?.title || order.extractedProductName || '').trim();
+            const expectedPlatform = String((order.items?.[0] as any)?.platform || '').trim();
             // Guard against NaN/Infinity from corrupted order data
             if (!Number.isFinite(expectedAmount) || expectedAmount <= 0) {
               orderLog.warn(`[ordersController] Skipping AI re-upload verification: invalid expectedAmount=${expectedAmount} for order=${order.mongoId}`);
@@ -1378,6 +1411,7 @@ export function makeOrdersController(env: Env) {
                 expectedOrderId,
                 expectedAmount,
                 ...(expectedProductName ? { expectedProductName } : {}),
+                ...(expectedPlatform ? { expectedPlatform } : {}),
               });
               logPerformance({
                 operation: 'AI_ORDER_REUPLOAD_VERIFICATION',
@@ -1399,6 +1433,15 @@ export function makeOrdersController(env: Env) {
                   'Please upload the correct order screenshot. ' +
                   (aiOrderVerification.discrepancyNote || ''));
               }
+              // Block re-upload if platform doesn't match (fraud prevention — e.g. Amazon deal with Flipkart screenshot)
+              if (aiOrderVerification && expectedPlatform
+                && aiOrderVerification.platformMatch === false
+                && aiOrderVerification.confidenceScore > 0) {
+                throw new AppError(422, 'PLATFORM_MISMATCH',
+                  `Order screenshot is from "${aiOrderVerification.detectedPlatform || 'unknown platform'}" but this order is for ${expectedPlatform}. ` +
+                  'Please upload a screenshot from the correct platform. ' +
+                  (aiOrderVerification.discrepancyNote || ''));
+              }
             }
           }
 
@@ -1410,9 +1453,11 @@ export function makeOrdersController(env: Env) {
               orderIdMatch: aiOrderVerification.orderIdMatch,
               amountMatch: aiOrderVerification.amountMatch,
               productNameMatch: aiOrderVerification.productNameMatch,
+              platformMatch: aiOrderVerification.platformMatch,
               detectedOrderId: aiOrderVerification.detectedOrderId,
               detectedAmount: aiOrderVerification.detectedAmount,
               detectedProductName: aiOrderVerification.detectedProductName,
+              detectedPlatform: aiOrderVerification.detectedPlatform,
               confidenceScore: aiOrderVerification.confidenceScore,
               discrepancyNote: aiOrderVerification.discrepancyNote,
               verificationMethod: aiOrderVerification.verificationMethod,
@@ -1436,7 +1481,9 @@ export function makeOrdersController(env: Env) {
                 orderIdMatch: aiOrderVerification.orderIdMatch,
                 amountMatch: aiOrderVerification.amountMatch,
                 productNameMatch: aiOrderVerification.productNameMatch,
+                platformMatch: aiOrderVerification.platformMatch,
                 confidenceScore: aiOrderVerification.confidenceScore,
+                detectedPlatform: aiOrderVerification.detectedPlatform,
                 verificationMethod: aiOrderVerification.verificationMethod,
               },
             });

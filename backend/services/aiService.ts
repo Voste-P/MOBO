@@ -861,16 +861,19 @@ type ProofPayload = {
   expectedOrderId: string;
   expectedAmount: number;
   expectedProductName?: string;
+  expectedPlatform?: string;
 };
 
 type ProofVerificationResult = {
   orderIdMatch: boolean;
   amountMatch: boolean;
   productNameMatch?: boolean;
+  platformMatch?: boolean;
   confidenceScore: number;
   detectedOrderId?: string;
   detectedAmount?: number;
   detectedProductName?: string;
+  detectedPlatform?: string;
   discrepancyNote?: string;
   verificationMethod?: 'gemini' | 'ocr' | 'combined';
 };
@@ -907,6 +910,7 @@ async function verifyProofWithOcr(
   expectedOrderId: string,
   expectedAmount: number,
   expectedProductName?: string,
+  expectedPlatform?: string,
 ): Promise<ProofVerificationResult> {
   try {
     const rawData = imageBase64.includes(',') ? imageBase64.split(',')[1]! : imageBase64;
@@ -1086,16 +1090,58 @@ async function verifyProofWithOcr(
     // Product name matching via OCR (when expected product name provided)
     const productNameMatch = expectedProductName ? isProductNameMatch(expectedProductName, ocrText) : undefined;
 
+    // Platform detection via OCR text patterns
+    const ocrLower = ocrText.toLowerCase();
+    let detectedPlatform: string | undefined;
+    if (ocrLower.includes('amazon.in') || ocrLower.includes('amazon.com') || ocrLower.includes('fulfilled by amazon') || /\bamazon\b/.test(ocrLower)) {
+      detectedPlatform = 'Amazon';
+    } else if (ocrLower.includes('flipkart.com') || ocrLower.includes('flipkart') || /\bod\d{10,}/i.test(ocrText)) {
+      detectedPlatform = 'Flipkart';
+    } else if (ocrLower.includes('myntra.com') || ocrLower.includes('myntra') || /\bmyn\d+/i.test(ocrText)) {
+      detectedPlatform = 'Myntra';
+    } else if (ocrLower.includes('meesho.com') || ocrLower.includes('meesho') || /\bmsh\d+/i.test(ocrText)) {
+      detectedPlatform = 'Meesho';
+    } else if (ocrLower.includes('ajio.com') || ocrLower.includes('ajio')) {
+      detectedPlatform = 'Ajio';
+    } else if (ocrLower.includes('jiomart') || ocrLower.includes('jiomart.com')) {
+      detectedPlatform = 'JioMart';
+    } else if (ocrLower.includes('nykaa.com') || ocrLower.includes('nykaa')) {
+      detectedPlatform = 'Nykaa';
+    } else if (ocrLower.includes('blinkit.com') || ocrLower.includes('blinkit')) {
+      detectedPlatform = 'Blinkit';
+    } else if (ocrLower.includes('zepto.co') || ocrLower.includes('zepto')) {
+      detectedPlatform = 'Zepto';
+    } else if (ocrLower.includes('snapdeal.com') || ocrLower.includes('snapdeal')) {
+      detectedPlatform = 'Snapdeal';
+    }
+
     const detectedNotes: string[] = [];
     if (!orderIdMatch) detectedNotes.push(`Order ID "${expectedOrderId}" not found in screenshot.`);
     if (!amountMatch) detectedNotes.push(`Amount ₹${expectedAmount} not found in screenshot.`);
     if (expectedProductName && productNameMatch === false) detectedNotes.push('Product name mismatch.');
     if (orderIdMatch && amountMatch) detectedNotes.push('Both order ID and amount matched via OCR.');
+    // Server-side platform comparison for OCR path
+    let platformMatch: boolean | undefined;
+    if (expectedPlatform && detectedPlatform) {
+      const normP = (p: string) => p.toLowerCase().replace(/\.(in|com|co)$/i, '').replace(/\s*(india|online)\s*/gi, '').trim();
+      platformMatch = normP(expectedPlatform) === normP(detectedPlatform)
+        || normP(detectedPlatform).includes(normP(expectedPlatform))
+        || normP(expectedPlatform).includes(normP(detectedPlatform));
+      if (!platformMatch) {
+        detectedNotes.push(`Platform mismatch: expected "${expectedPlatform}", detected "${detectedPlatform}".`);
+      }
+    } else if (expectedPlatform && !detectedPlatform) {
+      // Could not detect platform from OCR — flag as uncertain, don't hard-block from OCR
+      platformMatch = undefined;
+    }
+    if (detectedPlatform) detectedNotes.push(`Detected platform: ${detectedPlatform}.`);
 
     return {
       orderIdMatch,
       amountMatch,
       ...(productNameMatch !== undefined ? { productNameMatch } : {}),
+      ...(detectedPlatform !== undefined ? { detectedPlatform } : {}),
+      ...(platformMatch !== undefined ? { platformMatch } : {}),
       confidenceScore,
       discrepancyNote: detectedNotes.join(' ') || 'OCR fallback verification complete.',
     };
@@ -1143,7 +1189,7 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
 
   // If Gemini is not available or circuit breaker is open, fall back to OCR-based verification.
   if (!geminiAvailable || isGeminiCircuitOpen()) {
-    const ocrResult = await verifyProofWithOcr(payload.imageBase64, payload.expectedOrderId, payload.expectedAmount, payload.expectedProductName);
+    const ocrResult = await verifyProofWithOcr(payload.imageBase64, payload.expectedOrderId, payload.expectedAmount, payload.expectedProductName, payload.expectedPlatform);
     return { ...ocrResult, verificationMethod: 'ocr' as const };
   }
 
@@ -1189,10 +1235,25 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
                 ...(payload.expectedProductName
                   ? [`6. Find the PRODUCT NAME visible in the screenshot and compare to "${payload.expectedProductName}". The product must be the EXACT SAME product — ALL significant words (brand, model, type, variant name, fragrance/flavor, size, color, capacity) must match. CRITICAL: The same brand often has many DIFFERENT products with similar names (e.g. "Arabian Aroma Old Money" vs "Arabian Aroma Sovage" — DIFFERENT products). If even ONE distinguishing word differs, set productNameMatch=false. Default to false when uncertain.`]
                   : [`6. Also extract the PRODUCT NAME visible in the screenshot. Set productNameMatch=true (no expected product to compare).`]),
-                `7. Set confidenceScore 0-100: 90+ if all fields clearly visible and matched, 60-89 if partially matched or slightly unclear, below 60 if mismatched or unreadable.`,
-                `8. Always fill detectedOrderId, detectedAmount, and detectedProductName with what you actually see in the image, even if they don't match the expected values.`,
-                `9. If the screenshot is from a dark mode UI, still extract all text carefully.`,
-                `10. If the order ID has OCR-like digit confusion (O vs 0, I vs 1, S vs 5), normalize before comparing.`,
+                `7. PLATFORM DETECTION (CRITICAL): Identify which e-commerce platform this screenshot is from. Look for:`,
+                `   - Amazon: "amazon.in", "amazon.com", Amazon logo, orange-yellow branding, "Fulfilled by Amazon", order ID format 3-7-7 digits`,
+                `   - Flipkart: "flipkart.com", Flipkart logo, blue/yellow branding, order ID starting with "OD"`,
+                `   - Myntra: "myntra.com", Myntra logo, order ID starting with "MYN"`,
+                `   - Meesho: "meesho.com", Meesho logo, purple branding, order ID starting with "MSH"`,
+                `   - Ajio: "ajio.com", Ajio logo`,
+                `   - JioMart: "jiomart.com", JioMart logo`,
+                `   - Nykaa: "nykaa.com", Nykaa logo, pink branding`,
+                `   - Blinkit: "blinkit.com", Blinkit logo, yellow branding`,
+                `   - Zepto: "zepto.co", Zepto logo, purple branding`,
+                `   - Other platforms: detect from logos, domain names, or distinctive branding`,
+                `   Set detectedPlatform to the platform name (e.g. "Amazon", "Flipkart", "Myntra", "Meesho", etc.)`,
+                ...(payload.expectedPlatform
+                  ? [`   Expected platform: "${payload.expectedPlatform}". Set platformMatch=true ONLY if detected platform matches expected. If screenshot is from "${payload.expectedPlatform}" → true. If screenshot is from a DIFFERENT platform → false. This is CRITICAL for fraud prevention.`]
+                  : [`   No expected platform provided. Set platformMatch=true. Still detect and report detectedPlatform.`]),
+                `8. Set confidenceScore 0-100: 90+ if all fields clearly visible and matched, 60-89 if partially matched or slightly unclear, below 60 if mismatched or unreadable.`,
+                `9. Always fill detectedOrderId, detectedAmount, detectedProductName, and detectedPlatform with what you actually see in the image, even if they don't match the expected values.`,
+                `10. If the screenshot is from a dark mode UI, still extract all text carefully.`,
+                `11. If the order ID has OCR-like digit confusion (O vs 0, I vs 1, S vs 5), normalize before comparing.`,
               ].join('\n'),
             },
           ],
@@ -1205,13 +1266,15 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
                 orderIdMatch: { type: Type.BOOLEAN },
                 amountMatch: { type: Type.BOOLEAN },
                 productNameMatch: { type: Type.BOOLEAN },
+                platformMatch: { type: Type.BOOLEAN },
                 confidenceScore: { type: Type.INTEGER },
                 detectedOrderId: { type: Type.STRING },
                 detectedAmount: { type: Type.NUMBER },
                 detectedProductName: { type: Type.STRING },
+                detectedPlatform: { type: Type.STRING },
                 discrepancyNote: { type: Type.STRING },
               },
-              required: ['orderIdMatch', 'amountMatch', 'productNameMatch', 'confidenceScore'],
+              required: ['orderIdMatch', 'amountMatch', 'productNameMatch', 'platformMatch', 'confidenceScore'],
             },
           },
         }));
@@ -1223,6 +1286,34 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
 
         // Clamp confidenceScore to 0-100
         parsed.confidenceScore = Math.max(0, Math.min(100, parsed.confidenceScore ?? 0));
+
+        // ── Post-processing: validate platformMatch with server-side logic ──
+        // Gemini detects the platform; we double-check with deterministic string matching.
+        if (payload.expectedPlatform && parsed.detectedPlatform) {
+          const expPlat = payload.expectedPlatform.toLowerCase().trim();
+          const detPlat = parsed.detectedPlatform.toLowerCase().trim();
+          // Normalize common variations (e.g. "Amazon India" → "amazon", "Flipkart.com" → "flipkart")
+          const normPlatform = (p: string) => p.replace(/\.(in|com|co)$/i, '').replace(/\s*(india|online)\s*/gi, '').trim();
+          const serverPlatformMatch = normPlatform(expPlat) === normPlatform(detPlat)
+            || detPlat.includes(normPlatform(expPlat))
+            || normPlatform(expPlat).includes(normPlatform(detPlat));
+          if (!serverPlatformMatch) {
+            parsed.platformMatch = false;
+            parsed.discrepancyNote = `Platform mismatch: expected "${payload.expectedPlatform}", detected "${parsed.detectedPlatform}". Please upload a screenshot from ${payload.expectedPlatform}.`;
+          } else {
+            parsed.platformMatch = true;
+          }
+        } else if (payload.expectedPlatform && !parsed.detectedPlatform) {
+          // Couldn't detect platform — can't verify, mark as mismatch for safety
+          parsed.platformMatch = false;
+          parsed.discrepancyNote = parsed.discrepancyNote ||
+            `Could not detect platform in screenshot. Expected platform: ${payload.expectedPlatform}.`;
+        }
+
+        // Final safety net: if expectedPlatform was provided, ensure platformMatch is explicit boolean
+        if (payload.expectedPlatform) {
+          parsed.platformMatch = parsed.platformMatch === true;
+        }
 
         // ── Post-processing: validate productNameMatch with server-side logic ──
         // Gemini may false-positive on same-brand different-products (e.g. both "Avimee Herbal")
@@ -1281,7 +1372,7 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
     });
     aiLog.error('Gemini proof verification error', { error });
     // Fall back to OCR when Gemini fails at runtime.
-    const ocrResult = await verifyProofWithOcr(payload.imageBase64, payload.expectedOrderId, payload.expectedAmount, payload.expectedProductName);
+    const ocrResult = await verifyProofWithOcr(payload.imageBase64, payload.expectedOrderId, payload.expectedAmount, payload.expectedProductName, payload.expectedPlatform);
     logPerformance({
       operation: 'AI_VERIFY_PROOF',
       durationMs: Date.now() - _aiStart,
