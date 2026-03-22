@@ -356,11 +356,13 @@ export function makeOpsController(env: Env) {
               ? await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false AND status = ${statusFilter}
                   AND (${code} = ANY("allowed_agency_codes")
+                       OR "open_to_all" = true
                        OR EXISTS (SELECT 1 FROM unnest(${allCodes}::text[]) AS mc WHERE jsonb_exists(assignments, mc)))
                 `
               : await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false
                   AND (${code} = ANY("allowed_agency_codes")
+                       OR "open_to_all" = true
                        OR EXISTS (SELECT 1 FROM unnest(${allCodes}::text[]) AS mc WHERE jsonb_exists(assignments, mc)))
                 `;
             matchingIds = rows.map((r) => r.id);
@@ -368,11 +370,11 @@ export function makeOpsController(env: Env) {
             const rows = statusFilter
               ? await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false AND status = ${statusFilter}
-                  AND (${code} = ANY("allowed_agency_codes") OR jsonb_exists(assignments, ${code}))
+                  AND (${code} = ANY("allowed_agency_codes") OR jsonb_exists(assignments, ${code}) OR "open_to_all" = true)
                 `
               : await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false
-                  AND (${code} = ANY("allowed_agency_codes") OR jsonb_exists(assignments, ${code}))
+                  AND (${code} = ANY("allowed_agency_codes") OR jsonb_exists(assignments, ${code}) OR "open_to_all" = true)
                 `;
             matchingIds = rows.map((r) => r.id);
           }
@@ -2425,17 +2427,20 @@ export function makeOpsController(env: Env) {
           }
         }
 
+        // ── "Open to All" mode: skip per-mediator allocation ──
+        const isOpenToAll = body.openToAll === true;
+
         const positiveEntries = Object.entries(body.assignments || {}).filter(([, assignment]) => {
           if (typeof assignment === 'number') return assignment > 0;
           const limit = Number((assignment as any)?.limit ?? 0);
           return Number.isFinite(limit) && limit > 0;
         });
-        if (positiveEntries.length === 0) {
+        if (!isOpenToAll && positiveEntries.length === 0) {
           throw new AppError(400, 'NO_ASSIGNMENTS', 'At least one allocation (limit > 0) is required');
         }
 
         // Security: agency can only assign to active mediators under its own code.
-        if (agencyCode) {
+        if (agencyCode && !isOpenToAll) {
           const assignmentCodes = positiveEntries.map(([code]) => String(code).trim()).filter(Boolean);
           const mediators = await db().user.findMany({
             where: {
@@ -2481,12 +2486,12 @@ export function makeOpsController(env: Env) {
           current[code] = assignmentObj;
         }
 
-        // Enforce totalSlots
+        // Enforce totalSlots (skip for openToAll since no per-mediator allocation)
         const totalAssigned = Object.values(current).reduce(
           (sum: number, a: any) => sum + Number(typeof a === 'number' ? a : a?.limit ?? 0),
           0
         );
-        if (totalAssigned > (campaign.totalSlots ?? 0)) {
+        if (!isOpenToAll && totalAssigned > (campaign.totalSlots ?? 0)) {
           throw new AppError(
             409,
             'ASSIGNMENT_EXCEEDS_TOTAL_SLOTS',
@@ -2495,7 +2500,8 @@ export function makeOpsController(env: Env) {
         }
 
         const updateData: any = {
-          assignments: current,
+          assignments: isOpenToAll ? {} : current,
+          openToAll: isOpenToAll,
         };
 
         if (body.dealType) updateData.dealType = body.dealType;
@@ -2608,7 +2614,10 @@ export function makeOpsController(env: Env) {
           const slotAssignment = findAssignmentForMediator(campaign.assignments, requestedCode);
           const hasAssignment = !!slotAssignment && Number((slotAssignment as any)?.limit ?? 0) > 0;
 
-          const isAllowed = (agencyCode && allowedCodes.has(agencyCode.toLowerCase())) || allowedCodes.has(selfCode.toLowerCase()) || hasAssignment;
+          // "Open to All" campaigns: allow any mediator whose agency is in allowedAgencyCodes
+          const campaignIsOpenToAll = (campaign as any).openToAll === true;
+
+          const isAllowed = campaignIsOpenToAll || (agencyCode && allowedCodes.has(agencyCode.toLowerCase())) || allowedCodes.has(selfCode.toLowerCase()) || hasAssignment;
           if (!isAllowed) {
             throw new AppError(403, 'FORBIDDEN', 'Campaign not assigned to your network');
           }

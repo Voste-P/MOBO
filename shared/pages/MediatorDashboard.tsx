@@ -979,9 +979,15 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
                         <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest border border-zinc-100 px-1.5 py-0.5 rounded-md">
                           {c.platform}
                         </span>
-                        <span className="bg-[#CCF381]/20 text-[#5f7a28] text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide">
-                          {c.assignments[user.mediatorCode!] || 0} Slots
-                        </span>
+                        {c.openToAll ? (
+                          <span className="bg-emerald-50 text-emerald-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide border border-emerald-200">
+                            🌐 Open to All · {c.totalSlots - c.usedSlots} left
+                          </span>
+                        ) : (
+                          <span className="bg-[#CCF381]/20 text-[#5f7a28] text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide">
+                            {c.assignments[user.mediatorCode!] || 0} Slots
+                          </span>
+                        )}
                       </div>
                       <h4 className="font-bold text-zinc-900 text-base leading-tight line-clamp-1 mb-1">
                         {c.title}

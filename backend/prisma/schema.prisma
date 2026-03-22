@@ -450,6 +450,10 @@ model Campaign {
   /// Mediator code -> { limit, payout, commissionPaise }. Stored as JSONB because it is a dynamic Map.
   assignments Json @default("{}")
 
+  /// When true, all connected mediators can publish & sell without per-mediator allocation.
+  /// Slots are consumed first-come-first-serve until totalSlots exhausted.
+  openToAll Boolean @default(false) @map("open_to_all")
+
   locked       Boolean   @default(false)
   lockedAt     DateTime? @map("locked_at")
   lockedReason String?   @map("locked_reason")

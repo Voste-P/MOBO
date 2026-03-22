@@ -651,8 +651,9 @@ export function makeOrdersController(env: Env) {
           : {};
         const hasMediatorAssignment = upstreamMediatorCode ? (upstreamMediatorCode in assignmentsRaw) : false;
         const hasAgencyAccess = upstreamAgencyCode ? allowedAgencyCodes.includes(upstreamAgencyCode) : false;
+        const campaignIsOpenToAll = (campaign as any).openToAll === true;
 
-        if (!hasAgencyAccess && !hasMediatorAssignment) {
+        if (!campaignIsOpenToAll && !hasAgencyAccess && !hasMediatorAssignment) {
           throw new AppError(403, 'FORBIDDEN', 'Campaign is not available for your network');
         }
 
@@ -676,7 +677,8 @@ export function makeOrdersController(env: Env) {
 
         // [PERF] Parallel fetch: mediatorSales + maybeDeal are independent
         const [mediatorSales, maybeDeal] = await Promise.all([
-          (upstreamMediatorCode && assigned > 0)
+          // For "Open to All" campaigns, skip per-mediator limit check — only global slot limit applies
+          (!campaignIsOpenToAll && upstreamMediatorCode && assigned > 0)
             ? db().order.count({
                 where: {
                   managerName: upstreamMediatorCode,
@@ -689,7 +691,7 @@ export function makeOrdersController(env: Env) {
           db().deal.findFirst({ where: dealWhere as any }),
         ]);
 
-        if (upstreamMediatorCode && assigned > 0 && mediatorSales >= assigned) {
+        if (!campaignIsOpenToAll && upstreamMediatorCode && assigned > 0 && mediatorSales >= assigned) {
           throw new AppError(
             409,
             'SOLD_OUT_FOR_PARTNER',

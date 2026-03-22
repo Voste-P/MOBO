@@ -127,7 +127,8 @@ export const assignSlotsSchema = z.object({
         payout: z.number().nonnegative().optional(),
       }),
     ])
-  ),
+  ).optional().default({}),
+  openToAll: z.boolean().optional(),
   dealType: z.enum(['Discount', 'Review', 'Rating']).optional(),
   price: z.number().nonnegative().optional(),
   payout: z.number().nonnegative().optional(),

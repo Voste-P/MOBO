@@ -67,7 +67,7 @@ describe('ops campaigns: assign slots', () => {
         assignments: { [E2E_ACCOUNTS.mediator.mediatorCode]: 5 },
       });
 
-    expect(okRes.status).toBe(200);
+      expect(okRes.status).toBe(200);
 
     // Verify campaign updated in PG
     const updated = await db.campaign.findUnique({ where: { id: pgCampaign.id } });

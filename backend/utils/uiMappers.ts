@@ -120,6 +120,7 @@ export function toUiCampaign(c: any) {
     createdAt: c.createdAt ? new Date(c.createdAt).getTime() : Date.now(),
     returnWindowDays: c.returnWindowDays,
     dealType: c.dealType,
+    openToAll: c.openToAll ?? false,
     assignmentDetails,
   };
 }

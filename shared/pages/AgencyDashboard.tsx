@@ -1668,6 +1668,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
   const [commissionOnDeal, setCommissionOnDeal] = useState<string>('');
   const [commissionToMediator, setCommissionToMediator] = useState<string>('');
   const [mediatorPayouts, setMediatorPayouts] = useState<Record<string, string>>({});
+  const [openToAll, setOpenToAll] = useState(false);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copyingId, setCopyingId] = useState<string | null>(null);
@@ -1684,6 +1685,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     setAssignments(normalized);
     setAssignSearch('');
     setMediatorPayouts({});
+    setOpenToAll(assignModal.openToAll ?? false);
   }, [assignModal]);
 
   // Get list of mediator codes for this agency to verify if campaign is active in network
@@ -1764,6 +1766,26 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
 
   const handleAssign = async () => {
     if (!assignModal) return;
+
+    // "Open to All" mode: no per-mediator allocation needed
+    if (openToAll) {
+      const isInternal = String(assignModal.brandId || '') === String(user?.id || '');
+      const commission = isInternal ? 0 : commissionOnDeal.trim() ? Number(commissionOnDeal) : 0;
+      const dealType = selectedDealType !== (assignModal.dealType || 'Discount') ? selectedDealType : undefined;
+      try {
+        await api.ops.assignSlots(assignModal.id, {}, dealType, undefined, undefined, commission, true);
+        toast.success('Open to All distribution saved — all mediators can now publish this deal');
+        setAssignModal(null);
+        setAssignments({});
+        setMediatorPayouts({});
+        setOpenToAll(false);
+        onRefresh();
+      } catch (err) {
+        toast.error(formatErrorMessage(err, 'Failed to distribute inventory'));
+      }
+      return;
+    }
+
     const positiveAssignments = Object.fromEntries(
       Object.entries(assignments || {}).filter(([, v]) => Number(v) > 0)
     );
@@ -1804,7 +1826,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
 
     try {
       // Send rich assignments with per-mediator payout, plus commission on deal
-      await api.ops.assignSlots(assignModal.id, richAssignments, dealType, undefined, undefined, commission);
+      await api.ops.assignSlots(assignModal.id, richAssignments, dealType, undefined, undefined, commission, false);
       toast.success('Distribution saved');
       setAssignModal(null);
       setAssignments({});
@@ -2186,6 +2208,11 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                         </span>
                       </td>
                       <td className="p-5 text-right font-mono text-slate-700 font-bold">
+                        {c.openToAll && (
+                          <span className="text-[9px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 mr-2">
+                            🌐 Open to All
+                          </span>
+                        )}
                         <span className="text-slate-400 mr-1">SOLD:</span> {c.usedSlots}{' '}
                         <span className="text-slate-300 mx-1">/</span> {c.totalSlots}
                       </td>
@@ -2737,6 +2764,36 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
               </div>
             </div>
 
+            {/* ── Open to All Toggle ── */}
+            <div className={`p-3 rounded-2xl mb-2 border transition-all shrink-0 ${openToAll ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'}`}>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setOpenToAll(!openToAll)}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${openToAll ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                    aria-label="Toggle Open to All"
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${openToAll ? 'translate-x-6' : 'translate-x-0'}`} />
+                  </button>
+                  <div>
+                    <p className="text-sm font-black text-slate-900">🌐 Open to All Mediators</p>
+                    <p className="text-[10px] text-slate-500 font-medium">
+                      {openToAll
+                        ? 'All connected mediators can publish this deal. Buyers purchase first-come-first-serve until all slots are used.'
+                        : 'Enable to skip individual allocation — all mediators share the total slot pool.'}
+                    </p>
+                  </div>
+                </div>
+                {openToAll && (
+                  <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-full border border-emerald-200 whitespace-nowrap">
+                    {assignModal?.totalSlots ?? 0} slots shared
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Mediator list hidden when Open to All */}
+            {!openToAll && (
               <div className="flex items-center justify-between gap-4 mb-1 shrink-0">
               <div className="flex-1 max-w-md">
                 <div className="relative">
@@ -2916,6 +2973,24 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                 })
               )}
             </div>
+            )}
+
+            {/* Open to All info panel */}
+            {openToAll && (
+              <div className="flex-1 min-h-0 flex items-center justify-center">
+                <div className="text-center py-8">
+                  <div className="text-5xl mb-4">🌐</div>
+                  <h4 className="text-lg font-black text-slate-900 mb-2">Open to All Mediators</h4>
+                  <p className="text-sm text-slate-500 max-w-md mx-auto">
+                    All <strong>{mediators.filter((m: any) => m.status === 'active').length}</strong> connected mediators will be able to publish and sell this deal.
+                    Buyers can purchase on a first-come-first-serve basis until all <strong>{assignModal?.totalSlots ?? 0}</strong> slots are filled.
+                  </p>
+                  <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold border border-emerald-200">
+                    <span>Remaining: {(assignModal?.totalSlots ?? 0) - (assignModal?.usedSlots ?? 0)} slots</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Footer */}
             <div className="pt-4 border-t border-slate-100 flex justify-end gap-3 shrink-0">
@@ -2927,10 +3002,10 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
               </button>
               <button
                 onClick={handleAssign}
-                disabled={assignedTotal <= 0 || assignedTotal > availableForAssign}
-                className="px-8 py-3 bg-purple-600 text-white font-bold rounded-2xl hover:bg-purple-700 transition-all shadow-xl hover:shadow-2xl hover:shadow-purple-200 active:scale-95 flex items-center gap-2"
+                disabled={!openToAll && (assignedTotal <= 0 || assignedTotal > availableForAssign)}
+                className={`px-8 py-3 text-white font-bold rounded-2xl transition-all shadow-xl hover:shadow-2xl active:scale-95 flex items-center gap-2 ${openToAll ? 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-emerald-200' : 'bg-purple-600 hover:bg-purple-700 hover:shadow-purple-200'}`}
               >
-                Confirm Distribution <CheckCircle size={18} />
+                {openToAll ? '🌐 Confirm Open to All' : 'Confirm Distribution'} <CheckCircle size={18} />
               </button>
             </div>
           </div>

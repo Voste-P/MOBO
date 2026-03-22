@@ -888,12 +888,13 @@ export const api = {
       dealType?: string,
       price?: number,
       payout?: number,
-      commission?: number
+      commission?: number,
+      openToAll?: boolean
     ) => {
       await fetchOk('/ops/campaigns/assign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ id, assignments, dealType, price, payout, commission }),
+        body: JSON.stringify({ id, assignments, dealType, price, payout, commission, openToAll }),
       });
     },
     publishDeal: async (id: string, commission: number | undefined, mediatorCode: string) => {

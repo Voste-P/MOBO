@@ -237,6 +237,7 @@ export interface Campaign {
   createdAt: number;
   returnWindowDays?: number;
   dealType?: 'Discount' | 'Review' | 'Rating';
+  openToAll?: boolean;
 }
 
 export interface WithdrawalRequest {
