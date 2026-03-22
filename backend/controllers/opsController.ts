@@ -304,9 +304,7 @@ export function makeOpsController(env: Env) {
           ];
         }
 
-        const page = queryParams.page ?? 1;
-        const limit = queryParams.limit ?? 200;
-        const skip = (page - 1) * limit;
+        const { page, limit, skip } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
 
         const mediators = await db().user.findMany({
           where,
@@ -344,8 +342,7 @@ export function makeOpsController(env: Env) {
         const requested = queryParams.mediatorCode || undefined;
         const code = isPrivileged(roles) ? requested : String((user as any)?.mediatorCode || '');
 
-        const cPage = queryParams.page ?? 1;
-        const cLimit = queryParams.limit ?? 200;
+        const { limit: cLimit, skip: cSkip } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
         const statusFilter = queryParams.status && queryParams.status !== 'all' ? queryParams.status : null;
 
         let campaigns: any[];
@@ -384,7 +381,7 @@ export function makeOpsController(env: Env) {
             ? await db().campaign.findMany({
               where: { id: { in: matchingIds } },
               orderBy: { createdAt: 'desc' },
-              skip: (cPage - 1) * cLimit,
+              skip: cSkip,
               take: cLimit,
             })
             : [];
@@ -395,7 +392,7 @@ export function makeOpsController(env: Env) {
               ...(statusFilter ? { status: statusFilter as any } : {}),
             },
             orderBy: { createdAt: 'desc' },
-            skip: (cPage - 1) * cLimit,
+            skip: cSkip,
             take: cLimit,
           });
         }
@@ -472,15 +469,14 @@ export function makeOpsController(env: Env) {
           return;
         }
 
-        const dPage = queryParams.page ?? 1;
-        const dLimit = queryParams.limit ?? 200;
+        const { limit: dLimit, skip: dSkip } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
         const deals = await db().deal.findMany({
           where: {
             mediatorCode: { in: mediatorCodes },
             isDeleted: false,
           },
           orderBy: { createdAt: 'desc' },
-          skip: (dPage - 1) * dLimit,
+          skip: dSkip,
           take: dLimit,
         });
 
@@ -623,12 +619,11 @@ export function makeOpsController(env: Env) {
           ];
         }
 
-        const puPage = queryParams.page ?? 1;
-        const puLimit = queryParams.limit ?? 200;
+        const { page: puPage, limit: puLimit, skip: puSkip } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
         const users = await db().user.findMany({
           where,
           orderBy: { createdAt: 'desc' },
-          skip: (puPage - 1) * puLimit,
+          skip: puSkip,
           take: puLimit,
           select: { ...userListSelect, wallets: { where: { isDeleted: false }, take: 1, select: { id: true, availablePaise: true, pendingPaise: true } } },
         });
@@ -667,12 +662,11 @@ export function makeOpsController(env: Env) {
           ];
         }
 
-        const vuPage = queryParams.page ?? 1;
-        const vuLimit = queryParams.limit ?? 200;
+        const { page: vuPage, limit: vuLimit, skip: vuSkip } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
         const users = await db().user.findMany({
           where,
           orderBy: { createdAt: 'desc' },
-          skip: (vuPage - 1) * vuLimit,
+          skip: vuSkip,
           take: vuLimit,
           select: { ...userListSelect, wallets: { where: { isDeleted: false }, take: 1, select: { id: true, availablePaise: true, pendingPaise: true } } },
         });

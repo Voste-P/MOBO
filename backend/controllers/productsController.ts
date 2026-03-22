@@ -32,7 +32,7 @@ export function makeProductsController() {
           return;
         }
 
-        const { page, limit, skip, isPaginated } = parsePagination(req.query as Record<string, unknown>, { limit: 50 });
+        const { page, limit, skip, isPaginated } = parsePagination(req.query as Record<string, unknown>, { limit: 200 });
         const where = {
           mediatorCode: { equals: mediatorCode, mode: 'insensitive' as const },
           active: true,

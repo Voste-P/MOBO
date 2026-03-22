@@ -421,7 +421,7 @@ export function makeOrdersController(env: Env) {
         const targetUser = await db().user.findFirst({ where: userWhere as any, select: { id: true } });
         if (!targetUser) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
-        const { page, limit, skip, isPaginated } = parsePagination(req.query as Record<string, unknown>, { limit: 50 });
+        const { page, limit, skip, isPaginated } = parsePagination(req.query as Record<string, unknown>, { limit: 200 });
         const where = { userId: targetUser.id, isDeleted: false };
 
         const [orders, total] = await Promise.all([
@@ -1258,6 +1258,13 @@ export function makeOrdersController(env: Env) {
                   'Please upload the correct rating screenshot. ' +
                   (ratingAiResult.discrepancyNote || ''));
               }
+              // Block submission if screenshot is cropped/incomplete (fraud prevention)
+              if (ratingAiResult && ratingAiResult.screenshotCropped === true) {
+                throw new AppError(422, 'SCREENSHOT_INCOMPLETE',
+                  'Your rating screenshot appears to be cropped or incomplete. ' +
+                  'Please upload a FULL screenshot showing the complete review page including the page header and account name. ' +
+                  (ratingAiResult.discrepancyNote || ''));
+              }
             }
           }
 
@@ -1267,6 +1274,7 @@ export function makeOrdersController(env: Env) {
             updateData.ratingAiVerification = {
               accountNameMatch: ratingAiResult.accountNameMatch,
               productNameMatch: ratingAiResult.productNameMatch,
+              screenshotCropped: ratingAiResult.screenshotCropped,
               detectedAccountName: ratingAiResult.detectedAccountName,
               detectedProductName: ratingAiResult.detectedProductName,
               confidenceScore: ratingAiResult.confidenceScore,
@@ -1282,6 +1290,7 @@ export function makeOrdersController(env: Env) {
               metadata: {
                 accountNameMatch: ratingAiResult.accountNameMatch,
                 productNameMatch: ratingAiResult.productNameMatch,
+                screenshotCropped: ratingAiResult.screenshotCropped,
                 confidenceScore: ratingAiResult.confidenceScore,
                 detectedAccountName: ratingAiResult.detectedAccountName,
                 detectedProductName: ratingAiResult.detectedProductName,
@@ -1359,6 +1368,13 @@ export function makeOrdersController(env: Env) {
                   'Please upload a screenshot from the correct marketplace account. ' +
                   (returnWindowResult.discrepancyNote || ''));
               }
+              // Hard-block 5: Screenshot must not be cropped/incomplete
+              if (returnWindowResult && returnWindowResult.screenshotCropped === true) {
+                throw new AppError(422, 'SCREENSHOT_INCOMPLETE',
+                  'Your return window screenshot appears to be cropped or incomplete. ' +
+                  'Please upload a FULL screenshot showing the complete delivery/return page including the page header. ' +
+                  (returnWindowResult.discrepancyNote || ''));
+              }
               // Return window open/closed, amount — stored for mediator review, NOT blocking
             }
           }
@@ -1379,6 +1395,7 @@ export function makeOrdersController(env: Env) {
                 amountMatch: returnWindowResult.amountMatch,
                 soldByMatch: returnWindowResult.soldByMatch,
                 reviewerNameMatch: returnWindowResult.reviewerNameMatch,
+                screenshotCropped: returnWindowResult.screenshotCropped,
                 confidenceScore: returnWindowResult.confidenceScore,
               },
             });
@@ -1442,6 +1459,13 @@ export function makeOrdersController(env: Env) {
                   'Please upload a screenshot from the correct platform. ' +
                   (aiOrderVerification.discrepancyNote || ''));
               }
+              // Block re-upload if screenshot is cropped/incomplete (fraud prevention)
+              if (aiOrderVerification && aiOrderVerification.screenshotCropped === true) {
+                throw new AppError(422, 'SCREENSHOT_INCOMPLETE',
+                  'Your order screenshot appears to be cropped or incomplete. ' +
+                  'Please upload a FULL screenshot showing the complete order page including the page header. ' +
+                  (aiOrderVerification.discrepancyNote || ''));
+              }
             }
           }
 
@@ -1454,6 +1478,7 @@ export function makeOrdersController(env: Env) {
               amountMatch: aiOrderVerification.amountMatch,
               productNameMatch: aiOrderVerification.productNameMatch,
               platformMatch: aiOrderVerification.platformMatch,
+              screenshotCropped: aiOrderVerification.screenshotCropped,
               detectedOrderId: aiOrderVerification.detectedOrderId,
               detectedAmount: aiOrderVerification.detectedAmount,
               detectedProductName: aiOrderVerification.detectedProductName,
@@ -1482,6 +1507,7 @@ export function makeOrdersController(env: Env) {
                 amountMatch: aiOrderVerification.amountMatch,
                 productNameMatch: aiOrderVerification.productNameMatch,
                 platformMatch: aiOrderVerification.platformMatch,
+                screenshotCropped: aiOrderVerification.screenshotCropped,
                 confidenceScore: aiOrderVerification.confidenceScore,
                 detectedPlatform: aiOrderVerification.detectedPlatform,
                 verificationMethod: aiOrderVerification.verificationMethod,

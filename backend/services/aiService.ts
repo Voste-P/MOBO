@@ -869,6 +869,7 @@ type ProofVerificationResult = {
   amountMatch: boolean;
   productNameMatch?: boolean;
   platformMatch?: boolean;
+  screenshotCropped?: boolean;
   confidenceScore: number;
   detectedOrderId?: string;
   detectedAmount?: number;
@@ -1254,6 +1255,18 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
                 `9. Always fill detectedOrderId, detectedAmount, detectedProductName, and detectedPlatform with what you actually see in the image, even if they don't match the expected values.`,
                 `10. If the screenshot is from a dark mode UI, still extract all text carefully.`,
                 `11. If the order ID has OCR-like digit confusion (O vs 0, I vs 1, S vs 5), normalize before comparing.`,
+                `12. CROPPED/INCOMPLETE SCREENSHOT DETECTION (CRITICAL):`,
+                `   Determine if this screenshot has been intentionally CROPPED, CUT, or is INCOMPLETE.`,
+                `   A VALID order confirmation screenshot MUST show:`,
+                `   - The page header or app header with platform branding/logo at the TOP`,
+                `   - The order ID and amount in context (not just a snippet)`,
+                `   - The product name/details area`,
+                `   Signs of a CROPPED screenshot (set screenshotCropped=true):`,
+                `   - The screenshot starts abruptly in the MIDDLE of a page — no header visible`,
+                `   - Only a small portion of the order page is visible (e.g., just the order ID line)`,
+                `   - The top of the page is CUT OFF — content appears to start mid-section`,
+                `   - Navigation bar, site header/logo, account area are all missing from top`,
+                `   Set screenshotCropped=false ONLY if the screenshot shows a reasonably complete page view.`,
               ].join('\n'),
             },
           ],
@@ -1272,9 +1285,10 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
                 detectedAmount: { type: Type.NUMBER },
                 detectedProductName: { type: Type.STRING },
                 detectedPlatform: { type: Type.STRING },
+                screenshotCropped: { type: Type.BOOLEAN, description: 'true if the screenshot appears cropped, cut off, or incomplete — missing page header, platform branding, or showing only a fragment' },
                 discrepancyNote: { type: Type.STRING },
               },
-              required: ['orderIdMatch', 'amountMatch', 'productNameMatch', 'platformMatch', 'confidenceScore'],
+              required: ['orderIdMatch', 'amountMatch', 'productNameMatch', 'platformMatch', 'confidenceScore', 'screenshotCropped'],
             },
           },
         }));
@@ -1403,6 +1417,7 @@ export type RatingVerificationResult = {
   detectedAccountName?: string;
   detectedPublicName?: string;
   detectedProductName?: string;
+  screenshotCropped?: boolean;
   confidenceScore: number;
   discrepancyNote?: string;
 };
@@ -1726,6 +1741,21 @@ export async function verifyRatingScreenshotWithAi(
               `5. Set confidenceScore 0-100 based on how clearly visible and matching both fields are.`,
               `6. Always fill detectedAccountName with the greeting/header name (e.g. from "Hello, Ashok"), and detectedPublicName with the name shown beside "Edit public name" (if visible). Fill detectedProductName with the product text you see.`,
               `7. PARTIAL NAME MATCHING: The name visible in the screenshot may be PARTIAL or truncated. For example, the screenshot may show only "Chetan" but the expected reviewer name is "Chetan Chaudhari". If any significant part of the expected name appears in the screenshot names, set accountNameMatch=true. Similarly, if the expected name is "Chetan" and the screenshot shows "Chetan Chaudhari", that should also match.`,
+              `8. CROPPED/INCOMPLETE SCREENSHOT DETECTION (CRITICAL FOR FRAUD PREVENTION):`,
+              `   Determine if this screenshot has been intentionally CROPPED, CUT, or is INCOMPLETE.`,
+              `   A VALID full rating/review screenshot MUST show:`,
+              `   - The page header or account area at the TOP (e.g. "Hello, <Name>", navigation bar, or Amazon header)`,
+              `   - The product being rated (title, image, or description)`,
+              `   - The star rating and/or review text`,
+              `   Signs of a CROPPED screenshot (set screenshotCropped=true):`,
+              `   - The screenshot starts abruptly in the MIDDLE of a page — no header/top-of-page visible`,
+              `   - Only "Edit public name" or a name label is visible WITHOUT the page header greeting ("Hello, <Name>")`,
+              `   - The top of the page is CUT OFF — content appears to start mid-section`,
+              `   - Critical information like the account name header area is missing/not visible`,
+              `   - The screenshot shows only a FRAGMENT of the review page`,
+              `   - Key UI elements (navigation bar, page title, account icon) are absent from the top`,
+              `   Set screenshotCropped=false ONLY if the screenshot shows a COMPLETE or near-complete page view with the page header/top visible.`,
+              `   When in doubt, set screenshotCropped=true — better to ask for a full screenshot than to let fraud through.`,
             ].join('\n') },
           ],
           config: {
@@ -1740,9 +1770,10 @@ export async function verifyRatingScreenshotWithAi(
                 detectedAccountName: { type: Type.STRING, description: 'Name from the header/greeting area (e.g. "Hello, Ashok" → "Ashok"). Strip greeting prefix.' },
                 detectedPublicName: { type: Type.STRING, description: 'Name shown beside "Edit public name" on the review/rating page. This is the marketplace public display name. Null if not visible.' },
                 detectedProductName: { type: Type.STRING },
+                screenshotCropped: { type: Type.BOOLEAN, description: 'true if the screenshot appears cropped, cut off, or incomplete — missing page header, account area, or showing only a fragment of the page' },
                 discrepancyNote: { type: Type.STRING },
               },
-              required: ['accountNameMatch', 'productNameMatch', 'confidenceScore'],
+              required: ['accountNameMatch', 'productNameMatch', 'confidenceScore', 'screenshotCropped'],
             },
           },
         }));
@@ -1898,6 +1929,7 @@ export type ReturnWindowVerificationResult = {
   soldByMatch: boolean;
   returnWindowClosed: boolean;
   reviewerNameMatch: boolean;
+  screenshotCropped?: boolean;
   confidenceScore: number;
   detectedReturnWindow?: string;
   detectedAccountName?: string;
@@ -2151,6 +2183,10 @@ export async function verifyReturnWindowWithAi(
               `7. Set confidenceScore 0-100 based on match quality. Low confidence if fields are hard to read.`,
               `8. CRITICAL: If the screenshot appears to be from a DIFFERENT ORDER than expected, ALL match fields must be false. Do NOT guess or assume — if uncertain, set to false.`,
               `9. CRITICAL PRODUCT NAME RULE: Same brand ≠ same product. "Brand X Product A" and "Brand X Product B" are DIFFERENT products. Compare the FULL product name including model/variant identifiers, not just the brand.`,
+              `10. CROPPED/INCOMPLETE SCREENSHOT DETECTION: Determine if this screenshot is CROPPED or INCOMPLETE.`,
+              `   A valid delivery/return window screenshot should show the page header with platform branding, order details in context, and delivery status.`,
+              `   Set screenshotCropped=true if: the top of the page is cut off, no header/navigation visible, only a fragment of the page is shown.`,
+              `   Set screenshotCropped=false if the screenshot shows a reasonably complete page view.`,
             ].join('\n') },
           ],
           config: {
@@ -2168,9 +2204,10 @@ export async function verifyReturnWindowWithAi(
                 confidenceScore: { type: Type.INTEGER },
                 detectedReturnWindow: { type: Type.STRING },
                 detectedAccountName: { type: Type.STRING, description: 'Name from the header/greeting area (e.g. "Hello, Ashok" → "Ashok"). Strip greeting prefix. Null if not visible.' },
+                screenshotCropped: { type: Type.BOOLEAN, description: 'true if the screenshot appears cropped, cut off, or incomplete' },
                 discrepancyNote: { type: Type.STRING },
               },
-              required: ['orderIdMatch', 'productNameMatch', 'amountMatch', 'soldByMatch', 'returnWindowClosed', 'reviewerNameMatch', 'confidenceScore'],
+              required: ['orderIdMatch', 'productNameMatch', 'amountMatch', 'soldByMatch', 'returnWindowClosed', 'reviewerNameMatch', 'confidenceScore', 'screenshotCropped'],
             },
           },
         }));
