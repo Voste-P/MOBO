@@ -1,13 +1,13 @@
-﻿import React, { lazy, Suspense } from 'react';
+﻿import React, { Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ToastProvider } from '../context/ToastContext';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { PortalGuard } from '../components/PortalGuard';
 import { PageSkeleton } from '../components/ui/PageSkeleton';
 import { AgencyAuthScreen } from '../pages/AgencyAuth';
+import { lazyRetry } from '../utils/lazyRetry';
 
-// Lazy-load the 186KB AgencyDashboard — only fetched after auth succeeds
-const AgencyDashboard = lazy(() => import('../pages/AgencyDashboard').then(m => ({ default: m.AgencyDashboard })));
+const AgencyDashboard = lazyRetry(() => import('../pages/AgencyDashboard').then(m => ({ default: m.AgencyDashboard })));
 
 interface AgencyAppProps {
   onBack?: () => void;

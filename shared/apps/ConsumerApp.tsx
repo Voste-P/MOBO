@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, lazy, Suspense } from 'react';
+﻿import React, { useState, useRef, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { CartProvider } from '../context/CartContext';
 import { ChatProvider } from '../context/ChatContext';
@@ -12,13 +12,12 @@ import { PageSkeleton } from '../components/ui/PageSkeleton';
 import { AuthScreen } from '../pages/Auth';
 import { useSwipeTabs } from '../hooks/useSwipeTabs';
 import { Package, User, LogOut, Home as HomeIcon, Bot } from 'lucide-react';
+import { lazyRetry } from '../utils/lazyRetry';
 
-// Lazy-load heavy page components to reduce initial bundle size.
-// Orders alone is 102KB, Explore and Profile are also significant.
-const Home = lazy(() => import('../pages/Home').then(m => ({ default: m.Home })));
-const Explore = lazy(() => import('../pages/Explore').then(m => ({ default: m.Explore })));
-const Orders = lazy(() => import('../pages/Orders').then(m => ({ default: m.Orders })));
-const Profile = lazy(() => import('../pages/Profile').then(m => ({ default: m.Profile })));
+const Home = lazyRetry(() => import('../pages/Home').then(m => ({ default: m.Home })));
+const Explore = lazyRetry(() => import('../pages/Explore').then(m => ({ default: m.Explore })));
+const Orders = lazyRetry(() => import('../pages/Orders').then(m => ({ default: m.Orders })));
+const Profile = lazyRetry(() => import('../pages/Profile').then(m => ({ default: m.Profile })));
 
 function TabSkeleton() {
   return <PageSkeleton variant="cards" />;
