@@ -192,7 +192,7 @@ const AgencyProfile = ({ user }: any) => {
       toast.success('Profile updated');
     } catch (err) {
       console.error('Failed to update profile:', err);
-      toast.error('Failed to update profile.');
+      toast.error(formatErrorMessage(err, 'Failed to update profile.'));
     } finally {
       setLoading(false);
     }
@@ -4264,7 +4264,7 @@ export const AgencyDashboard: React.FC = () => {
       });
     } catch (e) {
       console.error('Dashboard data fetch failed', e);
-      toast.error('Failed to load dashboard data');
+      toast.error(formatErrorMessage(e, 'Failed to load dashboard data'));
     } finally {
       setIsDataLoading(false);
     }

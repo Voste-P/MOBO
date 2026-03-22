@@ -246,7 +246,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       if (cfg?.adminContactEmail) setConfigEmail(String(cfg.adminContactEmail));
     } catch (e) {
       console.error('Admin Config Fetch Error:', e);
-      toast.error('Failed to load system configuration.');
+      toast.error(formatErrorMessage(e, 'Failed to load system configuration.'));
     }
   };
 
@@ -299,7 +299,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     api.admin
       .getAuditLogs(params)
       .then((data) => setAuditLogs(Array.isArray(data) ? data : data?.logs ?? []))
-      .catch((e) => { console.error('Audit Logs Fetch Error:', e); toast.error('Failed to load audit logs.'); })
+      .catch((e) => { console.error('Audit Logs Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to load audit logs.')); })
       .finally(() => setAuditLoading(false));
   }, [user, view, auditActionFilter, auditDateFrom, auditDateTo]);
 
@@ -309,7 +309,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     api.admin
       .getUsers('all')
       .then((u) => setUsers(u))
-      .catch((e) => { console.error('Admin Users Fetch Error:', e); toast.error('Failed to refresh users list.'); });
+      .catch((e) => { console.error('Admin Users Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh users list.')); });
   }, [user, view]);
 
   useEffect(() => {
@@ -318,7 +318,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     api.admin
       .getInvites()
       .then((i) => setInvites(i))
-      .catch((e) => { console.error('Admin Invites Fetch Error:', e); toast.error('Failed to refresh invites.'); });
+      .catch((e) => { console.error('Admin Invites Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh invites.')); });
   }, [user, view]);
 
   useEffect(() => {
@@ -421,7 +421,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       }
     } catch (e) {
       console.error('Admin Data Fetch Error:', e);
-      toast.error('Failed to load admin data. Please refresh the page.');
+      toast.error(formatErrorMessage(e, 'Failed to load admin data. Please refresh the page.'));
     } finally {
       setIsLoading(false);
     }
@@ -2086,7 +2086,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         setAuditLogs(Array.isArray(data) ? data : data?.logs ?? []);
                       } catch (e) {
                         console.error(e);
-                        toast.error('Failed to load audit logs');
+                        toast.error(formatErrorMessage(e, 'Failed to load audit logs'));
                       } finally {
                         setAuditLoading(false);
                       }

@@ -521,7 +521,7 @@ export const api = {
   },
   products: {
     getAll: async (mediatorCode?: string) => {
-      const query = mediatorCode ? `?mediatorCode=${encodeURIComponent(mediatorCode)}` : '';
+      const query = mediatorCode ? `?mediatorCode=${encodeURIComponent(mediatorCode)}&limit=500` : '?limit=500';
       const data = await fetchJson(`/products${query}`, {
         headers: { ...authHeaders() },
       });
@@ -531,7 +531,7 @@ export const api = {
   orders: {
     /** [FIX] Added missing getUserOrders for Chatbot and Orders components */
     getUserOrders: async (userId: string) => {
-      return fetchJson(`/orders/user/${encodeURIComponent(userId)}`, {
+      return fetchJson(`/orders/user/${encodeURIComponent(userId)}?limit=500`, {
         headers: { ...authHeaders() },
       });
     },
@@ -675,46 +675,46 @@ export const api = {
   ops: {
     /** [FIX] Expanded ops object with all methods used by MediatorDashboard and AgencyDashboard */
     getMediators: async (agencyCode: string, opts?: { search?: string }) => {
-      const params = new URLSearchParams({ agencyCode });
+      const params = new URLSearchParams({ agencyCode, limit: '500' });
       if (opts?.search) params.set('search', opts.search);
       return fetchJson(`/ops/mediators?${params}`, {
         headers: { ...authHeaders() },
       });
     },
     getCampaigns: async (mediatorCode?: string) => {
-      const query = mediatorCode ? `?mediatorCode=${encodeURIComponent(mediatorCode)}` : '';
+      const query = mediatorCode ? `?mediatorCode=${encodeURIComponent(mediatorCode)}&limit=500` : '?limit=500';
       return fetchJson(`/ops/campaigns${query}`, {
         headers: { ...authHeaders() },
       });
     },
     getDeals: async (mediatorCode: string, role?: string) => {
       const query = role
-        ? `?mediatorCode=${encodeURIComponent(mediatorCode)}&role=${encodeURIComponent(role)}`
-        : `?mediatorCode=${encodeURIComponent(mediatorCode)}`;
+        ? `?mediatorCode=${encodeURIComponent(mediatorCode)}&role=${encodeURIComponent(role)}&limit=500`
+        : `?mediatorCode=${encodeURIComponent(mediatorCode)}&limit=500`;
       return fetchJson(`/ops/deals${query}`, {
         headers: { ...authHeaders() },
       });
     },
     getMediatorOrders: async (mediatorCode: string, role?: string) => {
       const query = role
-        ? `?mediatorCode=${encodeURIComponent(mediatorCode)}&role=${encodeURIComponent(role)}`
-        : `?mediatorCode=${encodeURIComponent(mediatorCode)}`;
+        ? `?mediatorCode=${encodeURIComponent(mediatorCode)}&role=${encodeURIComponent(role)}&limit=500`
+        : `?mediatorCode=${encodeURIComponent(mediatorCode)}&limit=500`;
       return fetchJson(`/ops/orders${query}`, {
         headers: { ...authHeaders() },
       });
     },
     getPendingUsers: async (code: string) => {
-      return fetchJson(`/ops/users/pending?code=${encodeURIComponent(code)}`, {
+      return fetchJson(`/ops/users/pending?code=${encodeURIComponent(code)}&limit=500`, {
         headers: { ...authHeaders() },
       });
     },
     getVerifiedUsers: async (code: string) => {
-      return fetchJson(`/ops/users/verified?code=${encodeURIComponent(code)}`, {
+      return fetchJson(`/ops/users/verified?code=${encodeURIComponent(code)}&limit=500`, {
         headers: { ...authHeaders() },
       });
     },
     getAgencyLedger: async () => {
-      return fetchJson('/ops/ledger', {
+      return fetchJson('/ops/ledger?limit=500', {
         headers: { ...authHeaders() },
       });
     },
@@ -912,12 +912,12 @@ export const api = {
   /** [FIX] Added missing brand object used in BrandDashboard.tsx */
   brand: {
     getConnectedAgencies: async (brandId: string) => {
-      return fetchJson(`/brand/agencies?brandId=${encodeURIComponent(brandId)}`, {
+      return fetchJson(`/brand/agencies?brandId=${encodeURIComponent(brandId)}&limit=500`, {
         headers: { ...authHeaders() },
       });
     },
     getBrandCampaigns: async (brandId: string) => {
-      return fetchJson(`/brand/campaigns?brandId=${encodeURIComponent(brandId)}`, {
+      return fetchJson(`/brand/campaigns?brandId=${encodeURIComponent(brandId)}&limit=500`, {
         headers: { ...authHeaders() },
       });
     },
@@ -927,7 +927,7 @@ export const api = {
       });
     },
     getTransactions: async (brandId: string) => {
-      return fetchJson(`/brand/transactions?brandId=${encodeURIComponent(brandId)}`, {
+      return fetchJson(`/brand/transactions?brandId=${encodeURIComponent(brandId)}&limit=500`, {
         headers: { ...authHeaders() },
       });
     },
@@ -988,7 +988,7 @@ export const api = {
       }),
     /** [FIX] Updated getUsers to accept an optional role argument for AdminPortal.tsx */
     getUsers: async (role: string = 'all', opts?: { search?: string; status?: string }) => {
-      const params = new URLSearchParams({ role });
+      const params = new URLSearchParams({ role, limit: '500' });
       if (opts?.search) params.set('search', opts.search);
       if (opts?.status) params.set('status', opts.status);
       return fetchJson(`/admin/users?${params}`, {
@@ -997,7 +997,7 @@ export const api = {
     },
     /** [FIX] Added missing admin methods used in AdminPortal.tsx */
     getFinancials: async (opts?: { status?: string }) => {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ limit: '500' });
       if (opts?.status) params.set('status', opts.status);
       const qs = params.toString();
       return fetchJson(`/admin/financials${qs ? '?' + qs : ''}`, {
@@ -1005,7 +1005,7 @@ export const api = {
       });
     },
     getProducts: async (opts?: { search?: string; active?: string }) => {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ limit: '500' });
       if (opts?.search) params.set('search', opts.search);
       if (opts?.active) params.set('active', opts.active);
       const qs = params.toString();
@@ -1020,11 +1020,11 @@ export const api = {
       });
     },
     getGrowthAnalytics: async () =>
-      fetchJson('/admin/growth', {
+      fetchJson('/admin/growth?limit=500', {
         headers: { ...authHeaders() },
       }),
     getInvites: async () =>
-      fetchJson('/admin/invites', {
+      fetchJson('/admin/invites?limit=500', {
         headers: { ...authHeaders() },
       }),
     getConfig: async () =>
@@ -1086,7 +1086,7 @@ export const api = {
   /** [FIX] Added missing tickets object used across various dashboards */
   tickets: {
     getAll: async () =>
-      fetchJson('/tickets', {
+      fetchJson('/tickets?limit=500', {
         headers: { ...authHeaders() },
       }),
     getIssueTypes: async () =>

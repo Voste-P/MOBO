@@ -114,7 +114,7 @@ export function makeAdminController() {
           ];
         }
 
-        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
+        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
         const [users, total] = await Promise.all([
           db().user.findMany({
             where,
