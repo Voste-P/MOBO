@@ -23,10 +23,9 @@ export interface PaginatedResponse<T> {
 }
 
 /**
- * Build response — returns paginated envelope if client sent ?page= or ?limit=,
- * otherwise returns plain array for backward compatibility.
+ * Build response — always returns plain array for maximum backward compatibility.
+ * The frontend `asArray()` helper handles both formats as defense-in-depth.
  */
-export function paginatedResponse<T>(data: T[], total: number, page: number, limit: number, isPaginated: boolean): PaginatedResponse<T> | T[] {
-  if (!isPaginated) return data;
-  return { data, total, page, limit };
+export function paginatedResponse<T>(data: T[], _total: number, _page: number, _limit: number, _isPaginated: boolean): T[] {
+  return data;
 }
