@@ -1068,7 +1068,7 @@ const OrdersView = ({ user }: any) => {
                             />
                           </div>
                           <span className="text-sm font-bold text-zinc-900 line-clamp-1">
-                            {o.items[0]?.title || 'Unknown'}
+                            {o.items?.[0]?.title || 'Unknown'}
                           </span>
                         </div>
                       </td>

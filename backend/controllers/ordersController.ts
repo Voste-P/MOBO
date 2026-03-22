@@ -134,11 +134,17 @@ export function makeOrdersController(env: Env) {
         metadata: { step: vKey, autoVerified: true, aiConfidenceScore: aiConfidence },
       },
     );
-    const updated = await db().order.update({
-      where: { id: freshOrder.id },
+    // Guard: only update if order is still UNDER_REVIEW (prevents race conditions)
+    const guardResult = await db().order.updateMany({
+      where: { id: freshOrder.id, workflowStatus: 'UNDER_REVIEW' },
       data: { verification: v, events: evts as any },
+    });
+    if (guardResult.count === 0) return freshOrder; // Order was modified concurrently
+    const updated = await db().order.findFirst({
+      where: { id: freshOrder.id, isDeleted: false },
       include: { items: { where: { isDeleted: false } } },
     });
+    if (!updated) return freshOrder;
 
     const finalize = await finalizeApprovalIfReady(updated!, 'SYSTEM_AI', envRef);
     orderLog.info('Auto-verified step by AI confidence', {

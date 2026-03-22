@@ -915,6 +915,9 @@ export function makeOpsController(env: Env) {
           data: { isVerifiedByMediator: true },
         });
 
+        authCacheInvalidate(buyerBefore.id);
+        authCacheInvalidate(buyerBefore.mongoId!);
+
         const userMongoId = user.mongoId ?? '';
         await writeAuditLog({ req, action: 'BUYER_APPROVED', entityType: 'User', entityId: userMongoId });
         businessLog.info('Buyer approved', { userId: userMongoId, mediatorCode: upstreamMediatorCode });

@@ -886,7 +886,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
                         {o.brandName || 'Brand'}
                       </div>
                       <div className="text-[10px] text-slate-500 truncate max-w-[180px]">
-                        {o.items[0]?.title}
+                        {o.items?.[0]?.title || 'Unknown Product'}
                       </div>
                       {o.soldBy && o.soldBy !== 'null' && o.soldBy !== 'undefined' && (
                         <div className="text-[9px] text-slate-400 mt-0.5">Seller: {o.soldBy}</div>
