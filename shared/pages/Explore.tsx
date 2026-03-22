@@ -1,5 +1,5 @@
 ﻿import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { api } from '../services/api';
+import { api, asArray } from '../services/api';
 import { subscribeRealtime } from '../services/realtime';
 import { useToast } from '../context/ToastContext';
 import { Product } from '../types';
@@ -57,7 +57,7 @@ export const Explore: React.FC = () => {
     }
     try {
       const data = await api.products.getAll();
-      setProducts(Array.isArray(data) ? data : []);
+      setProducts(asArray<Product>(data));
       setFetchError(false);
     } catch (err) {
       console.error(err);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { api } from '../services/api';
+import { api, asArray } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
@@ -301,7 +301,7 @@ export const Orders: React.FC = () => {
       loadOrders();
       loadMyTickets();
       api.products.getAll().then((data) => {
-        setAvailableProducts(Array.isArray(data) ? data : []);
+        setAvailableProducts(asArray<Product>(data));
         setProductsLoadError(false);
       }).catch((err) => {
         if (process.env.NODE_ENV !== 'production') console.error('Failed to load products:', err);
@@ -323,9 +323,8 @@ export const Orders: React.FC = () => {
     if (!user?.id) return;
     try {
       const data = await api.tickets.getAll();
-      const mine = Array.isArray(data)
-        ? data.filter((t: Ticket) => t.userId === user.id && t.issueType !== 'Feedback')
-        : [];
+      const mine = asArray<Ticket>(data)
+        .filter((t: Ticket) => t.userId === user.id && t.issueType !== 'Feedback');
       setMyTickets(mine.sort((a: Ticket, b: Ticket) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     } catch { /* silently degrade — tickets are secondary */ }
   };
@@ -366,18 +365,18 @@ export const Orders: React.FC = () => {
   const loadOrders = async () => {
     if (!user?.id) return;
     try {
-      const data = await api.orders.getUserOrders(user.id);
+      const data = asArray<Order>(await api.orders.getUserOrders(user.id));
       setOrders(data);
       // Keep selectedOrder in sync with refreshed data
       setSelectedOrder((prev) => {
         if (!prev) return prev;
-        const refreshed = (data as Order[]).find((o: Order) => o.id === prev.id);
+        const refreshed = data.find((o: Order) => o.id === prev.id);
         return refreshed || null;
       });
       // Keep proof modal in sync with refreshed data
       setProofToView((prev) => {
         if (!prev) return prev;
-        const updated = (data as Order[]).find((o: Order) => o.id === prev.id);
+        const updated = data.find((o: Order) => o.id === prev.id);
         return updated || null;
       });
     } catch (e) {
@@ -406,7 +405,7 @@ export const Orders: React.FC = () => {
         // Keep filters/product titles in sync (non-critical, but avoids stale UI).
         api.products
           .getAll()
-          .then((data) => { setAvailableProducts(Array.isArray(data) ? data : []); setProductsLoadError(false); })
+          .then((data) => { setAvailableProducts(asArray<Product>(data)); setProductsLoadError(false); })
           .catch((err) => {
             if (process.env.NODE_ENV !== 'production') console.error('Failed to load products:', err);
             setAvailableProducts([]);
@@ -1725,7 +1724,7 @@ export const Orders: React.FC = () => {
                           onClick={() => {
                             setProductsLoadError(false);
                             api.products.getAll().then((data) => {
-                              setAvailableProducts(Array.isArray(data) ? data : []);
+                              setAvailableProducts(asArray<Product>(data));
                               setProductsLoadError(false);
                             }).catch(() => {
                               setProductsLoadError(true);

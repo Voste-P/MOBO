@@ -2083,7 +2083,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         if (auditDateFrom) params.from = new Date(auditDateFrom).toISOString();
                         if (auditDateTo) params.to = new Date(auditDateTo + 'T23:59:59').toISOString();
                         const data = await api.admin.getAuditLogs(params);
-                        setAuditLogs(Array.isArray(data) ? data : data?.logs ?? []);
+                        setAuditLogs(asArray(data));
                       } catch (e) {
                         console.error(e);
                         toast.error(formatErrorMessage(e, 'Failed to load audit logs'));

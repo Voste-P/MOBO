@@ -4,7 +4,7 @@ import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
 import { maskMobile } from '../utils/mobiles';
 import { ProxiedImage } from '../components/ProxiedImage';
-import { api } from '../services/api';
+import { api, asArray } from '../services/api';
 import { BetaLock } from '../components/BetaLock';
 import { subscribeRealtime } from '../services/realtime';
 import {
@@ -110,7 +110,7 @@ export const Profile: React.FC = () => {
     statsLoadingRef.current = true;
     setIsStatsLoading(true);
     try {
-      const userOrders = await api.orders.getUserOrders(user.id);
+      const userOrders = asArray<Order>(await api.orders.getUserOrders(user.id));
       setOrders(userOrders);
       const spent = userOrders
         .filter((o: Order) => o.paymentStatus === 'Paid')
