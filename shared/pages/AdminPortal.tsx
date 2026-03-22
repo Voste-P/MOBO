@@ -298,7 +298,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     if (auditDateTo) params.to = new Date(auditDateTo + 'T23:59:59').toISOString();
     api.admin
       .getAuditLogs(params)
-      .then((data) => setAuditLogs(Array.isArray(data) ? data : data?.logs ?? []))
+      .then((data) => setAuditLogs(asArray(data)))
       .catch((e) => { console.error('Audit Logs Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to load audit logs.')); })
       .finally(() => setAuditLoading(false));
   }, [user, view, auditActionFilter, auditDateFrom, auditDateTo]);
@@ -308,7 +308,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     if (view !== 'users') return;
     api.admin
       .getUsers('all')
-      .then((u) => setUsers(u))
+      .then((u) => setUsers(asArray(u)))
       .catch((e) => { console.error('Admin Users Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh users list.')); });
   }, [user, view]);
 
@@ -317,7 +317,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     if (view !== 'invites') return;
     api.admin
       .getInvites()
-      .then((i) => setInvites(i))
+      .then((i) => setInvites(asArray(i)))
       .catch((e) => { console.error('Admin Invites Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh invites.')); });
   }, [user, view]);
 
@@ -338,7 +338,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
           });
           break;
         case 'users':
-          api.admin.getUsers('all').then((u) => setUsers(u)).catch(() => {});
+          api.admin.getUsers('all').then((u) => setUsers(asArray(u))).catch(() => {});
           break;
         case 'orders':
         case 'finance':
@@ -463,7 +463,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     try {
       await api.admin.generateInvite(inviteRole, inviteLabel);
       const updated = await api.admin.getInvites();
-      setInvites(updated);
+      setInvites(asArray(updated));
       setInviteLabel('');
       toast.success('Invite generated');
     } catch (e) {
@@ -498,7 +498,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       await api.admin.deleteWallet(target.id);
       toast.success('Wallet deleted');
       const updated = await api.admin.getUsers('all');
-      setUsers(updated);
+      setUsers(asArray(updated));
     } catch (e: any) {
       toast.error(formatErrorMessage(e, 'Failed to delete wallet'));
     } finally {
@@ -515,7 +515,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       await api.admin.deleteUser(target.id);
       toast.success('User deleted');
       const updated = await api.admin.getUsers('all');
-      setUsers(updated);
+      setUsers(asArray(updated));
     } catch (e: any) {
       toast.error(formatErrorMessage(e, 'Failed to delete user'));
     } finally {
@@ -531,7 +531,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       await api.admin.deleteProduct(productId);
       toast.success('Product deleted');
       const updated = await api.admin.getProducts();
-      setProducts(updated);
+      setProducts(asArray(updated));
     } catch (e: any) {
       toast.error(formatErrorMessage(e, 'Failed to delete product'));
     } finally {
