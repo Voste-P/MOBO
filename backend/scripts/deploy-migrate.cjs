@@ -24,7 +24,7 @@ async function main() {
 
   const client = new Client({
     connectionString: url,
-    ssl: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'false'
+    ssl: (process.env.DB_SSL_REJECT_UNAUTHORIZED === 'false' || process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0')
       ? { rejectUnauthorized: false }
       : true,
   });

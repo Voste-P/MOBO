@@ -304,7 +304,7 @@ export function makeOpsController(env: Env) {
           ];
         }
 
-        const { page, limit, skip } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
+        const { limit, skip } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
 
         const mediators = await db().user.findMany({
           where,
@@ -619,7 +619,7 @@ export function makeOpsController(env: Env) {
           ];
         }
 
-        const { page: puPage, limit: puLimit, skip: puSkip } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
+        const { limit: puLimit, skip: puSkip } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
         const users = await db().user.findMany({
           where,
           orderBy: { createdAt: 'desc' },
@@ -662,7 +662,7 @@ export function makeOpsController(env: Env) {
           ];
         }
 
-        const { page: vuPage, limit: vuLimit, skip: vuSkip } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
+        const { limit: vuLimit, skip: vuSkip } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
         const users = await db().user.findMany({
           where,
           orderBy: { createdAt: 'desc' },
