@@ -1121,6 +1121,12 @@ async function verifyProofWithOcr(
     if (!amountMatch) detectedNotes.push(`Amount ₹${expectedAmount} not found in screenshot.`);
     if (expectedProductName && productNameMatch === false) detectedNotes.push('Product name mismatch.');
     if (orderIdMatch && amountMatch) detectedNotes.push('Both order ID and amount matched via OCR.');
+
+    // OCR-based cropped screenshot detection:
+    // If OCR extracted very little text (< 100 chars) after all fallbacks, the screenshot is likely cropped/incomplete.
+    const screenshotCropped = ocrText.length < 100;
+    if (screenshotCropped) detectedNotes.push('Screenshot appears cropped — very little text detected.');
+
     // Server-side platform comparison for OCR path
     let platformMatch: boolean | undefined;
     if (expectedPlatform && detectedPlatform) {
@@ -1143,6 +1149,7 @@ async function verifyProofWithOcr(
       ...(productNameMatch !== undefined ? { productNameMatch } : {}),
       ...(detectedPlatform !== undefined ? { detectedPlatform } : {}),
       ...(platformMatch !== undefined ? { platformMatch } : {}),
+      screenshotCropped,
       confidenceScore,
       discrepancyNote: detectedNotes.join(' ') || 'OCR fallback verification complete.',
     };

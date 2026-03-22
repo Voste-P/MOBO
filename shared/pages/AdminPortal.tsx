@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../components/ui/ConfirmDialog';
-import { api, asArray } from '../services/api';
+import { api, asArray, extractPaginationMeta } from '../services/api';
+import type { PaginationMeta } from '../services/api';
 import { getDirectBackendUrl } from '../utils/apiBaseUrl';
 import { maskMobile } from '../utils/mobiles';
 import { formatErrorMessage } from '../utils/errors';
@@ -10,7 +11,7 @@ import { ProxiedImage } from '../components/ProxiedImage';
 
 import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
-import { Button, EmptyState, IconButton, Input, Spinner } from '../components/ui';
+import { Button, EmptyState, IconButton, Input, Spinner, Pagination } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { RatingVerificationBadge, ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
 import { DesktopShell } from '../components/DesktopShell';
@@ -223,6 +224,19 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   const [inventorySearch, setInventorySearch] = useState('');
   const [proofModal, setProofModal] = useState<Order | null>(null);
 
+  // --- Pagination state per tab ---
+  const PAGE_SIZE = 50;
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersPagination, setUsersPagination] = useState<PaginationMeta | null>(null);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [ordersPagination, setOrdersPagination] = useState<PaginationMeta | null>(null);
+  const [productsPage, setProductsPage] = useState(1);
+  const [productsPagination, setProductsPagination] = useState<PaginationMeta | null>(null);
+  const [invitesPage, setInvitesPage] = useState(1);
+  const [invitesPagination, setInvitesPagination] = useState<PaginationMeta | null>(null);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditPagination, setAuditPagination] = useState<PaginationMeta | null>(null);
+
 
   // Admin-specific: show up to 2 decimal places
   const formatCurrency = (amount: number) => formatCurrencyBase(amount, { maximumFractionDigits: 2 });
@@ -292,34 +306,73 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     if (!user || user.role !== 'admin') return;
     if (view !== 'audit-logs') return;
     setAuditLoading(true);
-    const params: any = { limit: 200 };
+    const params: any = { limit: PAGE_SIZE, page: auditPage };
     if (auditActionFilter) params.action = auditActionFilter;
     if (auditDateFrom) params.from = new Date(auditDateFrom).toISOString();
     if (auditDateTo) params.to = new Date(auditDateTo + 'T23:59:59').toISOString();
     api.admin
       .getAuditLogs(params)
-      .then((data) => setAuditLogs(asArray(data)))
+      .then((res) => {
+        setAuditLogs(asArray(res));
+        setAuditPagination(extractPaginationMeta(res));
+      })
       .catch((e) => { console.error('Audit Logs Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to load audit logs.')); })
       .finally(() => setAuditLoading(false));
-  }, [user, view, auditActionFilter, auditDateFrom, auditDateTo]);
+  }, [user, view, auditActionFilter, auditDateFrom, auditDateTo, auditPage]);
 
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
     if (view !== 'users') return;
+    const role = userRoleFilter === 'All' ? 'all' : userRoleFilter.toLowerCase();
+    const search = userSearch.trim() || undefined;
     api.admin
-      .getUsers('all')
-      .then((u) => setUsers(asArray(u)))
+      .getUsers(role, { page: usersPage, limit: PAGE_SIZE, search })
+      .then((res) => {
+        setUsers(asArray(res));
+        setUsersPagination(extractPaginationMeta(res));
+      })
       .catch((e) => { console.error('Admin Users Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh users list.')); });
-  }, [user, view]);
+  }, [user, view, usersPage, userRoleFilter, userSearch]);
 
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
     if (view !== 'invites') return;
     api.admin
-      .getInvites()
-      .then((i) => setInvites(asArray(i)))
+      .getInvites({ page: invitesPage, limit: PAGE_SIZE })
+      .then((res) => {
+        setInvites(asArray(res));
+        setInvitesPagination(extractPaginationMeta(res));
+      })
       .catch((e) => { console.error('Admin Invites Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh invites.')); });
-  }, [user, view]);
+  }, [user, view, invitesPage]);
+
+  // Re-fetch orders when page changes
+  useEffect(() => {
+    if (!user || user.role !== 'admin') return;
+    if (view !== 'orders' && view !== 'finance') return;
+    if (ordersPage === 1) return; // page 1 already fetched by fetchAllData
+    api.admin.getFinancials({ page: ordersPage, limit: PAGE_SIZE }).then((res) => {
+      const safeOrders = asArray<Order>(res);
+      setOrders(safeOrders);
+      setOrdersPagination(extractPaginationMeta(res));
+      setProofModal((prev) => {
+        if (!prev) return prev;
+        const updated = safeOrders.find((ord: Order) => ord.id === prev.id);
+        return updated || null;
+      });
+    }).catch((e) => { console.error('Admin Orders Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh orders.')); });
+  }, [user, view, ordersPage]);
+
+  // Re-fetch products when page changes
+  useEffect(() => {
+    if (!user || user.role !== 'admin') return;
+    if (view !== 'inventory') return;
+    if (productsPage === 1) return; // page 1 already fetched by fetchAllData
+    api.admin.getProducts({ page: productsPage, limit: PAGE_SIZE }).then((res) => {
+      setProducts(asArray(res));
+      setProductsPagination(extractPaginationMeta(res));
+    }).catch((e) => { console.error('Admin Products Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh products.')); });
+  }, [user, view, productsPage]);
 
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
@@ -338,13 +391,17 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
           });
           break;
         case 'users':
-          api.admin.getUsers('all').then((u) => setUsers(asArray(u))).catch(() => {});
+          api.admin.getUsers('all', { page: usersPage, limit: PAGE_SIZE }).then((res) => {
+            setUsers(asArray(res));
+            setUsersPagination(extractPaginationMeta(res));
+          }).catch(() => {});
           break;
         case 'orders':
         case 'finance':
-          api.admin.getFinancials().then((o) => {
-            const safeOrders = asArray<Order>(o);
+          api.admin.getFinancials({ page: ordersPage, limit: PAGE_SIZE }).then((res) => {
+            const safeOrders = asArray<Order>(res);
             setOrders(safeOrders);
+            setOrdersPagination(extractPaginationMeta(res));
             setProofModal((prev) => {
               if (!prev) return prev;
               const updated = safeOrders.find((ord: Order) => ord.id === prev.id);
@@ -353,14 +410,20 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
           }).catch(() => {});
           break;
         case 'inventory':
-          api.admin.getProducts().then((p) => setProducts(asArray(p))).catch(() => {});
+          api.admin.getProducts({ page: productsPage, limit: PAGE_SIZE }).then((res) => {
+            setProducts(asArray(res));
+            setProductsPagination(extractPaginationMeta(res));
+          }).catch(() => {});
           break;
         case 'support':
         case 'feedback':
           api.tickets.getAll().then((t) => setTickets(asArray(t))).catch(() => {});
           break;
         case 'invites':
-          api.admin.getInvites().then((i) => setInvites(asArray(i))).catch(() => {});
+          api.admin.getInvites({ page: invitesPage, limit: PAGE_SIZE }).then((res) => {
+            setInvites(asArray(res));
+            setInvitesPagination(extractPaginationMeta(res));
+          }).catch(() => {});
           break;
         default:
           break;
@@ -374,12 +437,12 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     setIsLoading(true);
     try {
       const results = await Promise.allSettled([
-        api.admin.getUsers('all'),
-        api.admin.getFinancials(),
-        api.admin.getProducts(),
+        api.admin.getUsers('all', { page: 1, limit: PAGE_SIZE }),
+        api.admin.getFinancials({ page: 1, limit: PAGE_SIZE }),
+        api.admin.getProducts({ page: 1, limit: PAGE_SIZE }),
         api.admin.getStats(),
         api.admin.getGrowthAnalytics(),
-        api.admin.getInvites(),
+        api.admin.getInvites({ page: 1, limit: PAGE_SIZE }),
         api.tickets.getAll(),
       ]);
 
@@ -387,12 +450,15 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
 
       const failures: string[] = [];
 
-      if (u.status === 'fulfilled') setUsers(asArray(u.value));
-      else { console.error('Admin Users Fetch Error:', u.reason); failures.push('users'); }
+      if (u.status === 'fulfilled') {
+        setUsers(asArray(u.value));
+        setUsersPagination(extractPaginationMeta(u.value));
+      } else { console.error('Admin Users Fetch Error:', u.reason); failures.push('users'); }
 
       if (o.status === 'fulfilled') {
         const safeOrders = asArray<Order>(o.value);
         setOrders(safeOrders);
+        setOrdersPagination(extractPaginationMeta(o.value));
         // Keep proof modal in sync with refreshed data
         setProofModal((prev) => {
           if (!prev) return prev;
@@ -401,8 +467,10 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         });
       } else { console.error('Admin Financials Fetch Error:', o.reason); failures.push('financials'); }
 
-      if (p.status === 'fulfilled') setProducts(asArray(p.value));
-      else { console.error('Admin Products Fetch Error:', p.reason); failures.push('products'); }
+      if (p.status === 'fulfilled') {
+        setProducts(asArray(p.value));
+        setProductsPagination(extractPaginationMeta(p.value));
+      } else { console.error('Admin Products Fetch Error:', p.reason); failures.push('products'); }
 
       if (s.status === 'fulfilled') setStats(s.value);
       else { console.error('Admin Stats Fetch Error:', s.reason); failures.push('stats'); }
@@ -410,8 +478,10 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       if (g.status === 'fulfilled') setChartData(asArray(g.value));
       else { console.error('Admin Growth Fetch Error:', g.reason); failures.push('analytics'); }
 
-      if (i.status === 'fulfilled') setInvites(asArray(i.value));
-      else { console.error('Admin Invites Fetch Error:', i.reason); failures.push('invites'); }
+      if (i.status === 'fulfilled') {
+        setInvites(asArray(i.value));
+        setInvitesPagination(extractPaginationMeta(i.value));
+      } else { console.error('Admin Invites Fetch Error:', i.reason); failures.push('invites'); }
 
       if (t.status === 'fulfilled') setTickets(asArray(t.value));
       else { console.error('Admin Tickets Fetch Error:', t.reason); failures.push('tickets'); }
@@ -1576,7 +1646,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         <button
                           key={role}
                           type="button"
-                          onClick={() => setUserRoleFilter(role)}
+                          onClick={() => { setUserRoleFilter(role); setUsersPage(1); }}
                           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
                             userRoleFilter === role
                               ? 'bg-slate-900 text-white border-slate-900 shadow-md'
@@ -1588,7 +1658,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       ))}
                     </div>
                     <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                      {filteredUsers.length} Records
+                      {usersPagination ? `${usersPagination.total.toLocaleString()} Total` : `${filteredUsers.length} Records`}
                     </div>
                   </div>
                   <div className="relative">
@@ -1597,7 +1667,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       type="text"
                       placeholder="Search by name, mobile, email, or code..."
                       value={userSearch}
-                      onChange={(e) => setUserSearch(e.target.value)}
+                      onChange={(e) => { setUserSearch(e.target.value); setUsersPage(1); }}
                       className="w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all bg-white placeholder:text-slate-400"
                     />
                     {userSearch && (
@@ -1717,6 +1787,15 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     </tbody>
                   </table>
                 </div>
+                {usersPagination && usersPagination.totalPages > 1 && (
+                  <Pagination
+                    page={usersPage}
+                    totalPages={usersPagination.totalPages}
+                    total={usersPagination.total}
+                    limit={usersPagination.limit}
+                    onPageChange={(p) => { setUsersPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  />
+                )}
               </div>
             )}
 
@@ -1863,7 +1942,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     <option value="Rejected_Expired">Expired</option>
                     <option value="Paid">Paid</option>
                   </select>
-                  <span className="text-xs text-slate-400 font-bold">{filteredOrders.length} orders</span>
+                  <span className="text-xs text-slate-400 font-bold">{ordersPagination ? `${ordersPagination.total.toLocaleString()} total` : `${filteredOrders.length} orders`}</span>
                 </div>
                 <div className="overflow-x-auto max-h-[600px] overflow-y-auto scrollbar-styled">
                   <table className="w-full text-left">
@@ -1880,12 +1959,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 text-sm font-medium">
-                      {filteredOrders.length > 200 && (
-                        <tr><td colSpan={8} className="p-3 text-center text-xs text-amber-600 bg-amber-50 font-semibold">
-                          Showing 200 of {filteredOrders.length} orders. Use filters to narrow results.
-                        </td></tr>
-                      )}
-                      {filteredOrders.slice(0, 200).map((o) => (
+                      {filteredOrders.map((o) => (
                         <tr key={o.id} className="hover:bg-slate-50/50 transition-colors">
                           <td className="p-5">
                             <div className="font-mono text-slate-500">
@@ -1922,6 +1996,15 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     </tbody>
                   </table>
                 </div>
+                {ordersPagination && ordersPagination.totalPages > 1 && (
+                  <Pagination
+                    page={ordersPage}
+                    totalPages={ordersPagination.totalPages}
+                    total={ordersPagination.total}
+                    limit={ordersPagination.limit}
+                    onPageChange={(p) => { setOrdersPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  />
+                )}
               </div>
             )}
 
@@ -1930,7 +2013,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
               <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden animate-enter">
                 <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                   <h3 className="font-extrabold text-lg text-slate-900">Live Inventory</h3>
-                  <span className="text-xs text-slate-400 font-bold">{filteredProducts.length} products</span>
+                  <span className="text-xs text-slate-400 font-bold">{productsPagination ? `${productsPagination.total.toLocaleString()} total` : `${filteredProducts.length} products`}</span>
                 </div>
                 <div className="p-4 border-b border-slate-100">
                   <Input
@@ -2019,6 +2102,15 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   </tbody>
                 </table>
                 </div>
+                {productsPagination && productsPagination.totalPages > 1 && (
+                  <Pagination
+                    page={productsPage}
+                    totalPages={productsPagination.totalPages}
+                    total={productsPagination.total}
+                    limit={productsPagination.limit}
+                    onPageChange={(p) => { setProductsPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  />
+                )}
               </div>
             )}
 
@@ -2078,12 +2170,13 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     onClick={async () => {
                       setAuditLoading(true);
                       try {
-                        const params: any = { limit: 10000 };
+                        const params: any = { limit: PAGE_SIZE, page: auditPage };
                         if (auditActionFilter) params.action = auditActionFilter;
                         if (auditDateFrom) params.from = new Date(auditDateFrom).toISOString();
                         if (auditDateTo) params.to = new Date(auditDateTo + 'T23:59:59').toISOString();
-                        const data = await api.admin.getAuditLogs(params);
-                        setAuditLogs(asArray(data));
+                        const res = await api.admin.getAuditLogs(params);
+                        setAuditLogs(asArray(res));
+                        setAuditPagination(extractPaginationMeta(res));
                       } catch (e) {
                         console.error(e);
                         toast.error(formatErrorMessage(e, 'Failed to load audit logs'));
@@ -2106,7 +2199,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   />
                   <select
                     value={auditActionFilter}
-                    onChange={(e) => setAuditActionFilter(e.target.value)}
+                    onChange={(e) => { setAuditActionFilter(e.target.value); setAuditPage(1); }}
                     aria-label="Filter by audit action"
                     className="px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-slate-300"
                   >
@@ -2195,6 +2288,16 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   </table>
                   </div>
                 </div>
+                {auditPagination && auditPagination.totalPages > 1 && (
+                  <Pagination
+                    page={auditPage}
+                    totalPages={auditPagination.totalPages}
+                    total={auditPagination.total}
+                    limit={auditPagination.limit}
+                    onPageChange={(p) => { setAuditPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    className="rounded-b-2xl"
+                  />
+                )}
               </div>
             )}
           </div>

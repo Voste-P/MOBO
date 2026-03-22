@@ -18,6 +18,37 @@ export function asArray<T = any>(response: unknown): T[] {
   return [];
 }
 
+/** Pagination metadata extracted from a paginated envelope */
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+/**
+ * Extract pagination metadata from an API response envelope.
+ * Returns null if the response is a plain array (no pagination info).
+ */
+export function extractPaginationMeta(response: unknown): PaginationMeta | null {
+  if (
+    response &&
+    typeof response === 'object' &&
+    !Array.isArray(response) &&
+    'total' in (response as any) &&
+    'page' in (response as any)
+  ) {
+    const r = response as any;
+    return {
+      total: Number(r.total) || 0,
+      page: Number(r.page) || 1,
+      limit: Number(r.limit) || 50,
+      totalPages: Number(r.totalPages) || 1,
+    };
+  }
+  return null;
+}
+
 export const TOKEN_STORAGE_KEY = 'mobo_tokens_v1';
 
 function makeRequestId(): string {
@@ -987,8 +1018,10 @@ export const api = {
         headers: { ...authHeaders() },
       }),
     /** [FIX] Updated getUsers to accept an optional role argument for AdminPortal.tsx */
-    getUsers: async (role: string = 'all', opts?: { search?: string; status?: string }) => {
-      const params = new URLSearchParams({ role, limit: '500' });
+    getUsers: async (role: string = 'all', opts?: { search?: string; status?: string; page?: number; limit?: number }) => {
+      const params = new URLSearchParams({ role });
+      if (opts?.page) params.set('page', String(opts.page));
+      if (opts?.limit) params.set('limit', String(opts.limit));
       if (opts?.search) params.set('search', opts.search);
       if (opts?.status) params.set('status', opts.status);
       return fetchJson(`/admin/users?${params}`, {
@@ -996,16 +1029,20 @@ export const api = {
       });
     },
     /** [FIX] Added missing admin methods used in AdminPortal.tsx */
-    getFinancials: async (opts?: { status?: string }) => {
-      const params = new URLSearchParams({ limit: '500' });
+    getFinancials: async (opts?: { status?: string; page?: number; limit?: number }) => {
+      const params = new URLSearchParams();
+      if (opts?.page) params.set('page', String(opts.page));
+      if (opts?.limit) params.set('limit', String(opts.limit));
       if (opts?.status) params.set('status', opts.status);
       const qs = params.toString();
       return fetchJson(`/admin/financials${qs ? '?' + qs : ''}`, {
         headers: { ...authHeaders() },
       });
     },
-    getProducts: async (opts?: { search?: string; active?: string }) => {
-      const params = new URLSearchParams({ limit: '500' });
+    getProducts: async (opts?: { search?: string; active?: string; page?: number; limit?: number }) => {
+      const params = new URLSearchParams();
+      if (opts?.page) params.set('page', String(opts.page));
+      if (opts?.limit) params.set('limit', String(opts.limit));
       if (opts?.search) params.set('search', opts.search);
       if (opts?.active) params.set('active', opts.active);
       const qs = params.toString();
@@ -1020,13 +1057,18 @@ export const api = {
       });
     },
     getGrowthAnalytics: async () =>
-      fetchJson('/admin/growth?limit=500', {
+      fetchJson('/admin/growth', {
         headers: { ...authHeaders() },
       }),
-    getInvites: async () =>
-      fetchJson('/admin/invites?limit=500', {
+    getInvites: async (opts?: { page?: number; limit?: number }) => {
+      const params = new URLSearchParams();
+      if (opts?.page) params.set('page', String(opts.page));
+      if (opts?.limit) params.set('limit', String(opts.limit));
+      const qs = params.toString();
+      return fetchJson(`/admin/invites${qs ? '?' + qs : ''}`, {
         headers: { ...authHeaders() },
-      }),
+      });
+    },
     getConfig: async () =>
       fetchJson('/admin/config', {
         headers: { ...authHeaders() },
@@ -1085,10 +1127,15 @@ export const api = {
   },
   /** [FIX] Added missing tickets object used across various dashboards */
   tickets: {
-    getAll: async () =>
-      fetchJson('/tickets?limit=500', {
+    getAll: async (opts?: { page?: number; limit?: number }) => {
+      const params = new URLSearchParams();
+      if (opts?.page) params.set('page', String(opts.page));
+      if (opts?.limit) params.set('limit', String(opts.limit));
+      const qs = params.toString();
+      return fetchJson(`/tickets${qs ? '?' + qs : ''}`, {
         headers: { ...authHeaders() },
-      }),
+      });
+    },
     getIssueTypes: async () =>
       fetchJson('/tickets/issue-types', {
         headers: { ...authHeaders() },
