@@ -1777,7 +1777,7 @@ export async function verifyRatingScreenshotWithAi(
               `   - Key UI elements (navigation bar, page title, account icon) are absent from the top`,
               `   Set screenshotCropped=false ONLY if the screenshot shows a COMPLETE or near-complete page view with the page header/top visible.`,
               `   When in doubt, set screenshotCropped=true — better to ask for a full screenshot than to let fraud through.`,
-              `9. HEADER GREETING DETECTION (CRITICAL):`,
+              `9. HEADER GREETING DETECTION (CRITICAL FOR FRAUD PREVENTION):`,
               `   Look specifically at the VERY TOP of the screenshot for a text greeting like:`,
               `   "Hello, <Name>", "Hi, <Name>", "Deliver to <Name>", "Account & Lists", or any navigation header showing user identity.`,
               `   Set headerGreetingVisible=true ONLY if such a greeting or account indicator is visible at the TOP of the page.`,
@@ -1785,6 +1785,7 @@ export async function verifyRatingScreenshotWithAi(
               `   IMPORTANT: The "<Name> Edit public name" text is NOT a header greeting — it is the profile section. Do NOT confuse these two.`,
               `   detectedAccountName MUST come ONLY from the header greeting ("Hello, Ashok" → "Ashok"). If no header greeting is visible, set detectedAccountName to empty string "".`,
               `   detectedPublicName comes from "<Name> Edit public name" text in the profile area.`,
+              `   headerGreetingText: Copy the EXACT VERBATIM greeting text from the top of the page (e.g. "Hello, Ashok" or "Deliver to Ashok - Mumbai 400001"). If no greeting/header text is visible, set to empty string "". Do NOT copy text from the profile/"Edit public name" area.`,
             ].join('\n') },
           ],
           config: {
@@ -1801,6 +1802,7 @@ export async function verifyRatingScreenshotWithAi(
                 detectedProductName: { type: Type.STRING },
                 screenshotCropped: { type: Type.BOOLEAN, description: 'true if the screenshot appears cropped, cut off, or incomplete — missing page header, account area, or showing only a fragment of the page' },
                 headerGreetingVisible: { type: Type.BOOLEAN, description: 'true ONLY if a greeting/header like "Hello, <Name>" or "Deliver to <Name>" or Amazon navigation bar with account name is visible at the TOP of the screenshot. "<Name> Edit public name" is NOT a header greeting — that is the profile section. Set false if the page starts directly with the review/rating content.' },
+                headerGreetingText: { type: Type.STRING, description: 'EXACT VERBATIM text of the greeting/header visible at the TOP of the page, e.g. "Hello, Ashok" or "Deliver to Ashok". If no greeting is visible, set to empty string "". Do NOT copy text from the "Edit public name" profile area.' },
                 discrepancyNote: { type: Type.STRING },
               },
               required: ['accountNameMatch', 'productNameMatch', 'confidenceScore', 'screenshotCropped', 'headerGreetingVisible'],
@@ -1913,38 +1915,31 @@ export async function verifyRatingScreenshotWithAi(
           }
         }
 
-        // Post-process: Detect cropped screenshots that Gemini missed.
-        // Multiple strategies to catch cropped screenshots:
-        // 1. headerGreetingVisible=false with public name visible → definitely cropped
-        // 2. detectedAccountName matches detectedPublicName → Gemini likely extracted both from same source
-        // 3. detectedAccountName is empty/missing but detectedPublicName exists → top cropped
-        if (!parsed.screenshotCropped) {
+        // BULLETPROOF crop detection — runs ALWAYS, overrides Gemini's screenshotCropped.
+        // We do NOT trust Gemini's boolean fields (screenshotCropped, headerGreetingVisible)
+        // because Gemini is non-deterministic and often gets these wrong.
+        // Instead, we validate using the VERBATIM headerGreetingText field: if it doesn't
+        // contain an actual greeting keyword, the header is not visible → screenshot is cropped.
+        {
           const hasPublicName = !!parsed.detectedPublicName && parsed.detectedPublicName.length > 0 && !/^(null|undefined|n\/a|none|\s*)$/i.test(parsed.detectedPublicName);
-          const hasAccountName = !!parsed.detectedAccountName && parsed.detectedAccountName.length > 0 && !/^(null|undefined|n\/a|none|\s*)$/i.test(parsed.detectedAccountName);
-          const headerVisible = (parsed as any).headerGreetingVisible === true;
+          const headerText = ((parsed as any).headerGreetingText || '').trim();
+          // Check if headerGreetingText contains a REAL greeting keyword that would only
+          // appear in the Amazon page header, NOT in the "Edit public name" profile area.
+          const GREETING_KEYWORDS = /\b(hello|hi|hey|deliver\s*to|account|welcome|namaste|sign\s*in|returns|orders)\b/i;
+          const hasRealGreeting = headerText.length > 0 && GREETING_KEYWORDS.test(headerText);
+          // Also reject if headerGreetingText just repeats the public name without greeting prefix
+          // (Gemini sometimes copies "ashok" from profile into headerGreetingText too)
+          const headerIsJustName = headerText.length > 0 && !GREETING_KEYWORDS.test(headerText);
 
-          // Strategy 1: Gemini explicitly says no header greeting visible
-          if (hasPublicName && !headerVisible) {
+          if (hasPublicName && (!hasRealGreeting || headerIsJustName)) {
+            // Public name ("Edit public name") is visible but no real header greeting found
+            // → screenshot is cropped, regardless of what Gemini says
             parsed.screenshotCropped = true;
-          }
-          // Strategy 2: Both names detected but they're identical — Gemini likely extracted both from "<Name> Edit public name"
-          // In a real full screenshot, the header says "Hello, Ashok" and profile says "ashok Edit public name"
-          // — these would typically have different casing/format if from different sources
-          if (hasPublicName && hasAccountName && !headerVisible) {
-            const acctClean = (parsed.detectedAccountName || '').toLowerCase().trim();
-            const pubClean = (parsed.detectedPublicName || '').toLowerCase().trim();
-            if (acctClean === pubClean || acctClean.includes(pubClean) || pubClean.includes(acctClean)) {
-              parsed.screenshotCropped = true;
+            // Build descriptive note
+            const cropNote = 'Screenshot appears cropped: reviewer public name is visible but the account header/greeting at the top of the page is missing. Please upload a FULL screenshot showing the complete page including the "Hello, <Name>" header.';
+            if (!parsed.discrepancyNote || !parsed.discrepancyNote.includes('cropped')) {
+              parsed.discrepancyNote = (parsed.discrepancyNote ? parsed.discrepancyNote + ' ' : '') + cropNote;
             }
-          }
-          // Strategy 3: No account name at all but public name exists
-          if (hasPublicName && !hasAccountName) {
-            parsed.screenshotCropped = true;
-          }
-
-          if (parsed.screenshotCropped) {
-            parsed.discrepancyNote = (parsed.discrepancyNote ? parsed.discrepancyNote + ' ' : '') +
-              'Screenshot appears cropped: reviewer public name is visible but the account header/greeting at the top of the page is missing. Please upload a FULL screenshot showing the complete page including the "Hello, <Name>" header.';
           }
         }
 
