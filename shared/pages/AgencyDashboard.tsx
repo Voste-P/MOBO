@@ -517,7 +517,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
       onRefresh();
     } catch (err) {
       console.error('Ledger update failed:', err);
-      toast.error('Update failed');
+      toast.error(formatErrorMessage(err, 'Failed to update ledger. Please try again.'));
     } finally {
       setIsUpdating(false);
     }
@@ -2289,8 +2289,20 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                               try {
                                 const res = await api.ops.copyCampaign(c.id);
                                 if (res.ok) {
-                                  toast.success('Campaign copied as Draft — see Active Inventory');
+                                  toast.success('Campaign copied as Draft — configure distribution');
                                   await onRefresh();
+                                  // Open distribute modal for the new draft campaign
+                                  if (res.campaign) {
+                                    setSelectedDealType(res.campaign.dealType || 'Discount');
+                                    setCustomPrice(String(res.campaign.price ?? 0));
+                                    setCustomPayout(String(res.campaign.payout ?? 0));
+                                    setCommissionOnDeal('0');
+                                    setCommissionToMediator(String(res.campaign.payout ?? 0));
+                                    setAssignments({});
+                                    setMediatorPayouts({});
+                                    setOpenToAll(false);
+                                    setAssignModal(res.campaign);
+                                  }
                                   setSubTab('inventory');
                                 } else {
                                   toast.error((res as any).error || 'Copy failed');
@@ -2427,7 +2439,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
           onClick={() => setCreateModal(false)}
         >
           <div
-            className="bg-white w-[95%] md:w-full max-w-lg rounded-[2rem] p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto scrollbar-styled animate-slide-up"
+            className="bg-white w-[95%] md:w-full max-w-lg rounded-[2rem] p-8 shadow-2xl relative max-h-[90dvh] overflow-y-auto scrollbar-styled animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-6">
@@ -2681,83 +2693,77 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-end gap-2">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
-                        Deal Price (₹)
-                      </label>
-                      <div className="bg-slate-50 border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center">
-                        <span className="text-xs font-bold text-slate-400 mr-2"></span>
-                        <input
-                          type="number"
-                          value={customPrice}
-                          readOnly
-                          aria-readonly="true"
-                          tabIndex={-1}
-                          className="w-12 bg-transparent text-[11px] font-bold text-slate-600 outline-none cursor-not-allowed"
-                          placeholder="0"
-                        />
-                      </div>
-                    </div>
-
-                    {!isAgencyCampaign && (
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
-                          Commission from Brand (₹)
-                        </label>
-                        <div className="bg-slate-50 border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center">
-                          <span className="text-xs font-bold text-slate-400 mr-2"></span>
-                          <input
-                            type="number"
-                            value={customPayout}
-                            readOnly
-                            aria-readonly="true"
-                            tabIndex={-1}
-                            className="w-12 bg-transparent text-[11px] font-bold text-slate-600 outline-none cursor-not-allowed"
-                            placeholder="0"
-                          />
-                        </div>
-                      </div>
-                    )}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
+                    Deal Price (₹)
+                  </label>
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center">
+                    <span className="text-xs font-bold text-slate-400 mr-2"></span>
+                    <input
+                      type="number"
+                      value={customPrice}
+                      readOnly
+                      aria-readonly="true"
+                      tabIndex={-1}
+                      className="w-12 bg-transparent text-[11px] font-bold text-slate-600 outline-none cursor-not-allowed"
+                      placeholder="0"
+                    />
                   </div>
+                </div>
 
-                  <div className="flex items-end gap-2">
-                    {!isAgencyCampaign && (
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
-                          Commission on Deal (₹)
-                        </label>
-                        <div className="bg-white border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center focus-within:ring-2 focus-within:ring-purple-100 transition-all">
-                          <span className="text-xs font-bold text-slate-400 mr-2"></span>
-                          <input
-                            type="number"
-                            value={commissionOnDeal}
-                            onChange={(e) => setCommissionOnDeal(e.target.value)}
-                            className="w-16 bg-transparent text-[11px] font-bold text-slate-900 outline-none"
-                            placeholder="0"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
-                        Default Commission to Mediator (₹)
-                      </label>
-                      <div className="bg-white border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center focus-within:ring-2 focus-within:ring-purple-100 transition-all">
-                        <span className="text-xs font-bold text-slate-400 mr-2"></span>
-                        <input
-                          type="number"
-                          value={commissionToMediator}
-                          onChange={(e) => setCommissionToMediator(e.target.value)}
-                          className="w-16 bg-transparent text-[11px] font-bold text-slate-900 outline-none"
-                          placeholder="0"
-                        />
-                      </div>
+                {!isAgencyCampaign && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
+                      Commission from Brand (₹)
+                    </label>
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center">
+                      <span className="text-xs font-bold text-slate-400 mr-2"></span>
+                      <input
+                        type="number"
+                        value={customPayout}
+                        readOnly
+                        aria-readonly="true"
+                        tabIndex={-1}
+                        className="w-12 bg-transparent text-[11px] font-bold text-slate-600 outline-none cursor-not-allowed"
+                        placeholder="0"
+                      />
                     </div>
                   </div>
-              </div>
+                )}
+
+                {!isAgencyCampaign && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
+                      Commission on Deal (₹)
+                    </label>
+                    <div className="bg-white border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center focus-within:ring-2 focus-within:ring-purple-100 transition-all">
+                      <span className="text-xs font-bold text-slate-400 mr-2"></span>
+                      <input
+                        type="number"
+                        value={commissionOnDeal}
+                        onChange={(e) => setCommissionOnDeal(e.target.value)}
+                        className="w-16 bg-transparent text-[11px] font-bold text-slate-900 outline-none"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
+                    Default Commission to Mediator (₹)
+                  </label>
+                  <div className="bg-white border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center focus-within:ring-2 focus-within:ring-purple-100 transition-all">
+                    <span className="text-xs font-bold text-slate-400 mr-2"></span>
+                    <input
+                      type="number"
+                      value={commissionToMediator}
+                      onChange={(e) => setCommissionToMediator(e.target.value)}
+                      className="w-16 bg-transparent text-[11px] font-bold text-slate-900 outline-none"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
 
                 <div className="flex gap-2 ml-auto">
                   <button
@@ -2778,27 +2784,25 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
             </div>
 
             {/* ── Open to All Toggle ── */}
-            <div className={`p-2 rounded-xl mb-1 border transition-all shrink-0 ${openToAll ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'}`}>
-              <div className="flex items-center justify-between gap-3">
+            <div className={`px-3 py-1.5 rounded-xl mb-1 border transition-all shrink-0 ${openToAll ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'}`}>
+              <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setOpenToAll(!openToAll)}
-                    className={`relative w-12 h-6 rounded-full transition-colors ${openToAll ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                    className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${openToAll ? 'bg-emerald-500' : 'bg-slate-300'}`}
                     aria-label="Toggle Open to All"
                   >
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${openToAll ? 'translate-x-6' : 'translate-x-0'}`} />
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${openToAll ? 'translate-x-5' : 'translate-x-0'}`} />
                   </button>
-                  <div>
-                    <p className="text-sm font-black text-slate-900">🌐 Open to All Mediators</p>
-                    <p className="text-[10px] text-slate-500 font-medium">
-                      {openToAll
-                        ? 'All connected mediators can publish this deal. Buyers purchase first-come-first-serve until all slots are used.'
-                        : 'Enable to skip individual allocation — all mediators share the total slot pool.'}
-                    </p>
-                  </div>
+                  <p className="text-xs font-black text-slate-900">🌐 Open to All Mediators</p>
+                  <p className="text-[10px] text-slate-400 font-medium hidden sm:block">
+                    {openToAll
+                      ? 'All mediators can publish. First-come-first-serve.'
+                      : 'Skip individual allocation.'}
+                  </p>
                 </div>
                 {openToAll && (
-                  <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-full border border-emerald-200 whitespace-nowrap">
+                  <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-1 rounded-full border border-emerald-200 whitespace-nowrap">
                     {assignModal?.totalSlots ?? 0} slots shared
                   </span>
                 )}
@@ -2842,7 +2846,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
             </div>
 
             {/* Mediator List — scrollable container sized to fill modal */}
-            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-styled space-y-1 pr-2 mb-1">
+            <div className="flex-1 min-h-[200px] overflow-y-auto scrollbar-styled space-y-1 pr-2 mb-1">
               {activeMediatorsForAssign.length === 0 ? (
                 loading ? (
                   <EmptyState
@@ -3314,7 +3318,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
           onClick={() => setProofOrder(null)}
         >
           <div
-            className="bg-white w-full max-w-lg rounded-[2rem] p-6 shadow-2xl relative flex flex-col max-h-[85vh]"
+            className="bg-white w-full max-w-lg rounded-[2rem] p-6 shadow-2xl relative flex flex-col max-h-[90dvh]"
             onClick={(e) => e.stopPropagation()}
           >
             <button type="button" aria-label="Close" onClick={() => setProofOrder(null)} className="absolute top-4 right-4 p-2 bg-slate-50 rounded-full hover:bg-slate-100 transition-colors">
@@ -3441,7 +3445,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
       {/* Reject Modal */}
       {rejectModal && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in" onClick={() => { setRejectModal(null); setRejectReason(''); }}>
-          <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl max-h-[90dvh] overflow-y-auto scrollbar-styled" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-extrabold text-lg text-red-600 mb-1 flex items-center gap-2"><AlertTriangle size={20} /> Reject Proof</h3>
             <p className="text-xs text-slate-500 mb-4">Order {getPrimaryOrderId(rejectModal.order)} · Rejecting <strong>{rejectModal.type}</strong> proof</p>
             <textarea
@@ -3785,7 +3789,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
           onClick={() => setSelectedMediator(null)}
         >
           <div
-            className="bg-white w-[95%] md:w-full max-w-5xl rounded-[2.5rem] shadow-2xl relative max-h-[90vh] flex flex-col animate-slide-up overflow-hidden"
+            className="bg-white w-[95%] md:w-full max-w-5xl rounded-[2.5rem] shadow-2xl relative max-h-[90dvh] flex flex-col animate-slide-up overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -4032,7 +4036,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
           onClick={() => setProofOrder(null)}
         >
           <div
-            className="bg-white w-full max-w-lg rounded-[2rem] p-6 shadow-2xl relative flex flex-col max-h-[85vh]"
+            className="bg-white w-full max-w-lg rounded-[2rem] p-6 shadow-2xl relative flex flex-col max-h-[90dvh]"
             onClick={(e) => e.stopPropagation()}
           >
             <button

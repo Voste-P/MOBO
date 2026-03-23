@@ -204,7 +204,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleClose} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[90vh] overflow-y-auto scrollbar-styled animate-enter">
+      <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[90dvh] overflow-y-auto scrollbar-styled animate-enter">
         {/* Header */}
         <div className="sticky top-0 bg-white rounded-t-3xl px-5 pt-5 pb-3 border-b border-gray-100 flex items-center justify-between z-10">
           <div className="flex items-center gap-2">

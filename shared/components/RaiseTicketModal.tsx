@@ -92,7 +92,7 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClos
       onClick={handleClose}
     >
       <div
-        className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl animate-slide-up relative max-h-[90vh] overflow-y-auto scrollbar-styled"
+        className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl animate-slide-up relative max-h-[90dvh] overflow-y-auto scrollbar-styled"
         onClick={(e) => e.stopPropagation()}
       >
         <button

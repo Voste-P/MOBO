@@ -134,7 +134,7 @@ function ConfirmDialog({
       role="dialog"
       aria-modal="true"
       aria-label={title ?? 'Confirmation'}
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-150"
       onMouseDown={(e) => {
         if (e.target === overlayRef.current) onCancel();
       }}

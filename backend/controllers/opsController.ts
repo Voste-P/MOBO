@@ -2396,10 +2396,13 @@ export function makeOpsController(env: Env) {
         const campaign = await db().campaign.findFirst({ where: { ...idWhere(body.id), isDeleted: false } });
         if (!campaign) throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
 
-        // Campaign must be active to accept new assignments.
-        if (String(campaign.status || '').toLowerCase() !== 'active') {
-          throw new AppError(409, 'CAMPAIGN_NOT_ACTIVE', 'Campaign must be active to assign slots');
+        // Campaign must be active or draft to accept new assignments.
+        // Draft campaigns get auto-activated upon successful distribution.
+        const campStatus = String(campaign.status || '').toLowerCase();
+        if (!['active', 'draft'].includes(campStatus)) {
+          throw new AppError(409, 'CAMPAIGN_NOT_ACTIVE', 'Campaign must be active or draft to assign slots');
         }
+        const wasDraft = campStatus === 'draft';
 
         // Check if orders exist – if so, only block term changes (price, dealType),
         // but still allow adding/modifying mediator assignments.
@@ -2510,6 +2513,11 @@ export function makeOpsController(env: Env) {
 
         if (body.dealType) updateData.dealType = body.dealType;
         if (typeof body.price !== 'undefined') updateData.pricePaise = rupeesToPaise(body.price);
+
+        // Auto-activate draft campaigns upon first distribution
+        if (wasDraft) {
+          updateData.status = 'active';
+        }
 
         if (!campaign.locked) {
           updateData.locked = true;
@@ -2984,7 +2992,23 @@ export function makeOpsController(env: Env) {
         logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Campaign', entityId: newDisplayId, action: 'CAMPAIGN_COPIED', changedFields: ['id'], before: { sourceCampaignId: id }, after: { newCampaignId: newDisplayId, status: 'draft', usedSlots: 0 } });
         logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_COPIED', newCampaignId: newDisplayId, sourceCampaignId: id } });
 
-        res.json({ ok: true, id: newDisplayId });
+        res.json({
+          ok: true,
+          id: newDisplayId,
+          campaign: {
+            id: newDisplayId,
+            title: newCampaign.title,
+            image: newCampaign.image,
+            dealType: newCampaign.dealType,
+            totalSlots: newCampaign.totalSlots,
+            usedSlots: 0,
+            status: 'draft',
+            price: (newCampaign.pricePaise ?? 0) / 100,
+            payout: (newCampaign.payoutPaise ?? 0) / 100,
+            assignments: {},
+            brandId: newCampaign.brandUserId,
+          },
+        });
       } catch (err) {
         logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'BUSINESS_LOGIC', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'ops/copyCampaign' } });
         next(err);

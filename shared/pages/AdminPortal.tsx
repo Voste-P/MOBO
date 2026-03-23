@@ -1398,7 +1398,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 max-h-[70vh] overflow-y-auto scrollbar-styled">
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 max-h-[70dvh] overflow-y-auto scrollbar-styled">
                   {isLoading ? (
                     <div className="col-span-full">
                       <EmptyState
@@ -1684,7 +1684,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     )}
                   </div>
                 </div>
-                <div className="overflow-x-auto max-h-[70vh] overflow-y-auto scrollbar-styled">
+                <div className="overflow-x-auto max-h-[70dvh] overflow-y-auto scrollbar-styled">
                   <table className="w-full text-left">
                     <thead className="bg-slate-50/80 text-xs font-extrabold uppercase text-slate-400 tracking-wider sticky top-0 z-10 backdrop-blur-sm">
                       <tr>
@@ -1696,7 +1696,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 text-sm font-medium">
-                      {filteredUsers.map((u) => (
+                      {filteredUsers.length === 0 ? (
+                        <tr><td colSpan={5} className="p-12 text-center text-slate-400 text-sm font-bold">No users match the current filter.</td></tr>
+                      ) : filteredUsers.map((u) => (
                         <tr key={u.id} className="hover:bg-slate-50/50 transition-colors group">
                           <td className="p-5">
                             <div className="flex items-center gap-3">
@@ -1970,7 +1972,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 text-sm font-medium">
-                      {filteredOrders.map((o) => (
+                      {filteredOrders.length === 0 ? (
+                        <tr><td colSpan={6} className="p-12 text-center text-slate-400 text-sm font-bold">No orders match the current filter.</td></tr>
+                      ) : filteredOrders.map((o) => (
                         <tr key={o.id} className="hover:bg-slate-50/50 transition-colors">
                           <td className="p-5">
                             <div className="font-mono text-slate-500">
@@ -2034,7 +2038,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     className="text-sm"
                   />
                 </div>
-                <div className="overflow-x-auto max-h-[70vh] overflow-y-auto scrollbar-styled">
+                <div className="overflow-x-auto max-h-[70dvh] overflow-y-auto scrollbar-styled">
                 <table className="w-full text-left">
                   <thead className="bg-slate-50 text-xs font-extrabold uppercase text-slate-400 tracking-wider sticky top-0 z-10">
                     <tr>
@@ -2049,7 +2053,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50 text-sm font-medium">
-                    {filteredProducts.map((p) => (
+                    {filteredProducts.length === 0 ? (
+                      <tr><td colSpan={7} className="p-12 text-center text-slate-400 text-sm font-bold">No products match the current filter.</td></tr>
+                    ) : filteredProducts.map((p) => (
                       <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="p-5">
                           <div className="flex items-center gap-3">
@@ -2243,7 +2249,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   />
                 </div>
                 <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                  <div className="overflow-x-auto max-h-[70vh] overflow-y-auto scrollbar-styled">
+                  <div className="overflow-x-auto max-h-[70dvh] overflow-y-auto scrollbar-styled">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
@@ -2317,7 +2323,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       {/* Proof Viewer Modal */}
       {proofModal && (
         <div className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => { setProofModal(null); }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto scrollbar-styled" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90dvh] overflow-y-auto scrollbar-styled" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
               <div>
                 <h3 className="font-extrabold text-lg text-slate-900">Order Proofs</h3>

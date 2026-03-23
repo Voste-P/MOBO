@@ -1271,7 +1271,7 @@ const OrdersView = ({ user }: any) => {
           onClick={() => { setViewProofOrder(null); }}
         >
           <div
-            className="bg-white w-full max-w-lg rounded-[2rem] p-6 shadow-2xl relative flex flex-col max-h-[85vh] animate-enter"
+            className="bg-white w-full max-w-lg rounded-[2rem] p-6 shadow-2xl relative flex flex-col max-h-[90dvh] animate-enter"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -3012,7 +3012,7 @@ export const BrandDashboard: React.FC = () => {
           onClick={() => setSelectedAgency(null)}
         >
           <div
-            className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl relative animate-enter flex flex-col max-h-[90vh]"
+            className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl relative animate-enter flex flex-col max-h-[90dvh]"
             onClick={(e) => e.stopPropagation()}
           >
             <button

@@ -1656,7 +1656,7 @@ export const Orders: React.FC = () => {
           }}
         >
           <div
-            className="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl animate-slide-up flex flex-col max-h-[85vh] relative"
+            className="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl animate-slide-up flex flex-col max-h-[90dvh] relative"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -2141,7 +2141,7 @@ export const Orders: React.FC = () => {
                 </p>
               )}
             </div>
-            <div className="space-y-4 max-h-[75vh] overflow-y-auto scrollbar-styled pr-1">
+            <div className="space-y-4 max-h-[75dvh] overflow-y-auto scrollbar-styled pr-1">
               <div className="space-y-2">
                 <div className="text-[10px] font-bold uppercase text-slate-400">Order Proof</div>
                 {proofToView.screenshots?.order ? (
@@ -2244,7 +2244,7 @@ export const Orders: React.FC = () => {
           }}
         >
           <div
-            className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-slide-up relative max-h-[85vh] overflow-y-auto scrollbar-styled"
+            className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-slide-up relative max-h-[90dvh] overflow-y-auto scrollbar-styled"
             onClick={(e) => e.stopPropagation()}
           >
             <button

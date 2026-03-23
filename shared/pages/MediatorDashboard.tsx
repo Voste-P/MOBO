@@ -594,7 +594,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
             icon={<HelpCircle size={22} className="text-zinc-400" />}
           />
         ) : (
-          <div className="space-y-2 max-h-[60vh] overflow-y-auto scrollbar-styled">
+          <div className="space-y-2 max-h-[60dvh] overflow-y-auto scrollbar-styled">
             {tickets.filter((t: Ticket) => {
               if (ticketFilter !== 'All' && String(t.status) !== ticketFilter) return false;
               if (ticketSearch.trim()) {
@@ -1526,7 +1526,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
 
   return (
     <div
-      className="absolute inset-0 z-[60] bg-black/60 backdrop-blur-md flex items-end animate-fade-in"
+      className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-md flex items-end animate-fade-in"
       onClick={onClose}
     >
       {ConfirmDialogElement}
@@ -1960,7 +1960,7 @@ export const MediatorDashboard: React.FC = () => {
       console.error(e);
       if (!silent) {
         const msg = (e as any)?.message ? String((e as any).message) : 'Failed to refresh dashboard.';
-        toast.error(msg);
+        toast.error(msg.includes('fetch') || msg.includes('network') ? 'Network error. Please check your connection.' : msg);
       }
     } finally {
       loadingRef.current = false;
@@ -2795,7 +2795,7 @@ export const MediatorDashboard: React.FC = () => {
 
       {rejectModalOpen && proofModal && (
         <div
-          className="absolute inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
           onClick={() => setRejectModalOpen(false)}
         >
           <div
@@ -2873,7 +2873,7 @@ export const MediatorDashboard: React.FC = () => {
       {/* FORCE APPROVE MODAL */}
       {approveModalOpen && proofModal && (
         <div
-          className="absolute inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
           onClick={() => setApproveModalOpen(false)}
         >
           <div
@@ -2922,7 +2922,7 @@ export const MediatorDashboard: React.FC = () => {
       {/* CANCEL ORDER MODAL */}
       {cancelModalOpen && proofModal && (
         <div
-          className="absolute inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
           onClick={() => setCancelModalOpen(false)}
         >
           <div
