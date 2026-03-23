@@ -13,7 +13,7 @@ import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 import { User, Campaign, Order, Ticket } from '../types';
-import { EmptyState, Spinner } from '../components/ui';
+import { EmptyState, Spinner, Pagination } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { DesktopShell } from '../components/DesktopShell';
 import { formatCurrency } from '../utils/formatCurrency';
@@ -2572,16 +2572,16 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
           onClick={() => setAssignModal(null)}
         >
           <div
-            className="bg-white w-[98%] md:w-full max-w-7xl rounded-2xl p-4 sm:p-5 lg:p-6 2xl:p-7 shadow-2xl relative h-[95vh] flex flex-col min-h-0 animate-slide-up"
+            className="bg-white w-[98%] md:w-full max-w-7xl rounded-2xl p-3 sm:p-4 lg:p-5 2xl:p-6 shadow-2xl relative h-[98vh] flex flex-col min-h-0 animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex justify-between items-start gap-4 mb-2 shrink-0">
+            <div className="flex justify-between items-center gap-4 mb-1 shrink-0">
               <div>
-                <h3 className="text-xl 2xl:text-2xl font-black text-slate-900 tracking-tight">
+                <h3 className="text-lg 2xl:text-xl font-black text-slate-900 tracking-tight leading-tight">
                   Distribute Inventory
                 </h3>
-                <p className="text-[11px] sm:text-xs text-slate-500 font-bold mt-0.5">
+                <p className="text-[10px] sm:text-[11px] text-slate-500 font-bold">
                   Allocate campaign slots to your team.
                 </p>
               </div>
@@ -2595,7 +2595,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
             </div>
 
             {/* Campaign Summary & Global Config */}
-            <div className="bg-slate-50 p-3 2xl:p-4 rounded-2xl mb-2 border border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3 shrink-0">
+            <div className="bg-slate-50 p-2 2xl:p-3 rounded-xl mb-1 border border-slate-100 flex flex-col lg:flex-row lg:items-start justify-between gap-2 shrink-0">
               <div className="flex gap-3 items-center min-w-0">
                 <div className="w-10 h-10 bg-white rounded-lg p-1.5 border border-slate-200 shadow-sm flex-shrink-0">
                   <ProxiedImage
@@ -2765,9 +2765,9 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
             </div>
 
             {/* ── Open to All Toggle ── */}
-            <div className={`p-3 rounded-2xl mb-2 border transition-all shrink-0 ${openToAll ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'}`}>
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-xl mb-1 border transition-all shrink-0 ${openToAll ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'}`}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
                   <button
                     onClick={() => setOpenToAll(!openToAll)}
                     className={`relative w-12 h-6 rounded-full transition-colors ${openToAll ? 'bg-emerald-500' : 'bg-slate-300'}`}
@@ -2794,8 +2794,8 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
 
             {/* Mediator list hidden when Open to All */}
             {!openToAll && (<>
-              <div className="flex items-center justify-between gap-4 mb-1 shrink-0">
-              <div className="flex-1 max-w-md">
+              <div className="flex items-center justify-between gap-3 mb-1 shrink-0">
+              <div className="flex-1 max-w-sm">
                 <div className="relative">
                   <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
@@ -2803,7 +2803,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                     value={assignSearch}
                     onChange={(e) => setAssignSearch(e.target.value)}
                     placeholder="Search mediators by name or code..."
-                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-purple-100 outline-none transition-all placeholder:text-slate-400"
+                    className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-xs font-bold focus:ring-2 focus:ring-purple-100 outline-none transition-all placeholder:text-slate-400"
                   />
                 </div>
               </div>
@@ -2813,7 +2813,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
             </div>
 
             {/* List Header */}
-            <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-slate-50 rounded-xl border border-slate-100 mb-2 shrink-0">
+            <div className="grid grid-cols-12 gap-4 px-4 py-1.5 bg-slate-50 rounded-lg border border-slate-100 mb-1 shrink-0">
               <div className="col-span-4 text-xs font-extrabold text-slate-400 uppercase tracking-wider pl-2">
                 Mediator Profile
               </div>
@@ -2993,17 +2993,17 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
             )}
 
             {/* Footer */}
-            <div className="pt-4 border-t border-slate-100 flex justify-end gap-3 shrink-0">
+            <div className="pt-2 border-t border-slate-100 flex justify-end gap-3 shrink-0">
               <button
                 onClick={() => setAssignModal(null)}
-                className="px-5 py-3 text-slate-500 font-bold text-sm hover:text-slate-800 hover:bg-slate-50 rounded-2xl transition-colors"
+                className="px-4 py-2.5 text-slate-500 font-bold text-sm hover:text-slate-800 hover:bg-slate-50 rounded-xl transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAssign}
                 disabled={!openToAll && (assignedTotal <= 0 || assignedTotal > availableForAssign)}
-                className={`px-8 py-3 text-white font-bold rounded-2xl transition-all shadow-xl hover:shadow-2xl active:scale-95 flex items-center gap-2 ${openToAll ? 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-emerald-200' : 'bg-purple-600 hover:bg-purple-700 hover:shadow-purple-200'}`}
+                className={`px-6 py-2.5 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center gap-2 ${openToAll ? 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-emerald-200' : 'bg-purple-600 hover:bg-purple-700 hover:shadow-purple-200'}`}
               >
                 {openToAll ? '🌐 Confirm Open to All' : 'Confirm Distribution'} <CheckCircle size={18} />
               </button>
@@ -3028,6 +3028,8 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
   const [rejectReason, setRejectReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
   const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [reviewPage, setReviewPage] = useState(1);
+  const REVIEW_PER_PAGE = 25;
 
   useEffect(() => {
     setProofOrder((prev) => {
@@ -3059,6 +3061,12 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
       return true;
     });
   }, [allOrders, campaignFilter, mediatorFilter, approvalFilter, statusFilter, searchTerm]);
+
+  // Reset page when filters change
+  useEffect(() => { setReviewPage(1); }, [campaignFilter, mediatorFilter, approvalFilter, statusFilter, searchTerm]);
+
+  const totalReviewPages = Math.max(1, Math.ceil(filtered.length / REVIEW_PER_PAGE));
+  const paginatedReviewOrders = filtered.slice((reviewPage - 1) * REVIEW_PER_PAGE, reviewPage * REVIEW_PER_PAGE);
 
   const handleReject = async () => {
     if (!rejectModal || rejectReason.trim().length < 5) return;
@@ -3181,7 +3189,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 text-sm">
-                {filtered.map((o: Order) => {
+                {paginatedReviewOrders.map((o: Order) => {
                   const method = getApprovalMethod(o);
                   const isManual = method === 'manual';
                   const wf = (o.workflowStatus || 'CREATED').toUpperCase();
@@ -3273,6 +3281,17 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
             </table>
           </div>
         </div>
+      )}
+
+      {/* Pagination */}
+      {totalReviewPages > 1 && (
+        <Pagination
+          page={reviewPage}
+          totalPages={totalReviewPages}
+          total={filtered.length}
+          limit={REVIEW_PER_PAGE}
+          onPageChange={(p) => { setReviewPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+        />
       )}
 
       {/* Proof Modal (reusable) */}
@@ -3440,6 +3459,8 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
   const [payoutAmount, setPayoutAmount] = useState('');
   const [payoutRef, setPayoutRef] = useState('');
   const [proofOrder, setProofOrder] = useState<Order | null>(null);
+  const [teamPage, setTeamPage] = useState(1);
+  const TEAM_PER_PAGE = 25;
 
 
   // Keep proof modal in sync when allOrders updates from real-time
@@ -3462,6 +3483,12 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
       m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.mediatorCode?.includes(searchTerm.toUpperCase())
   ), [subTab, activeMediators, pendingMediators, searchTerm]);
+
+  // Reset page when filters change
+  useEffect(() => { setTeamPage(1); }, [subTab, searchTerm]);
+
+  const totalTeamPages = Math.max(1, Math.ceil(filtered.length / TEAM_PER_PAGE));
+  const paginatedTeam = filtered.slice((teamPage - 1) * TEAM_PER_PAGE, teamPage * TEAM_PER_PAGE);
 
   // Filter orders for selected mediator (Sanitized for Privacy)
   const mediatorOrders = useMemo(() => {
@@ -3645,7 +3672,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                   </td>
                 </tr>
               ) : (
-                filtered.map((m: User) => (
+                paginatedTeam.map((m: User) => (
                   <tr
                     key={m.id}
                     onClick={() => subTab === 'roster' && setSelectedMediator(m)}
@@ -3726,6 +3753,17 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
           </table>
         </div>
       </div>
+
+      {/* Team Pagination */}
+      {totalTeamPages > 1 && (
+        <Pagination
+          page={teamPage}
+          totalPages={totalTeamPages}
+          total={filtered.length}
+          limit={TEAM_PER_PAGE}
+          onPageChange={(p) => { setTeamPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+        />
+      )}
 
       {/* DETAIL MODAL */}
       {selectedMediator && (

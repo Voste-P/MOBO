@@ -58,7 +58,7 @@ import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 import { User, Campaign, Order, Ticket } from '../types';
-import { EmptyState, Spinner } from '../components/ui';
+import { EmptyState, Spinner, Pagination } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
 import TicketDetailModal from '../components/TicketDetailModal';
@@ -605,6 +605,8 @@ const OrdersView = ({ user }: any) => {
   const [orderViewMode, setOrderViewMode] = useState<'orders' | 'orderSheet' | 'financeSheet'>('orders');
   const [isLoading, setIsLoading] = useState(true);
   const [sheetsExporting, setSheetsExporting] = useState(false);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const ORDERS_PER_PAGE = 25;
 
   const getOrderStatusBadge = (o: Order) => {
     const wf = String(o.workflowStatus || '').trim();
@@ -721,6 +723,12 @@ const OrdersView = ({ user }: any) => {
     }
     return textMatch;
   }), [orders, search, statusFilter, dealTypeFilter, mediatorFilter, productFilter]);
+
+  // Reset page when filters change
+  useEffect(() => { setOrdersPage(1); }, [search, statusFilter, dealTypeFilter, mediatorFilter, productFilter]);
+
+  const totalOrderPages = Math.max(1, Math.ceil(filtered.length / ORDERS_PER_PAGE));
+  const paginatedOrders = filtered.slice((ordersPage - 1) * ORDERS_PER_PAGE, ordersPage * ORDERS_PER_PAGE);
 
   const handleExport = async () => {
     if (filtered.length === 0) { toast.info('No orders to export'); return; }
@@ -1051,7 +1059,7 @@ const OrdersView = ({ user }: any) => {
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((o) => (
+                  paginatedOrders.map((o) => (
                     <tr key={o.id} className="hover:bg-zinc-50/50 transition-colors group">
                       <td className="p-6">
                         <div className="font-mono text-xs font-bold text-zinc-500">
@@ -1133,7 +1141,7 @@ const OrdersView = ({ user }: any) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-50">
-                    {filtered.map((o) => (
+                    {paginatedOrders.map((o) => (
                       <tr key={o.id} className="hover:bg-zinc-50/50 transition-colors">
                         <td className="p-6">
                           <span className="font-mono text-xs font-bold text-zinc-500">{getPrimaryOrderId(o)}</span>
@@ -1198,9 +1206,9 @@ const OrdersView = ({ user }: any) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-50">
-                    {filtered.map((o, i) => (
+                    {paginatedOrders.map((o, i) => (
                       <tr key={o.id} className="hover:bg-zinc-50/50 transition-colors">
-                        <td className="p-6 text-xs font-mono text-zinc-400">{i + 1}</td>
+                        <td className="p-6 text-xs font-mono text-zinc-400">{(ordersPage - 1) * ORDERS_PER_PAGE + i + 1}</td>
                         <td className="p-6">
                           <span className="text-xs font-bold text-zinc-700">{o.agencyName || 'Direct'}</span>
                         </td>
@@ -1245,6 +1253,17 @@ const OrdersView = ({ user }: any) => {
           </div>
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalOrderPages > 1 && (
+        <Pagination
+          page={ordersPage}
+          totalPages={totalOrderPages}
+          total={filtered.length}
+          limit={ORDERS_PER_PAGE}
+          onPageChange={(p) => { setOrdersPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+        />
+      )}
 
       {viewProofOrder && (
         <div

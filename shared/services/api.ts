@@ -948,18 +948,18 @@ export const api = {
         headers: { ...authHeaders() },
       });
     },
-    getBrandCampaigns: async (brandId: string) => {
-      return fetchJson(`/brand/campaigns?brandId=${encodeURIComponent(brandId)}&limit=500`, {
+    getBrandCampaigns: async (brandId: string, page = 1, limit = 50) => {
+      return fetchJson(`/brand/campaigns?brandId=${encodeURIComponent(brandId)}&page=${page}&limit=${limit}`, {
         headers: { ...authHeaders() },
       });
     },
-    getBrandOrders: async (brandName: string) => {
-      return fetchJson(`/brand/orders?brandName=${encodeURIComponent(brandName)}&limit=500`, {
+    getBrandOrders: async (brandName: string, page = 1, limit = 50) => {
+      return fetchJson(`/brand/orders?brandName=${encodeURIComponent(brandName)}&page=${page}&limit=${limit}`, {
         headers: { ...authHeaders() },
       });
     },
-    getTransactions: async (brandId: string) => {
-      return fetchJson(`/brand/transactions?brandId=${encodeURIComponent(brandId)}&limit=500`, {
+    getTransactions: async (brandId: string, page = 1, limit = 50) => {
+      return fetchJson(`/brand/transactions?brandId=${encodeURIComponent(brandId)}&page=${page}&limit=${limit}`, {
         headers: { ...authHeaders() },
       });
     },

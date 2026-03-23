@@ -111,6 +111,7 @@ export function makeOrdersController(env: Env) {
     envRef: Env,
   ): Promise<any> => {
     if (String(freshOrder.workflowStatus) !== 'UNDER_REVIEW') return freshOrder;
+    if (aiConfidence < threshold) return freshOrder; // Below auto-verify threshold
 
     const v = (freshOrder.verification && typeof freshOrder.verification === 'object')
       ? { ...(freshOrder.verification as any) } : {} as any;
@@ -614,6 +615,16 @@ export function makeOrdersController(env: Env) {
               '. Please upload the correct order screenshot.'
             );
           }
+          // Hard-block: cropped/incomplete screenshots are not acceptable
+          if (verification?.screenshotCropped === true) {
+            throw new AppError(
+              422,
+              'SCREENSHOT_INCOMPLETE',
+              'Your order screenshot appears to be cropped or incomplete. ' +
+              'Please upload a FULL screenshot showing the complete order page including the page header. ' +
+              (verification?.discrepancyNote || '')
+            );
+          }
           aiOrderConfidence = verification?.confidenceScore ?? 0;
         } else {
           throw new AppError(503, 'AI_NOT_CONFIGURED', 'Proof verification is temporarily unavailable. Please try again later.');
@@ -916,7 +927,7 @@ export function makeOrdersController(env: Env) {
           // the purchase step. The hard blocks (orderIdMatch, productNameMatch, etc.)
           // already ensure proof correctness — any surviving proof is "AI-approved".
           const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
-          if (aiOrderConfidence > 0) {
+          if (aiOrderConfidence >= autoThreshold) {
             const freshOrder = await db().order.findFirst({
               where: { mongoId: orderMongoId, isDeleted: false },
               include: { items: { where: { isDeleted: false } } },
@@ -1647,7 +1658,7 @@ export function makeOrdersController(env: Env) {
           // ── Auto-verify by AI confidence (submitClaim, already UNDER_REVIEW) ──
           // Any proof that passed AI hard-block validation (confidence > 0) is auto-verified.
           const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
-          if (claimAiConfidence > 0 && refreshed) {
+          if (claimAiConfidence >= autoThreshold && refreshed) {
             refreshed = await autoVerifyStep(refreshed, body.type, claimAiConfidence, autoThreshold, env);
           }
 

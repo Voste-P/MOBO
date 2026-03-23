@@ -1123,8 +1123,9 @@ async function verifyProofWithOcr(
     if (orderIdMatch && amountMatch) detectedNotes.push('Both order ID and amount matched via OCR.');
 
     // OCR-based cropped screenshot detection:
-    // If OCR extracted very little text (< 100 chars) after all fallbacks, the screenshot is likely cropped/incomplete.
-    const screenshotCropped = ocrText.length < 100;
+    // If OCR extracted very little text (< 200 chars), the screenshot is likely cropped/incomplete.
+    // Full order screenshots typically contain 300+ chars (header, order details, items, amounts).
+    const screenshotCropped = ocrText.length < 200;
     if (screenshotCropped) detectedNotes.push('Screenshot appears cropped — very little text detected.');
 
     // Server-side platform comparison for OCR path
