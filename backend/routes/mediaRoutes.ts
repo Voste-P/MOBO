@@ -13,12 +13,18 @@ const ALLOWED_PROTOCOLS = new Set(['http:', 'https:']);
  */
 const RATE_WINDOW_MS = 60_000; // 1 minute
 const RATE_MAX_REQUESTS = 120; // generous limit for pages with many product cards
+const RATE_MAX_IPS = 10_000; // cap tracked IPs to prevent unbounded memory
 const ipHits = new Map<string, { count: number; resetAt: number }>();
 
 function isRateLimited(ip: string): boolean {
   const now = Date.now();
   const entry = ipHits.get(ip);
   if (!entry || now >= entry.resetAt) {
+    // Evict oldest entries if map is at capacity
+    if (!entry && ipHits.size >= RATE_MAX_IPS) {
+      const first = ipHits.keys().next().value;
+      if (first !== undefined) ipHits.delete(first);
+    }
     ipHits.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
     return false;
   }

@@ -1050,14 +1050,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                 label="Users"
                 active={view === 'users'}
                 onClick={() => switchView('users')}
-                badge={users.length}
+                badge={usersPagination?.total ?? users.length}
               />
               <SidebarItem
                 icon={ShoppingCart}
                 label="Orders"
                 active={view === 'orders'}
                 onClick={() => switchView('orders')}
-                badge={orders.length}
+                badge={ordersPagination?.total ?? orders.length}
               />
               <SidebarItem
                 icon={Package}
@@ -2291,7 +2291,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       {auditLogs.length === 0 && (
                         <tr>
                           <td colSpan={5} className="p-8 text-center text-sm text-slate-400 font-bold">
-                            Click Refresh to load audit logs.
+                            {auditLoading ? 'Loading audit logs…' : 'No audit logs found for the selected filters.'}
                           </td>
                         </tr>
                       )}

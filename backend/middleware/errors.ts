@@ -24,10 +24,11 @@ const PROBE_PATTERNS = /\.(env|php|asp|cgi|bak|old|sql|config)|wp-admin|phpmyadm
 export function notFoundHandler(req: Request, res: Response): void {
   const isProd = process.env.NODE_ENV === 'production';
   // Only log probing-style 404s as security incidents; legitimate misses are just info
+  const safePath = req.path.replace(/[\r\n]/g, ' ');
   if (PROBE_PATTERNS.test(req.path)) {
-    logSecurityIncident('SUSPICIOUS_PATTERN', { severity: 'medium', userId: (req as any).auth?.userId, ip: req.ip, route: req.path, method: req.method, pattern: 'PROBE_DETECTED', userAgent: req.get('user-agent'), metadata: { query: req.query } });
+    logSecurityIncident('SUSPICIOUS_PATTERN', { severity: 'medium', userId: (req as any).auth?.userId, ip: req.ip, route: safePath, method: req.method, pattern: 'PROBE_DETECTED', userAgent: req.get('user-agent'), metadata: { query: req.query } });
   } else {
-    logger.debug('Route not found', { method: req.method, path: req.path, ip: req.ip });
+    logger.debug('Route not found', { method: req.method, path: safePath, ip: req.ip });
   }
   res.status(404).json({
     error: {

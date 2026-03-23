@@ -2841,8 +2841,8 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
               </div>
             </div>
 
-            {/* Mediator List */}
-            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-styled space-y-1 pr-1 mb-2">
+            {/* Mediator List — scrollable container sized to fill modal */}
+            <div className="flex-1 min-h-[40vh] overflow-y-auto scrollbar-styled space-y-1 pr-2 mb-2">
               {activeMediatorsForAssign.length === 0 ? (
                 loading ? (
                   <EmptyState
