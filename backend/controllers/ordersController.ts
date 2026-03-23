@@ -666,7 +666,20 @@ export function makeOrdersController(env: Env) {
         const assignmentsRaw = (campaign.assignments && typeof campaign.assignments === 'object' && !Array.isArray(campaign.assignments))
           ? campaign.assignments as Record<string, any>
           : {};
-        const hasMediatorAssignment = upstreamMediatorCode ? (upstreamMediatorCode in assignmentsRaw) : false;
+
+        // Case-insensitive assignment lookup — keys are stored lowercase by assignSlots.
+        const findAssignment = (code: string) => {
+          if (!code) return undefined;
+          if (Object.prototype.hasOwnProperty.call(assignmentsRaw, code)) return assignmentsRaw[code];
+          const lower = code.toLowerCase();
+          for (const [k, v] of Object.entries(assignmentsRaw)) {
+            if (k.toLowerCase() === lower) return v;
+          }
+          return undefined;
+        };
+
+        const mediatorAssignment = upstreamMediatorCode ? findAssignment(upstreamMediatorCode) : undefined;
+        const hasMediatorAssignment = mediatorAssignment !== undefined;
         const hasAgencyAccess = upstreamAgencyCode ? allowedAgencyCodes.includes(upstreamAgencyCode) : false;
         const campaignIsOpenToAll = (campaign as any).openToAll === true;
 
@@ -679,7 +692,7 @@ export function makeOrdersController(env: Env) {
           throw new AppError(409, 'SOLD_OUT', 'Sold Out Globally');
         }
 
-        const assignmentVal = upstreamMediatorCode ? assignmentsRaw[upstreamMediatorCode] : undefined;
+        const assignmentVal = mediatorAssignment;
         const assigned = upstreamMediatorCode
           ? typeof assignmentVal === 'number'
             ? assignmentVal
