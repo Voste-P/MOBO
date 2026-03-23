@@ -1028,7 +1028,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
                           </span>
                         ) : (
                           <span className="bg-[#CCF381]/20 text-[#5f7a28] text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide">
-                            {c.assignments[user.mediatorCode!] || 0} Slots
+                            {(user.mediatorCode ? c.assignments[(user.mediatorCode || '').toLowerCase()] : 0) || 0} Slots
                           </span>
                         )}
                       </div>

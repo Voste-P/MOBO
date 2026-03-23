@@ -2474,6 +2474,7 @@ export function makeOpsController(env: Env) {
           : {};
 
         for (const [code, assignment] of positiveEntries) {
+          const normCode = code.toLowerCase();
           const assignmentObj = typeof assignment === 'number'
             ? { limit: assignment, payout: payoutOverridePaise ?? campaign.payoutPaise }
             : {
@@ -2486,7 +2487,7 @@ export function makeOpsController(env: Env) {
           if (typeof commissionPaise !== 'undefined') {
             (assignmentObj as any).commissionPaise = commissionPaise;
           }
-          current[code] = assignmentObj;
+          current[normCode] = assignmentObj;
         }
 
         // Enforce totalSlots (skip for openToAll since no per-mediator allocation)

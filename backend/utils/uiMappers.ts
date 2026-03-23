@@ -82,22 +82,23 @@ export function toUiCampaign(c: any) {
   const assignmentDetails: Record<string, { limit: number; payout: number; commission: number }> = {};
   if (assignmentsObj && typeof assignmentsObj === 'object') {
     for (const [code, raw] of Object.entries(assignmentsObj)) {
+      const normCode = code.toLowerCase();
       if (typeof raw === 'number') {
-        assignments[code] = raw;
-        assignmentDetails[code] = { limit: raw, payout: paiseToRupees(c.payoutPaise), commission: 0 };
+        assignments[normCode] = raw;
+        assignmentDetails[normCode] = { limit: raw, payout: paiseToRupees(c.payoutPaise), commission: 0 };
         continue;
       }
       if (raw && typeof raw === 'object' && typeof (raw as any).limit === 'number') {
-        assignments[code] = (raw as any).limit;
-        assignmentDetails[code] = {
+        assignments[normCode] = (raw as any).limit;
+        assignmentDetails[normCode] = {
           limit: (raw as any).limit,
           payout: paiseToRupees(typeof (raw as any).payout === 'number' ? (raw as any).payout : c.payoutPaise),
           commission: paiseToRupees((raw as any).commissionPaise ?? 0),
         };
         continue;
       }
-      assignments[code] = 0;
-      assignmentDetails[code] = { limit: 0, payout: paiseToRupees(c.payoutPaise), commission: 0 };
+      assignments[normCode] = 0;
+      assignmentDetails[normCode] = { limit: 0, payout: paiseToRupees(c.payoutPaise), commission: 0 };
     }
   }
 
@@ -156,7 +157,6 @@ export function toUiDeal(d: any, mediatorName?: string) {
     mediatorName: safeText(mediatorName || d.mediatorName),
     campaignId: String(d.campaignId),
     active: !!d.active,
-    inventoryCount: d.inventoryCount ?? 0,
     totalSlots: d.totalSlots ?? 0,
     usedSlots: d.usedSlots ?? 0,
     remainingSlots: d.remainingSlots ?? 0,

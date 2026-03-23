@@ -557,7 +557,11 @@ export const api = {
       const data = await fetchJson(`/products?${params}`, {
         headers: { ...authHeaders() },
       });
-      return Array.isArray(data) ? data : [];
+      // Backend returns paginated envelope { data: [...] } when page/limit are sent.
+      // Use asArray-compatible unwrap so callers get the actual deals array.
+      if (Array.isArray(data)) return data;
+      if (data && typeof data === 'object' && Array.isArray((data as any).data)) return (data as any).data;
+      return [];
     },
   },
   orders: {

@@ -2812,8 +2812,8 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
               </div>
             </div>
 
-            {/* List Header */}
-            <div className="grid grid-cols-12 gap-4 px-4 py-1.5 bg-slate-50 rounded-lg border border-slate-100 mb-1 shrink-0">
+            {/* List Header — sticky so column names stay visible when scrolling 50+ mediators */}
+            <div className="grid grid-cols-12 gap-4 px-4 py-1.5 bg-slate-50 rounded-lg border border-slate-100 mb-1 shrink-0 sticky top-0 z-10">
               <div className="col-span-4 text-xs font-extrabold text-slate-400 uppercase tracking-wider pl-2">
                 Mediator Profile
               </div>
@@ -2829,7 +2829,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
             </div>
 
             {/* Mediator List */}
-            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-styled space-y-2 pr-1 mb-2">
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-styled space-y-1 pr-1 mb-2">
               {activeMediatorsForAssign.length === 0 ? (
                 loading ? (
                   <EmptyState
@@ -2861,11 +2861,11 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                   return (
                     <div
                       key={m.id}
-                      className={`grid grid-cols-12 gap-4 items-center p-2 border border-slate-100 rounded-2xl transition-all bg-white shadow-sm group ${isActive ? 'hover:border-purple-200 hover:bg-purple-50/10' : 'opacity-70'}`}
+                      className={`grid grid-cols-12 gap-4 items-center p-1.5 border border-slate-100 rounded-xl transition-all bg-white shadow-sm group ${isActive ? 'hover:border-purple-200 hover:bg-purple-50/10' : 'opacity-70'}`}
                     >
                       {/* Profile */}
-                      <div className="col-span-4 flex items-center gap-4 pl-2">
-                        <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center font-black text-sm group-hover:bg-purple-100 group-hover:text-purple-600 transition-colors shadow-inner overflow-hidden">
+                      <div className="col-span-4 flex items-center gap-3 pl-2">
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center font-black text-xs group-hover:bg-purple-100 group-hover:text-purple-600 transition-colors shadow-inner overflow-hidden">
                           {m.avatar ? (
                             <ProxiedImage src={m.avatar} alt={m.name ? `${m.name} avatar` : 'Avatar'} className="w-full h-full object-cover" />
                           ) : (
