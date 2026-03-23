@@ -1892,6 +1892,15 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     </tbody>
                   </table>
                 </div>
+                {invitesPagination && invitesPagination.totalPages > 1 && (
+                  <Pagination
+                    page={invitesPage}
+                    totalPages={invitesPagination.totalPages}
+                    total={invitesPagination.total}
+                    limit={invitesPagination.limit}
+                    onPageChange={(p) => { setInvitesPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  />
+                )}
               </div>
             )}
 

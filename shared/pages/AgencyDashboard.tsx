@@ -2793,7 +2793,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
             </div>
 
             {/* Mediator list hidden when Open to All */}
-            {!openToAll && (
+            {!openToAll && (<>
               <div className="flex items-center justify-between gap-4 mb-1 shrink-0">
               <div className="flex-1 max-w-md">
                 <div className="relative">
@@ -2973,7 +2973,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                 })
               )}
             </div>
-            )}
+            </>)}
 
             {/* Open to All info panel */}
             {openToAll && (
