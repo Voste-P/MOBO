@@ -1531,8 +1531,12 @@ async function verifyRatingWithOcr(
     // Combine all OCR texts
     const ocrText = allTexts.sort((a, b) => b.length - a.length).join('\n');
 
+    // Detect cropped screenshots — full rating pages typically have 200+ chars
+    const screenshotCropped = ocrText.length < 200;
+
     if (!ocrText || ocrText.length < 5) {
       return { accountNameMatch: false, productNameMatch: false, confidenceScore: 10,
+        screenshotCropped: true,
         discrepancyNote: 'OCR could not read text from the rating screenshot.' };
     }
 
@@ -1681,6 +1685,7 @@ async function verifyRatingWithOcr(
 
     return {
       accountNameMatch, productNameMatch, confidenceScore,
+      screenshotCropped,
       detectedAccountName: detectedAccountName || detectedPublicName,
       detectedPublicName,
       detectedProductName: matchedTokens.length > 0 ? matchedTokens.join(' ') : undefined,
@@ -2009,8 +2014,12 @@ async function verifyReturnWindowWithOcr(
     if (!ocrText || ocrText.length < 5) {
       return { orderIdMatch: false, productNameMatch: false, amountMatch: false, soldByMatch: false,
         returnWindowClosed: false, reviewerNameMatch: !expected.expectedReviewerName, confidenceScore: 10,
+        screenshotCropped: true,
         discrepancyNote: 'OCR could not read text from the delivery screenshot.' };
     }
+
+    // Detect cropped screenshots — full delivery/return window pages typically have 200+ chars
+    const screenshotCropped = ocrText.length < 200;
 
     const lower = ocrText.toLowerCase();
     const orderIdNorm = expected.expectedOrderId.replace(/[\s\-]/g, '').toLowerCase();
@@ -2120,6 +2129,7 @@ async function verifyReturnWindowWithOcr(
 
     return {
       orderIdMatch, productNameMatch, amountMatch, soldByMatch, returnWindowClosed, reviewerNameMatch, confidenceScore,
+      screenshotCropped,
       discrepancyNote: [
         !orderIdMatch ? `Order ID "${expected.expectedOrderId}" not found.` : '',
         !productNameMatch ? 'Product name mismatch.' : '',

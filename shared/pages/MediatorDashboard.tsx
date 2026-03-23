@@ -50,7 +50,7 @@ import {
   Package,
 } from 'lucide-react';
 
-import { EmptyState, Spinner } from '../components/ui';
+import { EmptyState, Spinner, Pagination } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { RatingVerificationBadge, ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
 import { MobileTabBar } from '../components/MobileTabBar';
@@ -118,8 +118,18 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
   ), [tickets]);
 
   const [viewMode, setViewMode] = useState<'todo' | 'cooling'>('todo');
+  const [orderPage, setOrderPage] = useState(1);
+  const ORDERS_PER_PAGE = 20;
 
-  // [PERF] Memoize all earnings/stats calculations
+  const currentOrders = viewMode === 'todo' ? actionRequiredOrders : coolingOrders;
+  const totalOrderPages = Math.ceil(currentOrders.length / ORDERS_PER_PAGE);
+  const paginatedOrders = useMemo(() => {
+    const safePage = Math.min(orderPage, Math.max(1, totalOrderPages));
+    return currentOrders.slice((safePage - 1) * ORDERS_PER_PAGE, safePage * ORDERS_PER_PAGE);
+  }, [currentOrders, orderPage, totalOrderPages]);
+
+  // Reset order page on view mode change
+  useEffect(() => { setOrderPage(1); }, [viewMode]);
   const { todayEarnings, totalDeals, totalEarnings, totalOrderValue, settledOrders, pendingOrders } = useMemo(() => {
     const todayStr = new Date().toDateString();
     return {
@@ -404,8 +414,9 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
             />
           )
         ) : (
+          <>
           <div className="space-y-3">
-            {(viewMode === 'todo' ? actionRequiredOrders : coolingOrders).map((o: Order) => {
+            {paginatedOrders.map((o: Order) => {
               const dealType = o.items?.[0]?.dealType || 'Discount';
               const settleDate = o.expectedSettlementDate
                 ? new Date(o.expectedSettlementDate).toDateString()
@@ -509,6 +520,17 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
               );
             })}
           </div>
+          {totalOrderPages > 1 && (
+            <Pagination
+              page={orderPage}
+              totalPages={totalOrderPages}
+              total={currentOrders.length}
+              limit={ORDERS_PER_PAGE}
+              onPageChange={setOrderPage}
+              className="mt-3 rounded-xl border border-zinc-100"
+            />
+          )}
+        </>
         )}
       </section>
 
@@ -732,6 +754,8 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
   const { toast } = useToast();
   const { confirm, ConfirmDialogElement } = useConfirm();
   const [marketSearch, setMarketSearch] = useState('');
+  const [marketPage, setMarketPage] = useState(1);
+  const MARKET_PER_PAGE = 20;
   const dealByCampaignId = useMemo(() => {
     const m = new Map<string, Product>();
     (deals || []).forEach((d: Product) => {
@@ -757,6 +781,15 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
   }, [deals, marketSearch]);
 
   const [mode, setMode] = useState<'published' | 'unpublished'>('unpublished');
+
+  const currentMarketItems = mode === 'published' ? filteredDeals : unpublishedCampaigns;
+  const totalMarketPages = Math.ceil(currentMarketItems.length / MARKET_PER_PAGE);
+  const paginatedMarketItems = useMemo(() => {
+    const safePage = Math.min(marketPage, Math.max(1, totalMarketPages));
+    return currentMarketItems.slice((safePage - 1) * MARKET_PER_PAGE, safePage * MARKET_PER_PAGE);
+  }, [currentMarketItems, marketPage, totalMarketPages]);
+
+  useEffect(() => { setMarketPage(1); }, [mode, marketSearch]);
 
   return (
     <div className="space-y-5 animate-enter">
@@ -854,7 +887,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
                 )}
               </div>
             ) : (
-              filteredDeals.map((d: Product) => (
+              (paginatedMarketItems as Product[]).map((d: Product) => (
                 <div
                   key={String(d.id)}
                   className="bg-white p-4 rounded-[1.5rem] border border-zinc-100 shadow-sm flex flex-col relative overflow-hidden"
@@ -931,6 +964,16 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
               ))
             )}
           </div>
+          {totalMarketPages > 1 && (
+            <Pagination
+              page={marketPage}
+              totalPages={totalMarketPages}
+              total={filteredDeals.length}
+              limit={MARKET_PER_PAGE}
+              onPageChange={setMarketPage}
+              className="mt-3 rounded-xl border border-zinc-100"
+            />
+          )}
         </div>
       ) : (
         <div>
@@ -961,7 +1004,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
                 )}
               </div>
             ) : (
-              unpublishedCampaigns.map((c: Campaign) => (
+              (paginatedMarketItems as Campaign[]).map((c: Campaign) => (
                 <div
                   key={c.id}
                   className="bg-white p-4 rounded-[1.5rem] border border-zinc-100 shadow-sm flex flex-col relative overflow-hidden hover:shadow-lg transition-all duration-300"
@@ -1041,6 +1084,16 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
               ))
             )}
           </div>
+          {totalMarketPages > 1 && (
+            <Pagination
+              page={marketPage}
+              totalPages={totalMarketPages}
+              total={unpublishedCampaigns.length}
+              limit={MARKET_PER_PAGE}
+              onPageChange={setMarketPage}
+              className="mt-3 rounded-xl border border-zinc-100"
+            />
+          )}
         </div>
       )}
     </div>
@@ -1050,10 +1103,20 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
 const SquadView = ({ user, pendingUsers, verifiedUsers, loading, orders: _orders, onRefresh: _onRefresh, onSelectUser }: any) => {
   const { toast } = useToast();
   const [squadSearch, setSquadSearch] = useState('');
+  const [squadPage, setSquadPage] = useState(1);
+  const SQUAD_PER_PAGE = 25;
   const filteredVerified = useMemo(() =>
     verifiedUsers.filter((u: User) => matchesSearch(squadSearch, u.name, u.mobile)),
     [verifiedUsers, squadSearch]
   );
+  const totalSquadPages = Math.ceil(filteredVerified.length / SQUAD_PER_PAGE);
+  const paginatedSquad = useMemo(() => {
+    const safePage = Math.min(squadPage, Math.max(1, totalSquadPages));
+    return filteredVerified.slice((safePage - 1) * SQUAD_PER_PAGE, safePage * SQUAD_PER_PAGE);
+  }, [filteredVerified, squadPage, totalSquadPages]);
+
+  useEffect(() => { setSquadPage(1); }, [squadSearch]);
+
   const _filteredPending = useMemo(() =>
     pendingUsers.filter((u: User) => matchesSearch(squadSearch, u.name, u.mobile)),
     [pendingUsers, squadSearch]
@@ -1140,7 +1203,7 @@ const SquadView = ({ user, pendingUsers, verifiedUsers, loading, orders: _orders
             </div>
           ) : (
             <div className="divide-y divide-zinc-50">
-              {filteredVerified.map((u: User) => (
+              {paginatedSquad.map((u: User) => (
                 <div
                   key={u.id}
                   onClick={() => onSelectUser(u)}
@@ -1177,6 +1240,16 @@ const SquadView = ({ user, pendingUsers, verifiedUsers, loading, orders: _orders
                 </div>
               ))}
             </div>
+          )}
+          {totalSquadPages > 1 && (
+            <Pagination
+              page={squadPage}
+              totalPages={totalSquadPages}
+              total={filteredVerified.length}
+              limit={SQUAD_PER_PAGE}
+              onPageChange={setSquadPage}
+              className="mt-3 rounded-xl border border-zinc-100"
+            />
           )}
         </div>
       </div>
