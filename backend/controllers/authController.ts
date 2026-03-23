@@ -185,7 +185,7 @@ export function makeAuthController(env: Env) {
           entityType: 'User',
           entityId: user.id,
           metadata: { role: 'shopper', mobile: user.mobile, parentCode: String(user.parentCode || '') },
-        }).catch(() => {});
+        }).catch((err) => { businessLog.warn('Failed to audit registration', { error: err?.message }); });
 
         businessLog.info('Buyer registered', { userId: user.id, mobile: user.mobile, parentCode: String(user.parentCode || ''), inviteUsed: !!consumed, ip: req.ip });
         logAuthEvent('REGISTRATION', {
@@ -417,7 +417,7 @@ export function makeAuthController(env: Env) {
             actorUserId: authUser.id,
             actorRoles: authUser.roles as any,
             metadata: { role: authUser.role },
-          }).catch(() => {}),
+          }).catch((err: any) => { businessLog.warn('Failed to audit login', { error: err?.message }); }),
         ]);
 
         businessLog.info('Login successful', { userId: authUser.id, role: authUser.role, identifier: mobile || username, ip: req.ip });
@@ -666,7 +666,7 @@ export function makeAuthController(env: Env) {
           entityType: 'User',
           entityId: user.mongoId!,
           metadata: { role: user.role, mobile: user.mobile, pendingApproval },
-        }).catch(() => {});
+        }).catch((err) => { businessLog.warn('Failed to audit registration', { error: err?.message }); });
 
         businessLog.info(`${String(user.role).charAt(0).toUpperCase() + String(user.role).slice(1)} registered`, { userId: user.id, role: user.role, mobile: user.mobile, mediatorCode: user.mediatorCode, parentCode: String(user.parentCode || ''), pendingApproval, inviteUsed: !!consumed, ip: req.ip });
         logAuthEvent('REGISTRATION', {
@@ -808,7 +808,7 @@ export function makeAuthController(env: Env) {
           entityType: 'User',
           entityId: user.mongoId!,
           metadata: { role: 'brand', mobile: user.mobile },
-        }).catch(() => {});
+        }).catch((err) => { businessLog.warn('Failed to audit registration', { error: err?.message }); });
 
         businessLog.info('Brand registered', { userId: user.id, mobile: user.mobile, brandCode: user.brandCode, inviteUsed: true, ip: req.ip });
         logAuthEvent('REGISTRATION', {

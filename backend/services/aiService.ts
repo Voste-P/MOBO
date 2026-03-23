@@ -249,7 +249,7 @@ async function releaseOcrWorker(worker: Awaited<ReturnType<typeof createWorker>>
     if (_ocrPool.length < OCR_POOL_SIZE) {
       createWorker('eng', undefined, { langPath: LOCAL_LANG_PATH })
         .then((w) => { if (_ocrPool.length < OCR_POOL_SIZE) _ocrPool.push(w); else w.terminate().catch(() => {}); })
-        .catch(() => { /* pool will be replenished on next acquire */ });
+        .catch((err) => { aiLog.warn('[OCR Pool] Replenishment failed', { error: err?.message }); });
     }
     return;
   }

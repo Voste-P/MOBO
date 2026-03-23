@@ -28,6 +28,7 @@ export function usePullToRefresh({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const startY = useRef(0);
   const pulling = useRef(false);
+  const pullDistanceRef = useRef(0);
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
     const el = e.currentTarget;
@@ -42,11 +43,13 @@ export function usePullToRefresh({
     const dy = e.touches[0].clientY - startY.current;
     if (dy < 0) {
       pulling.current = false;
+      pullDistanceRef.current = 0;
       setPullDistance(0);
       return;
     }
     // Rubber-band effect: diminish pull as it increases
     const clamped = Math.min(dy * 0.5, maxPull);
+    pullDistanceRef.current = clamped;
     setPullDistance(clamped);
   }, [maxPull]);
 
@@ -54,7 +57,7 @@ export function usePullToRefresh({
     if (!pulling.current) return;
     pulling.current = false;
 
-    if (pullDistance >= threshold) {
+    if (pullDistanceRef.current >= threshold) {
       setIsRefreshing(true);
       setPullDistance(threshold * 0.6); // Snap to spinner position
       try {
@@ -62,11 +65,13 @@ export function usePullToRefresh({
       } finally {
         setIsRefreshing(false);
         setPullDistance(0);
+        pullDistanceRef.current = 0;
       }
     } else {
       setPullDistance(0);
+      pullDistanceRef.current = 0;
     }
-  }, [pullDistance, threshold, onRefresh]);
+  }, [threshold, onRefresh]);
 
   return {
     handlers: { onTouchStart, onTouchMove, onTouchEnd },

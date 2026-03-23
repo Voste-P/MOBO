@@ -334,6 +334,8 @@ export function makeOrdersController(env: Env) {
         if (orderIds.length === 0) throw new AppError(400, 'MISSING_ORDER_IDS', 'orderIds array required');
         if (orderIds.length > 500) throw new AppError(400, 'TOO_MANY_ORDERS', 'Max 500 orders per batch');
 
+        const { roles, user: _user, pgUserId } = getRequester(req);
+
         const proofTypes = ['order', 'payment', 'rating', 'review', 'returnwindow'] as const;
         const tokens: Record<string, Record<string, string | null>> = {};
 
@@ -352,6 +354,20 @@ export function makeOrdersController(env: Env) {
           const mapped = pgOrder(o);
           orderMap.set(String(o.id), mapped);
           if (o.mongoId) orderMap.set(String(o.mongoId), mapped);
+        }
+
+        // Authorization: only privileged roles (admin/ops) can batch across all orders.
+        // Non-privileged users can only generate URLs for their own orders.
+        if (!isPrivileged(roles)) {
+          for (const o of orders) {
+            const mapped = orderMap.get(String(o.id));
+            if (!mapped) continue;
+            const isOwner = String(o.userId) === pgUserId;
+            const isBrand = roles.includes('brand') && String(o.brandUserId) === pgUserId;
+            if (!isOwner && !isBrand) {
+              throw new AppError(403, 'FORBIDDEN', 'You can only generate proof URLs for your own orders');
+            }
+          }
         }
 
         for (const oid of orderIds) {

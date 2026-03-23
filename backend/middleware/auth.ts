@@ -45,6 +45,12 @@ function validateJwtPayload(decoded: unknown): { sub: string; role?: string } {
   const payload = decoded as Record<string, unknown>;
   const sub = typeof payload.sub === 'string' ? payload.sub : typeof payload.sub === 'number' ? String(payload.sub) : '';
   if (!sub) throw new AppError(401, 'UNAUTHENTICATED', 'Invalid token: missing subject');
+  // Require valid UUID v4 or MongoDB ObjectId format
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const MONGO_ID_RE = /^[0-9a-fA-F]{24}$/;
+  if (!UUID_RE.test(sub) && !MONGO_ID_RE.test(sub)) {
+    throw new AppError(401, 'UNAUTHENTICATED', 'Invalid token subject format');
+  }
   const role = typeof payload.role === 'string' ? payload.role : undefined;
   return { sub, role };
 }
