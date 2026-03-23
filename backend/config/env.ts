@@ -7,8 +7,8 @@ const envSchema = z.object({
 
   // Express body parser limits.
   // Use values supported by the `bytes` package syntax (e.g. '1mb', '500kb').
-  // 15mb accommodates base64-encoded proof images (~10MB raw) with headroom.
-  REQUEST_BODY_LIMIT: z.string().trim().min(1).default('15mb'),
+  // 12mb accommodates base64-encoded proof images (~10MB raw → ~13.3MB base64).
+  REQUEST_BODY_LIMIT: z.string().trim().min(1).default('12mb'),
 
   // PostgreSQL — primary and only database via Prisma.
   // Required in production. Optional in dev/test where mocks or env files supply it.

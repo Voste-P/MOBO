@@ -927,10 +927,11 @@ async function verifyProofWithOcr(
     const rawData = imageBase64.includes(',') ? imageBase64.split(',')[1]! : imageBase64;
     const imgBuffer = Buffer.from(rawData, 'base64');
 
-    // Preprocess with Sharp for better OCR accuracy
+    // Auto-rotate from EXIF (mobile photos often have rotation metadata) then preprocess for OCR
     let processedBuffer: Buffer;
     try {
       processedBuffer = await sharp(imgBuffer)
+        .rotate()        // auto-rotate based on EXIF orientation
         .greyscale()
         .normalize()
         .sharpen()
@@ -1451,7 +1452,7 @@ async function verifyRatingWithOcr(
     const imgBuffer = Buffer.from(rawData, 'base64');
     let processedBuffer: Buffer;
     try {
-      processedBuffer = await sharp(imgBuffer).greyscale().normalize().sharpen().toBuffer();
+      processedBuffer = await sharp(imgBuffer).rotate().greyscale().normalize().sharpen().toBuffer();
     } catch { processedBuffer = imgBuffer; }
 
     // Detect orientation for multi-crop
@@ -2014,7 +2015,7 @@ async function verifyReturnWindowWithOcr(
     const rawData = imageBase64.includes(',') ? imageBase64.split(',')[1]! : imageBase64;
     const imgBuffer = Buffer.from(rawData, 'base64');
     let processedBuffer: Buffer;
-    try { processedBuffer = await sharp(imgBuffer).greyscale().normalize().sharpen().toBuffer(); }
+    try { processedBuffer = await sharp(imgBuffer).rotate().greyscale().normalize().sharpen().toBuffer(); }
     catch { processedBuffer = imgBuffer; }
 
     let worker: any = await acquireOcrWorker();

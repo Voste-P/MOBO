@@ -238,10 +238,11 @@ async function canManageTicketByRole(params: {
         if (registered) return true;
 
         // Buyer has orders managed by this mediator
-        const hasOrders = await db.order.count({
+        const hasOrders = await db.order.findFirst({
           where: { managerName: mediatorCode, userId: ticket.userId, isDeleted: false },
+          select: { id: true },
         });
-        if (hasOrders > 0) return true;
+        if (hasOrders) return true;
 
         // Ticket's specific order is managed by this mediator
         if (ticket.orderId) {
@@ -292,10 +293,11 @@ async function canManageTicketByRole(params: {
           if (order) return true;
         }
         // Fallback: check if ticket creator has ANY orders managed by this agency's network
-        const hasAnyAgencyOrders = await db.order.count({
+        const hasAnyAgencyOrders = await db.order.findFirst({
           where: { managerName: { in: allAgencyCodes }, userId: ticket.userId, isDeleted: false },
+          select: { id: true },
         });
-        if (hasAnyAgencyOrders > 0) return true;
+        if (hasAnyAgencyOrders) return true;
       }
     }
 

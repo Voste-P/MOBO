@@ -126,7 +126,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               key={t.id}
               className={clsx(
                 'pointer-events-auto border-l-4 rounded-2xl shadow-2xl',
-                'px-4 py-3 backdrop-blur',
+                'px-4 py-3 backdrop-blur animate-toast-in',
                 variantClasses(t.variant)
               )}
               role="alert"
