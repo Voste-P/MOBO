@@ -2585,7 +2585,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
           onClick={() => setAssignModal(null)}
         >
           <div
-            className="bg-white w-[98%] md:w-full max-w-7xl rounded-2xl p-3 sm:p-4 lg:p-5 2xl:p-6 shadow-2xl relative h-[98vh] flex flex-col min-h-0 animate-slide-up"
+            className="bg-white w-[98%] md:w-full max-w-7xl rounded-2xl p-3 sm:p-4 lg:p-5 shadow-2xl relative max-h-[98dvh] flex flex-col min-h-0 animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -2608,7 +2608,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
             </div>
 
             {/* Campaign Summary & Global Config */}
-            <div className="bg-slate-50 p-2 2xl:p-3 rounded-xl mb-1 border border-slate-100 flex flex-col lg:flex-row lg:items-start justify-between gap-2 shrink-0">
+            <div className="bg-slate-50 p-2 rounded-xl mb-1 border border-slate-100 flex flex-col lg:flex-row lg:items-start justify-between gap-1.5 shrink-0">
               <div className="flex gap-3 items-center min-w-0">
                 <div className="w-10 h-10 bg-white rounded-lg p-1.5 border border-slate-200 shadow-sm flex-shrink-0">
                   <ProxiedImage
@@ -2826,7 +2826,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
             </div>
 
             {/* List Header — sticky so column names stay visible when scrolling 50+ mediators */}
-            <div className="grid grid-cols-12 gap-4 px-4 py-1.5 bg-slate-50 rounded-lg border border-slate-100 mb-1 shrink-0 sticky top-0 z-10">
+            <div className="grid grid-cols-12 gap-3 px-4 py-1 bg-slate-50 rounded-lg border border-slate-100 mb-1 shrink-0 sticky top-0 z-10">
               <div className="col-span-4 text-xs font-extrabold text-slate-400 uppercase tracking-wider pl-2">
                 Mediator Profile
               </div>
@@ -2842,7 +2842,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
             </div>
 
             {/* Mediator List — scrollable container sized to fill modal */}
-            <div className="flex-1 min-h-[40vh] overflow-y-auto scrollbar-styled space-y-1 pr-2 mb-2">
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-styled space-y-1 pr-2 mb-1">
               {activeMediatorsForAssign.length === 0 ? (
                 loading ? (
                   <EmptyState
@@ -2874,7 +2874,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                   return (
                     <div
                       key={m.id}
-                      className={`grid grid-cols-12 gap-4 items-center p-1.5 border border-slate-100 rounded-xl transition-all bg-white shadow-sm group ${isActive ? 'hover:border-purple-200 hover:bg-purple-50/10' : 'opacity-70'}`}
+                      className={`grid grid-cols-12 gap-3 items-center p-1.5 border border-slate-100 rounded-xl transition-all bg-white shadow-sm group ${isActive ? 'hover:border-purple-200 hover:bg-purple-50/10' : 'opacity-70'}`}
                     >
                       {/* Profile */}
                       <div className="col-span-4 flex items-center gap-3 pl-2">
@@ -3441,7 +3441,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
       {/* Reject Modal */}
       {rejectModal && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in" onClick={() => { setRejectModal(null); setRejectReason(''); }}>
-          <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-extrabold text-lg text-red-600 mb-1 flex items-center gap-2"><AlertTriangle size={20} /> Reject Proof</h3>
             <p className="text-xs text-slate-500 mb-4">Order {getPrimaryOrderId(rejectModal.order)} · Rejecting <strong>{rejectModal.type}</strong> proof</p>
             <textarea

@@ -207,6 +207,7 @@ function toErrorFromPayload(payload: any, fallback: string): Error {
   const message =
     payload?.error?.message ||
     payload?.message ||
+    (typeof payload?.error === 'string' ? payload.error : null) ||
     (typeof payload === 'string' ? payload : null) ||
     fallback;
   const err = new Error(maybeFixMojibake(String(message)));

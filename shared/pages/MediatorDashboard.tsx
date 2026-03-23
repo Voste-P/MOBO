@@ -1531,7 +1531,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
     >
       {ConfirmDialogElement}
       <div
-        className="bg-[#F8F9FA] w-full rounded-t-[2.5rem] h-[92%] shadow-2xl animate-slide-up relative flex flex-col"
+        className="bg-[#F8F9FA] w-full rounded-t-[2.5rem] max-h-[92%] h-[92%] shadow-2xl animate-slide-up relative flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex-none p-5 bg-[#18181B] rounded-t-[2.5rem] text-white pb-8">

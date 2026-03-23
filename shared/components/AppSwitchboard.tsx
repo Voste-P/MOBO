@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 export const AppSwitchboard: React.FC<{ onSelect: (role: string) => void }> = ({ onSelect }) => (
-  <div className="min-h-screen bg-slate-950 text-white flex flex-col font-sans selection:bg-lime-400 selection:text-black">
+  <div className="min-h-[100dvh] bg-slate-950 text-white flex flex-col font-sans selection:bg-lime-400 selection:text-black">
     {/* Animated Background */}
     <div className="fixed inset-0 z-0">
       <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_-20%,#312e81,transparent)] opacity-40"></div>

@@ -2120,7 +2120,7 @@ export const Orders: React.FC = () => {
           onClick={() => setProofToView(null)}
         >
           <div
-            className="max-w-lg w-full bg-white p-4 rounded-2xl relative shadow-2xl"
+            className="max-w-lg w-full bg-white p-4 rounded-2xl relative shadow-2xl max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <button

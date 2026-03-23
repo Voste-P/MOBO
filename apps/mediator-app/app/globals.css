@@ -62,22 +62,23 @@ label,
 
 /* Thin styled scrollbar — use on scrollable areas that need visible scrolling */
 .scrollbar-styled::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 8px;
+  height: 8px;
 }
 .scrollbar-styled::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 999px;
 }
 .scrollbar-styled::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(0, 0, 0, 0.2);
   border-radius: 999px;
 }
 .scrollbar-styled::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.35);
 }
 .scrollbar-styled {
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
+  scrollbar-color: rgba(0, 0, 0, 0.2) rgba(0, 0, 0, 0.04);
 }
 
 /* Scrollbar variant for dark backgrounds */

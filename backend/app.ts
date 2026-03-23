@@ -332,7 +332,7 @@ export function createApp(env: Env) {
         metadata: { origin },
       });
       return res.status(403).json({
-        error: 'origin_not_allowed',
+        error: { code: 'ORIGIN_NOT_ALLOWED', message: 'This domain is not authorized to access the API. Please check CORS_ORIGINS configuration.' },
       });
     }
     next();
