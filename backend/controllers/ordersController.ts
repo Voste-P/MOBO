@@ -1233,10 +1233,32 @@ export function makeOrdersController(env: Env) {
             }
           }
           updateData.reviewLink = reviewUrl;
-          // Auto-verify review links: URL validation already confirms it's from a known marketplace.
-          // Set confidence so autoVerifyStep can pick it up.
+          // Auto-verify review links: URL validation confirms it's from a known marketplace.
+          // Additionally verify the link is reachable (HEAD request with timeout) before
+          // awarding auto-verify confidence. This prevents fraudulent dead links from
+          // being auto-approved.
           if (env.NODE_ENV !== 'test') {
-            claimAiConfidence = env.AI_REVIEW_LINK_CONFIDENCE ?? 95;
+            try {
+              const headResp = await fetch(reviewUrl, {
+                method: 'HEAD',
+                redirect: 'follow',
+                signal: AbortSignal.timeout(8000),
+              });
+              if (headResp.ok || headResp.status === 405 || headResp.status === 403) {
+                // 200/405 (method not allowed but URL exists)/403 (auth-gated) — link exists
+                claimAiConfidence = env.AI_REVIEW_LINK_CONFIDENCE ?? 95;
+              } else {
+                orderLog.warn('Review link HEAD returned non-OK status', {
+                  orderId: order.mongoId, status: headResp.status, url: reviewUrl,
+                });
+                // Still accept the link but don't auto-verify — mediator will review
+                claimAiConfidence = 0;
+              }
+            } catch {
+              // Network error / timeout — accept link but skip auto-verify
+              orderLog.warn('Review link HEAD request failed', { orderId: order.mongoId, url: reviewUrl });
+              claimAiConfidence = 0;
+            }
           }
           if (order.rejectionType === 'review') {
             updateData.rejectionType = null;

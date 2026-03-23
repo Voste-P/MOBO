@@ -26,6 +26,13 @@ const emitter = new EventEmitter();
 // Allow many SSE clients but cap to prevent resource exhaustion.
 emitter.setMaxListeners(500);
 
+/** Track active listener count for monitoring. */
+let _activeListeners = 0;
+
+export function getActiveListenerCount(): number {
+  return _activeListeners;
+}
+
 export function publishRealtime(evt: RealtimeEvent) {
   try {
     emitter.emit('event', evt);
@@ -39,7 +46,18 @@ export function publishBroadcast(type: string, payload?: any) {
   publishRealtime({ type, ts: new Date().toISOString(), payload, audience: { broadcast: true } });
 }
 
+/**
+ * Subscribe to realtime events. Returns an unsubscribe function that MUST be
+ * called when the SSE client disconnects to prevent listener leaks.
+ */
 export function subscribeRealtime(listener: Listener) {
+  _activeListeners++;
   emitter.on('event', listener);
-  return () => emitter.off('event', listener);
+  let unsubscribed = false;
+  return () => {
+    if (unsubscribed) return; // prevent double-unsubscribe
+    unsubscribed = true;
+    _activeListeners--;
+    emitter.off('event', listener);
+  };
 }

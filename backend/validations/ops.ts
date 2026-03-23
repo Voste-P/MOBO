@@ -20,18 +20,18 @@ export const verifyOrderRequirementSchema = z.object({
 export const rejectOrderProofSchema = z.object({
   orderId: z.string().min(1),
   type: z.enum(['order', 'review', 'rating', 'returnWindow']),
-  reason: z.string().min(5).max(500),
+  reason: z.string().min(5).max(500).transform(v => v.replace(/<[^>]*>/g, '').replace(/[\x00-\x1f]/g, '').trim()),
 });
 
 export const cancelOrderProofsSchema = z.object({
   orderId: z.string().min(1),
-  reason: z.string().min(5).max(500),
+  reason: z.string().min(5).max(500).transform(v => v.replace(/<[^>]*>/g, '').replace(/[\x00-\x1f]/g, '').trim()),
 });
 
 export const requestMissingProofSchema = z.object({
   orderId: z.string().min(1),
   type: z.enum(['review', 'rating', 'returnWindow']),
-  note: z.string().max(300).optional(),
+  note: z.string().max(300).transform(v => v.replace(/<[^>]*>/g, '').replace(/[\x00-\x1f]/g, '').trim()).optional(),
 });
 
 const normalizeQueryString = (value: unknown) => {
@@ -162,10 +162,10 @@ export const declineOfferSchema = z.object({
 
 export const forceApproveOrderSchema = z.object({
   orderId: z.string().min(1),
-  note: z.string().max(500).optional(),
+  note: z.string().max(500).transform(v => v.replace(/<[^>]*>/g, '').replace(/[\x00-\x1f]/g, '').trim()).optional(),
 });
 
 export const cancelOrderSchema = z.object({
   orderId: z.string().min(1),
-  reason: z.string().min(5).max(500),
+  reason: z.string().min(5).max(500).transform(v => v.replace(/<[^>]*>/g, '').replace(/[\x00-\x1f]/g, '').trim()),
 });

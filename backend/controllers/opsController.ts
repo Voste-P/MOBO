@@ -168,7 +168,8 @@ export async function finalizeApprovalIfReady(order: any, actorUserId: string, e
     actorUserId,
   });
 
-  // Use updateMany with workflowStatus guard to prevent duplicate events on concurrent verify
+  // Use updateMany with workflowStatus guard to prevent duplicate events on concurrent verify.
+  // If count is 0, another request already approved or modified the order — idempotent return.
   const updated = await db().order.updateMany({
     where: { id: order.id, workflowStatus: 'UNDER_REVIEW' },
     data: {
@@ -184,6 +185,14 @@ export async function finalizeApprovalIfReady(order: any, actorUserId: string, e
   });
 
   if (updated.count === 0) {
+    // Re-check: if the order was already APPROVED by a concurrent request, treat as success
+    const recheck = await db().order.findFirst({
+      where: { id: order.id, isDeleted: false },
+      select: { workflowStatus: true },
+    });
+    if (recheck?.workflowStatus === 'APPROVED') {
+      return { approved: true, reason: 'ALREADY_APPROVED' };
+    }
     return { approved: false, reason: 'CONCURRENT_UPDATE' };
   }
 

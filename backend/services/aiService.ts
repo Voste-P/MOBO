@@ -35,6 +35,9 @@ let _circuitBreakerCooldownMs = 300_000; // 5 min, overridden by env
 
 /** Circuit state for proper half-open handling. */
 let _circuitState: 'CLOSED' | 'OPEN' | 'HALF_OPEN' = 'CLOSED';
+/** Track consecutive successes in HALF_OPEN before closing the circuit. */
+let _halfOpenSuccessCount = 0;
+const HALF_OPEN_SUCCESS_THRESHOLD = 3; // require 3 consecutive successes to close
 
 function isGeminiCircuitOpen(): boolean {
   if (_circuitState === 'CLOSED') return false;
@@ -53,18 +56,25 @@ function isGeminiCircuitOpen(): boolean {
 
 function recordGeminiSuccess(): void {
   if (_circuitState === 'HALF_OPEN') {
-    aiLog.info('[Circuit Breaker] CLOSED — probe request succeeded');
+    _halfOpenSuccessCount++;
+    if (_halfOpenSuccessCount >= HALF_OPEN_SUCCESS_THRESHOLD) {
+      aiLog.info(`[Circuit Breaker] CLOSED — ${_halfOpenSuccessCount} consecutive probe successes`);
+      _circuitState = 'CLOSED';
+      _halfOpenSuccessCount = 0;
+    } else {
+      aiLog.info(`[Circuit Breaker] HALF_OPEN — probe success ${_halfOpenSuccessCount}/${HALF_OPEN_SUCCESS_THRESHOLD}`);
+    }
   }
   _geminiConsecutiveFails = 0;
-  _circuitState = 'CLOSED';
 }
 
 function recordGeminiFailure(): void {
   _geminiConsecutiveFails++;
   _geminiLastFailTimestamp = Date.now();
   if (_circuitState === 'HALF_OPEN') {
-    // Probe failed — immediately re-open the circuit
+    // Probe failed — immediately re-open the circuit, reset success counter
     _circuitState = 'OPEN';
+    _halfOpenSuccessCount = 0;
     aiLog.warn(`[Circuit Breaker] OPEN (probe failed) — re-opening for ${_circuitBreakerCooldownMs / 1000}s.`);
   } else if (_geminiConsecutiveFails >= _circuitBreakerThreshold) {
     _circuitState = 'OPEN';

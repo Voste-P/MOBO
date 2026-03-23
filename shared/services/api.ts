@@ -658,7 +658,7 @@ export const api = {
       }
     },
     /** Pre-validate rating screenshot: checks account name + product name match */
-    verifyRating: async (file: File, expectedBuyerName: string, expectedProductName: string, expectedReviewerName?: string, orderId?: string) => {
+    verifyRating: async (file: File, expectedBuyerName: string, expectedProductName: string, expectedReviewerName?: string, orderId?: string, signal?: AbortSignal) => {
       const rawBase64 = await readFileAsDataUrl(file);
       // Compress before sending to stay under Vercel proxy body limit.
       const compressed = await compressImage(rawBase64, { maxDimension: 1600, quality: 0.8 });
@@ -666,16 +666,18 @@ export const api = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ imageBase64: compressed, expectedBuyerName, expectedProductName, ...(expectedReviewerName ? { expectedReviewerName } : {}), ...(orderId ? { orderId } : {}) }),
+        ...(signal ? { signal } : {}),
       });
     },
     /** Pre-validate return window screenshot: checks order ID, product, amount, seller, return window closed */
-    verifyReturnWindow: async (file: File, expectedOrderId: string, expectedProductName: string, expectedAmount: number, expectedSoldBy?: string, expectedReviewerName?: string) => {
+    verifyReturnWindow: async (file: File, expectedOrderId: string, expectedProductName: string, expectedAmount: number, expectedSoldBy?: string, expectedReviewerName?: string, signal?: AbortSignal) => {
       const rawBase64 = await readFileAsDataUrl(file);
       const compressed = await compressImage(rawBase64, { maxDimension: 1600, quality: 0.8 });
       return fetchJson('/ai/verify-return-window', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ imageBase64: compressed, expectedOrderId, expectedProductName, expectedAmount, ...(expectedSoldBy ? { expectedSoldBy } : {}), ...(expectedReviewerName ? { expectedReviewerName } : {}) }),
+        ...(signal ? { signal } : {}),
       });
     },
   },

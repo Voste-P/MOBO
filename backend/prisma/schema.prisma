@@ -618,6 +618,8 @@ model Order {
   @@index([brandUserId, workflowStatus, isDeleted]) // brand dashboard filtered listing
   @@index([managerName, isDeleted, createdAt(sort: Desc)]) // ops dashboard filtered listing
   @@index([buyerMobile, isDeleted])                  // velocity check lookups
+  @@index([workflowStatus, affiliateStatus, createdAt(sort: Desc)]) // admin filtered order listing
+  @@index([managerName, workflowStatus, isDeleted])  // ops dashboard mediator-scoped queries
   @@map("orders")
 }
 

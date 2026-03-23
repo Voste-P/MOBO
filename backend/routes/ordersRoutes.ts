@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import type { Env } from '../config/env.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireRoles } from '../middleware/auth.js';
 import { makeOrdersController } from '../controllers/ordersController.js';
 import { prisma } from '../database/prisma.js';
 import { idWhere } from '../utils/idWhere.js';
@@ -36,7 +36,7 @@ export function ordersRoutes(env: Env): Router {
   // UI expects these endpoints to exist.
   router.get('/orders/user/:userId', requireAuth(env), ownerOrPrivileged, orders.getUserOrders);
   router.post('/orders', requireAuth(env), orderWriteLimiter, orders.createOrder);
-  router.post('/orders/claim', requireAuth(env), orderWriteLimiter, orders.submitClaim);
+  router.post('/orders/claim', requireAuth(env), requireRoles('shopper'), orderWriteLimiter, orders.submitClaim);
   router.patch('/orders/:orderId/reviewer-name', requireAuth(env), orderWriteLimiter, orders.setReviewerName);
   router.get('/orders/:orderId/proof/:type', requireAuth(env), (_req, res, next) => {
     // Proof screenshots are immutable once uploaded — cache aggressively

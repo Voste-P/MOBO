@@ -265,6 +265,10 @@ export const Orders: React.FC = () => {
   } | null>(null);
   const [rwFile, setRwFile] = useState<File | null>(null);
 
+  // AbortController refs to cancel in-flight AI verification when user re-uploads
+  const ratingAbortRef = useRef<AbortController | null>(null);
+  const rwAbortRef = useRef<AbortController | null>(null);
+
   // Order list search & filter
   const [orderListSearch, setOrderListSearch] = useState('');
   const [orderListStatus, setOrderListStatus] = useState<string>('All');
@@ -608,6 +612,11 @@ export const Orders: React.FC = () => {
       return;
     }
 
+    // Cancel any in-flight verification to prevent stale-state race
+    ratingAbortRef.current?.abort();
+    const controller = new AbortController();
+    ratingAbortRef.current = controller;
+
     // Show preview immediately
     const reader = new FileReader();
     reader.onload = () => setRatingPreview(reader.result as string);
@@ -630,7 +639,7 @@ export const Orders: React.FC = () => {
       // confusing mismatches against the buyer's app account name.
       if (!hasReviewerName) {
         if (productName) {
-          const result = await api.orders.verifyRating(file, buyerName || '', productName, undefined, selectedOrder.id);
+          const result = await api.orders.verifyRating(file, buyerName || '', productName, undefined, selectedOrder.id, controller.signal);
           // Override account name match — we can't verify without a reviewer name
           setRatingVerification({ ...result, accountNameMatch: true });
           if (result.screenshotCropped) {
@@ -648,7 +657,7 @@ export const Orders: React.FC = () => {
         if (reviewerName && productName) {
           // Pass buyer's app account name as expectedBuyerName (secondary),
           // and reviewer name as expectedReviewerName (PRIMARY match target).
-          const result = await api.orders.verifyRating(file, buyerName || '', productName, reviewerName, selectedOrder.id);
+          const result = await api.orders.verifyRating(file, buyerName || '', productName, reviewerName, selectedOrder.id, controller.signal);
           setRatingVerification(result);
 
           if (result.screenshotCropped) {
@@ -668,6 +677,7 @@ export const Orders: React.FC = () => {
         }
       }
     } catch (err: any) {
+      if (err?.name === 'AbortError') return; // Cancelled by re-upload — ignore silently
       if (process.env.NODE_ENV !== 'production') console.error('Rating pre-validation failed:', err);
       // Keep verification null — submit button stays disabled until user retries
       setRatingVerification(null);
@@ -744,6 +754,11 @@ export const Orders: React.FC = () => {
       return;
     }
 
+    // Cancel any in-flight verification to prevent stale-state race
+    rwAbortRef.current?.abort();
+    const controller = new AbortController();
+    rwAbortRef.current = controller;
+
     // Show preview immediately
     const reader = new FileReader();
     reader.onload = () => setRwPreview(reader.result as string);
@@ -773,6 +788,7 @@ export const Orders: React.FC = () => {
         file, orderId, productName, amount,
         soldBy || undefined,
         reviewerName || undefined,
+        controller.signal,
       );
       setRwVerification(result);
 
@@ -792,6 +808,7 @@ export const Orders: React.FC = () => {
         }
       }
     } catch (err: any) {
+      if (err?.name === 'AbortError') return; // Cancelled by re-upload — ignore silently
       if (process.env.NODE_ENV !== 'production') console.error('Return window pre-validation failed:', err);
       // Keep verification null — submit button stays disabled until user retries
       setRwVerification(null);
