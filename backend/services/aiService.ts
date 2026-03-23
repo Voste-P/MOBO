@@ -1531,8 +1531,13 @@ async function verifyRatingWithOcr(
     // Combine all OCR texts
     const ocrText = allTexts.sort((a, b) => b.length - a.length).join('\n');
 
-    // Detect cropped screenshots — full rating pages typically have 200+ chars
-    const screenshotCropped = ocrText.length < 200;
+    // Detect cropped screenshots — multiple heuristics:
+    // 1. Very short OCR text means very little content visible
+    // 2. "Edit public name" visible but no header greeting means top is cropped
+    const textTooShort = ocrText.length < 200;
+    const hasEditPublicName = /edit\s*public\s*name/i.test(ocrText);
+    const hasHeaderGreeting = /\b(hello|hi|hey|welcome|dear|namaste)\s*,?\s*[a-z]/i.test(ocrText);
+    const screenshotCropped = textTooShort || (hasEditPublicName && !hasHeaderGreeting);
 
     if (!ocrText || ocrText.length < 5) {
       return { accountNameMatch: false, productNameMatch: false, confidenceScore: 10,
@@ -1690,11 +1695,14 @@ async function verifyRatingWithOcr(
       detectedPublicName,
       detectedProductName: matchedTokens.length > 0 ? matchedTokens.join(' ') : undefined,
       discrepancyNote: [
+        screenshotCropped && hasEditPublicName && !hasHeaderGreeting
+          ? 'Screenshot appears cropped: public name visible but account header/greeting is missing.'
+          : '',
         !accountNameMatch ? (expectedReviewerName
           ? `Account name "${expectedBuyerName}" and reviewer name "${expectedReviewerName}" not found in screenshot.`
           : `Account name "${expectedBuyerName}" not found in screenshot.`) : '',
         !productNameMatch ? `Product name not matching in screenshot.` : '',
-        accountNameMatch && productNameMatch ? 'Account name and product matched via OCR.' : '',
+        accountNameMatch && productNameMatch && !screenshotCropped ? 'Account name and product matched via OCR.' : '',
       ].filter(Boolean).join(' '),
     };
   } catch (err) {
@@ -1893,6 +1901,20 @@ export async function verifyRatingScreenshotWithAi(
             parsed.productNameMatch = false;
             parsed.discrepancyNote = (parsed.discrepancyNote ? parsed.discrepancyNote + ' ' : '') +
               'Could not detect product name in screenshot to verify against expected product.';
+          }
+        }
+
+        // Post-process: Detect cropped screenshots that Gemini missed.
+        // If public name (beside "Edit public name") is visible but the header
+        // greeting ("Hello, <Name>") is NOT, the user likely cropped out the top
+        // of the page to hide the real account identity. Force screenshotCropped=true.
+        if (!parsed.screenshotCropped) {
+          const hasPublicName = !!parsed.detectedPublicName && !/^(null|undefined|n\/a|none)$/i.test(parsed.detectedPublicName);
+          const hasAccountName = !!parsed.detectedAccountName && !/^(null|undefined|n\/a|none)$/i.test(parsed.detectedAccountName);
+          if (hasPublicName && !hasAccountName) {
+            parsed.screenshotCropped = true;
+            parsed.discrepancyNote = (parsed.discrepancyNote ? parsed.discrepancyNote + ' ' : '') +
+              'Screenshot appears cropped: reviewer public name is visible but the account header/greeting at the top of the page is missing. Please upload a FULL screenshot showing the complete page including the "Hello, <Name>" header.';
           }
         }
 
