@@ -170,7 +170,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
   return (
     <div className="space-y-6 animate-enter">
       {/* Header Stats */}
-      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide px-1 snap-x">
+      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-styled px-1 snap-x">
         <div className="min-w-[150px] bg-[#18181B] p-4 rounded-[1.5rem] shadow-xl relative overflow-hidden snap-center flex-1">
           <div className="absolute top-0 right-0 w-24 h-24 bg-[#CCF381]/10 rounded-full blur-2xl -mr-6 -mt-6"></div>
           <div className="relative z-10">
@@ -238,7 +238,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
               {pendingUsers.length} requests
             </span>
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide px-1 snap-x">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-styled px-1 snap-x">
             {pendingUsers.map((u: User) => (
               <div
                 key={u.id}

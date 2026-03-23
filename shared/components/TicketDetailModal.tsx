@@ -188,7 +188,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
       onClick={onClose}
     >
       <div
-        className="bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[85vh] animate-slide-up"
+        className="bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[85dvh] animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

@@ -212,12 +212,12 @@ const AgencyProfile = ({ user }: any) => {
     <div className="max-w-5xl mx-auto animate-enter pb-12">
       {/* Header */}
       <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden relative mb-8 group">
-        <div className="h-32 bg-gradient-to-r from-purple-600 to-indigo-600 relative">
-          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
+        <div className="h-28 sm:h-32 bg-gradient-to-r from-purple-600 to-indigo-600 relative">
+          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.7\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\'/%3E%3C/svg%3E")' }} />
         </div>
-        <div className="px-8 pb-8 flex flex-col md:flex-row items-end -mt-12 gap-6">
+        <div className="px-4 sm:px-8 pb-6 sm:pb-8 flex flex-col md:flex-row items-end -mt-10 sm:-mt-12 gap-4 sm:gap-6">
           <div className="relative">
-            <div className="w-32 h-32 rounded-[2rem] bg-white p-2 shadow-lg border border-slate-100 flex-shrink-0">
+            <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-[1.5rem] sm:rounded-[2rem] bg-white p-2 shadow-lg border border-slate-100 flex-shrink-0">
               <div className="w-full h-full bg-slate-900 rounded-[1.5rem] flex items-center justify-center text-4xl font-black text-white overflow-hidden relative group-hover:scale-[1.02] transition-transform duration-500">
                 {avatar ? (
                   <ProxiedImage
@@ -2846,7 +2846,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
             </div>
 
             {/* Mediator List — scrollable container sized to fill modal */}
-            <div className="flex-1 min-h-[200px] overflow-y-auto scrollbar-styled space-y-1 pr-2 mb-1">
+            <div className="flex-1 min-h-[280px] overflow-y-auto scrollbar-styled space-y-1 pr-2 mb-1">
               {activeMediatorsForAssign.length === 0 ? (
                 loading ? (
                   <EmptyState
@@ -2995,14 +2995,14 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
             {/* Open to All info panel */}
             {openToAll && (
               <div className="flex-1 min-h-0 flex items-center justify-center">
-                <div className="text-center py-8">
-                  <div className="text-5xl mb-4">🌐</div>
-                  <h4 className="text-lg font-black text-slate-900 mb-2">Open to All Mediators</h4>
-                  <p className="text-sm text-slate-500 max-w-md mx-auto">
+                <div className="text-center py-4">
+                  <div className="text-4xl mb-2">🌐</div>
+                  <h4 className="text-base font-black text-slate-900 mb-1">Open to All Mediators</h4>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
                     All <strong>{mediators.filter((m: any) => m.status === 'active').length}</strong> connected mediators will be able to publish and sell this deal.
                     Buyers can purchase on a first-come-first-serve basis until all <strong>{assignModal?.totalSlots ?? 0}</strong> slots are filled.
                   </p>
-                  <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold border border-emerald-200">
+                  <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-bold border border-emerald-200">
                     <span>Remaining: {(assignModal?.totalSlots ?? 0) - (assignModal?.usedSlots ?? 0)} slots</span>
                   </div>
                 </div>
@@ -3424,7 +3424,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-xs font-extrabold text-teal-500 uppercase tracking-widest"><Package size={14} /> Return Window</div>
                   <div className="rounded-2xl border-2 border-teal-100 overflow-hidden shadow-sm">
-                    <ProofImage orderId={proofOrder.id} proofType="returnWindow" existingSrc={proofOrder.screenshots.returnWindow !== 'exists' ? proofOrder.screenshots.returnWindow : undefined} className="w-full h-auto max-h-[60vh] object-contain bg-zinc-50" alt="Return Window" />
+                    <ProofImage orderId={proofOrder.id} proofType="returnWindow" existingSrc={proofOrder.screenshots.returnWindow !== 'exists' ? proofOrder.screenshots.returnWindow : undefined} className="w-full h-auto max-h-[60dvh] object-contain bg-zinc-50" alt="Return Window" />
                   </div>
                 </div>
               )}
@@ -4258,7 +4258,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                       orderId={proofOrder.id}
                       proofType="returnWindow"
                       existingSrc={proofOrder.screenshots.returnWindow !== 'exists' ? proofOrder.screenshots.returnWindow : undefined}
-                      className="w-full h-auto max-h-[60vh] object-contain bg-zinc-50"
+                      className="w-full h-auto max-h-[60dvh] object-contain bg-zinc-50"
                       alt="Return Window proof"
                     />
                   </div>
@@ -4688,7 +4688,7 @@ export const AgencyDashboard: React.FC = () => {
               icon={<HelpCircle size={22} className="text-slate-400" />}
             />
           ) : (
-            <div className="space-y-3 max-h-[65vh] overflow-y-auto scrollbar-styled">
+            <div className="space-y-3 max-h-[65dvh] overflow-y-auto scrollbar-styled">
               {tickets.filter((t: Ticket) => {
                 if (ticketFilter !== 'All' && String(t.status) !== ticketFilter) return false;
                 if (ticketSearch.trim()) {

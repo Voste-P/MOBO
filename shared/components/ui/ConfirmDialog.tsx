@@ -166,7 +166,7 @@ function ConfirmDialog({
         )}
 
         {/* Message */}
-        <p className="text-center text-sm text-zinc-600 leading-relaxed mb-6 max-h-[40vh] overflow-y-auto scrollbar-styled">
+        <p className="text-center text-sm text-zinc-600 leading-relaxed mb-6 max-h-[40dvh] overflow-y-auto scrollbar-styled">
           {message}
         </p>
 

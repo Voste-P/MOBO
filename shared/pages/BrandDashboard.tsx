@@ -1491,7 +1491,7 @@ const OrdersView = ({ user }: any) => {
                       orderId={viewProofOrder.id}
                       proofType="returnWindow"
                       existingSrc={viewProofOrder.screenshots.returnWindow !== 'exists' ? viewProofOrder.screenshots.returnWindow : undefined}
-                      className="w-full h-auto max-h-[60vh] object-contain bg-zinc-50"
+                      className="w-full h-auto max-h-[60dvh] object-contain bg-zinc-50"
                       alt="Return Window proof"
                     />
                   </div>
@@ -2606,7 +2606,7 @@ export const BrandDashboard: React.FC = () => {
                 icon={<HelpCircle size={22} className="text-zinc-400" />}
               />
             ) : (
-              <div className="space-y-3 max-h-[65vh] overflow-y-auto scrollbar-styled">
+              <div className="space-y-3 max-h-[65dvh] overflow-y-auto scrollbar-styled">
                 {tickets.filter((t: Ticket) => {
                   if (ticketFilter !== 'All' && String(t.status) !== ticketFilter) return false;
                   if (ticketSearch.trim()) {

@@ -424,7 +424,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                   Close
                 </button>
               </div>
-              <div className="max-h-[360px] overflow-y-auto scrollbar-hide space-y-2 p-1">
+              <div className="max-h-[360px] overflow-y-auto scrollbar-styled space-y-2 p-1">
                 {notifications.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <Bell size={20} className="text-slate-300 mb-2" />
@@ -571,7 +571,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                 </div>
               </div>
             {msg.relatedProducts && msg.relatedProducts.length > 0 && (
-              <div className="w-screen relative left-1/2 -translate-x-1/2 mt-4 pl-4 overflow-x-auto scrollbar-hide snap-x">
+              <div className="w-screen relative left-1/2 -translate-x-1/2 mt-4 pl-4 overflow-x-auto scrollbar-styled snap-x">
                 <div className="flex gap-4 w-max pr-8 pl-4 pb-4">
                   {msg.relatedProducts.map((product) => (
                     <ProductCard key={product.id} product={product} />
@@ -706,7 +706,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
       </div>
 
       <div className="shrink-0 w-full px-4 pb-20 safe-bottom">
-        <div className="flex flex-nowrap gap-2 justify-center pb-3 overflow-x-auto scrollbar-hide">
+        <div className="flex flex-nowrap gap-2 justify-center pb-3 overflow-x-auto scrollbar-styled">
           {quickActions.map((action) => (
             <button
               key={action.command}

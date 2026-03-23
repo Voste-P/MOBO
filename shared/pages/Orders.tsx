@@ -242,6 +242,7 @@ export const Orders: React.FC = () => {
     confidenceScore: number;
     detectedAccountName?: string;
     detectedProductName?: string;
+    screenshotCropped?: boolean;
     discrepancyNote?: string;
   } | null>(null);
   const [ratingFile, setRatingFile] = useState<File | null>(null);
@@ -259,6 +260,7 @@ export const Orders: React.FC = () => {
     confidenceScore: number;
     detectedReturnWindow?: string;
     detectedAccountName?: string;
+    screenshotCropped?: boolean;
     discrepancyNote?: string;
   } | null>(null);
   const [rwFile, setRwFile] = useState<File | null>(null);
@@ -631,7 +633,9 @@ export const Orders: React.FC = () => {
           const result = await api.orders.verifyRating(file, buyerName || '', productName, undefined, selectedOrder.id);
           // Override account name match — we can't verify without a reviewer name
           setRatingVerification({ ...result, accountNameMatch: true });
-          if (!result.productNameMatch) {
+          if (result.screenshotCropped) {
+            toast.error('Screenshot appears cropped or incomplete. Please upload a FULL screenshot showing the complete page including the account name header at the top.');
+          } else if (!result.productNameMatch) {
             toast.warning('Product name does not match this order. Please check the screenshot.');
           } else {
             toast.success('Screenshot verified! Product matches.');
@@ -647,7 +651,9 @@ export const Orders: React.FC = () => {
           const result = await api.orders.verifyRating(file, buyerName || '', productName, reviewerName, selectedOrder.id);
           setRatingVerification(result);
 
-          if (!result.accountNameMatch && !result.productNameMatch) {
+          if (result.screenshotCropped) {
+            toast.error('Screenshot appears cropped or incomplete. Please upload a FULL screenshot showing the complete rating page including the account name header at the top.');
+          } else if (!result.accountNameMatch && !result.productNameMatch) {
             toast.error(`Reviewer name "${reviewerName}" and product do not match. Upload the correct screenshot.`);
           } else if (!result.accountNameMatch) {
             toast.error(`Reviewer name "${reviewerName}" not found in screenshot. ${result.detectedAccountName ? `Found "${result.detectedAccountName}" instead.` : ''}`);
@@ -679,6 +685,12 @@ export const Orders: React.FC = () => {
     // Block if AI verification hasn't completed yet (file uploaded but not verified)
     if (!ratingVerification) {
       toast.error('Please wait for AI verification to complete before submitting.');
+      return;
+    }
+
+    // Block submission when screenshot is cropped/incomplete
+    if (ratingVerification.screenshotCropped) {
+      toast.error('Screenshot appears cropped or incomplete. Please upload a FULL screenshot showing the complete rating page including the account name header at the top.');
       return;
     }
 
@@ -764,16 +776,20 @@ export const Orders: React.FC = () => {
       );
       setRwVerification(result);
 
-      // Hard-block fields: order ID, product name, seller/sold by
-      const hardFails: string[] = [];
-      if (!result.orderIdMatch) hardFails.push('Order ID');
-      if (!result.productNameMatch) hardFails.push('Product name');
-      if (!result.soldByMatch && soldBy) hardFails.push('Seller name');
-
-      if (hardFails.length > 0) {
-        toast.error(`Mismatch: ${hardFails.join(', ')}. Please upload the correct return window screenshot.`);
+      if (result.screenshotCropped) {
+        toast.error('Screenshot appears cropped or incomplete. Please upload a FULL screenshot showing the complete order page including the page header.');
       } else {
-        toast.success(`Return window verified! Return window: ${result.returnWindowClosed ? 'Closed' : 'Open'}. You can submit.`);
+        // Hard-block fields: order ID, product name, seller/sold by
+        const hardFails: string[] = [];
+        if (!result.orderIdMatch) hardFails.push('Order ID');
+        if (!result.productNameMatch) hardFails.push('Product name');
+        if (!result.soldByMatch && soldBy) hardFails.push('Seller name');
+
+        if (hardFails.length > 0) {
+          toast.error(`Mismatch: ${hardFails.join(', ')}. Please upload the correct return window screenshot.`);
+        } else {
+          toast.success(`Return window verified! Return window: ${result.returnWindowClosed ? 'Closed' : 'Open'}. You can submit.`);
+        }
       }
     } catch (err: any) {
       if (process.env.NODE_ENV !== 'production') console.error('Return window pre-validation failed:', err);
@@ -793,6 +809,12 @@ export const Orders: React.FC = () => {
     // Block if AI verification hasn't completed yet (file uploaded but not verified)
     if (!rwVerification) {
       toast.error('Please wait for AI verification to complete before submitting.');
+      return;
+    }
+
+    // Block submission when screenshot is cropped/incomplete
+    if (rwVerification.screenshotCropped) {
+      toast.error('Screenshot appears cropped or incomplete. Please upload a FULL screenshot showing the complete order page including the page header.');
       return;
     }
 
@@ -1564,7 +1586,7 @@ export const Orders: React.FC = () => {
                   </p>
                 );
                 return (
-                <div className="max-h-[50vh] overflow-y-auto scrollbar-styled space-y-2">
+                <div className="max-h-[50dvh] overflow-y-auto scrollbar-styled space-y-2">
                 {filtered.map((t) => (
                   <div key={t.id} className="bg-white rounded-xl border border-zinc-200 p-3 space-y-1.5 cursor-pointer hover:border-zinc-400 transition-colors" onClick={() => setSelectedTicket(t)}>
                     <div className="flex items-center justify-between">
@@ -1653,6 +1675,18 @@ export const Orders: React.FC = () => {
             setSelectedProduct(null);
             setReviewLinkInput('');
             setFormSearch('');
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setIsNewOrderModalOpen(false);
+              setFormScreenshot(null);
+              setExtractedDetails({ orderId: '', amount: '' });
+              setMatchStatus({ id: 'none', amount: 'none', productName: 'none', reviewerName: 'none' });
+              setOrderIdLocked(false);
+              setSelectedProduct(null);
+              setReviewLinkInput('');
+              setFormSearch('');
+            }
           }}
         >
           <div
@@ -2120,7 +2154,7 @@ export const Orders: React.FC = () => {
           onClick={() => setProofToView(null)}
         >
           <div
-            className="max-w-lg w-full bg-white p-4 rounded-2xl relative shadow-2xl max-h-[90vh] flex flex-col"
+            className="max-w-lg w-full bg-white p-4 rounded-2xl relative shadow-2xl max-h-[90dvh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -2383,7 +2417,13 @@ export const Orders: React.FC = () => {
                       </div>
                     </div>
 
-                    {ratingVerification.accountNameMatch && ratingVerification.productNameMatch && (
+                    {ratingVerification.screenshotCropped && (
+                      <p className="text-[10px] text-red-600 font-bold bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
+                        <AlertTriangle size={12} />
+                        Screenshot appears cropped or incomplete. Please upload a FULL screenshot showing the complete rating page including the account name header at the top.
+                      </p>
+                    )}
+                    {ratingVerification.accountNameMatch && ratingVerification.productNameMatch && !ratingVerification.screenshotCropped && (
                       <p className="text-[10px] text-green-600 font-bold bg-green-50 p-2 rounded-lg flex items-center gap-1.5">
                         <CheckCircle2 size={12} /> Rating screenshot verified. Ready to submit.
                       </p>
@@ -2433,6 +2473,8 @@ export const Orders: React.FC = () => {
                     !ratingFile ||
                     // Block submit until AI verification succeeds
                     !ratingVerification ||
+                    // Block submit when screenshot is cropped/incomplete
+                    !!(ratingVerification && ratingVerification.screenshotCropped) ||
                     // Block submit when reviewer name doesn't match or product name doesn't match
                     !!(ratingVerification && !ratingVerification.accountNameMatch && selectedOrder?.reviewerName) ||
                     !!(ratingVerification && !ratingVerification.productNameMatch)
@@ -2541,7 +2583,13 @@ export const Orders: React.FC = () => {
                       )}
                     </div>
 
-                    {rwVerification.orderIdMatch && rwVerification.productNameMatch && rwVerification.returnWindowClosed && rwVerification.amountMatch && (!selectedOrder?.soldBy || rwVerification.soldByMatch) && (!selectedOrder?.reviewerName || rwVerification.reviewerNameMatch) && (
+                    {rwVerification.screenshotCropped && (
+                      <p className="text-[10px] text-red-600 font-bold bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
+                        <AlertTriangle size={12} />
+                        Screenshot appears cropped or incomplete. Please upload a FULL screenshot showing the complete order page including the page header.
+                      </p>
+                    )}
+                    {rwVerification.orderIdMatch && rwVerification.productNameMatch && rwVerification.returnWindowClosed && rwVerification.amountMatch && !rwVerification.screenshotCropped && (!selectedOrder?.soldBy || rwVerification.soldByMatch) && (!selectedOrder?.reviewerName || rwVerification.reviewerNameMatch) && (
                       <p className="text-[10px] text-green-600 font-bold bg-green-50 p-2 rounded-lg flex items-center gap-1.5">
                         <CheckCircle2 size={12} /> Return window screenshot verified. Ready to submit.
                       </p>
@@ -2606,6 +2654,8 @@ export const Orders: React.FC = () => {
                     !rwFile ||
                     // Block submit until AI verification succeeds
                     !rwVerification ||
+                    // Block submit when screenshot is cropped/incomplete
+                    !!rwVerification.screenshotCropped ||
                     // Block submit when critical checks fail
                     !rwVerification.orderIdMatch ||
                     !rwVerification.productNameMatch ||

@@ -176,7 +176,7 @@ export const Explore: React.FC = () => {
         </div>
 
         {/* Deal Type Filter */}
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1 mb-1.5">
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-styled pb-1 mb-1.5">
           {dealTypes.map((dt) => {
             const label = dt === 'Discount' ? 'Order Deal' : dt === 'All' ? 'All Types' : `${dt} Deal`;
             return (
@@ -198,7 +198,7 @@ export const Explore: React.FC = () => {
         </div>
 
         {/* Categories */}
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1">
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-styled pb-1">
           {categories.map((cat) => (
             <button
               key={cat}
