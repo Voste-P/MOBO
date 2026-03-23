@@ -613,6 +613,7 @@ model Order {
   @@index([isDeleted, createdAt(sort: Desc)])     // soft-delete + recent-first listing
   @@index([isDeleted, affiliateStatus, createdAt(sort: Desc)]) // admin financials with status filter
   @@index([externalOrderId])                       // duplicate-check during order creation
+  @@index([userId, externalOrderId, isDeleted])    // order creation duplicate detection (hot path)
   @@index([userId, workflowStatus, isDeleted])     // buyer dashboard filtered listing
   @@index([brandUserId, workflowStatus, isDeleted]) // brand dashboard filtered listing
   @@index([managerName, isDeleted, createdAt(sort: Desc)]) // ops dashboard filtered listing

@@ -1,4 +1,4 @@
-import type { NextFunction, Request, Response } from 'express';
+﻿import type { NextFunction, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { AppError } from '../middleware/errors.js';
 import { idWhere } from '../utils/idWhere.js';
@@ -114,7 +114,7 @@ export function makeAdminController() {
           ];
         }
 
-        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
+        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 100, maxLimit: 500 });
         const [users, total] = await Promise.all([
           db().user.findMany({
             where,
@@ -153,7 +153,7 @@ export function makeAdminController() {
           where.affiliateStatus = queryParams.status;
         }
 
-        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
+        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 100, maxLimit: 500 });
         const [orders, total] = await Promise.all([
           db().order.findMany({
             where,
@@ -301,7 +301,7 @@ export function makeAdminController() {
           ];
         }
 
-        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
+        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 100, maxLimit: 500 });
         const [deals, total] = await Promise.all([
           db().deal.findMany({
             where,

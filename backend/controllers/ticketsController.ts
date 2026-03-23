@@ -336,12 +336,12 @@ async function canManageTicketByRole(params: {
         });
         if (regUnderAgency) return true;
 
-        // Resolve mediator codes under all connected agencies for deep lookup
-        const allMediatorCodes: string[] = [];
-        for (const code of connectedCodes) {
-          const mCodes = await listMediatorCodesForAgency(code);
-          allMediatorCodes.push(...mCodes);
-        }
+        // Resolve mediator codes under all connected agencies in a single batched query
+        const allMedUsers = await db.user.findMany({
+          where: { parentCode: { in: connectedCodes }, roles: { has: 'mediator' as any }, isDeleted: false },
+          select: { mediatorCode: true },
+        });
+        const allMediatorCodes: string[] = allMedUsers.map(u => u.mediatorCode).filter(Boolean) as string[];
         if (allMediatorCodes.length) {
           // Creator is a mediator in a connected agency network
           const mediatorInNetwork = await db.user.findFirst({
@@ -435,12 +435,12 @@ async function canManageTicketByRole(params: {
             const connectedCodes = brand?.connectedAgencyCodes ?? [];
             if (connectedCodes.length > 0) {
               if (connectedCodes.includes(creatorParent) || connectedCodes.includes(creatorMediator)) return true;
-              // Check if creator is under a mediator whose agency is connected
-              const allMediatorCodes: string[] = [];
-              for (const code of connectedCodes) {
-                const mCodes = await listMediatorCodesForAgency(code);
-                allMediatorCodes.push(...mCodes);
-              }
+              // Check if creator is under a mediator whose agency is connected (batched query)
+              const allMedU = await db.user.findMany({
+                where: { parentCode: { in: connectedCodes }, roles: { has: 'mediator' as any }, isDeleted: false },
+                select: { mediatorCode: true },
+              });
+              const allMediatorCodes: string[] = allMedU.map(u => u.mediatorCode).filter(Boolean) as string[];
               if (allMediatorCodes.includes(creatorParent) || allMediatorCodes.includes(creatorMediator)) return true;
             }
           }
@@ -746,26 +746,27 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
             const connectedAgencies = await db.agency.findMany({ where: { agencyCode: { in: connectedCodes }, isDeleted: false }, select: { ownerUserId: true } });
             const agencyOwnerIds = connectedAgencies.map(a => a.ownerUserId).filter(Boolean);
 
-            // Resolve all mediators and buyers under connected agencies
-            const allMediatorCodes: string[] = [];
-            for (const code of connectedCodes) {
-              const mCodes = await listMediatorCodesForAgency(code);
-              allMediatorCodes.push(...mCodes);
-            }
+            // Resolve all mediators under connected agencies in a single batched query
+            const allMediatorUsers = await db.user.findMany({
+              where: { parentCode: { in: connectedCodes }, roles: { has: 'mediator' as any }, isDeleted: false },
+              select: { mediatorCode: true },
+            });
+            const allMediatorCodes: string[] = allMediatorUsers.map(u => u.mediatorCode).filter(Boolean) as string[];
 
             let mediatorUserIds: string[] = [];
             let buyerUserIds: string[] = [];
             if (allMediatorCodes.length) {
-              const mediatorUsers = await db.user.findMany({
-                where: { mediatorCode: { in: allMediatorCodes }, isDeleted: false },
-                select: { id: true },
-              });
+              const [mediatorUsers, buyerUsers] = await Promise.all([
+                db.user.findMany({
+                  where: { mediatorCode: { in: allMediatorCodes }, isDeleted: false },
+                  select: { id: true },
+                }),
+                db.user.findMany({
+                  where: { parentCode: { in: allMediatorCodes }, isDeleted: false },
+                  select: { id: true },
+                }),
+              ]);
               mediatorUserIds = mediatorUsers.map(u => u.id);
-
-              const buyerUsers = await db.user.findMany({
-                where: { parentCode: { in: allMediatorCodes }, isDeleted: false },
-                select: { id: true },
-              });
               buyerUserIds = buyerUsers.map(b => b.id);
             }
 

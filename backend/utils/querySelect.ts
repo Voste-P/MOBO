@@ -146,7 +146,7 @@ export const orderNotificationSelect = {
   brandName: true,
   updatedAt: true,
   createdAt: true,
-  items: true,
+  items: { where: { isDeleted: false }, select: { id: true, dealType: true, title: true } },
 } as const;
 
 /**

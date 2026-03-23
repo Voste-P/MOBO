@@ -1,4 +1,4 @@
-import type { NextFunction, Request, Response } from 'express';
+﻿import type { NextFunction, Request, Response } from 'express';
 import type { Env } from '../config/env.js';
 import { AppError } from '../middleware/errors.js';
 import type { Role } from '../middleware/auth.js';
@@ -54,7 +54,7 @@ async function buildOrderAudience(order: any, agencyCode?: string) {
   const managerCode = String(order?.managerName || '').trim();
   const normalizedAgencyCode = String(agencyCode || '').trim();
 
-  // Resolve PG UUIDs → mongoIds for realtime (frontend matches by JWT sub = mongoId)
+  // Resolve PG UUIDs â†’ mongoIds for realtime (frontend matches by JWT sub = mongoId)
   const [buyerUser, brandUser] = await Promise.all([
     order?.userId ? db().user.findUnique({ where: { id: order.userId }, select: { mongoId: true } }) : null,
     order?.brandUserId ? db().user.findUnique({ where: { id: order.brandUserId }, select: { mongoId: true } }) : null,
@@ -160,7 +160,7 @@ export async function finalizeApprovalIfReady(order: any, actorUserId: string, e
   settleDate.setDate(settleDate.getDate() + COOLING_PERIOD_DAYS);
   const currentEvents = Array.isArray(order.events) ? (order.events as any[]) : [];
 
-  orderLog.info('All proofs verified — approving order', {
+  orderLog.info('All proofs verified â€” approving order', {
     orderId: order.mongoId,
     coolingDays: COOLING_PERIOD_DAYS,
     settlementDate: settleDate.toISOString(),
@@ -304,7 +304,7 @@ export function makeOpsController(env: Env) {
           ];
         }
 
-        const { limit, skip } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
+        const { limit, skip } = parsePagination(req.query as any, { limit: 100, maxLimit: 500 });
 
         const mediators = await db().user.findMany({
           where,
@@ -342,7 +342,7 @@ export function makeOpsController(env: Env) {
         const requested = queryParams.mediatorCode || undefined;
         const code = isPrivileged(roles) ? requested : String((user as any)?.mediatorCode || '');
 
-        const { limit: cLimit, skip: cSkip } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
+        const { limit: cLimit, skip: cSkip } = parsePagination(req.query as any, { limit: 100, maxLimit: 500 });
         const statusFilter = queryParams.status && queryParams.status !== 'all' ? queryParams.status : null;
 
         let campaigns: any[];
@@ -471,7 +471,7 @@ export function makeOpsController(env: Env) {
           return;
         }
 
-        const { limit: dLimit, skip: dSkip } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
+        const { limit: dLimit, skip: dSkip } = parsePagination(req.query as any, { limit: 100, maxLimit: 500 });
         const deals = await db().deal.findMany({
           where: {
             mediatorCode: { in: mediatorCodes },
@@ -621,7 +621,7 @@ export function makeOpsController(env: Env) {
           ];
         }
 
-        const { limit: puLimit, skip: puSkip } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
+        const { limit: puLimit, skip: puSkip } = parsePagination(req.query as any, { limit: 100, maxLimit: 500 });
         const users = await db().user.findMany({
           where,
           orderBy: { createdAt: 'desc' },
@@ -664,7 +664,7 @@ export function makeOpsController(env: Env) {
           ];
         }
 
-        const { limit: vuLimit, skip: vuSkip } = parsePagination(req.query as any, { limit: 500, maxLimit: 2000 });
+        const { limit: vuLimit, skip: vuSkip } = parsePagination(req.query as any, { limit: 100, maxLimit: 500 });
         const users = await db().user.findMany({
           where,
           orderBy: { createdAt: 'desc' },
@@ -1423,7 +1423,7 @@ export function makeOpsController(env: Env) {
             userId: buyerId,
             app: 'buyer',
             payload: {
-              title: wasApproved ? 'Proof recalled — re-upload needed' : 'Proof rejected',
+              title: wasApproved ? 'Proof recalled â€” re-upload needed' : 'Proof rejected',
               body: body.reason || 'Please re-upload the required proof.',
               url: '/orders',
             },
@@ -1662,7 +1662,7 @@ export function makeOpsController(env: Env) {
 
         const agencyCode = await assertOrderAccess(order, roles, user);
 
-        // Buyer must also be active — order.userId is PG UUID
+        // Buyer must also be active â€” order.userId is PG UUID
         const buyer = await db().user.findUnique({ where: { id: order.userId }, select: { id: true, status: true, isDeleted: true } });
         if (!buyer || buyer.isDeleted || buyer.status !== 'active') {
           throw new AppError(409, 'FROZEN_SUSPENSION', 'Buyer is not active; settlement is blocked');
@@ -1776,7 +1776,7 @@ export function makeOpsController(env: Env) {
             }
           }
 
-          // Atomic settlement using Prisma transaction — wallet + order status in one commit
+          // Atomic settlement using Prisma transaction â€” wallet + order status in one commit
           await db().$transaction(async (tx: any) => {
             await applyWalletDebit({
               idempotencyKey: `order-settlement-debit-${order.mongoId}`,
@@ -2354,7 +2354,7 @@ export function makeOpsController(env: Env) {
           ? Object.keys(assignments)
           : [];
 
-        // Resolve brandUserId (PG UUID) → mongoId for realtime audience
+        // Resolve brandUserId (PG UUID) â†’ mongoId for realtime audience
         const brandUser = await db().user.findUnique({ where: { id: campaign.brandUserId }, select: { mongoId: true } });
         const brandMongoId = brandUser?.mongoId || '';
 
@@ -2404,7 +2404,7 @@ export function makeOpsController(env: Env) {
         }
         const wasDraft = campStatus === 'draft';
 
-        // Check if orders exist – if so, only block term changes (price, dealType),
+        // Check if orders exist â€“ if so, only block term changes (price, dealType),
         // but still allow adding/modifying mediator assignments.
         const hasOrders = await db().orderItem.findFirst({
           where: { campaignId: campaign.id, isDeleted: false, order: { isDeleted: false } },
@@ -2433,7 +2433,7 @@ export function makeOpsController(env: Env) {
           }
         }
 
-        // ── "Open to All" mode: skip per-mediator allocation ──
+        // â”€â”€ "Open to All" mode: skip per-mediator allocation â”€â”€
         const isOpenToAll = body.openToAll === true;
 
         const positiveEntries = Object.entries(body.assignments || {}).filter(([, assignment]) => {
@@ -2525,7 +2525,7 @@ export function makeOpsController(env: Env) {
           updateData.lockedReason = 'SLOT_ASSIGNMENT';
         }
 
-        // Optimistic concurrency via updatedAt check — prevents slot overwrites
+        // Optimistic concurrency via updatedAt check â€” prevents slot overwrites
         // when two requests try to assign simultaneously.
         try {
           const updated = await db().campaign.updateMany({
@@ -2560,7 +2560,7 @@ export function makeOpsController(env: Env) {
           ])
         ).filter(Boolean);
 
-        // Resolve brandUserId → mongoId for audience
+        // Resolve brandUserId â†’ mongoId for audience
         const brandUser = await db().user.findUnique({ where: { id: campaign.brandUserId }, select: { mongoId: true } });
         const brandMongoId = brandUser?.mongoId || '';
 
@@ -2767,7 +2767,7 @@ export function makeOpsController(env: Env) {
         const amountPaise = rupeesToPaise(body.amount);
 
         if (canAny && wallet.availablePaise < amountPaise) {
-          throw new AppError(409, 'INSUFFICIENT_FUNDS', `Wallet only has ₹${(wallet.availablePaise / 100).toFixed(2)} available but payout is ₹${body.amount}`);
+          throw new AppError(409, 'INSUFFICIENT_FUNDS', `Wallet only has â‚¹${(wallet.availablePaise / 100).toFixed(2)} available but payout is â‚¹${body.amount}`);
         }
 
         const requestId = String(
