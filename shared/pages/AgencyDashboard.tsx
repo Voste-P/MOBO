@@ -783,6 +783,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
             aria-label="Filter by status"
             className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white"
           >
+            <option value="All">All Status</option>
             <option value="Pending">Pending</option>
             <option value="Pending_Cooling">Cooling</option>
             <option value="Approved_Settled">Settled</option>
@@ -794,6 +795,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
             aria-label="Filter by deal type"
             className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white"
           >
+            <option value="All">All Types</option>
             <option value="Discount">Order Deal</option>
             <option value="Rating">Rating Deal</option>
             <option value="Review">Review Deal</option>
@@ -804,6 +806,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
             aria-label="Filter by mediator"
             className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white max-w-[160px]"
           >
+            <option value="All">All Mediators</option>
             {mediatorOptions.map((m) => (
               <option key={m} value={m}>{m}</option>
             ))}
@@ -814,6 +817,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
             aria-label="Filter by product"
             className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white max-w-[200px] truncate"
           >
+            <option value="All">All Products</option>
             {productOptions.map((p) => (
               <option key={p} value={p}>{p.length > 30 ? p.slice(0, 30) + '…' : p}</option>
             ))}
@@ -1688,9 +1692,9 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     setOpenToAll(assignModal.openToAll ?? false);
   }, [assignModal]);
 
-  // Get list of mediator codes for this agency to verify if campaign is active in network
+  // Get list of mediator codes for this agency (lowercase for case-insensitive matching with assignment keys)
   const myMediatorCodes = useMemo(
-    () => mediators.map((m: any) => m.mediatorCode).filter(Boolean),
+    () => mediators.map((m: any) => (m.mediatorCode || '').toLowerCase()).filter(Boolean),
     [mediators]
   );
 
@@ -1729,26 +1733,33 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     return Array.from(brands).sort();
   }, [campaigns]);
 
-  // Active Inventory = what agency is already managing (at least one sub-mediator has assignments)
+  // Active Inventory = agency-created campaigns OR campaigns with sub-mediator assignments OR openToAll distributed
   const activeInventory = useMemo(() => {
     const base = campaigns.filter(
       (c: Campaign) =>
         c.allowedAgencies.includes(user.mediatorCode) &&
-        (c.status === 'Draft' || Object.keys(c.assignments || {}).some((code) => myMediatorCodes.includes(code)))
+        (
+          c.status === 'Draft' ||
+          String(c.brandId || '') === String(user.id || '') ||
+          c.openToAll ||
+          Object.keys(c.assignments || {}).some((code) => myMediatorCodes.includes(code.toLowerCase()))
+        )
     );
     return applyFilters(base);
-  }, [campaigns, user.mediatorCode, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
+  }, [campaigns, user.mediatorCode, user.id, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
 
-  // Filter campaigns for "Offered by Brands" (where agency is allowed but no sub-mediators have slots yet)
+  // Offered by Brands = external brand campaigns without assignments, not self-created, not openToAll distributed
   const offeredCampaigns = useMemo(() => {
     const base = campaigns.filter(
       (c: Campaign) =>
         c.allowedAgencies.includes(user.mediatorCode) &&
         c.status !== 'Draft' &&
-        !Object.keys(c.assignments || {}).some((code) => myMediatorCodes.includes(code))
+        String(c.brandId || '') !== String(user.id || '') &&
+        !c.openToAll &&
+        !Object.keys(c.assignments || {}).some((code) => myMediatorCodes.includes(code.toLowerCase()))
     );
     return applyFilters(base);
-  }, [campaigns, user.mediatorCode, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
+  }, [campaigns, user.mediatorCode, user.id, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
 
   // New Campaign Form
   const [newCampaign, setNewCampaign] = useState({
@@ -2064,6 +2075,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
           aria-label="Filter by deal type"
           className="px-3 py-3 rounded-xl border border-slate-200 text-xs font-bold bg-white"
         >
+          <option value="All">All Types</option>
           <option value="Discount">Discount</option>
           <option value="Review">Review</option>
           <option value="Rating">Rating</option>
@@ -2074,6 +2086,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
           aria-label="Filter by brand"
           className="px-3 py-3 rounded-xl border border-slate-200 text-xs font-bold bg-white"
         >
+          <option value="All">All Brands</option>
           {brandOptions.map((b) => (
             <option key={b} value={b}>{b}</option>
           ))}
@@ -4361,13 +4374,17 @@ export const AgencyDashboard: React.FC = () => {
 
       // Fixed logic: Campaign is active if this agency is allowed AND some sub-mediators have assignments
       const myMediatorCodes: string[] = safeMeds
-        .map((m: User) => m.mediatorCode)
-        .filter((code: string | undefined | null): code is string => Boolean(code));
+        .map((m: User) => (m.mediatorCode || '').toLowerCase())
+        .filter((code: string): code is string => Boolean(code));
       const activeCount = safeCamps.filter(
         (c: Campaign) =>
           c.status === 'Active' &&
           c.allowedAgencies.includes(user.mediatorCode!) &&
-          Object.keys(c.assignments || {}).some((code: string) => myMediatorCodes.includes(code))
+          (
+            String(c.brandId || '') === String(user.id || '') ||
+            c.openToAll ||
+            Object.keys(c.assignments || {}).some((code: string) => myMediatorCodes.includes(code.toLowerCase()))
+          )
       ).length;
 
       setStats({

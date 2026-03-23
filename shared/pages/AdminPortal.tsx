@@ -567,8 +567,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     try {
       await api.admin.deleteWallet(target.id);
       toast.success('Wallet deleted');
-      const updated = await api.admin.getUsers('all');
+      const updated = await api.admin.getUsers('all', { page: usersPage, limit: PAGE_SIZE });
       setUsers(asArray(updated));
+      setUsersPagination(extractPaginationMeta(updated));
     } catch (e: any) {
       toast.error(formatErrorMessage(e, 'Failed to delete wallet'));
     } finally {
@@ -584,8 +585,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     try {
       await api.admin.deleteUser(target.id);
       toast.success('User deleted');
-      const updated = await api.admin.getUsers('all');
+      const updated = await api.admin.getUsers('all', { page: usersPage, limit: PAGE_SIZE });
       setUsers(asArray(updated));
+      setUsersPagination(extractPaginationMeta(updated));
     } catch (e: any) {
       toast.error(formatErrorMessage(e, 'Failed to delete user'));
     } finally {
