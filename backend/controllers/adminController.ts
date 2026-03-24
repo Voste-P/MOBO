@@ -114,7 +114,7 @@ export function makeAdminController() {
           ];
         }
 
-        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 100, maxLimit: 500 });
+        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
         const [users, total] = await Promise.all([
           db().user.findMany({
             where,
@@ -153,7 +153,7 @@ export function makeAdminController() {
           where.affiliateStatus = queryParams.status;
         }
 
-        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 100, maxLimit: 500 });
+        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
         const [orders, total] = await Promise.all([
           db().order.findMany({
             where,
@@ -301,7 +301,7 @@ export function makeAdminController() {
           ];
         }
 
-        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 100, maxLimit: 500 });
+        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
         const [deals, total] = await Promise.all([
           db().deal.findMany({
             where,
@@ -348,7 +348,7 @@ export function makeAdminController() {
         const dealId = String(req.params.dealId || '').trim();
         if (!dealId) throw new AppError(400, 'INVALID_DEAL_ID', 'dealId required');
 
-        const deal = await db().deal.findFirst({ where: { ...idWhere(dealId), isDeleted: false } });
+        const deal = await db().deal.findFirst({ where: { ...idWhere(dealId), isDeleted: false }, select: { id: true, mongoId: true, mediatorCode: true, title: true } });
         if (!deal) throw new AppError(404, 'DEAL_NOT_FOUND', 'Deal not found');
 
         // Check for orders referencing this deal via order items
@@ -407,7 +407,7 @@ export function makeAdminController() {
         const userId = String(req.params.userId || '').trim();
         if (!userId) throw new AppError(400, 'INVALID_USER_ID', 'userId required');
 
-        const user = await db().user.findFirst({ where: { ...idWhere(userId), isDeleted: false } });
+        const user = await db().user.findFirst({ where: { ...idWhere(userId), isDeleted: false }, select: { id: true, mongoId: true, roles: true, mediatorCode: true, status: true, name: true } });
         if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
         const roles = Array.isArray(user.roles) ? (user.roles as string[]) : [];
@@ -436,7 +436,7 @@ export function makeAdminController() {
             where: { beneficiaryUserId: user.id, status: { in: ['requested', 'processing'] as any }, isDeleted: false },
             select: { id: true },
           }),
-          db().wallet.findFirst({ where: { ownerUserId: user.id, isDeleted: false } }),
+          db().wallet.findFirst({ where: { ownerUserId: user.id, isDeleted: false }, select: { id: true, availablePaise: true, pendingPaise: true, lockedPaise: true } }),
         ]);
 
         if (hasCampaigns) throw new AppError(409, 'USER_HAS_CAMPAIGNS', 'This user has active campaigns. Please remove them first before deleting.');
@@ -578,7 +578,7 @@ export function makeAdminController() {
           throw new AppError(400, 'CANNOT_SELF_SUSPEND', 'Cannot suspend your own account');
         }
 
-        const before = await db().user.findFirst({ where: { ...idWhere(body.userId), isDeleted: false } });
+        const before = await db().user.findFirst({ where: { ...idWhere(body.userId), isDeleted: false }, select: { id: true, mongoId: true, status: true, roles: true, isDeleted: true, name: true, mediatorCode: true } });
         if (!before) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
         if (before.isDeleted) throw new AppError(409, 'USER_DELETED', 'Cannot update status of a deleted user');
 

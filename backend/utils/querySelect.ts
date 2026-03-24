@@ -202,6 +202,27 @@ export const orderExistsSelect = {
 } as const;
 
 /**
+ * Prisma `select` for Order proof retrieval and authorization.
+ * Only fetches fields needed for proof access checks and screenshot values.
+ * Avoids fetching items, events, AI verification JSONB, and other heavy columns.
+ */
+export const orderProofSelect = {
+  id: true,
+  mongoId: true,
+  userId: true,
+  brandUserId: true,
+  brandName: true,
+  agencyName: true,
+  managerName: true,
+  screenshotOrder: true,
+  screenshotPayment: true,
+  screenshotReview: true,
+  screenshotRating: true,
+  screenshotReturnWindow: true,
+  reviewLink: true,
+} as const;
+
+/**
  * Prisma `select` for notification order queries.
  * Fetches only the fields needed for notification processing.
  */

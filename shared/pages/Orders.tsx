@@ -5,7 +5,6 @@ import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
 import { checkProductNameMatch, checkReviewerNameMatch } from '../utils/productNameMatch';
 import { useRealtimeInvalidation } from '../hooks/useApiQuery';
-import { invalidateQueries } from '../context/QueryProvider';
 import { subscribeRealtime } from '../services/realtime';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
@@ -308,19 +307,26 @@ export const Orders: React.FC = () => {
     if (user) {
       loadOrders();
       loadMyTickets();
-      api.products.getAll().then((data) => {
-        setAvailableProducts(asArray<Product>(data));
-        setProductsLoadError(false);
-      }).catch((err) => {
-        if (process.env.NODE_ENV !== 'production') console.error('Failed to load products:', err);
-        setAvailableProducts([]);
-        setProductsLoadError(true);
-        toast.error('Failed to load available deals. Pull down to retry.');
-      });
     } else {
       setIsLoading(false);
     }
   }, [user]);
+
+  // Defer product loading until the New Order modal is opened
+  const productsLoadedRef = useRef(false);
+  useEffect(() => {
+    if (!isNewOrderModalOpen || productsLoadedRef.current) return;
+    productsLoadedRef.current = true;
+    api.products.getAll().then((data) => {
+      setAvailableProducts(asArray<Product>(data));
+      setProductsLoadError(false);
+    }).catch((err) => {
+      if (process.env.NODE_ENV !== 'production') console.error('Failed to load products:', err);
+      setAvailableProducts([]);
+      setProductsLoadError(true);
+      toast.error('Failed to load available deals. Pull down to retry.');
+    });
+  }, [isNewOrderModalOpen]);
 
   const handlePullRefresh = useCallback(async () => {
     await loadOrders();
@@ -395,13 +401,12 @@ export const Orders: React.FC = () => {
     }
   };
 
-  // React Query realtime invalidation replaces manual subscribeRealtime
+  // React Query realtime invalidation for products (orders handled by manual subscription below)
   useRealtimeInvalidation({
-    'orders.changed': [['orders']],
-    'notifications.changed': [['orders']],
+    'deals.changed': [['products']],
   });
 
-  // Realtime: refresh tickets & products on relevant events
+  // Realtime: refresh orders & tickets on relevant events
   useEffect(() => {
     if (!user) return;
 
@@ -417,15 +422,13 @@ export const Orders: React.FC = () => {
       if (msg.type === 'orders.changed' || msg.type === 'notifications.changed') schedule();
       if (msg.type === 'tickets.changed') loadMyTickets();
       if (msg.type === 'deals.changed') {
-        invalidateQueries(['products']);
-        api.products
-          .getAll()
-          .then((data) => { setAvailableProducts(asArray<Product>(data)); setProductsLoadError(false); })
-          .catch((err) => {
-            if (process.env.NODE_ENV !== 'production') console.error('Failed to load products:', err);
-            setAvailableProducts([]);
-            setProductsLoadError(true);
-          });
+        // Refresh products only if modal was already opened
+        if (productsLoadedRef.current) {
+          api.products
+            .getAll()
+            .then((data) => { setAvailableProducts(asArray<Product>(data)); setProductsLoadError(false); })
+            .catch(() => {});
+        }
       }
     });
     return () => {

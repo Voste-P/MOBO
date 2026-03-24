@@ -9,7 +9,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
  * - gcTime: 10min — unused cache garbage-collected after 10 minutes
  * - refetchOnWindowFocus: false — prevents unnecessary refetches on tab switch
  * - refetchOnMount: false — prevents refetch when component remounts within staleTime
- * - retry: 1 — single retry on failure (api.ts already has retry logic)
+ * - retry: 0 — disabled at RQ level (api.ts fetchWithRetry already handles retries with backoff)
  */
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,7 +18,7 @@ const queryClient = new QueryClient({
       gcTime: 10 * 60_000,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-      retry: 1,
+      retry: 0,
     },
   },
 });

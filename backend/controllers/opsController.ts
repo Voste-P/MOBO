@@ -313,7 +313,7 @@ export function makeOpsController(env: Env) {
           ];
         }
 
-        const { limit, skip } = parsePagination(req.query as any, { limit: 100, maxLimit: 500 });
+        const { limit, skip } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
 
         const mediators = await db().user.findMany({
           where,
@@ -351,7 +351,7 @@ export function makeOpsController(env: Env) {
         const requested = queryParams.mediatorCode || undefined;
         const code = isPrivileged(roles) ? requested : String((user as any)?.mediatorCode || '');
 
-        const { limit: cLimit, skip: cSkip } = parsePagination(req.query as any, { limit: 100, maxLimit: 500 });
+        const { limit: cLimit, skip: cSkip } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
         const statusFilter = queryParams.status && queryParams.status !== 'all' ? queryParams.status : null;
 
         let campaigns: any[];
@@ -482,7 +482,7 @@ export function makeOpsController(env: Env) {
           return;
         }
 
-        const { limit: dLimit, skip: dSkip } = parsePagination(req.query as any, { limit: 100, maxLimit: 500 });
+        const { limit: dLimit, skip: dSkip } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
         const deals = await db().deal.findMany({
           where: {
             mediatorCode: { in: mediatorCodes },
@@ -540,7 +540,7 @@ export function makeOpsController(env: Env) {
           return;
         }
 
-        const { page: oPage, limit: oLimit, skip: oSkip, isPaginated: oIsPaginated } = parsePagination(req.query, { limit: 200 });
+        const { page: oPage, limit: oLimit, skip: oSkip, isPaginated: oIsPaginated } = parsePagination(req.query, { limit: 50, maxLimit: 200 });
         const oWhere = { managerName: { in: managerCodes }, isDeleted: false };
         const uniqueCodes = [...new Set(managerCodes)];
         // Orders, count, and mediator names are all independent — run in parallel
@@ -636,7 +636,7 @@ export function makeOpsController(env: Env) {
           ];
         }
 
-        const { limit: puLimit, skip: puSkip } = parsePagination(req.query as any, { limit: 100, maxLimit: 500 });
+        const { limit: puLimit, skip: puSkip } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
         const users = await db().user.findMany({
           where,
           orderBy: { createdAt: 'desc' },
@@ -679,7 +679,7 @@ export function makeOpsController(env: Env) {
           ];
         }
 
-        const { limit: vuLimit, skip: vuSkip } = parsePagination(req.query as any, { limit: 100, maxLimit: 500 });
+        const { limit: vuLimit, skip: vuSkip } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
         const users = await db().user.findMany({
           where,
           orderBy: { createdAt: 'desc' },
@@ -1718,7 +1718,7 @@ export function makeOpsController(env: Env) {
         const productId = String(order.items?.[0]?.productId || '').trim();
         const mediatorCode = String(order.managerName || '').trim();
 
-        const campaign = campaignId ? await db().campaign.findFirst({ where: { id: campaignId, isDeleted: false } }) : null;
+        const campaign = campaignId ? await db().campaign.findFirst({ where: { id: campaignId, isDeleted: false }, select: { id: true, assignments: true, brandUserId: true } }) : null;
 
         let isOverLimit = false;
         if (campaignId && mediatorCode) {
@@ -1751,7 +1751,7 @@ export function makeOpsController(env: Env) {
             throw new AppError(409, 'MISSING_DEAL_ID', 'Order is missing deal reference');
           }
 
-          const deal = await db().deal.findFirst({ where: { ...idWhere(productId), isDeleted: false } });
+          const deal = await db().deal.findFirst({ where: { ...idWhere(productId), isDeleted: false }, select: { id: true, payoutPaise: true } });
           if (!deal) {
             throw new AppError(409, 'DEAL_NOT_FOUND', 'Cannot settle: deal not found');
           }
@@ -1965,7 +1965,7 @@ export function makeOpsController(env: Env) {
         const campaignId = order.items?.[0]?.campaignId;
         const mediatorCode = String(order.managerName || '').trim();
 
-        const campaign = campaignId ? await db().campaign.findFirst({ where: { id: campaignId, isDeleted: false } }) : null;
+        const campaign = campaignId ? await db().campaign.findFirst({ where: { id: campaignId, isDeleted: false }, select: { id: true, assignments: true, brandUserId: true } }) : null;
         const brandId = String(order.brandUserId || campaign?.brandUserId || '').trim();
 
         const isCapExceeded = String(order.affiliateStatus) === 'Cap_Exceeded';
@@ -2002,7 +2002,7 @@ export function makeOpsController(env: Env) {
 
         if (!isCapExceeded && settlementMode !== 'external') {
           if (!productId) throw new AppError(409, 'MISSING_DEAL_ID', 'Order is missing deal reference');
-          const deal = await db().deal.findFirst({ where: { ...idWhere(productId), isDeleted: false } });
+          const deal = await db().deal.findFirst({ where: { ...idWhere(productId), isDeleted: false }, select: { id: true, payoutPaise: true } });
           if (!deal) throw new AppError(409, 'DEAL_NOT_FOUND', 'Cannot revert: deal not found');
 
           const payoutPaise = Number(deal.payoutPaise ?? 0);
@@ -2234,7 +2234,7 @@ export function makeOpsController(env: Env) {
         }
 
         const { roles, pgUserId, user: requester } = getRequester(req);
-        const campaign = await db().campaign.findFirst({ where: { ...idWhere(campaignId), isDeleted: false } });
+        const campaign = await db().campaign.findFirst({ where: { ...idWhere(campaignId), isDeleted: false }, select: { id: true, mongoId: true, status: true, brandUserId: true, allowedAgencyCodes: true, title: true } });
         if (!campaign) {
           throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
         }
@@ -2320,7 +2320,7 @@ export function makeOpsController(env: Env) {
 
         const { roles, pgUserId } = getRequester(req);
 
-        const campaign = await db().campaign.findFirst({ where: { ...idWhere(campaignId), isDeleted: false } });
+        const campaign = await db().campaign.findFirst({ where: { ...idWhere(campaignId), isDeleted: false }, select: { id: true, mongoId: true, brandUserId: true, title: true, allowedAgencyCodes: true, assignments: true } });
         if (!campaign) {
           throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
         }
@@ -2849,7 +2849,7 @@ export function makeOpsController(env: Env) {
           throw new AppError(403, 'FORBIDDEN', 'Insufficient role');
         }
 
-        const payout = await db().payout.findFirst({ where: { ...idWhere(payoutId), isDeleted: false } });
+        const payout = await db().payout.findFirst({ where: { ...idWhere(payoutId), isDeleted: false }, select: { id: true, mongoId: true, beneficiaryUserId: true, amountPaise: true, status: true } });
         if (!payout) throw new AppError(404, 'PAYOUT_NOT_FOUND', 'Payout not found');
 
         const beneficiary = await db().user.findUnique({ where: { id: payout.beneficiaryUserId }, select: { id: true, mongoId: true, isDeleted: true, parentCode: true } });

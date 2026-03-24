@@ -9,7 +9,7 @@ import { pgOrder } from '../utils/pgMappers.js';
 import { createOrderSchema, submitClaimSchema } from '../validations/orders.js';
 import { rupeesToPaise } from '../utils/money.js';
 import { toUiOrder, toUiOrderSummary } from '../utils/uiMappers.js';
-import { orderListSelectLite, getProofFlags } from '../utils/querySelect.js';
+import { orderListSelectLite, orderProofSelect, getProofFlags } from '../utils/querySelect.js';
 import { parsePagination, paginatedResponse } from '../utils/pagination.js';
 import { pushOrderEvent, isTerminalAffiliateStatus } from '../services/orderEvents.js';
 import { transitionOrderWorkflow } from '../services/orderWorkflow.js';
@@ -53,7 +53,7 @@ export function makeOrdersController(env: Env) {
       : { OR: [{ mongoId: orderId }, { externalOrderId: orderId }] as any, isDeleted: false };
     const found = await db().order.findFirst({
       where: where as any,
-      include: { items: { where: { isDeleted: false } } },
+      select: orderProofSelect,
     });
     return found ? pgOrder(found) : null;
   };
@@ -345,7 +345,7 @@ export function makeOrdersController(env: Env) {
             OR: orderIds.map(id => UUID_RE.test(id) ? { id } : { mongoId: id }),
             isDeleted: false,
           },
-          include: { items: { where: { isDeleted: false } } },
+          select: orderProofSelect,
         });
 
         // Map by both id and mongoId for quick lookup

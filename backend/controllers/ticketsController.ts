@@ -657,7 +657,7 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
           if (roleFilter && roleFilter !== 'all') ticketWhere.role = roleFilter;
           if (statusFilter && statusFilter !== 'All' && statusFilter !== 'all') ticketWhere.status = statusFilter;
           if (targetRoleFilter && targetRoleFilter !== 'all') ticketWhere.targetRole = targetRoleFilter;
-          const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 200, maxLimit: 500 });
+          const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
           const [tickets, total] = await Promise.all([
             db.ticket.findMany({ where: ticketWhere, orderBy: { createdAt: 'desc' }, skip, take: limit }),
             db.ticket.count({ where: ticketWhere }),
@@ -670,7 +670,7 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
 
         if (roles.includes('shopper')) {
           const shopperWhere = { userId: pgUserId, isDeleted: false };
-          const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 200, maxLimit: 500 });
+          const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
           const [tickets, total] = await Promise.all([
             db.ticket.findMany({ where: shopperWhere, orderBy: { createdAt: 'desc' }, skip, take: limit }),
             db.ticket.count({ where: shopperWhere }),
@@ -794,7 +794,7 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
             isDeleted: false,
             OR: cascadeTargets,
         };
-        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 200, maxLimit: 500 });
+        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
         const [tickets, total] = await Promise.all([
           db.ticket.findMany({
             where: ticketWhere,
