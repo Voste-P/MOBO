@@ -552,7 +552,7 @@ export const api = {
     },
   },
   products: {
-    getAll: async (mediatorCode?: string, page = 1, limit = 500) => {
+    getAll: async (mediatorCode?: string, page = 1, limit = 50) => {
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
       if (mediatorCode) params.set('mediatorCode', mediatorCode);
       const data = await fetchJson(`/products?${params}`, {
@@ -567,7 +567,7 @@ export const api = {
   },
   orders: {
     /** [FIX] Added missing getUserOrders for Chatbot and Orders components */
-    getUserOrders: async (userId: string, page = 1, limit = 500) => {
+    getUserOrders: async (userId: string, page = 1, limit = 50) => {
       return fetchJson(`/orders/user/${encodeURIComponent(userId)}?page=${page}&limit=${limit}`, {
         headers: { ...authHeaders() },
       });
@@ -714,44 +714,44 @@ export const api = {
   ops: {
     /** [FIX] Expanded ops object with all methods used by MediatorDashboard and AgencyDashboard */
     getMediators: async (agencyCode: string, opts?: { search?: string; page?: number; limit?: number }) => {
-      const params = new URLSearchParams({ agencyCode, page: String(opts?.page || 1), limit: String(opts?.limit || 500) });
+      const params = new URLSearchParams({ agencyCode, page: String(opts?.page || 1), limit: String(opts?.limit || 50) });
       if (opts?.search) params.set('search', opts.search);
       return fetchJson(`/ops/mediators?${params}`, {
         headers: { ...authHeaders() },
       });
     },
-    getCampaigns: async (mediatorCode?: string, page = 1, limit = 500) => {
+    getCampaigns: async (mediatorCode?: string, page = 1, limit = 50) => {
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
       if (mediatorCode) params.set('mediatorCode', mediatorCode);
       return fetchJson(`/ops/campaigns?${params}`, {
         headers: { ...authHeaders() },
       });
     },
-    getDeals: async (mediatorCode: string, role?: string, page = 1, limit = 500) => {
+    getDeals: async (mediatorCode: string, role?: string, page = 1, limit = 50) => {
       const params = new URLSearchParams({ mediatorCode, page: String(page), limit: String(limit) });
       if (role) params.set('role', role);
       return fetchJson(`/ops/deals?${params}`, {
         headers: { ...authHeaders() },
       });
     },
-    getMediatorOrders: async (mediatorCode: string, role?: string, page = 1, limit = 500) => {
+    getMediatorOrders: async (mediatorCode: string, role?: string, page = 1, limit = 50) => {
       const params = new URLSearchParams({ mediatorCode, page: String(page), limit: String(limit) });
       if (role) params.set('role', role);
       return fetchJson(`/ops/orders?${params}`, {
         headers: { ...authHeaders() },
       });
     },
-    getPendingUsers: async (code: string, page = 1, limit = 500) => {
+    getPendingUsers: async (code: string, page = 1, limit = 50) => {
       return fetchJson(`/ops/users/pending?code=${encodeURIComponent(code)}&page=${page}&limit=${limit}`, {
         headers: { ...authHeaders() },
       });
     },
-    getVerifiedUsers: async (code: string, page = 1, limit = 500) => {
+    getVerifiedUsers: async (code: string, page = 1, limit = 50) => {
       return fetchJson(`/ops/users/verified?code=${encodeURIComponent(code)}&page=${page}&limit=${limit}`, {
         headers: { ...authHeaders() },
       });
     },
-    getAgencyLedger: async (page = 1, limit = 500) => {
+    getAgencyLedger: async (page = 1, limit = 50) => {
       return fetchJson(`/ops/ledger?page=${page}&limit=${limit}`, {
         headers: { ...authHeaders() },
       });
@@ -950,7 +950,7 @@ export const api = {
   },
   /** [FIX] Added missing brand object used in BrandDashboard.tsx */
   brand: {
-    getConnectedAgencies: async (brandId: string, page = 1, limit = 500) => {
+    getConnectedAgencies: async (brandId: string, page = 1, limit = 50) => {
       return fetchJson(`/brand/agencies?brandId=${encodeURIComponent(brandId)}&page=${page}&limit=${limit}`, {
         headers: { ...authHeaders() },
       });

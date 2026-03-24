@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
 import { checkProductNameMatch, checkReviewerNameMatch } from '../utils/productNameMatch';
-import { subscribeRealtime } from '../services/realtime';
+import { useRealtimeInvalidation } from '../hooks/useApiQuery';
+import { invalidateQueries } from '../context/QueryProvider';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 
@@ -393,9 +394,16 @@ export const Orders: React.FC = () => {
     }
   };
 
-  // Realtime: refresh order list when any order changes.
+  // React Query realtime invalidation replaces manual subscribeRealtime
+  useRealtimeInvalidation({
+    'orders.changed': [['orders']],
+    'notifications.changed': [['orders']],
+  });
+
+  // Realtime: refresh tickets & products on relevant events
   useEffect(() => {
     if (!user) return;
+    const { subscribeRealtime } = require('../services/realtime');
     let timer: any = null;
     const schedule = () => {
       if (timer) return;
@@ -404,11 +412,11 @@ export const Orders: React.FC = () => {
         loadOrders();
       }, 500);
     };
-    const unsub = subscribeRealtime((msg) => {
+    const unsub = subscribeRealtime((msg: any) => {
       if (msg.type === 'orders.changed' || msg.type === 'notifications.changed') schedule();
       if (msg.type === 'tickets.changed') loadMyTickets();
       if (msg.type === 'deals.changed') {
-        // Keep filters/product titles in sync (non-critical, but avoids stale UI).
+        invalidateQueries('products');
         api.products
           .getAll()
           .then((data) => { setAvailableProducts(asArray<Product>(data)); setProductsLoadError(false); })

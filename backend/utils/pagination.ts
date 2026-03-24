@@ -6,7 +6,7 @@
 
 /** Parse page/limit from query params with safe bounds */
 export function parsePagination(query: Record<string, unknown>, defaults?: { page?: number; limit?: number; maxLimit?: number }) {
-  const maxCap = defaults?.maxLimit ?? 500;
+  const maxCap = defaults?.maxLimit ?? 200;
   const page = Math.max(1, Number(query.page) || defaults?.page || 1);
   const limit = Math.min(maxCap, Math.max(1, Number(query.limit) || defaults?.limit || 50));
   const skip = (page - 1) * limit;

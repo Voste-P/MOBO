@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import React, { Suspense } from 'react';
+import { QueryProvider } from '../../../shared/context/QueryProvider';
 import { AuthProvider } from '../../../shared/context/AuthContext';
 import { ToastProvider } from '../../../shared/context/ToastContext';
 import { ErrorBoundary } from '../../../shared/components/ErrorBoundary';
@@ -13,15 +14,17 @@ const AdminPortal = lazyRetry(() =>
 
 export default function Page() {
   return (
-    <ErrorBoundary>
-      <AuthProvider>
-        <ToastProvider>
+    <QueryProvider>
+      <ErrorBoundary>
+        <AuthProvider>
+          <ToastProvider>
           <Suspense fallback={<PageSkeleton variant="dashboard" />}>
             <AdminPortal onBack={() => {}} />
           </Suspense>
-        </ToastProvider>
-      </AuthProvider>
-    </ErrorBoundary>
+          </ToastProvider>
+        </AuthProvider>
+      </ErrorBoundary>
+    </QueryProvider>
   );
 }
 

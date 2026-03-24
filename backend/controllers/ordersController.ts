@@ -444,7 +444,7 @@ export function makeOrdersController(env: Env) {
         const targetUser = await db().user.findFirst({ where: userWhere as any, select: { id: true } });
         if (!targetUser) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
-        const { page, limit, skip, isPaginated } = parsePagination(req.query as Record<string, unknown>, { limit: 200 });
+        const { page, limit, skip, isPaginated } = parsePagination(req.query as Record<string, unknown>, { limit: 50 });
         const where = { userId: targetUser.id, isDeleted: false };
 
         const [orders, total] = await Promise.all([

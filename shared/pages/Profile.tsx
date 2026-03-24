@@ -6,7 +6,7 @@ import { maskMobile } from '../utils/mobiles';
 import { ProxiedImage } from '../components/ProxiedImage';
 import { api, asArray } from '../services/api';
 import { BetaLock } from '../components/BetaLock';
-import { subscribeRealtime } from '../services/realtime';
+import { useRealtimeInvalidation } from '../hooks/useApiQuery';
 import {
   Camera,
   QrCode,
@@ -80,11 +80,17 @@ export const Profile: React.FC = () => {
     if (user) refreshStats();
   }, [user]);
 
-  // Realtime: keep buyer stats in sync across sessions.
+  // React Query realtime invalidation — keeps shared order cache warm
+  useRealtimeInvalidation({
+    'orders.changed': [['orders']],
+  });
+
+  // Refresh stats when orders change via realtime
   useEffect(() => {
     if (!user) return;
     if (user.role !== 'user') return;
 
+    const { subscribeRealtime } = require('../services/realtime');
     let timer: any = null;
     const schedule = () => {
       if (timer) return;
@@ -94,7 +100,7 @@ export const Profile: React.FC = () => {
       }, 600);
     };
 
-    const unsub = subscribeRealtime((msg) => {
+    const unsub = subscribeRealtime((msg: any) => {
       if (msg.type === 'orders.changed') schedule();
     });
 

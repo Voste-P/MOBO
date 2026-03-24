@@ -1,32 +1,34 @@
-﻿import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { api, asArray } from '../services/api';
-import { subscribeRealtime } from '../services/realtime';
+﻿import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useToast } from '../context/ToastContext';
 import { Product } from '../types';
 import { ProductCard } from '../components/ProductCard';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
+import { useProducts } from '../hooks/useApiQuery';
 import { Search, AlertTriangle, ShoppingBag } from 'lucide-react';
 import { EmptyState, Input } from '../components/ui';
 
 export const Explore: React.FC = () => {
   const { toast } = useToast();
-  const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedDealType, setSelectedDealType] = useState('All');
-  const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState(false);
-  const silentSyncRef = useRef(false);
   const [ticketOpen, setTicketOpen] = useState(false);
+
+  // React Query: auto-caches, deduplicates, and handles stale-while-revalidate
+  const { data: products = [], isLoading: loading, isError: fetchError, refetch } = useProducts(undefined, 1, 200);
+
+  useEffect(() => {
+    if (fetchError) toast.error('Failed to load deals. Please try again.');
+  }, [fetchError]);
 
   const handlePullRefresh = useCallback(async () => {
     setSearchTerm('');
     setSelectedCategory('All');
     setSelectedDealType('All');
-    await fetchDeals();
-  }, []);
+    await refetch();
+  }, [refetch]);
   const { handlers: pullHandlers, pullDistance, isRefreshing } = usePullToRefresh({ onRefresh: handlePullRefresh });
 
   const dealTypes = useMemo(() => {
@@ -46,52 +48,6 @@ export const Explore: React.FC = () => {
     }
     return ['All', ...Array.from(seen).sort()];
   }, [products]);
-
-  const fetchDeals = async (silent = false) => {
-    if (silent) {
-      if (silentSyncRef.current) return;
-      silentSyncRef.current = true;
-    } else {
-      setLoading(true);
-      setFetchError(false);
-    }
-    try {
-      const data = await api.products.getAll();
-      setProducts(asArray<Product>(data));
-      setFetchError(false);
-    } catch (err) {
-      console.error(err);
-      if (!silent) {
-        toast.error('Failed to load deals. Please try again.');
-        setFetchError(true);
-      }
-    } finally {
-      setLoading(false);
-      silentSyncRef.current = false;
-    }
-  };
-
-  useEffect(() => {
-    fetchDeals();
-
-    let timer: any = null;
-    const schedule = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        timer = null;
-        fetchDeals(true);
-      }, 400);
-    };
-
-    // Realtime inventory updates (SSE)
-    const unsub = subscribeRealtime((msg) => {
-      if (msg.type === 'deals.changed') schedule();
-    });
-    return () => {
-      unsub();
-      if (timer) clearTimeout(timer);
-    };
-  }, []);
 
   // Derived filtered list — no extra state or effect needed
   const filtered = useMemo(() => {
