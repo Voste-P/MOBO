@@ -57,10 +57,19 @@ async function enrichTicketsWithExternalOrderIds(tickets: any[]): Promise<any[]>
   }));
 }
 
-/** Combined enrichment: resolver names + external order IDs */
+/** Combined enrichment: resolver names + external order IDs (parallel) */
 async function enrichTickets(tickets: any[]): Promise<any[]> {
-  const withResolvers = await enrichTicketsWithResolverNames(tickets);
-  return enrichTicketsWithExternalOrderIds(withResolvers);
+  if (!tickets.length) return tickets;
+  const [withResolvers, withExternalIds] = await Promise.all([
+    enrichTicketsWithResolverNames(tickets),
+    enrichTicketsWithExternalOrderIds(tickets),
+  ]);
+  // Merge: resolvers contribute resolvedByName, externalIds contribute externalOrderId
+  return tickets.map((t, i) => ({
+    ...t,
+    resolvedByName: withResolvers[i]?.resolvedByName ?? null,
+    externalOrderId: withExternalIds[i]?.externalOrderId ?? null,
+  }));
 }
 
 async function buildTicketAudience(ticket: any) {
@@ -230,27 +239,24 @@ async function canManageTicketByRole(params: {
     if (roles.includes('mediator')) {
       const mediatorCode = String(user?.mediatorCode || '').trim();
       if (mediatorCode) {
-        // Buyer registered under this mediator (parentCode)
-        const registered = await db.user.findFirst({
-          where: { id: ticket.userId, parentCode: mediatorCode, isDeleted: false },
-          select: { id: true },
-        });
-        if (registered) return true;
-
-        // Buyer has orders managed by this mediator
-        const hasOrders = await db.order.findFirst({
-          where: { managerName: mediatorCode, userId: ticket.userId, isDeleted: false },
-          select: { id: true },
-        });
-        if (hasOrders) return true;
-
-        // Ticket's specific order is managed by this mediator
-        if (ticket.orderId) {
-          const order = await db.order.findFirst({
-            where: { ...idWhere(ticket.orderId), managerName: mediatorCode, isDeleted: false },
-          });
-          if (order) return true;
-        }
+        // All three checks are independent — run in parallel
+        const [registered, hasOrders, orderMatch] = await Promise.all([
+          db.user.findFirst({
+            where: { id: ticket.userId, parentCode: mediatorCode, isDeleted: false },
+            select: { id: true },
+          }),
+          db.order.findFirst({
+            where: { managerName: mediatorCode, userId: ticket.userId, isDeleted: false },
+            select: { id: true },
+          }),
+          ticket.orderId
+            ? db.order.findFirst({
+                where: { ...idWhere(ticket.orderId), managerName: mediatorCode, isDeleted: false },
+                select: { id: true },
+              })
+            : null,
+        ]);
+        if (registered || hasOrders || orderMatch) return true;
       }
     }
 
@@ -259,45 +265,38 @@ async function canManageTicketByRole(params: {
       const agencyCode = await resolveAgencyCode(pgUserId, user);
       if (agencyCode) {
         const mediatorCodes = await listMediatorCodesForAgency(agencyCode);
-
-        // Creator is directly registered under this agency (parentCode = agencyCode)
-        const directReg = await db.user.findFirst({
-          where: { id: ticket.userId, parentCode: agencyCode, isDeleted: false },
-          select: { id: true },
-        });
-        if (directReg) return true;
-
-        if (mediatorCodes.length > 0) {
-          // Creator is a mediator in this agency's network
-          const mediatorUser = await db.user.findFirst({
-            where: { id: ticket.userId, mediatorCode: { in: mediatorCodes }, isDeleted: false },
-            select: { id: true },
-          });
-          if (mediatorUser) return true;
-
-          // Creator is a buyer under a mediator in this agency's network
-          const buyerUnderMediator = await db.user.findFirst({
-            where: { id: ticket.userId, parentCode: { in: mediatorCodes }, isDeleted: false },
-            select: { id: true },
-          });
-          if (buyerUnderMediator) return true;
-        }
-
-        // Via order linkage — check ANY order managed by this agency or its mediators
-        // (covers cases where buyer ticket was escalated and has no orderId, or orderId format differs)
         const allAgencyCodes = [agencyCode, ...mediatorCodes];
-        if (ticket.orderId) {
-          const order = await db.order.findFirst({
-            where: { ...idWhere(ticket.orderId), managerName: { in: allAgencyCodes }, isDeleted: false },
-          });
-          if (order) return true;
-        }
-        // Fallback: check if ticket creator has ANY orders managed by this agency's network
-        const hasAnyAgencyOrders = await db.order.findFirst({
-          where: { managerName: { in: allAgencyCodes }, userId: ticket.userId, isDeleted: false },
-          select: { id: true },
-        });
-        if (hasAnyAgencyOrders) return true;
+
+        // All checks below are independent — run in parallel
+        const [directReg, mediatorUser, buyerUnderMediator, orderMatch, hasAnyAgencyOrders] = await Promise.all([
+          db.user.findFirst({
+            where: { id: ticket.userId, parentCode: agencyCode, isDeleted: false },
+            select: { id: true },
+          }),
+          mediatorCodes.length > 0
+            ? db.user.findFirst({
+                where: { id: ticket.userId, mediatorCode: { in: mediatorCodes }, isDeleted: false },
+                select: { id: true },
+              })
+            : null,
+          mediatorCodes.length > 0
+            ? db.user.findFirst({
+                where: { id: ticket.userId, parentCode: { in: mediatorCodes }, isDeleted: false },
+                select: { id: true },
+              })
+            : null,
+          ticket.orderId
+            ? db.order.findFirst({
+                where: { ...idWhere(ticket.orderId), managerName: { in: allAgencyCodes }, isDeleted: false },
+                select: { id: true },
+              })
+            : null,
+          db.order.findFirst({
+            where: { managerName: { in: allAgencyCodes }, userId: ticket.userId, isDeleted: false },
+            select: { id: true },
+          }),
+        ]);
+        if (directReg || mediatorUser || buyerUnderMediator || orderMatch || hasAnyAgencyOrders) return true;
       }
     }
 
@@ -318,60 +317,59 @@ async function canManageTicketByRole(params: {
         }
         // Not brand-targeted and not linked to brand's order — deny
       } else {
-      const brand = await db.brand.findFirst({
-        where: { ownerUserId: pgUserId, isDeleted: false },
-        select: { connectedAgencyCodes: true },
-      });
+      // Wave 1: brand entity + direct order check (independent)
+      const [orderCheck, brand] = await Promise.all([
+        ticket.orderId
+          ? db.order.findFirst({
+              where: { ...idWhere(ticket.orderId), brandUserId: pgUserId, isDeleted: false },
+              select: { id: true },
+            })
+          : null,
+        db.brand.findFirst({
+          where: { ownerUserId: pgUserId, isDeleted: false },
+          select: { connectedAgencyCodes: true },
+        }),
+      ]);
+      if (orderCheck) return true;
+
       const connectedCodes = brand?.connectedAgencyCodes ?? [];
       if (connectedCodes.length) {
-        // Creator is a connected agency owner
-        const connectedAgencies = await db.agency.findMany({
-          where: { agencyCode: { in: connectedCodes }, isDeleted: false },
-          select: { ownerUserId: true },
-        });
+        // Wave 2: agency owners + direct registration + mediator codes (independent)
+        const [connectedAgencies, regUnderAgency, allMedUsers] = await Promise.all([
+          db.agency.findMany({
+            where: { agencyCode: { in: connectedCodes }, isDeleted: false },
+            select: { ownerUserId: true },
+          }),
+          db.user.findFirst({
+            where: { id: ticket.userId, parentCode: { in: connectedCodes }, isDeleted: false },
+            select: { id: true },
+          }),
+          db.user.findMany({
+            where: { parentCode: { in: connectedCodes }, roles: { has: 'mediator' as any }, isDeleted: false },
+            select: { mediatorCode: true },
+          }),
+        ]);
         if (connectedAgencies.some(a => a.ownerUserId === ticket.userId)) return true;
-
-        // Creator is registered under any connected agency (or their mediators)
-        const regUnderAgency = await db.user.findFirst({
-          where: { id: ticket.userId, parentCode: { in: connectedCodes }, isDeleted: false },
-          select: { id: true },
-        });
         if (regUnderAgency) return true;
 
-        // Resolve mediator codes under all connected agencies in a single batched query
-        const allMedUsers = await db.user.findMany({
-          where: { parentCode: { in: connectedCodes }, roles: { has: 'mediator' as any }, isDeleted: false },
-          select: { mediatorCode: true },
-        });
         const allMediatorCodes: string[] = allMedUsers.map(u => u.mediatorCode).filter(Boolean) as string[];
         if (allMediatorCodes.length) {
-          // Creator is a mediator in a connected agency network
-          const mediatorInNetwork = await db.user.findFirst({
-            where: { id: ticket.userId, mediatorCode: { in: allMediatorCodes }, isDeleted: false },
-            select: { id: true },
-          });
-          if (mediatorInNetwork) return true;
-
-          // Creator is a buyer under mediators in connected agency networks
-          const deepReg = await db.user.findFirst({
-            where: { id: ticket.userId, parentCode: { in: allMediatorCodes }, isDeleted: false },
-            select: { id: true },
-          });
-          if (deepReg) return true;
+          // Wave 3: all deep network checks + order fallback (independent)
+          const [mediatorInNetwork, deepReg, hasAnyBrandOrders] = await Promise.all([
+            db.user.findFirst({
+              where: { id: ticket.userId, mediatorCode: { in: allMediatorCodes }, isDeleted: false },
+              select: { id: true },
+            }),
+            db.user.findFirst({
+              where: { id: ticket.userId, parentCode: { in: allMediatorCodes }, isDeleted: false },
+              select: { id: true },
+            }),
+            db.order.count({
+              where: { brandUserId: pgUserId, userId: ticket.userId, isDeleted: false },
+            }),
+          ]);
+          if (mediatorInNetwork || deepReg || hasAnyBrandOrders > 0) return true;
         }
-
-        // Via order linkage — specific order check
-        if (ticket.orderId) {
-          const order = await db.order.findFirst({
-            where: { ...idWhere(ticket.orderId), brandUserId: pgUserId, isDeleted: false },
-          });
-          if (order) return true;
-        }
-        // Fallback: check if ticket creator has ANY orders from this brand
-        const hasAnyBrandOrders = await db.order.count({
-          where: { brandUserId: pgUserId, userId: ticket.userId, isDeleted: false },
-        });
-        if (hasAnyBrandOrders > 0) return true;
       }
       }
     }
@@ -690,17 +688,18 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
 
         if (roles.includes('mediator') && mediatorCode) {
           // Mediator sees buyer tickets targeted to 'mediator' from their buyers
-          const mediatorOrders = await db.order.findMany({
-            where: { managerName: mediatorCode, isDeleted: false },
-            select: { userId: true },
-          });
+          // Both lookups are independent — run in parallel
+          const [mediatorOrders, registeredBuyers] = await Promise.all([
+            db.order.findMany({
+              where: { managerName: mediatorCode, isDeleted: false },
+              select: { userId: true },
+            }),
+            db.user.findMany({
+              where: { parentCode: mediatorCode, roles: { has: 'shopper' as any }, isDeleted: false },
+              select: { id: true },
+            }),
+          ]);
           const buyerUserIds = [...new Set(mediatorOrders.map(o => o.userId).filter(Boolean))];
-
-          // Also include buyers registered under this mediator via parentCode
-          const registeredBuyers = await db.user.findMany({
-            where: { parentCode: mediatorCode, roles: { has: 'shopper' as any }, isDeleted: false },
-            select: { id: true },
-          });
           const registeredBuyerIds = registeredBuyers.map(b => b.id);
           const allBuyerIds = [...new Set([...buyerUserIds, ...registeredBuyerIds])];
 
@@ -713,16 +712,18 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
           // Agency sees tickets from mediators + buyers in their network at ALL relevant target levels
           const mediatorCodes = await listMediatorCodesForAgency(agencyCode);
           if (mediatorCodes.length) {
-            const mediatorUsers = await db.user.findMany({
-              where: { mediatorCode: { in: mediatorCodes }, isDeleted: false },
-              select: { id: true },
-            });
+            // Both lookups are independent — run in parallel
+            const [mediatorUsers, buyerUsers] = await Promise.all([
+              db.user.findMany({
+                where: { mediatorCode: { in: mediatorCodes }, isDeleted: false },
+                select: { id: true },
+              }),
+              db.user.findMany({
+                where: { parentCode: { in: mediatorCodes }, isDeleted: false },
+                select: { id: true },
+              }),
+            ]);
             const mediatorUserIds = mediatorUsers.map(u => u.id);
-
-            const buyerUsers = await db.user.findMany({
-              where: { parentCode: { in: mediatorCodes }, isDeleted: false },
-              select: { id: true },
-            });
             const buyerInMediatorNetwork = buyerUsers.map(b => b.id);
 
             // All users in this agency's network (mediators + their buyers)

@@ -1,10 +1,14 @@
 import withPWAInit from '@ducanh2912/next-pwa';
 
+// Prevent Next 15 lockfile-patcher from running (already resolved by workspace install).
+process.env.NEXT_IGNORE_INCORRECT_LOCKFILE = '1';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  output: 'standalone',
+  // standalone is for Docker/self-hosted; Vercel uses its own build adapter.
+  output: process.env.VERCEL ? undefined : 'standalone',
   eslint: {
     ignoreDuringBuilds: true,
   },

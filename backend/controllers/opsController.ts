@@ -539,7 +539,9 @@ export function makeOpsController(env: Env) {
 
         const { page: oPage, limit: oLimit, skip: oSkip, isPaginated: oIsPaginated } = parsePagination(req.query, { limit: 200 });
         const oWhere = { managerName: { in: managerCodes }, isDeleted: false };
-        const [orders, oTotal] = await Promise.all([
+        const uniqueCodes = [...new Set(managerCodes)];
+        // Orders, count, and mediator names are all independent — run in parallel
+        const [orders, oTotal, mediatorUsers] = await Promise.all([
           db().order.findMany({
             where: oWhere,
             select: orderListSelectLite,
@@ -548,6 +550,12 @@ export function makeOpsController(env: Env) {
             take: oLimit,
           }),
           db().order.count({ where: oWhere }),
+          uniqueCodes.length > 0
+            ? db().user.findMany({
+                where: { mediatorCode: { in: uniqueCodes }, isDeleted: false },
+                select: { mediatorCode: true, name: true },
+              })
+            : Promise.resolve([]),
         ]);
 
         // Fetch lightweight proof boolean flags (avoids transferring base64 blobs)
@@ -571,12 +579,7 @@ export function makeOpsController(env: Env) {
         }).filter(Boolean);
 
         // Enrich orders with actual mediator display names (managerName stores mediator code)
-        const uniqueCodes = [...new Set(managerCodes)];
         if (uniqueCodes.length > 0) {
-          const mediatorUsers = await db().user.findMany({
-            where: { mediatorCode: { in: uniqueCodes }, isDeleted: false },
-            select: { mediatorCode: true, name: true },
-          });
           const codeToName = new Map<string, string>();
           for (const m of mediatorUsers) {
             if (m.mediatorCode && m.name) codeToName.set(m.mediatorCode, m.name);
