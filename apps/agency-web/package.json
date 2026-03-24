@@ -9,6 +9,7 @@
     "start": "node ../../scripts/next.mjs start -p 3003"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.95.2",
     "next": "^15.1.0",
     "lucide-react": "^0.556.0",
     "recharts": "^2.12.0",
