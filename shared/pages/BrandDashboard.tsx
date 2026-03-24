@@ -2832,7 +2832,7 @@ export const BrandDashboard: React.FC = () => {
                         e.stopPropagation();
                         if (!user) return;
                         if (await confirmDialog({ message: 'Disconnect this Agency?', confirmLabel: 'Disconnect', variant: 'destructive' })) {
-                          api.brand.removeAgency(user.id, ag.mediatorCode!).then(fetchData).catch((err: any) => toast.error(formatErrorMessage(err, 'Failed to disconnect agency')));
+                          api.brand.removeAgency(user.id, ag.mediatorCode!).then(() => refreshData()).catch((err: any) => toast.error(formatErrorMessage(err, 'Failed to disconnect agency')));
                         }
                       }}
                       aria-label="Disconnect agency"

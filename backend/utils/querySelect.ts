@@ -190,9 +190,6 @@ export const transactionListSelect = {
   status: true,
   fromUserId: true,
   toUserId: true,
-  fromName: true,
-  toName: true,
-  reference: true,
   createdAt: true,
   updatedAt: true,
 } as const;
