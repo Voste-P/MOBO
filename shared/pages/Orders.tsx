@@ -413,7 +413,7 @@ export const Orders: React.FC = () => {
       }, 500);
     };
     const unsub = subscribeRealtime((msg: any) => {
-      if (msg.type === 'orders.changed' || msg.type === 'notifications.changed') schedule();
+      if (msg.type === 'orders.changed') schedule();
       if (msg.type === 'tickets.changed') loadMyTickets();
       if (msg.type === 'deals.changed') {
         // Refresh products only if modal was already opened
@@ -455,7 +455,6 @@ export const Orders: React.FC = () => {
       toast.success('Proof uploaded!');
       mergeSubmitResponse(resp);
       setSelectedOrder(null);
-      loadOrders();
     } catch (err: any) {
       toast.error(formatErrorMessage(err, 'Failed to upload proof'));
     } finally {
@@ -478,7 +477,6 @@ export const Orders: React.FC = () => {
       mergeSubmitResponse(resp);
       setSelectedOrder(null);
       setInputValue('');
-      loadOrders();
     } catch (e: any) {
       toast.error(formatErrorMessage(e, 'Failed to submit link'));
     } finally {
@@ -741,7 +739,6 @@ export const Orders: React.FC = () => {
       setRatingPreview(null);
       setRatingFile(null);
       setRatingVerification(null);
-      loadOrders();
     } catch (err: any) {
       toast.error(formatErrorMessage(err, 'Failed to upload proof'));
     } finally {
@@ -872,7 +869,6 @@ export const Orders: React.FC = () => {
       setRwPreview(null);
       setRwFile(null);
       setRwVerification(null);
-      loadOrders();
     } catch (err: any) {
       toast.error(formatErrorMessage(err, 'Failed to upload proof'));
     } finally {

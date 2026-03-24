@@ -353,11 +353,10 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       .catch((e) => { console.error('Admin Invites Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh invites.')); });
   }, [user, view, invitesPage]);
 
-  // Re-fetch orders when page changes
+  // Fetch orders when switching to orders/finance view or when page changes
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
     if (view !== 'orders' && view !== 'finance') return;
-    if (ordersPage === 1) return; // page 1 already fetched by refreshCurrentView
     api.admin.getFinancials({ page: ordersPage, limit: PAGE_SIZE }).then((res) => {
       const safeOrders = asArray<Order>(res);
       setOrders(safeOrders);
@@ -370,11 +369,10 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     }).catch((e) => { console.error('Admin Orders Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh orders.')); });
   }, [user, view, ordersPage]);
 
-  // Re-fetch products when page changes
+  // Fetch products when switching to inventory view or when page changes
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
     if (view !== 'inventory') return;
-    if (productsPage === 1) return; // page 1 already fetched by refreshCurrentView
     api.admin.getProducts({ page: productsPage, limit: PAGE_SIZE }).then((res) => {
       setProducts(asArray(res));
       setProductsPagination(extractPaginationMeta(res));
@@ -1223,7 +1221,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                           return (
                             <div key={role}>
                               <div className="flex justify-between text-xs font-bold text-slate-600 mb-1">
-                                <span>{role}s</span>
+                                <span>{role === 'Agency' ? 'Agencies' : `${role}s`}</span>
                                 <span>
                                   {count} ({pct}%)
                                 </span>
