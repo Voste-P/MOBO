@@ -7,6 +7,7 @@ import { ProxiedImage } from '../components/ProxiedImage';
 import { api, asArray } from '../services/api';
 import { BetaLock } from '../components/BetaLock';
 import { useRealtimeInvalidation } from '../hooks/useApiQuery';
+import { subscribeRealtime } from '../services/realtime';
 import {
   Camera,
   QrCode,
@@ -90,7 +91,7 @@ export const Profile: React.FC = () => {
     if (!user) return;
     if (user.role !== 'user') return;
 
-    const { subscribeRealtime } = require('../services/realtime');
+
     let timer: any = null;
     const schedule = () => {
       if (timer) return;

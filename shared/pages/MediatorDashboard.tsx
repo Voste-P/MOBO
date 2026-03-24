@@ -8,6 +8,7 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 import { api, asArray } from '../services/api';
 import { subscribeRealtime } from '../services/realtime';
+import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 import { normalizeMobileTo10Digits, maskMobile } from '../utils/mobiles';
 import { formatCurrency } from '../utils/formatCurrency';
 import { getPrimaryOrderId } from '../utils/orderHelpers';
@@ -1816,6 +1817,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
 export const MediatorDashboard: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  useRealtimeConnection();
   const {
     notifications: inboxNotifications,
     unreadCount,

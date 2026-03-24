@@ -6,6 +6,7 @@ import { formatErrorMessage } from '../utils/errors';
 import { checkProductNameMatch, checkReviewerNameMatch } from '../utils/productNameMatch';
 import { useRealtimeInvalidation } from '../hooks/useApiQuery';
 import { invalidateQueries } from '../context/QueryProvider';
+import { subscribeRealtime } from '../services/realtime';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 
@@ -403,7 +404,7 @@ export const Orders: React.FC = () => {
   // Realtime: refresh tickets & products on relevant events
   useEffect(() => {
     if (!user) return;
-    const { subscribeRealtime } = require('../services/realtime');
+
     let timer: any = null;
     const schedule = () => {
       if (timer) return;

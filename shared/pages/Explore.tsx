@@ -1,6 +1,5 @@
 ﻿import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useToast } from '../context/ToastContext';
-import { Product } from '../types';
 import { ProductCard } from '../components/ProductCard';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
