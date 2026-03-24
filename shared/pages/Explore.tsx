@@ -199,7 +199,7 @@ export const Explore: React.FC = () => {
             <p className="text-xs text-zinc-400 max-w-[240px] text-center">Please check your internet connection and try again.</p>
             <button
               type="button"
-              onClick={() => fetchDeals()}
+              onClick={() => refetch()}
               className="px-6 py-2.5 bg-black text-white rounded-full text-xs font-bold hover:bg-zinc-800 transition-colors active:scale-95"
             >
               Try Again

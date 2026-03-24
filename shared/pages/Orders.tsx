@@ -417,7 +417,7 @@ export const Orders: React.FC = () => {
       if (msg.type === 'orders.changed' || msg.type === 'notifications.changed') schedule();
       if (msg.type === 'tickets.changed') loadMyTickets();
       if (msg.type === 'deals.changed') {
-        invalidateQueries('products');
+        invalidateQueries(['products']);
         api.products
           .getAll()
           .then((data) => { setAvailableProducts(asArray<Product>(data)); setProductsLoadError(false); })

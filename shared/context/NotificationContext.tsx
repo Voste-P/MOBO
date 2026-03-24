@@ -108,7 +108,6 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   const removeNotification = useCallback((id: string) => {
     setLocal((prev) => prev.filter((n) => n.id !== id));
-    setInbox((prev) => prev.filter((n) => n.id !== id));
     setDismissedIds((prev) => {
       const next = new Set(prev);
       next.add(id);
