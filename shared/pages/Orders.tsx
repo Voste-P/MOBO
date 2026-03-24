@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
 import { checkProductNameMatch, checkReviewerNameMatch } from '../utils/productNameMatch';
-import { useRealtimeInvalidation } from '../hooks/useApiQuery';
 import { subscribeRealtime } from '../services/realtime';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
@@ -400,11 +399,6 @@ export const Orders: React.FC = () => {
       setIsLoading(false);
     }
   };
-
-  // React Query realtime invalidation for products (orders handled by manual subscription below)
-  useRealtimeInvalidation({
-    'deals.changed': [['products']],
-  });
 
   // Realtime: refresh orders & tickets on relevant events
   useEffect(() => {

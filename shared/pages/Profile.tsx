@@ -6,7 +6,6 @@ import { maskMobile } from '../utils/mobiles';
 import { ProxiedImage } from '../components/ProxiedImage';
 import { api, asArray } from '../services/api';
 import { BetaLock } from '../components/BetaLock';
-import { useRealtimeInvalidation } from '../hooks/useApiQuery';
 import { subscribeRealtime } from '../services/realtime';
 import {
   Camera,
@@ -80,11 +79,6 @@ export const Profile: React.FC = () => {
   useEffect(() => {
     if (user) refreshStats();
   }, [user]);
-
-  // React Query realtime invalidation — keeps shared order cache warm
-  useRealtimeInvalidation({
-    'orders.changed': [['orders']],
-  });
 
   // Refresh stats when orders change via realtime
   useEffect(() => {

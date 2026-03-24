@@ -6,10 +6,12 @@
   useCallback,
   useEffect,
   useMemo,
+  useRef,
 } from 'react';
 import { AppNotification } from '../types';
 import { useAuth } from './AuthContext';
-import { useNotifications as useNotificationsQuery } from '../hooks/useApiQuery';
+import { api, asArray } from '../services/api';
+import { subscribeRealtime } from '../services/realtime';
 
 interface NotificationContextType {
   notifications: AppNotification[];
@@ -33,8 +35,37 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   const storageScope = user?.id ? `:${user.id}` : ':anon';
 
-  // React Query handles fetching, caching, deduplication, and SSE-driven invalidation
-  const { data: rawInbox, refetch } = useNotificationsQuery(user?.id);
+  // Native fetch for notifications (replaces React Query)
+  const [rawInbox, setRawInbox] = useState<any[]>([]);
+  const fetchingRef = useRef(false);
+
+  const fetchNotifications = useCallback(async () => {
+    if (!user?.id || fetchingRef.current) return;
+    fetchingRef.current = true;
+    try {
+      const data = await api.notifications.list();
+      setRawInbox(asArray(data));
+    } catch {
+      // silent — notifications are non-critical
+    } finally {
+      fetchingRef.current = false;
+    }
+  }, [user?.id]);
+
+  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
+
+  // Realtime: refresh on relevant events
+  useEffect(() => {
+    if (!user?.id) return;
+    let timer: any = null;
+    const unsub = subscribeRealtime((msg: any) => {
+      if (['orders.changed', 'notifications.changed', 'tickets.changed', 'wallets.changed'].includes(msg.type)) {
+        if (timer) return;
+        timer = setTimeout(() => { timer = null; fetchNotifications(); }, 600);
+      }
+    });
+    return () => { unsub(); if (timer) clearTimeout(timer); };
+  }, [user?.id, fetchNotifications]);
 
   const inbox = useMemo<AppNotification[]>(() => {
     const data = rawInbox;
@@ -68,8 +99,8 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   }, [user?.id]);
 
   const refresh = useCallback(async () => {
-    await refetch();
-  }, [refetch]);
+    await fetchNotifications();
+  }, [fetchNotifications]);
 
   const notifications = useMemo(() => {
     const safeParse = (v: string | undefined) => {

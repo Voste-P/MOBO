@@ -1,12 +1,14 @@
-﻿import React, { useMemo, useState, useEffect, useCallback } from 'react';
+﻿import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '../context/ToastContext';
 import { ProductCard } from '../components/ProductCard';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
-import { useProducts } from '../hooks/useApiQuery';
+import { api, asArray } from '../services/api';
+import { subscribeRealtime } from '../services/realtime';
 import { Search, AlertTriangle, ShoppingBag } from 'lucide-react';
 import { EmptyState, Input } from '../components/ui';
+import { Product } from '../types';
 
 export const Explore: React.FC = () => {
   const { toast } = useToast();
@@ -15,8 +17,40 @@ export const Explore: React.FC = () => {
   const [selectedDealType, setSelectedDealType] = useState('All');
   const [ticketOpen, setTicketOpen] = useState(false);
 
-  // React Query: auto-caches, deduplicates, and handles stale-while-revalidate
-  const { data: products = [], isLoading: loading, isError: fetchError, refetch } = useProducts(undefined, 1, 200);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
+  const loadingRef = useRef(false);
+
+  const loadProducts = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    setLoading(true);
+    setFetchError(false);
+    try {
+      const data = await api.products.getAll(undefined, 1, 200);
+      setProducts(asArray<Product>(data));
+    } catch {
+      setFetchError(true);
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadProducts(); }, [loadProducts]);
+
+  // Realtime: refresh products on deals.changed
+  useEffect(() => {
+    let timer: any = null;
+    const unsub = subscribeRealtime((msg: any) => {
+      if (msg.type === 'deals.changed') {
+        if (timer) return;
+        timer = setTimeout(() => { timer = null; loadProducts(); }, 500);
+      }
+    });
+    return () => { unsub(); if (timer) clearTimeout(timer); };
+  }, [loadProducts]);
 
   useEffect(() => {
     if (fetchError) toast.error('Failed to load deals. Please try again.');
@@ -26,8 +60,8 @@ export const Explore: React.FC = () => {
     setSearchTerm('');
     setSelectedCategory('All');
     setSelectedDealType('All');
-    await refetch();
-  }, [refetch]);
+    await loadProducts();
+  }, [loadProducts]);
   const { handlers: pullHandlers, pullDistance, isRefreshing } = usePullToRefresh({ onRefresh: handlePullRefresh });
 
   const dealTypes = useMemo(() => {
@@ -199,7 +233,7 @@ export const Explore: React.FC = () => {
             <p className="text-xs text-zinc-400 max-w-[240px] text-center">Please check your internet connection and try again.</p>
             <button
               type="button"
-              onClick={() => refetch()}
+              onClick={() => loadProducts()}
               className="px-6 py-2.5 bg-black text-white rounded-full text-xs font-bold hover:bg-zinc-800 transition-colors active:scale-95"
             >
               Try Again

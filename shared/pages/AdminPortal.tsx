@@ -357,7 +357,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
     if (view !== 'orders' && view !== 'finance') return;
-    if (ordersPage === 1) return; // page 1 already fetched by fetchAllData
+    if (ordersPage === 1) return; // page 1 already fetched by refreshCurrentView
     api.admin.getFinancials({ page: ordersPage, limit: PAGE_SIZE }).then((res) => {
       const safeOrders = asArray<Order>(res);
       setOrders(safeOrders);
@@ -374,7 +374,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
     if (view !== 'inventory') return;
-    if (productsPage === 1) return; // page 1 already fetched by fetchAllData
+    if (productsPage === 1) return; // page 1 already fetched by refreshCurrentView
     api.admin.getProducts({ page: productsPage, limit: PAGE_SIZE }).then((res) => {
       setProducts(asArray(res));
       setProductsPagination(extractPaginationMeta(res));
@@ -440,62 +440,11 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     }
   };
 
+  /** Refresh only the current tab's data (used by DesktopShell onRefresh) */
   const fetchAllData = async () => {
     setIsLoading(true);
     try {
-      const results = await Promise.allSettled([
-        api.admin.getUsers('all', { page: 1, limit: PAGE_SIZE }),
-        api.admin.getFinancials({ page: 1, limit: PAGE_SIZE }),
-        api.admin.getProducts({ page: 1, limit: PAGE_SIZE }),
-        api.admin.getStats(),
-        api.admin.getGrowthAnalytics(),
-        api.admin.getInvites({ page: 1, limit: PAGE_SIZE }),
-        api.tickets.getAll(),
-      ]);
-
-      const [u, o, p, s, g, i, t] = results;
-
-      const failures: string[] = [];
-
-      if (u.status === 'fulfilled') {
-        setUsers(asArray(u.value));
-        setUsersPagination(extractPaginationMeta(u.value));
-      } else { console.error('Admin Users Fetch Error:', u.reason); failures.push('users'); }
-
-      if (o.status === 'fulfilled') {
-        const safeOrders = asArray<Order>(o.value);
-        setOrders(safeOrders);
-        setOrdersPagination(extractPaginationMeta(o.value));
-        // Keep proof modal in sync with refreshed data
-        setProofModal((prev) => {
-          if (!prev) return prev;
-          const updated = safeOrders.find((ord: Order) => ord.id === prev.id);
-          return updated || null;
-        });
-      } else { console.error('Admin Financials Fetch Error:', o.reason); failures.push('financials'); }
-
-      if (p.status === 'fulfilled') {
-        setProducts(asArray(p.value));
-        setProductsPagination(extractPaginationMeta(p.value));
-      } else { console.error('Admin Products Fetch Error:', p.reason); failures.push('products'); }
-
-      if (s.status === 'fulfilled') setStats(s.value);
-      else { console.error('Admin Stats Fetch Error:', s.reason); failures.push('stats'); }
-
-      if (g.status === 'fulfilled') setChartData(asArray(g.value));
-      else { console.error('Admin Growth Fetch Error:', g.reason); failures.push('analytics'); }
-
-      if (i.status === 'fulfilled') {
-        setInvites(asArray(i.value));
-        setInvitesPagination(extractPaginationMeta(i.value));
-      } else { console.error('Admin Invites Fetch Error:', i.reason); failures.push('invites'); }
-
-      if (t.status === 'fulfilled') setTickets(asArray(t.value));
-      else { console.error('Admin Tickets Fetch Error:', t.reason); failures.push('tickets'); }
-
-      if (failures.length > 0) {
-        toast.error(`Failed to load: ${failures.join(', ')}. Some data may be stale.`);
-      }
+      await refreshCurrentView();
     } catch (e) {
       console.error('Admin Data Fetch Error:', e);
       toast.error(formatErrorMessage(e, 'Failed to load admin data. Please refresh the page.'));
