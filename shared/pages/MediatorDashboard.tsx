@@ -1894,69 +1894,83 @@ export const MediatorDashboard: React.FC = () => {
 
   // AI Analysis — now reads stored data from order, no Gemini calls needed
 
-  useEffect(() => {
-    loadData();
-  }, [user, selectedBuyer]);
+  const loadedRef = useRef<Set<string>>(new Set());
 
-  useEffect(() => {
-    if (!showNotifications) return;
-    refreshNotifications();
-  }, [showNotifications, refreshNotifications]);
+  const tabDataNeeds = useMemo<string[]>(() => {
+    switch (activeTab) {
+      case 'inbox': return ['orders', 'campaigns', 'deals', 'pending', 'verified', 'tickets'];
+      case 'market': return ['campaigns', 'deals'];
+      case 'squad': return ['pending', 'verified'];
+      case 'profile': return [];
+      default: return [];
+    }
+  }, [activeTab]);
 
-  const loadData = async (opts?: unknown) => {
+  const loadData = useCallback(async (opts?: { force?: boolean; silent?: boolean }) => {
     if (!user) return;
     if (loadingRef.current) return;
-    const silent =
-      !!opts &&
-      typeof opts === 'object' &&
-      Object.prototype.hasOwnProperty.call(opts, 'silent') &&
-      Boolean((opts as any).silent);
+    const force = opts?.force ?? false;
+    const silent = !!opts?.silent;
+
+    const needed = force
+      ? tabDataNeeds
+      : tabDataNeeds.filter((k) => !loadedRef.current.has(k));
+    if (needed.length === 0) return;
 
     loadingRef.current = true;
     setLoading(true);
     try {
-      const [ords, camps, publishedDeals, pend, ver, tix] = await Promise.all([
-        api.ops.getMediatorOrders(user.mediatorCode || ''),
-        api.ops.getCampaigns(user.mediatorCode || ''),
-        api.ops.getDeals(user.mediatorCode || ''),
-        api.ops.getPendingUsers(user.mediatorCode || ''),
-        api.ops.getVerifiedUsers(user.mediatorCode || ''),
-        api.tickets.getAll(),
-      ]);
-      const safeOrds = asArray<Order>(ords);
-      const safeCamps = asArray<Campaign>(camps);
-      const safeDeals = asArray(publishedDeals);
-      const safePend = asArray<User>(pend);
-      const safeVer = asArray<User>(ver);
-      const safeTix = asArray<Ticket>(tix);
+      const promises: Promise<any>[] = [];
+      const keys: string[] = [];
 
-      setOrders(safeOrds);
-      setCampaigns(safeCamps);
-      setDeals(safeDeals);
-      setPendingUsers(safePend);
-      setVerifiedUsers(safeVer);
-      setTickets(safeTix.filter((t: Ticket) => t.issueType !== 'Feedback'));
+      if (needed.includes('orders')) { promises.push(api.ops.getMediatorOrders(user.mediatorCode || '')); keys.push('orders'); }
+      if (needed.includes('campaigns')) { promises.push(api.ops.getCampaigns(user.mediatorCode || '')); keys.push('campaigns'); }
+      if (needed.includes('deals')) { promises.push(api.ops.getDeals(user.mediatorCode || '')); keys.push('deals'); }
+      if (needed.includes('pending')) { promises.push(api.ops.getPendingUsers(user.mediatorCode || '')); keys.push('pending'); }
+      if (needed.includes('verified')) { promises.push(api.ops.getVerifiedUsers(user.mediatorCode || '')); keys.push('verified'); }
+      if (needed.includes('tickets')) { promises.push(api.tickets.getAll()); keys.push('tickets'); }
 
-      // Keep the open proof-verification modal in sync with realtime order updates
-      // (e.g., buyer uploaded a new proof while the modal is open).
-      setProofModal((prev) => {
-        if (!prev) return prev;
-        const updated = safeOrds.find((o: Order) => o.id === prev.id);
-        return updated || null;
-      });
+      const results = await Promise.all(promises);
 
-      // Keep the open buyer/ledger view in sync with realtime profile updates
-      // (e.g., UPI/QR updates emitted via `users.changed`).
-      setSelectedBuyer((prev) => {
-        if (!prev) return prev;
-        const updated = [...safePend, ...safeVer].find((u: any) => u?.id === (prev as any).id);
-        if (!updated) return prev;
-        const changed =
-          updated.name !== (prev as any).name ||
-          updated.mobile !== (prev as any).mobile ||
-          updated.upiId !== (prev as any).upiId ||
-          updated.qrCode !== (prev as any).qrCode;
-        return changed ? updated : prev;
+      keys.forEach((key, i) => {
+        loadedRef.current.add(key);
+        switch (key) {
+          case 'orders': {
+            const safeOrds = asArray<Order>(results[i]);
+            setOrders(safeOrds);
+            setProofModal((prev) => {
+              if (!prev) return prev;
+              const updated = safeOrds.find((o: Order) => o.id === prev.id);
+              return updated || null;
+            });
+            break;
+          }
+          case 'campaigns': setCampaigns(asArray<Campaign>(results[i])); break;
+          case 'deals': setDeals(asArray(results[i])); break;
+          case 'pending': {
+            const safePend = asArray<User>(results[i]);
+            setPendingUsers(safePend);
+            setSelectedBuyer((prev) => {
+              if (!prev) return prev;
+              const updated = safePend.find((u: any) => u?.id === (prev as any).id);
+              if (!updated) return prev;
+              return updated.name !== (prev as any).name || updated.mobile !== (prev as any).mobile || updated.upiId !== (prev as any).upiId || updated.qrCode !== (prev as any).qrCode ? updated : prev;
+            });
+            break;
+          }
+          case 'verified': {
+            const safeVer = asArray<User>(results[i]);
+            setVerifiedUsers(safeVer);
+            setSelectedBuyer((prev) => {
+              if (!prev) return prev;
+              const updated = safeVer.find((u: any) => u?.id === (prev as any).id);
+              if (!updated) return prev;
+              return updated.name !== (prev as any).name || updated.mobile !== (prev as any).mobile || updated.upiId !== (prev as any).upiId || updated.qrCode !== (prev as any).qrCode ? updated : prev;
+            });
+            break;
+          }
+          case 'tickets': setTickets(asArray<Ticket>(results[i]).filter((t: Ticket) => t.issueType !== 'Feedback')); break;
+        }
       });
     } catch (e) {
       console.error(e);
@@ -1968,17 +1982,26 @@ export const MediatorDashboard: React.FC = () => {
       loadingRef.current = false;
       setLoading(false);
     }
-  };
+  }, [user, activeTab, tabDataNeeds]);
 
-  // Realtime: refresh queue/dashboard when backend state changes.
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    if (!showNotifications) return;
+    refreshNotifications();
+  }, [showNotifications, refreshNotifications]);
+
+  // Realtime: refresh only active tab's data
   useEffect(() => {
     if (!user) return;
-    let timer: any = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const schedule = () => {
-      if (timer) return;
+      if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        loadData({ silent: true });
+        loadData({ force: true, silent: true });
         if (showNotifications) refreshNotifications();
       }, 600);
     };
@@ -1997,7 +2020,9 @@ export const MediatorDashboard: React.FC = () => {
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [user, showNotifications, refreshNotifications]);
+  }, [user, showNotifications, refreshNotifications, loadData]);
+
+  const refreshData = useCallback(() => loadData({ force: true }), [loadData]);
 
   const handlePublish = async () => {
     if (!dealBuilder || !user?.mediatorCode) return;
@@ -2007,7 +2032,7 @@ export const MediatorDashboard: React.FC = () => {
       setDealBuilder(null);
       setCommission('');
       toast.success('Deal saved');
-      loadData();
+      loadData({ force: true });
     } catch (e) {
       console.error(e);
       const msg = (e as any)?.message ? String((e as any).message) : 'Failed to publish deal.';
@@ -2018,7 +2043,7 @@ export const MediatorDashboard: React.FC = () => {
   const hasNotifications = unreadCount > 0;
 
   const handlePullRefresh = useCallback(async () => {
-    await loadData();
+    await loadData({ force: true });
   }, [user]);
   const { handlers: pullHandlers, pullDistance, isRefreshing: isPullRefreshing } = usePullToRefresh({ onRefresh: handlePullRefresh });
 
@@ -2179,7 +2204,7 @@ export const MediatorDashboard: React.FC = () => {
             pendingUsers={pendingUsers}
             tickets={tickets}
             loading={loading}
-            onRefresh={loadData}
+            onRefresh={refreshData}
             unpublishedCount={unpublishedCount}
             onGoToUnpublished={() => handleTabChange('market')}
             onViewProof={(order: Order) => {
@@ -2193,7 +2218,7 @@ export const MediatorDashboard: React.FC = () => {
             deals={deals}
             loading={loading}
             user={user}
-            onRefresh={loadData}
+            onRefresh={refreshData}
             onPublish={setDealBuilder}
           />
         )}
@@ -2204,7 +2229,7 @@ export const MediatorDashboard: React.FC = () => {
             verifiedUsers={verifiedUsers}
             orders={orders}
             loading={loading}
-            onRefresh={loadData}
+            onRefresh={refreshData}
             onSelectUser={setSelectedBuyer}
           />
         )}
@@ -2652,7 +2677,7 @@ export const MediatorDashboard: React.FC = () => {
                       )
                     );
                     toast.success('Buyer notified to upload missing proof.');
-                    await loadData();
+                    await loadData({ force: true });
                   } catch (err) {
                     toast.error(formatErrorMessage(err, 'Failed to request missing proof'));
                   }
@@ -2728,7 +2753,7 @@ export const MediatorDashboard: React.FC = () => {
                       toast.success('Purchase verified.');
                     }
 
-                    await loadData();
+                    await loadData({ force: true });
                     // Keep modal open with refreshed order if more steps needed
                     if (!resp?.approved && resp?.order) {
                       setProofModal(resp.order);
@@ -2759,7 +2784,7 @@ export const MediatorDashboard: React.FC = () => {
                           toast.success('Deal verified ✓');
                         }
 
-                        await loadData();
+                        await loadData({ force: true });
                         if (!resp?.approved && resp?.order) {
                           setProofModal(resp.order);
                         } else if (!resp?.approved) {
@@ -2858,7 +2883,7 @@ export const MediatorDashboard: React.FC = () => {
                     toast.success('Proof rejected and buyer notified.');
                     setRejectModalOpen(false);
                     setProofModal(null);
-                    await loadData();
+                    await loadData({ force: true });
                   } catch (err) {
                     toast.error(formatErrorMessage(err, 'Failed to reject proof'));
                   }
@@ -2907,7 +2932,7 @@ export const MediatorDashboard: React.FC = () => {
                     toast.success('Order approved → Pending Cooling (14 days)');
                     setApproveModalOpen(false);
                     setProofModal(null);
-                    await loadData();
+                    await loadData({ force: true });
                   } catch (err) {
                     toast.error(formatErrorMessage(err, 'Failed to approve order'));
                   }
@@ -2960,7 +2985,7 @@ export const MediatorDashboard: React.FC = () => {
                     toast.success('Order cancelled and slot released.');
                     setCancelModalOpen(false);
                     setProofModal(null);
-                    await loadData();
+                    await loadData({ force: true });
                   } catch (err) {
                     toast.error(formatErrorMessage(err, 'Failed to cancel order'));
                   }
@@ -3095,7 +3120,7 @@ export const MediatorDashboard: React.FC = () => {
           orders={orders.filter((o) => o.userId === selectedBuyer.id)}
           loading={loading}
           onClose={() => setSelectedBuyer(null)}
-          onRefresh={loadData}
+          onRefresh={refreshData}
         />
       )}
       <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />

@@ -266,7 +266,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
 
   useEffect(() => {
     if (user?.role === 'admin') {
-      fetchAllData();
+      // Only fetch the current view's data + stats, not everything upfront
+      refreshCurrentView();
+      if (view === 'dashboard') {
+        Promise.allSettled([api.admin.getStats(), api.admin.getGrowthAnalytics()]).then(([s, g]) => {
+          if (s.status === 'fulfilled') setStats(s.value);
+          if (g.status === 'fulfilled') setChartData(asArray(g.value));
+        });
+      }
       fetchSystemConfig();
     }
   }, [user]);

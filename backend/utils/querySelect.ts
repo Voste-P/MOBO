@@ -117,6 +117,87 @@ export const userListSelect = {
 } as const;
 
 /**
+ * Prisma `select` for Campaign list queries.
+ * Includes all fields needed by toUiCampaign() but EXCLUDES `image` column
+ * which can be a large base64 blob. Frontend should use productUrl or
+ * a separate image proxy endpoint for thumbnails.
+ */
+export const campaignListSelect = {
+  id: true,
+  mongoId: true,
+  title: true,
+  brandUserId: true,
+  brandName: true,
+  platform: true,
+  image: true,
+  productUrl: true,
+  originalPricePaise: true,
+  pricePaise: true,
+  payoutPaise: true,
+  returnWindowDays: true,
+  dealType: true,
+  totalSlots: true,
+  usedSlots: true,
+  status: true,
+  allowedAgencyCodes: true,
+  assignments: true,
+  openToAll: true,
+  locked: true,
+  lockedAt: true,
+  lockedReason: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+  // Excluded: updatedBy, isDeleted (already filtered in WHERE)
+} as const;
+
+/**
+ * Prisma `select` for Deal list queries.
+ * Includes fields needed by toUiDeal() / pgDeal().
+ */
+export const dealListSelect = {
+  id: true,
+  mongoId: true,
+  campaignId: true,
+  mediatorCode: true,
+  title: true,
+  description: true,
+  image: true,
+  productUrl: true,
+  platform: true,
+  brandName: true,
+  dealType: true,
+  originalPricePaise: true,
+  pricePaise: true,
+  commissionPaise: true,
+  payoutPaise: true,
+  rating: true,
+  category: true,
+  active: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+/**
+ * Prisma `select` for Transaction list queries.
+ * Excludes heavy metadata JSONB when listing.
+ */
+export const transactionListSelect = {
+  id: true,
+  mongoId: true,
+  type: true,
+  amountPaise: true,
+  status: true,
+  fromUserId: true,
+  toUserId: true,
+  fromName: true,
+  toName: true,
+  reference: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+/**
  * Prisma `select` for Order existence checks.
  */
 export const orderExistsSelect = {

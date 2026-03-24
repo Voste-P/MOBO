@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { getDirectBackendUrl } from '../utils/apiBaseUrl';
 import { maskMobile } from '../utils/mobiles';
 import { formatErrorMessage } from '../utils/errors';
@@ -2230,43 +2230,78 @@ export const BrandDashboard: React.FC = () => {
   const [resolutionNote, setResolutionNote] = useState('');
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
-  const fetchData = async () => {
+  const loadedRef = useRef<Set<string>>(new Set());
+  const fetchRef = useRef(false);
+
+  const tabDataNeeds = useMemo<string[]>(() => {
+    switch (activeTab) {
+      case 'dashboard': return ['campaigns', 'agencies', 'orders'];
+      case 'campaigns': return ['campaigns'];
+      case 'orders': return ['orders'];
+      case 'agencies': return ['agencies'];
+      case 'requests': return ['agencies'];
+      case 'tickets': return ['tickets'];
+      case 'profile': return [];
+      default: return [];
+    }
+  }, [activeTab]);
+
+  const fetchData = useCallback(async (opts?: { force?: boolean; silent?: boolean }) => {
     if (!user) return;
-    setIsDataLoading(true);
+    if (fetchRef.current) return;
+    const force = opts?.force ?? false;
+    const silent = opts?.silent ?? false;
+
+    const needed = force
+      ? tabDataNeeds
+      : tabDataNeeds.filter((k) => !loadedRef.current.has(k));
+    if (needed.length === 0) return;
+
+    fetchRef.current = true;
+    if (!silent) setIsDataLoading(true);
     try {
-      const [camps, ags, ords, txns, tix] = await Promise.all([
-        api.brand.getBrandCampaigns(user.id),
-        api.brand.getConnectedAgencies(user.id),
-        api.brand.getBrandOrders(user.name),
-        api.brand.getTransactions(user.id),
-        api.tickets.getAll().catch(() => []),
-      ]);
-      setCampaigns(asArray(camps));
-      setAgencies(asArray(ags));
-      setOrders(asArray(ords));
-      setTransactions(asArray(txns));
-      setTickets(asArray<Ticket>(tix).filter((t: Ticket) => t.issueType !== 'Feedback'));
+      const promises: Promise<any>[] = [];
+      const keys: string[] = [];
+
+      if (needed.includes('campaigns')) { promises.push(api.brand.getBrandCampaigns(user.id)); keys.push('campaigns'); }
+      if (needed.includes('agencies')) { promises.push(api.brand.getConnectedAgencies(user.id)); keys.push('agencies'); }
+      if (needed.includes('orders')) { promises.push(api.brand.getBrandOrders(user.name)); keys.push('orders'); }
+      if (needed.includes('transactions')) { promises.push(api.brand.getTransactions(user.id)); keys.push('transactions'); }
+      if (needed.includes('tickets')) { promises.push(api.tickets.getAll().catch(() => [])); keys.push('tickets'); }
+
+      const results = await Promise.all(promises);
+      keys.forEach((key, i) => {
+        loadedRef.current.add(key);
+        switch (key) {
+          case 'campaigns': setCampaigns(asArray(results[i])); break;
+          case 'agencies': setAgencies(asArray(results[i])); break;
+          case 'orders': setOrders(asArray(results[i])); break;
+          case 'transactions': setTransactions(asArray(results[i])); break;
+          case 'tickets': setTickets(asArray<Ticket>(results[i]).filter((t: Ticket) => t.issueType !== 'Feedback')); break;
+        }
+      });
     } catch (e) {
       console.error('Dashboard data fetch failed', e);
-      toast.error(formatErrorMessage(e, 'Failed to load dashboard data'));
+      if (!silent) toast.error(formatErrorMessage(e, 'Failed to load dashboard data'));
     } finally {
+      fetchRef.current = false;
       setIsDataLoading(false);
     }
-  };
+  }, [user, activeTab, tabDataNeeds]);
 
   useEffect(() => {
     fetchData();
-  }, [user]);
+  }, [fetchData]);
 
-  // Realtime: refresh when orders/wallets/users change.
+  // Realtime: refresh only active tab's data
   useEffect(() => {
     if (!user) return;
-    let timer: any = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const schedule = () => {
-      if (timer) return;
+      if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        fetchData();
+        fetchData({ force: true, silent: true });
       }, 900);
     };
     const unsub = subscribeRealtime((msg) => {
@@ -2285,7 +2320,9 @@ export const BrandDashboard: React.FC = () => {
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [user]);
+  }, [user, fetchData]);
+
+  const refreshData = useCallback(() => fetchData({ force: true }), [fetchData]);
 
   const handlePayout = async () => {
     if (!selectedAgency || !payoutAmount || !payoutRef || !user) return;
@@ -2305,7 +2342,7 @@ export const BrandDashboard: React.FC = () => {
       setPayoutAmount('');
       setPayoutRef('');
       setSelectedAgency(null);
-      fetchData();
+      fetchData({ force: true });
     } catch (e) {
       toast.error(formatErrorMessage(e, 'Payment failed'));
     } finally {
@@ -2547,7 +2584,7 @@ export const BrandDashboard: React.FC = () => {
             agencies={agencies}
             user={user}
             loading={isDataLoading}
-            onRefresh={fetchData}
+            onRefresh={refreshData}
           />
         )}
         {activeTab === 'orders' && <OrdersView user={user} />}
@@ -2669,7 +2706,7 @@ export const BrandDashboard: React.FC = () => {
                               try {
                                 await api.tickets.escalate(t.id);
                                 toast.success('Ticket escalated to admin.');
-                                fetchData();
+                                fetchData({ force: true });
                               } catch (err: any) {
                                 toast.error(formatErrorMessage(err, 'Failed to escalate ticket.'));
                               }
@@ -2686,10 +2723,10 @@ export const BrandDashboard: React.FC = () => {
                             className="w-full px-2 py-1.5 text-xs rounded-lg border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
                           <div className="flex items-center gap-2">
                             <button type="button" onClick={async () => {
-                              try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData(); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
+                              try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ force: true }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
                             }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✓ Resolve</button>
                             <button type="button" onClick={async () => {
-                              try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData(); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
+                              try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ force: true }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
                             }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
                             <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
                               className="px-3 py-1 rounded-lg text-xs font-bold bg-zinc-100 text-zinc-500 hover:bg-zinc-200">Cancel</button>
@@ -2704,7 +2741,7 @@ export const BrandDashboard: React.FC = () => {
                               try {
                                 await api.tickets.update(t.id, 'Open');
                                 toast.success('Ticket reopened.');
-                                fetchData();
+                                fetchData({ force: true });
                               } catch (err: any) {
                                 toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
                               }
@@ -2719,7 +2756,7 @@ export const BrandDashboard: React.FC = () => {
                               try {
                                 await api.tickets.delete(t.id);
                                 toast.success('Ticket deleted.');
-                                fetchData();
+                                fetchData({ force: true });
                               } catch (err: any) {
                                 toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
                               }
@@ -2958,7 +2995,7 @@ export const BrandDashboard: React.FC = () => {
                               (r: any) => r.agencyId !== req.agencyId
                             );
                             await updateUser({ pendingConnections: newPending });
-                            fetchData();
+                            fetchData({ force: true });
                           } catch (e) {
                             console.error('Failed to decline', e);
                             toast.error(formatErrorMessage(e, 'Failed to decline connection'));
@@ -2988,7 +3025,7 @@ export const BrandDashboard: React.FC = () => {
                               pendingConnections: newPending,
                               connectedAgencies: newConnected,
                             });
-                            fetchData();
+                            fetchData({ force: true });
                           } catch (e) {
                             console.error('Failed to approve', e);
                             toast.error(formatErrorMessage(e, 'Failed to approve connection'));
@@ -3165,7 +3202,7 @@ export const BrandDashboard: React.FC = () => {
       open={!!selectedTicket}
       onClose={() => setSelectedTicket(null)}
       ticket={selectedTicket}
-      onRefresh={fetchData}
+      onRefresh={refreshData}
     />
     {BrandConfirmDialog}
     </>

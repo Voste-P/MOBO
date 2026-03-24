@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../components/ui/ConfirmDialog';
@@ -4352,72 +4352,109 @@ export const AgencyDashboard: React.FC = () => {
   const [resolutionNote, setResolutionNote] = useState('');
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
-  const fetchData = async () => {
+  // Track which data sets have been loaded to avoid redundant fetches
+  const loadedRef = useRef<Set<string>>(new Set());
+  const fetchRef = useRef(false);
+
+  // Compute which data sets the active tab needs
+  const tabDataNeeds = useMemo<string[]>(() => {
+    switch (activeTab) {
+      case 'dashboard': return ['mediators', 'campaigns', 'orders'];
+      case 'team': return ['mediators', 'orders'];
+      case 'inventory': return ['campaigns', 'mediators', 'orders'];
+      case 'orders': return ['orders', 'campaigns', 'mediators'];
+      case 'finance': return ['orders', 'mediators'];
+      case 'payouts': return ['ledger'];
+      case 'tickets': return ['tickets'];
+      case 'brands': return [];
+      case 'profile': return [];
+      default: return [];
+    }
+  }, [activeTab]);
+
+  const fetchData = useCallback(async (opts?: { force?: boolean; silent?: boolean }) => {
     if (!user?.mediatorCode) return;
-    setIsDataLoading(true);
+    if (fetchRef.current) return;
+    const force = opts?.force ?? false;
+    const silent = opts?.silent ?? false;
+
+    // Determine which data sets are actually needed but not yet loaded
+    const needed = force
+      ? tabDataNeeds
+      : tabDataNeeds.filter((k) => !loadedRef.current.has(k));
+    if (needed.length === 0) return;
+
+    fetchRef.current = true;
+    if (!silent) setIsDataLoading(true);
     try {
-      const [meds, camps, ords, ledger, tix] = await Promise.all([
-        api.ops.getMediators(user.mediatorCode),
-        api.ops.getCampaigns(user.mediatorCode),
-        api.ops.getMediatorOrders(user.mediatorCode, 'agency'),
-        api.ops.getAgencyLedger(),
-        api.tickets.getAll().catch(() => []),
-      ]);
-      const safeMeds = asArray<User>(meds);
-      const safeCamps = asArray<Campaign>(camps);
-      const safeOrds = asArray<Order>(ords);
-      const safeLedger = asArray(ledger);
+      const promises: Promise<any>[] = [];
+      const keys: string[] = [];
 
-      setMediators(safeMeds);
-      setCampaigns(safeCamps);
-      setOrders(safeOrds);
-      setPayouts(safeLedger);
-      setTickets(asArray<Ticket>(tix).filter((t: Ticket) => t.issueType !== 'Feedback'));
+      if (needed.includes('mediators')) { promises.push(api.ops.getMediators(user.mediatorCode)); keys.push('mediators'); }
+      if (needed.includes('campaigns')) { promises.push(api.ops.getCampaigns(user.mediatorCode)); keys.push('campaigns'); }
+      if (needed.includes('orders')) { promises.push(api.ops.getMediatorOrders(user.mediatorCode, 'agency')); keys.push('orders'); }
+      if (needed.includes('ledger')) { promises.push(api.ops.getAgencyLedger()); keys.push('ledger'); }
+      if (needed.includes('tickets')) { promises.push(api.tickets.getAll().catch(() => [])); keys.push('tickets'); }
 
-      const revenue = safeOrds.reduce((sum: number, o: Order) => sum + (o.total || 0), 0);
+      const results = await Promise.all(promises);
 
-      // Fixed logic: Campaign is active if this agency is allowed AND some sub-mediators have assignments
-      const myMediatorCodes: string[] = safeMeds
-        .map((m: User) => (m.mediatorCode || '').toLowerCase())
-        .filter((code: string): code is string => Boolean(code));
-      const activeCount = safeCamps.filter(
-        (c: Campaign) =>
-          c.status === 'Active' &&
-          c.allowedAgencies.includes(user.mediatorCode!) &&
-          (
-            String(c.brandId || '') === String(user.id || '') ||
-            c.openToAll ||
-            Object.keys(c.assignments || {}).some((code: string) => myMediatorCodes.includes(code.toLowerCase()))
-          )
-      ).length;
+      // Map results back to state
+      let safeMeds = mediators;
+      let safeCamps = campaigns;
+      let safeOrds = orders;
 
-      setStats({
-        revenue,
-        totalMediators: safeMeds.length,
-        activeCampaigns: activeCount,
+      keys.forEach((key, i) => {
+        loadedRef.current.add(key);
+        switch (key) {
+          case 'mediators': safeMeds = asArray<User>(results[i]); setMediators(safeMeds); break;
+          case 'campaigns': safeCamps = asArray<Campaign>(results[i]); setCampaigns(safeCamps); break;
+          case 'orders': safeOrds = asArray<Order>(results[i]); setOrders(safeOrds); break;
+          case 'ledger': setPayouts(asArray(results[i])); break;
+          case 'tickets': setTickets(asArray<Ticket>(results[i]).filter((t: Ticket) => t.issueType !== 'Feedback')); break;
+        }
       });
+
+      // Recompute stats when relevant data loaded
+      if (keys.includes('orders') || keys.includes('mediators') || keys.includes('campaigns')) {
+        const revenue = safeOrds.reduce((sum: number, o: Order) => sum + (o.total || 0), 0);
+        const myMediatorCodes: string[] = safeMeds
+          .map((m: User) => (m.mediatorCode || '').toLowerCase())
+          .filter((code: string): code is string => Boolean(code));
+        const activeCount = safeCamps.filter(
+          (c: Campaign) =>
+            c.status === 'Active' &&
+            c.allowedAgencies.includes(user.mediatorCode!) &&
+            (
+              String(c.brandId || '') === String(user.id || '') ||
+              c.openToAll ||
+              Object.keys(c.assignments || {}).some((code: string) => myMediatorCodes.includes(code.toLowerCase()))
+            )
+        ).length;
+        setStats({ revenue, totalMediators: safeMeds.length, activeCampaigns: activeCount });
+      }
     } catch (e) {
       console.error('Dashboard data fetch failed', e);
-      toast.error(formatErrorMessage(e, 'Failed to load dashboard data'));
+      if (!silent) toast.error(formatErrorMessage(e, 'Failed to load dashboard data'));
     } finally {
+      fetchRef.current = false;
       setIsDataLoading(false);
     }
-  };
+  }, [user, activeTab, tabDataNeeds]);
 
-
+  // Single effect: fetch on mount, tab change, and realtime events
   useEffect(() => {
     fetchData();
-  }, [user]);
+  }, [fetchData]);
 
-  // Realtime: refresh when backend data changes.
+  // Realtime: refresh only active tab's data
   useEffect(() => {
     if (!user) return;
-    let timer: any = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const schedule = () => {
-      if (timer) return;
+      if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        fetchData();
+        fetchData({ force: true, silent: true });
       }, 900);
     };
     const unsub = subscribeRealtime((msg) => {
@@ -4436,7 +4473,10 @@ export const AgencyDashboard: React.FC = () => {
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [user]);
+  }, [user, fetchData]);
+
+  // Force refresh for child component mutation callbacks
+  const refreshData = useCallback(() => fetchData({ force: true }), [fetchData]);
 
   return (
     <DesktopShell
@@ -4594,7 +4634,7 @@ export const AgencyDashboard: React.FC = () => {
           mediators={mediators}
           user={user}
           loading={isDataLoading}
-          onRefresh={fetchData}
+          onRefresh={refreshData}
           allOrders={orders}
         />
       )}
@@ -4603,7 +4643,7 @@ export const AgencyDashboard: React.FC = () => {
           campaigns={campaigns}
           user={user}
           loading={isDataLoading}
-          onRefresh={fetchData}
+          onRefresh={refreshData}
           mediators={mediators}
           allOrders={orders}
         />
@@ -4614,7 +4654,7 @@ export const AgencyDashboard: React.FC = () => {
           campaigns={campaigns}
           mediators={mediators}
           loading={isDataLoading}
-          onRefresh={fetchData}
+          onRefresh={refreshData}
         />
       )}
       {activeTab === 'finance' && (
@@ -4622,7 +4662,7 @@ export const AgencyDashboard: React.FC = () => {
           allOrders={orders}
           mediators={mediators}
           loading={isDataLoading}
-          onRefresh={fetchData}
+          onRefresh={refreshData}
           user={user}
         />
       )}
@@ -4630,7 +4670,7 @@ export const AgencyDashboard: React.FC = () => {
         <PayoutsView
           payouts={payouts}
           loading={isDataLoading}
-          onRefresh={fetchData}
+          onRefresh={refreshData}
         />
       )}
       {activeTab === 'brands' && <BrandsView />}
@@ -4751,10 +4791,10 @@ export const AgencyDashboard: React.FC = () => {
                           className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
                         <div className="flex items-center gap-2">
                           <button type="button" onClick={async () => {
-                            try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData(); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
+                            try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ force: true }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
                           }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✓ Resolve</button>
                           <button type="button" onClick={async () => {
-                            try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData(); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
+                            try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ force: true }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
                           }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
                           <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
                             className="px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 hover:bg-slate-200">Cancel</button>
@@ -4769,7 +4809,7 @@ export const AgencyDashboard: React.FC = () => {
                             try {
                               await api.tickets.update(t.id, 'Open');
                               toast.success('Ticket reopened.');
-                              fetchData();
+                              fetchData({ force: true });
                             } catch (err: any) {
                               toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
                             }
@@ -4784,7 +4824,7 @@ export const AgencyDashboard: React.FC = () => {
                             try {
                               await api.tickets.delete(t.id);
                               toast.success('Ticket deleted.');
-                              fetchData();
+                              fetchData({ force: true });
                             } catch (err: any) {
                               toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
                             }
@@ -4808,7 +4848,7 @@ export const AgencyDashboard: React.FC = () => {
         open={!!selectedTicket}
         onClose={() => setSelectedTicket(null)}
         ticket={selectedTicket}
-        onRefresh={fetchData}
+        onRefresh={refreshData}
       />
     </DesktopShell>
   );

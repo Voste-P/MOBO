@@ -34,7 +34,7 @@ import {
 } from '../validations/ops.js';
 import { rupeesToPaise } from '../utils/money.js';
 import { toUiCampaign, toUiDeal, toUiOrder, toUiOrderSummary, toUiUser, safeIso } from '../utils/uiMappers.js';
-import { orderListSelectLite, getProofFlags, userListSelect } from '../utils/querySelect.js';
+import { orderListSelectLite, getProofFlags, userListSelect, campaignListSelect, dealListSelect } from '../utils/querySelect.js';
 import { idWhere } from '../utils/idWhere.js';
 import { ensureWallet, applyWalletDebit, applyWalletCredit } from '../services/walletService.js';
 import { getRequester, isPrivileged, requireAnyRole } from '../services/authz.js';
@@ -394,6 +394,7 @@ export function makeOpsController(env: Env) {
               orderBy: { createdAt: 'desc' },
               skip: cSkip,
               take: cLimit,
+              select: campaignListSelect,
             })
             : [];
         } else {
@@ -405,6 +406,7 @@ export function makeOpsController(env: Env) {
             orderBy: { createdAt: 'desc' },
             skip: cSkip,
             take: cLimit,
+            select: campaignListSelect,
           });
         }
 
@@ -489,6 +491,7 @@ export function makeOpsController(env: Env) {
           orderBy: { createdAt: 'desc' },
           skip: dSkip,
           take: dLimit,
+          select: dealListSelect,
         });
 
         const dealList = deals.map((d: any) => toUiDeal(pgDeal(d)));

@@ -7,7 +7,7 @@ import { orderLog, businessLog, securityLog } from '../config/logger.js';
 import { logChangeEvent, logAccessEvent, logErrorEvent } from '../config/appLogs.js';
 import { adminUsersQuerySchema, adminFinancialsQuerySchema, adminProductsQuerySchema, adminAuditLogsQuerySchema, reactivateOrderSchema, updateUserStatusSchema } from '../validations/admin.js';
 import { toUiOrderSummary, toUiUser, toUiRole, toUiDeal } from '../utils/uiMappers.js';
-import { orderListSelectLite, getProofFlags, userAdminListSelect } from '../utils/querySelect.js';
+import { orderListSelectLite, getProofFlags, userAdminListSelect, dealListSelect } from '../utils/querySelect.js';
 import { parsePagination, paginatedResponse } from '../utils/pagination.js';
 import { writeAuditLog } from '../services/audit.js';
 import { freezeOrders, reactivateOrder as reactivateOrderWorkflow } from '../services/orderWorkflow.js';
@@ -308,7 +308,7 @@ export function makeAdminController() {
             orderBy: { createdAt: 'desc' },
             skip,
             take: limit,
-            include: { campaign: { select: { totalSlots: true, usedSlots: true, createdAt: true } } },
+            select: { ...dealListSelect, campaign: { select: { totalSlots: true, usedSlots: true, createdAt: true } } },
           }),
           db().deal.count({ where }),
         ]);

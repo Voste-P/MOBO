@@ -8,7 +8,7 @@ import { logChangeEvent, logAccessEvent, logErrorEvent } from '../config/appLogs
 import { prisma } from '../database/prisma.js';
 import { rupeesToPaise } from '../utils/money.js';
 import { toUiCampaign, toUiOrderSummary, toUiOrderSummaryForBrand, toUiUser } from '../utils/uiMappers.js';
-import { orderListSelectLite, getProofFlags, userListSelect } from '../utils/querySelect.js';
+import { orderListSelectLite, getProofFlags, userListSelect, campaignListSelect, transactionListSelect } from '../utils/querySelect.js';
 import { parsePagination, paginatedResponse } from '../utils/pagination.js';
 import { pgUser, pgOrder, pgCampaign } from '../utils/pgMappers.js';
 import { getRequester, isPrivileged } from '../services/authz.js';
@@ -148,6 +148,7 @@ export function makeBrandController() {
             orderBy: { createdAt: 'desc' },
             skip,
             take: limit,
+            select: campaignListSelect,
           }),
           db().campaign.count({ where: { brandUserId: brandPgId, isDeleted: false } }),
         ]);
@@ -287,6 +288,7 @@ export function makeBrandController() {
             orderBy: { createdAt: 'desc' },
             skip,
             take: limit,
+            select: { ...transactionListSelect, metadata: true },
           }),
           db().transaction.count({ where: txWhere }),
         ]);
