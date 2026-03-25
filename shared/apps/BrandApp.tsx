@@ -1,6 +1,5 @@
 ﻿import React, { Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { NotificationProvider } from '../context/NotificationContext';
 import { ToastProvider } from '../context/ToastContext';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { PortalGuard } from '../components/PortalGuard';
@@ -37,13 +36,11 @@ export const BrandApp: React.FC<BrandAppProps> = ({ onBack }) => {
   return (
     <ErrorBoundary>
       <ToastProvider>
-        <NotificationProvider>
-          <div className="relative min-h-[100dvh] flex flex-col">
-            <Suspense fallback={<PageSkeleton variant="dashboard" />}>
-              <BrandDashboard />
-            </Suspense>
-          </div>
-        </NotificationProvider>
+        <div className="relative min-h-[100dvh] flex flex-col">
+          <Suspense fallback={<PageSkeleton variant="dashboard" />}>
+            <BrandDashboard />
+          </Suspense>
+        </div>
       </ToastProvider>
     </ErrorBoundary>
   );

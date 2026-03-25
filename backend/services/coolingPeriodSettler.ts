@@ -11,12 +11,21 @@ import type { Role } from '../middleware/auth.js';
 
 const SYSTEM_ACTOR = 'system:cooling-settler';
 
+/** Prefetched batch data to eliminate N+1 queries in settlement loop. */
+interface SettlePrefetch {
+  disputeOrderIds: Set<string | null>;
+  campaignMap: Map<string, { id: string; assignments: any; brandUserId: string }>;
+  dealMap: Map<string, { id: string; mongoId: string | null; payoutPaise: number }>;
+  userMap: Map<string, { id: string; mongoId: string | null; status: string; isDeleted: boolean }>;
+  mediatorMap: Map<string, { id: string; mediatorCode: string | null }>;
+}
+
 /**
  * Settles a single order whose cooling period has expired.
  * Mirrors the manual settleOrderPayment logic — wallet debit/credit + workflow transitions.
  * Returns true if settled, false if skipped (disputed/frozen/already settled).
  */
-async function settleOne(order: any, env: Env): Promise<boolean> {
+async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promise<boolean> {
   const orderDisplayId = order.mongoId ?? order.id;
 
   // Skip frozen orders
@@ -34,11 +43,13 @@ async function settleOne(order: any, env: Env): Promise<boolean> {
     return false;
   }
 
-  // Skip if there's an open dispute ticket
-  const hasOpenDispute = await db().ticket.findFirst({
-    where: { orderId: orderDisplayId, status: 'Open', isDeleted: false },
-    select: { id: true },
-  });
+  // Skip if there's an open dispute ticket (use prefetch if available)
+  const hasOpenDispute = prefetch
+    ? prefetch.disputeOrderIds.has(orderDisplayId)
+    : !!(await db().ticket.findFirst({
+        where: { orderId: orderDisplayId, status: 'Open', isDeleted: false },
+        select: { id: true },
+      }));
   if (hasOpenDispute) {
     const newEvents = pushOrderEvent(order.events as any, {
       type: 'FROZEN_DISPUTED',
@@ -54,11 +65,13 @@ async function settleOne(order: any, env: Env): Promise<boolean> {
     return false;
   }
 
-  // Verify buyer is still active
-  const buyer = await db().user.findUnique({
-    where: { id: order.userId },
-    select: { id: true, status: true, isDeleted: true },
-  });
+  // Verify buyer is still active (use prefetch if available)
+  const buyer = prefetch
+    ? (prefetch.userMap.get(order.userId) ?? null)
+    : await db().user.findUnique({
+        where: { id: order.userId },
+        select: { id: true, status: true, isDeleted: true },
+      });
   if (!buyer || buyer.isDeleted || buyer.status !== 'active') {
     orderLog.warn('[cooling-settler] Buyer not active, skipping settlement', {
       orderId: orderDisplayId,
@@ -72,10 +85,12 @@ async function settleOne(order: any, env: Env): Promise<boolean> {
   const mediatorCode = String(order.managerName || '').trim();
 
   const campaign = campaignId
-    ? await db().campaign.findFirst({
-        where: { id: campaignId, isDeleted: false },
-        select: { id: true, assignments: true, brandUserId: true },
-      })
+    ? (prefetch
+        ? (prefetch.campaignMap.get(campaignId) ?? null)
+        : await db().campaign.findFirst({
+            where: { id: campaignId, isDeleted: false },
+            select: { id: true, assignments: true, brandUserId: true },
+          }))
     : null;
 
   // Cap check
@@ -105,10 +120,12 @@ async function settleOne(order: any, env: Env): Promise<boolean> {
 
   // Wallet settlement (same atomic logic as manual settle)
   if (!isOverLimit && productId) {
-    const deal = await db().deal.findFirst({
-      where: { ...idWhere(productId), isDeleted: false },
-      select: { id: true, payoutPaise: true },
-    });
+    const deal = prefetch
+      ? (prefetch.dealMap.get(productId) ?? null)
+      : await db().deal.findFirst({
+          where: { ...idWhere(productId), isDeleted: false },
+          select: { id: true, payoutPaise: true },
+        });
     if (!deal) {
       orderLog.warn('[cooling-settler] Deal not found, skipping', {
         orderId: orderDisplayId,
@@ -140,10 +157,12 @@ async function settleOne(order: any, env: Env): Promise<boolean> {
     const mediatorMarginPaise = payoutPaise - buyerCommissionPaise;
     let mediatorUserId: string | null = null;
     if (mediatorMarginPaise > 0 && mediatorCode) {
-      const mediator = await db().user.findFirst({
-        where: { mediatorCode, isDeleted: false },
-        select: { id: true },
-      });
+      const mediator = prefetch
+        ? (prefetch.mediatorMap.get(mediatorCode) ?? null)
+        : await db().user.findFirst({
+            where: { mediatorCode, isDeleted: false },
+            select: { id: true },
+          });
       if (mediator) {
         mediatorUserId = mediator.id;
         await ensureWallet(mediatorUserId);
@@ -254,13 +273,15 @@ async function settleOne(order: any, env: Env): Promise<boolean> {
     env,
   });
 
-  // Realtime notifications
+  // Realtime notifications — use prefetched user data when available
   const privilegedRoles: Role[] = ['admin', 'ops'];
   const audience: { roles?: Role[]; userIds?: string[] } = { roles: privilegedRoles, userIds: [] };
-  const [buyerUser, brandUser] = await Promise.all([
-    order.userId ? db().user.findUnique({ where: { id: order.userId }, select: { mongoId: true } }) : null,
-    order.brandUserId ? db().user.findUnique({ where: { id: order.brandUserId }, select: { mongoId: true } }) : null,
-  ]);
+  const buyerUser = prefetch
+    ? (prefetch.userMap.get(order.userId) ?? null)
+    : order.userId ? await db().user.findUnique({ where: { id: order.userId }, select: { mongoId: true } }) : null;
+  const brandUser = prefetch
+    ? (order.brandUserId ? (prefetch.userMap.get(order.brandUserId) ?? null) : null)
+    : order.brandUserId ? await db().user.findUnique({ where: { id: order.brandUserId }, select: { mongoId: true } }) : null;
   if (buyerUser?.mongoId) audience.userIds!.push(buyerUser.mongoId);
   if (brandUser?.mongoId) audience.userIds!.push(brandUser.mongoId);
 
@@ -323,9 +344,72 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
 
   orderLog.info(`[cooling-settler] Found ${orders.length} orders ready for settlement`);
 
+  // ── Batch prefetch: load all related data in parallel to eliminate N+1 queries ──
+  const orderIds = orders.map(o => o.mongoId ?? o.id);
+  const campaignIds = [...new Set(orders.map(o => o.items?.[0]?.campaignId).filter(Boolean))] as string[];
+  const productIds = [...new Set(orders.map(o => String(o.items?.[0]?.productId || '').trim()).filter(Boolean))];
+  const userIds = [...new Set(orders.flatMap(o => [o.userId, o.brandUserId].filter(Boolean)))] as string[];
+  const mediatorCodes = [...new Set(orders.map(o => String(o.managerName || '').trim()).filter(Boolean))];
+
+  const [disputes, campaignsArr, dealsArr, usersArr, mediatorsArr] = await Promise.all([
+    // Batch dispute check: find all open dispute tickets for these orders
+    db().ticket.findMany({
+      where: { orderId: { in: orderIds }, status: 'Open', isDeleted: false },
+      select: { orderId: true },
+    }),
+    // Batch campaign lookup
+    campaignIds.length > 0
+      ? db().campaign.findMany({
+          where: { id: { in: campaignIds }, isDeleted: false },
+          select: { id: true, assignments: true, brandUserId: true },
+        })
+      : [],
+    // Batch deal lookup
+    productIds.length > 0
+      ? db().deal.findMany({
+          where: { mongoId: { in: productIds }, isDeleted: false },
+          select: { id: true, mongoId: true, payoutPaise: true },
+        }).then(async (byMongo) => {
+          // Also try by UUID for non-mongo product IDs
+          const foundMongoIds = new Set(byMongo.map(d => d.mongoId));
+          const remaining = productIds.filter(pid => !foundMongoIds.has(pid) && pid.includes('-'));
+          if (remaining.length === 0) return byMongo;
+          const byUuid = await db().deal.findMany({
+            where: { id: { in: remaining }, isDeleted: false },
+            select: { id: true, mongoId: true, payoutPaise: true },
+          });
+          return [...byMongo, ...byUuid];
+        })
+      : [],
+    // Batch user lookup (buyers + brands)
+    userIds.length > 0
+      ? db().user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, mongoId: true, status: true, isDeleted: true },
+        })
+      : [],
+    // Batch mediator lookup
+    mediatorCodes.length > 0
+      ? db().user.findMany({
+          where: { mediatorCode: { in: mediatorCodes }, isDeleted: false },
+          select: { id: true, mediatorCode: true },
+        })
+      : [],
+  ]);
+
+  // Build lookup maps for O(1) access during settlement
+  const disputeOrderIds = new Set(disputes.map(t => t.orderId));
+  const campaignMap = new Map(campaignsArr.map(c => [c.id, c]));
+  const dealMap = new Map(dealsArr.map(d => [d.mongoId ?? d.id, d]));
+  const userMap = new Map(usersArr.map(u => [u.id, u]));
+  const mediatorMap = new Map(mediatorsArr.map(m => [m.mediatorCode!, m]));
+
+  // Attach prefetched data to a context object passed into settleOne
+  const prefetch = { disputeOrderIds, campaignMap, dealMap, userMap, mediatorMap };
+
   for (const order of orders) {
     try {
-      const didSettle = await settleOne(order, env);
+      const didSettle = await settleOne(order, env, prefetch);
       if (didSettle) settled++;
       else skipped++;
     } catch (err) {

@@ -4459,9 +4459,8 @@ export const AgencyDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load when tab changes — clear cache so each tab always fetches fresh
+  // Trigger data load when tab changes — only fetch keys not yet loaded
   useEffect(() => {
-    for (const k of tabDataNeedsRef.current) loadedRef.current.delete(k);
     fetchData();
   }, [fetchData, activeTab]);
 

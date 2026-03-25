@@ -2266,9 +2266,8 @@ export const BrandDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load on mount and tab change — clear cache so each tab always fetches fresh
+  // Trigger data load on mount and tab change — only fetch keys not yet loaded
   useEffect(() => {
-    for (const k of tabDataNeedsRef.current) loadedRef.current.delete(k);
     fetchData();
   }, [fetchData, activeTab]);
 

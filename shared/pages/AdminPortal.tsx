@@ -289,6 +289,18 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     }
   }, [user?.role]);
 
+  // Fetch dashboard stats when switching to dashboard view (skip initial mount — handled above)
+  const dashboardMountedRef = useRef(false);
+  useEffect(() => {
+    if (!user?.id || user.role !== 'admin') return;
+    if (view !== 'dashboard') { dashboardMountedRef.current = true; return; }
+    if (!dashboardMountedRef.current) { dashboardMountedRef.current = true; return; } // skip first mount
+    Promise.allSettled([api.admin.getStats(), api.admin.getGrowthAnalytics()]).then(([s, g]) => {
+      if (s.status === 'fulfilled') setStats(s.value);
+      if (g.status === 'fulfilled') setChartData(asArray(g.value));
+    });
+  }, [user?.id, view]);
+
   // Realtime: only refresh when the event is relevant to the current view
   const lastRealtimeRefreshRef = useRef(0);
   useEffect(() => {
@@ -421,12 +433,12 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   const refreshCurrentView = async () => {
     try {
       switch (view) {
-        case 'dashboard':
-          Promise.allSettled([api.admin.getStats(), api.admin.getGrowthAnalytics()]).then(([s, g]) => {
-            if (s.status === 'fulfilled') setStats(s.value);
-            if (g.status === 'fulfilled') setChartData(asArray(g.value));
-          });
+        case 'dashboard': {
+          const [s, g] = await Promise.allSettled([api.admin.getStats(), api.admin.getGrowthAnalytics()]);
+          if (s.status === 'fulfilled') setStats(s.value);
+          if (g.status === 'fulfilled') setChartData(asArray(g.value));
           break;
+        }
         case 'users': {
           const role = userRoleFilter === 'All' ? 'all' : userRoleFilter.toLowerCase();
           const search = debouncedUserSearch.trim() || undefined;

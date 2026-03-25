@@ -95,14 +95,18 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
     }
   }, [open, ticket, loadComments]);
 
-  // Realtime: refresh comments on tickets.changed, with 60s fallback poll
+  // Realtime: refresh comments on tickets.changed (no polling — SSE handles updates)
   useEffect(() => {
     if (!open || !ticket) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const unsub = subscribeRealtime((msg) => {
-      if (msg.type === 'tickets.changed') loadComments();
+      if (msg.type === 'tickets.changed') {
+        // Debounce rapid SSE bursts
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => { timer = null; loadComments(); }, 600);
+      }
     });
-    const interval = setInterval(loadComments, 60000);
-    return () => { unsub(); clearInterval(interval); };
+    return () => { unsub(); if (timer) clearTimeout(timer); };
   }, [open, ticket, loadComments]);
 
   useEffect(() => {
