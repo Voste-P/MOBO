@@ -122,14 +122,17 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
             <div className="flex flex-col h-full bg-[#F2F2F7] relative overflow-hidden font-sans">
               <div className="flex-1 overflow-hidden overscroll-none" {...swipeHandlers}>
                 <Suspense fallback={<TabSkeleton />}>
-                  <div
-                    key={activeTab}
-                    className={`h-full overflow-y-auto scrollbar-styled animate-slide-tab ${slideDir === 'left' ? 'slide-from-right' : 'slide-from-left'}`}
-                  >
-                    {activeTab === 'home' && <Home onVoiceNavigate={handleTabChange} />}
-                    {activeTab === 'explore' && <Explore />}
-                    {activeTab === 'orders' && <Orders />}
-                    {activeTab === 'profile' && <Profile />}
+                  <div className={`h-full ${activeTab === 'explore' ? '' : 'hidden'}`}>
+                    <div className="h-full overflow-y-auto scrollbar-styled"><Explore /></div>
+                  </div>
+                  <div className={`h-full ${activeTab === 'home' ? '' : 'hidden'}`}>
+                    <div className="h-full overflow-y-auto scrollbar-styled"><Home onVoiceNavigate={handleTabChange} /></div>
+                  </div>
+                  <div className={`h-full ${activeTab === 'orders' ? '' : 'hidden'}`}>
+                    <div className="h-full overflow-y-auto scrollbar-styled"><Orders /></div>
+                  </div>
+                  <div className={`h-full ${activeTab === 'profile' ? '' : 'hidden'}`}>
+                    <div className="h-full overflow-y-auto scrollbar-styled"><Profile /></div>
                   </div>
                 </Suspense>
               </div>

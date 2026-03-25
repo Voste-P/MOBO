@@ -971,6 +971,7 @@ export const Orders: React.FC = () => {
       setExtractedDetails({ orderId: '', amount: '' });
       setMatchStatus({ id: 'none', amount: 'none', productName: 'none', reviewerName: 'none' });
       setOrderIdLocked(false);
+      // Realtime will sync the order list; do a background refresh to ensure consistency
       loadOrders();
       toast.success('Order submitted successfully!');
     } catch (e: any) {

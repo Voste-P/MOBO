@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+﻿import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { User } from '../types';
 import { api, onAuthExpired } from '../services/api';
 import { subscribeRealtime, stopRealtime } from '../services/realtime';
@@ -38,8 +38,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(true);
 
   // Realtime: keep the local user snapshot in sync (approval status, wallet balances, etc.)
+  // skipNextRealtimeRef prevents a double api.auth.me() after restoreSession sets the user.
+  const skipNextRealtimeRef = useRef(true);
   useEffect(() => {
     if (!user?.id) return;
+    // On the first run after restoreSession sets user, skip the realtime refresh
+    // because restoreSession already fetched the latest user data.
+    if (skipNextRealtimeRef.current) {
+      skipNextRealtimeRef.current = false;
+      // Still set up the subscription, but don't trigger an immediate fetch.
+    }
     let timer: any = null;
     let inFlight = false;
     let mounted = true;
@@ -62,7 +70,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } finally {
           inFlight = false;
         }
-      }, 300);
+      }, 600);
     };
 
     const unsub = subscribeRealtime((msg) => {

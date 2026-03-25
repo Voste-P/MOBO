@@ -2225,10 +2225,7 @@ export const MediatorDashboard: React.FC = () => {
         onTouchEnd={(e) => { swipeHandlers.onTouchEnd(e); pullHandlers.onTouchEnd(); }}
       >
         <PullToRefreshIndicator distance={pullDistance} isRefreshing={isPullRefreshing} />
-        <div
-          key={activeTab}
-          className={`animate-slide-tab ${slideDir === 'left' ? 'slide-from-right' : 'slide-from-left'}`}
-        >
+        <div>
         {activeTab === 'inbox' && (
           <InboxView
             orders={orders}

@@ -723,15 +723,15 @@ export function makeOpsController(env: Env) {
               res.json([]);
               return;
             }
-            const mediatorCodes = await listMediatorCodesForAgency(agencyCode);
-            if (!mediatorCodes.length) {
+            // Single query: directly find mediator IDs by parentCode instead of two hops
+            const mediators = await db().user.findMany({
+              where: { roles: { has: 'mediator' as any }, parentCode: agencyCode, isDeleted: false },
+              select: { id: true },
+            });
+            if (!mediators.length) {
               res.json([]);
               return;
             }
-            const mediators = await db().user.findMany({
-              where: { roles: { has: 'mediator' as any }, mediatorCode: { in: mediatorCodes }, isDeleted: false },
-              select: { id: true },
-            });
             payoutWhere.beneficiaryUserId = { in: mediators.map((m: any) => m.id) };
           } else {
             throw new AppError(403, 'FORBIDDEN', 'Insufficient role');
@@ -745,20 +745,17 @@ export function makeOpsController(env: Env) {
             orderBy: { requestedAt: 'desc' },
             take: limit,
             skip,
-            select: { id: true, mongoId: true, beneficiaryUserId: true, amountPaise: true, requestedAt: true, createdAt: true, status: true, providerRef: true },
+            select: {
+              id: true, mongoId: true, beneficiaryUserId: true, amountPaise: true,
+              requestedAt: true, createdAt: true, status: true, providerRef: true,
+              beneficiary: { select: { id: true, mongoId: true, name: true, mediatorCode: true } },
+            },
           }),
           db().payout.count({ where: payoutWhere }),
         ]);
 
-        const beneficiaryIds = payouts.map((p: any) => p.beneficiaryUserId).filter(Boolean);
-        const users = await db().user.findMany({
-          where: { id: { in: beneficiaryIds }, isDeleted: false },
-          select: { id: true, mongoId: true, name: true, mediatorCode: true },
-        });
-        const byId = new Map(users.map((u: any) => [String(u.id), u]));
-
         const mapped = payouts.map((p: any) => {
-          const u = byId.get(String(p.beneficiaryUserId));
+          const u = p.beneficiary;
           return {
             id: p.mongoId ?? p.id,
             mediatorName: u?.name ?? 'Mediator',

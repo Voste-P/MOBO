@@ -1705,19 +1705,19 @@ export function makeOrdersController(env: Env) {
           try {
             const privilegedRoles: Role[] = ['admin', 'ops'];
             const managerCode = String(order.managerName || '').trim();
-            const mediatorUser = managerCode
-              ? await db().user.findFirst({
-                where: { roles: { has: 'mediator' as any }, mediatorCode: managerCode, isDeleted: false },
-                select: { parentCode: true },
-              })
-              : null;
-            const upstreamAgencyCode = String(mediatorUser?.parentCode || '').trim();
-            const [orderUser, brandUser] = await Promise.all([
+            const [mediatorUser, orderUser, brandUser] = await Promise.all([
+              managerCode
+                ? db().user.findFirst({
+                  where: { roles: { has: 'mediator' as any }, mediatorCode: managerCode, isDeleted: false },
+                  select: { parentCode: true },
+                })
+                : null,
               db().user.findUnique({ where: { id: order.userId }, select: { mongoId: true } }),
               order.brandUserId
                 ? db().user.findUnique({ where: { id: order.brandUserId }, select: { mongoId: true } })
                 : null,
             ]);
+            const upstreamAgencyCode = String(mediatorUser?.parentCode || '').trim();
             const audience = {
               roles: privilegedRoles,
               userIds: [orderUser?.mongoId ?? '', brandUser?.mongoId ?? ''].filter(Boolean),
@@ -1752,19 +1752,19 @@ export function makeOrdersController(env: Env) {
           try {
             const privilegedRoles: Role[] = ['admin', 'ops'];
             const managerCode = String(order.managerName || '').trim();
-            const mediatorUser = managerCode
-              ? await db().user.findFirst({
-                where: { roles: { has: 'mediator' as any }, mediatorCode: managerCode, isDeleted: false },
-                select: { parentCode: true },
-              })
-              : null;
-            const upstreamAgencyCode = String(mediatorUser?.parentCode || '').trim();
-            const [orderUser, brandUser] = await Promise.all([
+            const [mediatorUser, orderUser, brandUser] = await Promise.all([
+              managerCode
+                ? db().user.findFirst({
+                  where: { roles: { has: 'mediator' as any }, mediatorCode: managerCode, isDeleted: false },
+                  select: { parentCode: true },
+                })
+                : null,
               db().user.findUnique({ where: { id: order.userId }, select: { mongoId: true } }),
               order.brandUserId
                 ? db().user.findUnique({ where: { id: order.brandUserId }, select: { mongoId: true } })
                 : null,
             ]);
+            const upstreamAgencyCode = String(mediatorUser?.parentCode || '').trim();
             const audience = {
               roles: privilegedRoles,
               userIds: [orderUser?.mongoId ?? '', brandUser?.mongoId ?? ''].filter(Boolean),
@@ -1818,21 +1818,20 @@ export function makeOrdersController(env: Env) {
         try {
         const privilegedRoles: Role[] = ['admin', 'ops'];
         const managerCode = String(order.managerName || '').trim();
-        const mediatorUser = managerCode
-          ? await db().user.findFirst({
-            where: { roles: { has: 'mediator' as any }, mediatorCode: managerCode, isDeleted: false },
-            select: { parentCode: true },
-          })
-          : null;
-        const upstreamAgencyCode = String(mediatorUser?.parentCode || '').trim();
-
-        // Resolve mongoIds for realtime audience — parallel lookups
-        const [orderUser, brandUser] = await Promise.all([
+        // Parallelize all user lookups — mediator, order owner, brand user
+        const [mediatorUser, orderUser, brandUser] = await Promise.all([
+          managerCode
+            ? db().user.findFirst({
+              where: { roles: { has: 'mediator' as any }, mediatorCode: managerCode, isDeleted: false },
+              select: { parentCode: true },
+            })
+            : null,
           db().user.findUnique({ where: { id: order.userId }, select: { mongoId: true } }),
           order.brandUserId
             ? db().user.findUnique({ where: { id: order.brandUserId }, select: { mongoId: true } })
             : null,
         ]);
+        const upstreamAgencyCode = String(mediatorUser?.parentCode || '').trim();
 
         const audience = {
           roles: privilegedRoles,
