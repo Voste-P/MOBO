@@ -178,16 +178,18 @@ const BrandProfileView = () => {
   });
   const [avatar, setAvatar] = useState(user?.avatar);
 
+  const prevUserIdRef = useRef(user?.id);
   useEffect(() => {
-    if (user) {
-      setForm({
-        name: user.name || '',
-        mobile: user.mobile || '',
-        email: user.email || '',
-      });
-      setAvatar(user.avatar);
-    }
-  }, [user]);
+    if (!user) return;
+    if (prevUserIdRef.current === user.id) return;
+    prevUserIdRef.current = user.id;
+    setForm({
+      name: user.name || '',
+      mobile: user.mobile || '',
+      email: user.email || '',
+    });
+    setAvatar(user.avatar);
+  }, [user?.id]);
 
   const handleSave = async () => {
     setLoading(true);
@@ -2284,7 +2286,7 @@ export const BrandDashboard: React.FC = () => {
       fetchRef.current = false;
       setIsDataLoading(false);
     }
-  }, [user, activeTab, tabDataNeeds]);
+  }, [user?.id, activeTab, tabDataNeeds]);
 
   useEffect(() => {
     fetchData();
@@ -2292,7 +2294,7 @@ export const BrandDashboard: React.FC = () => {
 
   // Realtime: only invalidate data keys relevant to the SSE event, then refetch
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const eventToKeys: Record<string, string[]> = {
       'orders.changed': ['orders'],
@@ -2322,7 +2324,7 @@ export const BrandDashboard: React.FC = () => {
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [user, fetchData, tabDataNeeds]);
+  }, [user?.id, fetchData, tabDataNeeds]);
 
   const refreshData = useCallback(() => fetchData({ force: true }), [fetchData]);
 

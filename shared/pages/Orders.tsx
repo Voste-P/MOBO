@@ -316,7 +316,7 @@ export const Orders: React.FC = () => {
     } else {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user?.id]);
 
   // Defer product loading until the New Order modal is opened; reset stale flag on close
   const productsLoadedRef = useRef(false);
@@ -342,7 +342,7 @@ export const Orders: React.FC = () => {
 
   const handlePullRefresh = useCallback(async () => {
     await Promise.all([loadOrders(), loadMyTickets()]);
-  }, [user]);
+  }, [user?.id]);
   const { handlers: pullHandlers, pullDistance, isRefreshing: isPullRefreshing } = usePullToRefresh({ onRefresh: handlePullRefresh });
 
   const loadMyTickets = async () => {

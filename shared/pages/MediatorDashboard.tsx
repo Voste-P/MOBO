@@ -1984,7 +1984,7 @@ export const MediatorDashboard: React.FC = () => {
       loadingRef.current = false;
       setLoading(false);
     }
-  }, [user, activeTab, tabDataNeeds]);
+  }, [user?.id, activeTab, tabDataNeeds]);
 
   useEffect(() => {
     loadData();
@@ -1997,7 +1997,7 @@ export const MediatorDashboard: React.FC = () => {
 
   // Realtime: only invalidate data keys relevant to the SSE event, then refetch
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const eventToKeys: Record<string, string[]> = {
       'orders.changed': ['orders'],
@@ -2030,7 +2030,7 @@ export const MediatorDashboard: React.FC = () => {
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [user, refreshNotifications, loadData, tabDataNeeds]);
+  }, [user?.id, refreshNotifications, loadData, tabDataNeeds]);
 
   const refreshData = useCallback(() => loadData({ force: true }), [loadData]);
 
@@ -2054,7 +2054,7 @@ export const MediatorDashboard: React.FC = () => {
 
   const handlePullRefresh = useCallback(async () => {
     await loadData({ force: true });
-  }, [user]);
+  }, [loadData]);
   const { handlers: pullHandlers, pullDistance, isRefreshing: isPullRefreshing } = usePullToRefresh({ onRefresh: handlePullRefresh });
 
   const unpublishedCount = useMemo(() => {

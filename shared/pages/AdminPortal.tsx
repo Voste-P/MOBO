@@ -254,8 +254,22 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   const [auditDateFrom, setAuditDateFrom] = useState('');
   const [auditDateTo, setAuditDateTo] = useState('');
 
+  // Debounced user search: input state for immediate UI, debounced value for API calls
+  const [debouncedUserSearch, setDebouncedUserSearch] = useState('');
+  const userSearchTimerRef = useRef<any>(null);
+  const handleUserSearchChange = (value: string) => {
+    setUserSearch(value);
+    if (userSearchTimerRef.current) clearTimeout(userSearchTimerRef.current);
+    userSearchTimerRef.current = setTimeout(() => {
+      setDebouncedUserSearch(value);
+      setUsersPage(1);
+    }, 350);
+  };
+
   // Ref to always call the latest refreshCurrentView (avoids stale closures in realtime handler)
   const refreshCurrentViewRef = useRef<() => void>(() => {});
+  // Guard: only run initial data fetch once when admin session is established
+  const initialLoadRef = useRef(false);
 
   const fetchSystemConfig = async () => {
     try {
@@ -268,14 +282,15 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   };
 
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (user?.role === 'admin' && !initialLoadRef.current) {
+      initialLoadRef.current = true;
       refreshCurrentView();
     }
-  }, [user]);
+  }, [user?.role]);
 
   // Realtime: only refresh when the event is relevant to the current view
   useEffect(() => {
-    if (!user || user.role !== 'admin') return;
+    if (!user?.id || user.role !== 'admin') return;
     let timer: any = null;
     const viewRelevantEvents: Record<string, string[]> = {
       dashboard: ['orders.changed', 'users.changed', 'wallets.changed'],
@@ -306,11 +321,11 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [user, view]);
+  }, [user?.id, view]);
 
   // Auto-fetch audit logs when switching to audit-logs view or when filters change
   useEffect(() => {
-    if (!user || user.role !== 'admin') return;
+    if (!user?.id || user.role !== 'admin') return;
     if (view !== 'audit-logs') return;
     setAuditLoading(true);
     const params: any = { limit: PAGE_SIZE, page: auditPage };
@@ -325,13 +340,13 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       })
       .catch((e) => { console.error('Audit Logs Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to load audit logs.')); })
       .finally(() => setAuditLoading(false));
-  }, [user, view, auditActionFilter, auditDateFrom, auditDateTo, auditPage]);
+  }, [user?.id, view, auditActionFilter, auditDateFrom, auditDateTo, auditPage]);
 
   useEffect(() => {
-    if (!user || user.role !== 'admin') return;
+    if (!user?.id || user.role !== 'admin') return;
     if (view !== 'users') return;
     const role = userRoleFilter === 'All' ? 'all' : userRoleFilter.toLowerCase();
-    const search = userSearch.trim() || undefined;
+    const search = debouncedUserSearch.trim() || undefined;
     api.admin
       .getUsers(role, { page: usersPage, limit: PAGE_SIZE, search })
       .then((res) => {
@@ -339,10 +354,10 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         setUsersPagination(extractPaginationMeta(res));
       })
       .catch((e) => { console.error('Admin Users Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh users list.')); });
-  }, [user, view, usersPage, userRoleFilter, userSearch]);
+  }, [user?.id, view, usersPage, userRoleFilter, debouncedUserSearch]);
 
   useEffect(() => {
-    if (!user || user.role !== 'admin') return;
+    if (!user?.id || user.role !== 'admin') return;
     if (view !== 'invites') return;
     api.admin
       .getInvites({ page: invitesPage, limit: PAGE_SIZE })
@@ -351,11 +366,11 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         setInvitesPagination(extractPaginationMeta(res));
       })
       .catch((e) => { console.error('Admin Invites Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh invites.')); });
-  }, [user, view, invitesPage]);
+  }, [user?.id, view, invitesPage]);
 
   // Fetch orders when switching to orders/finance view or when page changes
   useEffect(() => {
-    if (!user || user.role !== 'admin') return;
+    if (!user?.id || user.role !== 'admin') return;
     if (view !== 'orders' && view !== 'finance') return;
     api.admin.getFinancials({ page: ordersPage, limit: PAGE_SIZE }).then((res) => {
       const safeOrders = asArray<Order>(res);
@@ -367,32 +382,32 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         return updated || null;
       });
     }).catch((e) => { console.error('Admin Orders Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh orders.')); });
-  }, [user, view, ordersPage]);
+  }, [user?.id, view, ordersPage]);
 
   // Fetch products when switching to inventory view or when page changes
   useEffect(() => {
-    if (!user || user.role !== 'admin') return;
+    if (!user?.id || user.role !== 'admin') return;
     if (view !== 'inventory') return;
     api.admin.getProducts({ page: productsPage, limit: PAGE_SIZE }).then((res) => {
       setProducts(asArray(res));
       setProductsPagination(extractPaginationMeta(res));
     }).catch((e) => { console.error('Admin Products Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh products.')); });
-  }, [user, view, productsPage]);
+  }, [user?.id, view, productsPage]);
 
   useEffect(() => {
-    if (!user || user.role !== 'admin') return;
+    if (!user?.id || user.role !== 'admin') return;
     if (view !== 'settings') return;
     fetchSystemConfig();
-  }, [user, view]);
+  }, [user?.id, view]);
 
   // Fetch tickets when switching to support/feedback view
   useEffect(() => {
-    if (!user || user.role !== 'admin') return;
+    if (!user?.id || user.role !== 'admin') return;
     if (view !== 'support' && view !== 'feedback') return;
     api.tickets.getAll({ issueType: view === 'feedback' ? 'Feedback' : 'Support' })
       .then((res) => setTickets(asArray(res)))
       .catch((e) => { console.error('Admin Tickets Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to load tickets.')); });
-  }, [user, view]);
+  }, [user?.id, view]);
 
   /** Refresh only the data needed for the active tab/view (instead of ALL endpoints). */
   const refreshCurrentView = async () => {
@@ -406,7 +421,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
           break;
         case 'users': {
           const role = userRoleFilter === 'All' ? 'all' : userRoleFilter.toLowerCase();
-          const search = userSearch.trim() || undefined;
+          const search = debouncedUserSearch.trim() || undefined;
           api.admin.getUsers(role, { page: usersPage, limit: PAGE_SIZE, search }).then((res) => {
             setUsers(asArray(res));
             setUsersPagination(extractPaginationMeta(res));
@@ -1638,13 +1653,13 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       type="text"
                       placeholder="Search by name, mobile, email, or code..."
                       value={userSearch}
-                      onChange={(e) => { setUserSearch(e.target.value); setUsersPage(1); }}
+                      onChange={(e) => handleUserSearchChange(e.target.value)}
                       className="w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all bg-white placeholder:text-slate-400"
                     />
                     {userSearch && (
                       <button
                         type="button"
-                        onClick={() => setUserSearch('')}
+                        onClick={() => handleUserSearchChange('')}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                         aria-label="Clear search"
                       >

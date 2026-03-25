@@ -55,16 +55,20 @@ export const Profile: React.FC = () => {
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState(false);
 
-  // Re-sync form fields when the user context changes (e.g. after login, token refresh)
-  // but only when the user is NOT currently editing to avoid overwriting in-progress changes.
+  // Re-sync form fields when the user identity changes (login/logout)
+  // but not on every user object refresh from realtime, and not while editing.
+  const prevUserIdRef = useRef(user?.id);
   useEffect(() => {
     if (!user || isEditing) return;
+    // Only re-sync if the user identity changed (login/switch), not on every object refresh
+    if (prevUserIdRef.current === user.id) return;
+    prevUserIdRef.current = user.id;
     setName(user.name || '');
     setMobile(user.mobile || '');
     setUpiId(user.upiId || '');
     setAvatar(user.avatar);
     setQrCode(user.qrCode);
-  }, [user, isEditing]);
+  }, [user?.id, isEditing]);
 
   /** Validate UPI ID format: handle@provider, 3-50 chars */
   function validateUpiId(value: string): string {
@@ -78,11 +82,11 @@ export const Profile: React.FC = () => {
 
   useEffect(() => {
     if (user) refreshStats();
-  }, [user]);
+  }, [user?.id]);
 
   // Refresh stats when orders change via realtime
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
     if (user.role !== 'user') return;
 
 
@@ -103,7 +107,7 @@ export const Profile: React.FC = () => {
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [user]);
+  }, [user?.id]);
 
   const refreshStats = async (opts?: { silent?: boolean }) => {
     if (!user) return;
