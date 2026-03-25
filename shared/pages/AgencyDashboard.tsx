@@ -3143,7 +3143,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
           <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Order Review</h2>
           <p className="text-xs text-slate-500 mt-1">{filtered.length} orders · {manualCount} manually approved</p>
         </div>
-        <button onClick={onRefresh} disabled={loading} className="text-xs font-bold text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 px-4 py-2 rounded-xl transition-colors">
+        <button onClick={() => onRefresh(['orders', 'campaigns', 'mediators'])} disabled={loading} className="text-xs font-bold text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 px-4 py-2 rounded-xl transition-colors">
           {loading ? 'Refreshing…' : 'Refresh'}
         </button>
       </div>
@@ -4357,6 +4357,7 @@ export const AgencyDashboard: React.FC = () => {
   // Track which data sets have been loaded to avoid redundant fetches
   const loadedRef = useRef<Set<string>>(new Set());
   const fetchRef = useRef(false);
+  const lastFetchedAt = useRef<Record<string, number>>({});
   // Ref to always read current state for stats computation (avoids stale closures)
   const dataRef = useRef({ mediators, campaigns, orders });
   dataRef.current = { mediators, campaigns, orders };
@@ -4418,8 +4419,10 @@ export const AgencyDashboard: React.FC = () => {
       let safeCamps = dataRef.current.campaigns;
       let safeOrds = dataRef.current.orders;
 
+      const now = Date.now();
       keys.forEach((key, i) => {
         loadedRef.current.add(key);
+        lastFetchedAt.current[key] = now;
         switch (key) {
           case 'mediators': safeMeds = asArray<User>(results[i]); setMediators(safeMeds); break;
           case 'campaigns': safeCamps = asArray<Campaign>(results[i]); setCampaigns(safeCamps); break;
@@ -4456,8 +4459,9 @@ export const AgencyDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load when tab changes (separate from the stable callback)
+  // Trigger data load when tab changes — clear cache so each tab always fetches fresh
   useEffect(() => {
+    for (const k of tabDataNeedsRef.current) loadedRef.current.delete(k);
     fetchData();
   }, [fetchData, activeTab]);
 
@@ -4476,7 +4480,11 @@ export const AgencyDashboard: React.FC = () => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        for (const k of keysToInvalidate) loadedRef.current.delete(k);
+        // Skip keys that were just fetched by an explicit refresh (prevents double-fetch)
+        const now = Date.now();
+        const stale = keysToInvalidate.filter(k => (now - (lastFetchedAt.current[k] || 0)) > 2000);
+        if (stale.length === 0) return;
+        for (const k of stale) loadedRef.current.delete(k);
         fetchData({ silent: true });
       }, 900);
     };

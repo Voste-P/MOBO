@@ -2196,6 +2196,7 @@ export const BrandDashboard: React.FC = () => {
 
   const loadedRef = useRef<Set<string>>(new Set());
   const fetchRef = useRef(false);
+  const lastFetchedAt = useRef<Record<string, number>>({});
 
   const tabDataNeeds = useMemo<string[]>(() => {
     switch (activeTab) {
@@ -2244,8 +2245,10 @@ export const BrandDashboard: React.FC = () => {
       if (needed.includes('tickets')) { promises.push(api.tickets.getAll().catch(() => [])); keys.push('tickets'); }
 
       const results = await Promise.all(promises);
+      const now = Date.now();
       keys.forEach((key, i) => {
         loadedRef.current.add(key);
+        lastFetchedAt.current[key] = now;
         switch (key) {
           case 'campaigns': setCampaigns(asArray(results[i])); break;
           case 'agencies': setAgencies(asArray(results[i])); break;
@@ -2263,8 +2266,9 @@ export const BrandDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load on mount and tab change
+  // Trigger data load on mount and tab change — clear cache so each tab always fetches fresh
   useEffect(() => {
+    for (const k of tabDataNeedsRef.current) loadedRef.current.delete(k);
     fetchData();
   }, [fetchData, activeTab]);
 
@@ -2283,8 +2287,11 @@ export const BrandDashboard: React.FC = () => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        // Only invalidate the keys touched by this event
-        for (const k of keysToInvalidate) loadedRef.current.delete(k);
+        // Skip keys that were just fetched by an explicit refresh (prevents double-fetch)
+        const now = Date.now();
+        const stale = keysToInvalidate.filter(k => (now - (lastFetchedAt.current[k] || 0)) > 2000);
+        if (stale.length === 0) return;
+        for (const k of stale) loadedRef.current.delete(k);
         fetchData({ silent: true });
       }, 900);
     };

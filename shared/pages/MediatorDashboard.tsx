@@ -1904,6 +1904,7 @@ export const MediatorDashboard: React.FC = () => {
   // AI Analysis — now reads stored data from order, no Gemini calls needed
 
   const loadedRef = useRef<Set<string>>(new Set());
+  const lastFetchedAt = useRef<Record<string, number>>({});
 
   const tabDataNeeds = useMemo<string[]>(() => {
     switch (activeTab) {
@@ -1951,8 +1952,10 @@ export const MediatorDashboard: React.FC = () => {
 
       const results = await Promise.all(promises);
 
+      const now = Date.now();
       keys.forEach((key, i) => {
         loadedRef.current.add(key);
+        lastFetchedAt.current[key] = now;
         switch (key) {
           case 'orders': {
             const safeOrds = asArray<Order>(results[i]);
@@ -2003,8 +2006,9 @@ export const MediatorDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load on mount and tab change
+  // Trigger data load on mount and tab change — clear cache so each tab always fetches fresh
   useEffect(() => {
+    for (const k of tabDataNeedsRef.current) loadedRef.current.delete(k);
     loadData();
   }, [loadData, activeTab]);
 
@@ -2028,7 +2032,14 @@ export const MediatorDashboard: React.FC = () => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        for (const k of keysToInvalidate) loadedRef.current.delete(k);
+        // Skip keys that were just fetched by an explicit refresh (prevents double-fetch)
+        const now = Date.now();
+        const stale = keysToInvalidate.filter(k => (now - (lastFetchedAt.current[k] || 0)) > 2000);
+        if (stale.length === 0) {
+          if (showNotificationsRef.current) refreshNotifications();
+          return;
+        }
+        for (const k of stale) loadedRef.current.delete(k);
         loadData({ silent: true });
         if (showNotificationsRef.current) refreshNotifications();
       }, 800);
