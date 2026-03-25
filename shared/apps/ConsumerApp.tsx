@@ -30,7 +30,7 @@ interface ConsumerAppProps {
 export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'home' | 'explore' | 'orders' | 'profile'>('explore');
-  const [slideDir, setSlideDir] = useState<'left' | 'right'>('right');
+  const [_slideDir, setSlideDir] = useState<'left' | 'right'>('right');
   const prevTabIdx = useRef(0);
 
   const TAB_ORDER = ['explore', 'home', 'orders', 'profile'] as const;

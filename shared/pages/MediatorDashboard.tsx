@@ -1826,7 +1826,7 @@ export const MediatorDashboard: React.FC = () => {
     refresh: refreshNotifications,
   } = useNotification();
   const [activeTab, setActiveTab] = useState<'inbox' | 'market' | 'squad' | 'profile'>('inbox');
-  const [slideDir, setSlideDir] = useState<'left' | 'right'>('right');
+  const [_slideDir, setSlideDir] = useState<'left' | 'right'>('right');
   const prevTabIdx = useRef(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const showNotificationsRef = useRef(showNotifications);

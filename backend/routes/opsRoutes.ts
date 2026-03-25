@@ -31,13 +31,18 @@ export function opsRoutes(env: Env): Router {
 
   router.post('/brands/connect', ops.requestBrandConnection);
 
-  router.get('/mediators', ops.getMediators);
-  router.get('/campaigns', ops.getCampaigns);
-  router.get('/deals', ops.getDeals);
-  router.get('/orders', ops.getOrders);
-  router.get('/users/pending', ops.getPendingUsers);
-  router.get('/users/verified', ops.getVerifiedUsers);
-  router.get('/ledger', ops.getLedger);
+  const dashboardCache: import('express').RequestHandler = (_req, res, next) => {
+    res.setHeader('Cache-Control', 'private, max-age=15');
+    next();
+  };
+
+  router.get('/mediators', dashboardCache, ops.getMediators);
+  router.get('/campaigns', dashboardCache, ops.getCampaigns);
+  router.get('/deals', dashboardCache, ops.getDeals);
+  router.get('/orders', dashboardCache, ops.getOrders);
+  router.get('/users/pending', dashboardCache, ops.getPendingUsers);
+  router.get('/users/verified', dashboardCache, ops.getVerifiedUsers);
+  router.get('/ledger', dashboardCache, ops.getLedger);
 
   router.post('/mediators/approve', ops.approveMediator);
   router.post('/mediators/reject', ops.rejectMediator);
