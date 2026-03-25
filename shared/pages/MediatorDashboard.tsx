@@ -270,7 +270,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                     onClick={() =>
                       api.ops
                         .approveUser(u.id)
-                        .then(onRefresh)
+                        .then(() => onRefresh(['pending', 'verified']))
                         .catch((e: any) => toast.error(formatErrorMessage(e, 'Failed to approve user')))
                     }
                     className="w-8 h-8 rounded-lg bg-zinc-900 text-white flex items-center justify-center hover:bg-[#CCF381] hover:text-black transition-all shadow-md active:scale-90"
@@ -284,7 +284,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                     onClick={() =>
                       api.ops
                         .rejectUser(u.id)
-                        .then(onRefresh)
+                        .then(() => onRefresh(['pending']))
                         .catch((e: any) => toast.error(formatErrorMessage(e, 'Failed to reject user')))
                     }
                     className="w-8 h-8 rounded-lg bg-zinc-50 text-zinc-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all active:scale-90"
@@ -668,7 +668,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                                 await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined);
                                 toast.success('Ticket resolved.');
                                 setResolvingTicketId(null); setResolutionNote('');
-                                onRefresh();
+                                onRefresh(['tickets']);
                               } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
                             }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
                               ✓ Resolve
@@ -678,7 +678,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                                 await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined);
                                 toast.success('Ticket rejected.');
                                 setResolvingTicketId(null); setResolutionNote('');
-                                onRefresh();
+                                onRefresh(['tickets']);
                               } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
                             }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-50 border border-red-200 text-red-600 hover:bg-red-100">
                               ✗ Reject
@@ -708,7 +708,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                           try {
                             await api.tickets.update(t.id, 'Open');
                             toast.success('Ticket reopened.');
-                            onRefresh();
+                            onRefresh(['tickets']);
                           } catch (err: any) {
                             toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
                           }
@@ -723,7 +723,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                           try {
                             await api.tickets.delete(t.id);
                             toast.success('Ticket deleted.');
-                            onRefresh();
+                            onRefresh(['tickets']);
                           } catch (err: any) {
                             toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
                           }
@@ -1071,7 +1071,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
                           if (!(await confirm({ message: 'Delete this unpublished campaign?', confirmLabel: 'Delete', variant: 'destructive' }))) return;
                           await api.ops.deleteCampaign(String(c.id));
                           toast.success('Campaign deleted.');
-                          onRefresh?.();
+                          onRefresh?.(['campaigns', 'deals']);
                         } catch (err) {
                           toast.error(formatErrorMessage(err, 'Failed to delete campaign'));
                         }
@@ -1508,7 +1508,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
       await api.ops.settleOrderPayment(settleId, utr.trim() || undefined, 'external');
       setSettleId(null);
       setUtr('');
-      onRefresh();
+      onRefresh(['orders']);
     } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to settle'));
     }
@@ -1518,7 +1518,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
     if (await confirm({ message: 'Undo this settlement? Funds will be reversed.', title: 'Undo Settlement', confirmLabel: 'Undo', variant: 'destructive' })) {
       try {
         await api.ops.unsettleOrderPayment(orderId);
-        onRefresh();
+        onRefresh(['orders']);
       } catch (err) {
         toast.error(formatErrorMessage(err, 'Failed to revert settlement'));
       }
@@ -1919,14 +1919,19 @@ export const MediatorDashboard: React.FC = () => {
   const tabDataNeedsRef = useRef(tabDataNeeds);
   tabDataNeedsRef.current = tabDataNeeds;
 
-  const loadData = useCallback(async (opts?: { force?: boolean; silent?: boolean }) => {
+  const loadData = useCallback(async (opts?: { force?: boolean; silent?: boolean; keys?: string[] }) => {
     if (!user) return;
     if (loadingRef.current) return;
     const force = opts?.force ?? false;
     const silent = !!opts?.silent;
+    const invalidateKeys = opts?.keys;
+
+    if (invalidateKeys) {
+      for (const k of invalidateKeys) loadedRef.current.delete(k);
+    }
 
     const currentNeeds = tabDataNeedsRef.current;
-    const needed = force
+    const needed = (force && !invalidateKeys)
       ? currentNeeds
       : currentNeeds.filter((k) => !loadedRef.current.has(k));
     if (needed.length === 0) return;
@@ -2045,7 +2050,10 @@ export const MediatorDashboard: React.FC = () => {
     };
   }, [user?.id, refreshNotifications, loadData]);
 
-  const refreshData = useCallback(() => loadData({ force: true }), [loadData]);
+  const refreshData = useCallback((keys?: string[]) => {
+    if (keys) return loadData({ keys });
+    return loadData({ force: true });
+  }, [loadData]);
 
   const handlePublish = async () => {
     if (!dealBuilder || !user?.mediatorCode) return;
@@ -2055,7 +2063,7 @@ export const MediatorDashboard: React.FC = () => {
       setDealBuilder(null);
       setCommission('');
       toast.success('Deal saved');
-      loadData({ force: true });
+      loadData({ keys: ['campaigns', 'deals'] });
     } catch (e) {
       console.error(e);
       const msg = (e as any)?.message ? String((e as any).message) : 'Failed to publish deal.';
@@ -2674,7 +2682,7 @@ export const MediatorDashboard: React.FC = () => {
                       )
                     );
                     toast.success('Buyer notified to upload missing proof.');
-                    await loadData({ force: true });
+                    await loadData({ keys: ['orders'] });
                   } catch (err) {
                     toast.error(formatErrorMessage(err, 'Failed to request missing proof'));
                   }
@@ -2750,7 +2758,7 @@ export const MediatorDashboard: React.FC = () => {
                       toast.success('Purchase verified.');
                     }
 
-                    await loadData({ force: true });
+                    await loadData({ keys: ['orders'] });
                     // Keep modal open with refreshed order if more steps needed
                     if (!resp?.approved && resp?.order) {
                       setProofModal(resp.order);
@@ -2781,7 +2789,7 @@ export const MediatorDashboard: React.FC = () => {
                           toast.success('Deal verified ✓');
                         }
 
-                        await loadData({ force: true });
+                        await loadData({ keys: ['orders'] });
                         if (!resp?.approved && resp?.order) {
                           setProofModal(resp.order);
                         } else if (!resp?.approved) {
@@ -2880,7 +2888,7 @@ export const MediatorDashboard: React.FC = () => {
                     toast.success('Proof rejected and buyer notified.');
                     setRejectModalOpen(false);
                     setProofModal(null);
-                    await loadData({ force: true });
+                    await loadData({ keys: ['orders'] });
                   } catch (err) {
                     toast.error(formatErrorMessage(err, 'Failed to reject proof'));
                   }
@@ -2929,7 +2937,7 @@ export const MediatorDashboard: React.FC = () => {
                     toast.success('Order approved → Pending Cooling (14 days)');
                     setApproveModalOpen(false);
                     setProofModal(null);
-                    await loadData({ force: true });
+                    await loadData({ keys: ['orders'] });
                   } catch (err) {
                     toast.error(formatErrorMessage(err, 'Failed to approve order'));
                   }
@@ -2982,7 +2990,7 @@ export const MediatorDashboard: React.FC = () => {
                     toast.success('Order cancelled and slot released.');
                     setCancelModalOpen(false);
                     setProofModal(null);
-                    await loadData({ force: true });
+                    await loadData({ keys: ['orders'] });
                   } catch (err) {
                     toast.error(formatErrorMessage(err, 'Failed to cancel order'));
                   }

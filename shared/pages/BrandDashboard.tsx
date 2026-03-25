@@ -1628,7 +1628,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
       setIsEditing(false);
       setEditingId(null);
       setForm(initialForm);
-      onRefresh();
+      onRefresh(['campaigns']);
     } catch (err) {
       console.error('Failed to save campaign:', err);
       toast.error(formatErrorMessage(err, 'Failed to save campaign'));
@@ -1664,7 +1664,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
     try {
       await api.brand.updateCampaign(campaign.id, { status: next });
       toast.success(next === 'paused' ? 'Campaign paused' : 'Campaign resumed');
-      onRefresh();
+      onRefresh(['campaigns']);
     } catch (err) {
       console.error('Failed to update campaign status:', err);
       toast.error(formatErrorMessage(err, 'Failed to update campaign status'));
@@ -1680,7 +1680,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
     try {
       await api.brand.deleteCampaign(campaign.id);
       toast.success('Campaign deleted');
-      onRefresh();
+      onRefresh(['campaigns']);
     } catch (err: any) {
       toast.error(formatErrorMessage(err, 'Failed to delete campaign'));
     } finally {
@@ -2177,7 +2177,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
                       try {
                         await api.brand.copyCampaign(c.id);
                         toast.success('Campaign copied as Draft — you can now edit it');
-                        onRefresh();
+                        onRefresh(['campaigns']);
                       } catch (err) {
                         toast.error(formatErrorMessage(err, 'Copy failed'));
                       } finally {
@@ -2249,14 +2249,19 @@ export const BrandDashboard: React.FC = () => {
   const tabDataNeedsRef = useRef(tabDataNeeds);
   tabDataNeedsRef.current = tabDataNeeds;
 
-  const fetchData = useCallback(async (opts?: { force?: boolean; silent?: boolean }) => {
+  const fetchData = useCallback(async (opts?: { force?: boolean; silent?: boolean; keys?: string[] }) => {
     if (!user) return;
     if (fetchRef.current) return;
     const force = opts?.force ?? false;
     const silent = opts?.silent ?? false;
+    const invalidateKeys = opts?.keys;
+
+    if (invalidateKeys) {
+      for (const k of invalidateKeys) loadedRef.current.delete(k);
+    }
 
     const currentNeeds = tabDataNeedsRef.current;
-    const needed = force
+    const needed = (force && !invalidateKeys)
       ? currentNeeds
       : currentNeeds.filter((k) => !loadedRef.current.has(k));
     if (needed.length === 0) return;
@@ -2332,7 +2337,10 @@ export const BrandDashboard: React.FC = () => {
     };
   }, [user?.id, fetchData]);
 
-  const refreshData = useCallback(() => fetchData({ force: true }), [fetchData]);
+  const refreshData = useCallback((keys?: string[]) => {
+    if (keys) return fetchData({ keys });
+    return fetchData({ force: true });
+  }, [fetchData]);
 
   const handlePayout = async () => {
     if (!selectedAgency || !payoutAmount || !payoutRef || !user) return;
@@ -2352,7 +2360,7 @@ export const BrandDashboard: React.FC = () => {
       setPayoutAmount('');
       setPayoutRef('');
       setSelectedAgency(null);
-      fetchData({ force: true });
+      fetchData({ keys: ['transactions'] });
     } catch (e) {
       toast.error(formatErrorMessage(e, 'Payment failed'));
     } finally {
@@ -2716,7 +2724,7 @@ export const BrandDashboard: React.FC = () => {
                               try {
                                 await api.tickets.escalate(t.id);
                                 toast.success('Ticket escalated to admin.');
-                                fetchData({ force: true });
+                                fetchData({ keys: ['tickets'] });
                               } catch (err: any) {
                                 toast.error(formatErrorMessage(err, 'Failed to escalate ticket.'));
                               }
@@ -2733,10 +2741,10 @@ export const BrandDashboard: React.FC = () => {
                             className="w-full px-2 py-1.5 text-xs rounded-lg border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
                           <div className="flex items-center gap-2">
                             <button type="button" onClick={async () => {
-                              try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ force: true }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
+                              try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
                             }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✓ Resolve</button>
                             <button type="button" onClick={async () => {
-                              try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ force: true }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
+                              try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
                             }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
                             <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
                               className="px-3 py-1 rounded-lg text-xs font-bold bg-zinc-100 text-zinc-500 hover:bg-zinc-200">Cancel</button>
@@ -2751,7 +2759,7 @@ export const BrandDashboard: React.FC = () => {
                               try {
                                 await api.tickets.update(t.id, 'Open');
                                 toast.success('Ticket reopened.');
-                                fetchData({ force: true });
+                                fetchData({ keys: ['tickets'] });
                               } catch (err: any) {
                                 toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
                               }
@@ -2766,7 +2774,7 @@ export const BrandDashboard: React.FC = () => {
                               try {
                                 await api.tickets.delete(t.id);
                                 toast.success('Ticket deleted.');
-                                fetchData({ force: true });
+                                fetchData({ keys: ['tickets'] });
                               } catch (err: any) {
                                 toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
                               }
@@ -2842,7 +2850,7 @@ export const BrandDashboard: React.FC = () => {
                         e.stopPropagation();
                         if (!user) return;
                         if (await confirmDialog({ message: 'Disconnect this Agency?', confirmLabel: 'Disconnect', variant: 'destructive' })) {
-                          api.brand.removeAgency(user.id, ag.mediatorCode!).then(() => refreshData()).catch((err: any) => toast.error(formatErrorMessage(err, 'Failed to disconnect agency')));
+                          api.brand.removeAgency(user.id, ag.mediatorCode!).then(() => refreshData(['agencies'])).catch((err: any) => toast.error(formatErrorMessage(err, 'Failed to disconnect agency')));
                         }
                       }}
                       aria-label="Disconnect agency"
@@ -3005,7 +3013,7 @@ export const BrandDashboard: React.FC = () => {
                               (r: any) => r.agencyId !== req.agencyId
                             );
                             await updateUser({ pendingConnections: newPending });
-                            fetchData({ force: true });
+                            fetchData({ keys: ['agencies'] });
                           } catch (e) {
                             console.error('Failed to decline', e);
                             toast.error(formatErrorMessage(e, 'Failed to decline connection'));
@@ -3035,7 +3043,7 @@ export const BrandDashboard: React.FC = () => {
                               pendingConnections: newPending,
                               connectedAgencies: newConnected,
                             });
-                            fetchData({ force: true });
+                            fetchData({ keys: ['agencies'] });
                           } catch (e) {
                             console.error('Failed to approve', e);
                             toast.error(formatErrorMessage(e, 'Failed to approve connection'));

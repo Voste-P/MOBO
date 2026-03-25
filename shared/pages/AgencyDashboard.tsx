@@ -516,7 +516,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
 
       toast.success('Ledger updated');
       setEditingOrder(null);
-      onRefresh();
+      onRefresh(['orders']);
     } catch (err) {
       console.error('Ledger update failed:', err);
       toast.error(formatErrorMessage(err, 'Failed to update ledger. Please try again.'));
@@ -1792,7 +1792,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
         setAssignments({});
         setMediatorPayouts({});
         setOpenToAll(false);
-        onRefresh();
+        onRefresh(['campaigns']);
       } catch (err) {
         toast.error(formatErrorMessage(err, 'Failed to distribute inventory'));
       }
@@ -1844,7 +1844,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
       setAssignModal(null);
       setAssignments({});
       setMediatorPayouts({});
-      onRefresh();
+      onRefresh(['campaigns']);
     } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to distribute inventory'));
     }
@@ -1912,7 +1912,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
         productUrl: '',
         brandName: '',
       });
-      onRefresh();
+      onRefresh(['campaigns']);
     } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to create campaign'));
     }
@@ -1970,7 +1970,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     try {
       await api.ops.updateCampaignStatus(campaign.id, next);
       toast.success(next === 'paused' ? 'Campaign paused' : 'Campaign resumed');
-      onRefresh();
+      onRefresh(['campaigns']);
     } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to update campaign status'));
     } finally {
@@ -1985,7 +1985,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     try {
       await api.ops.deleteCampaign(campaign.id);
       toast.success('Campaign deleted');
-      onRefresh();
+      onRefresh(['campaigns']);
     } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to delete campaign'));
     } finally {
@@ -2292,7 +2292,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                                 const res = await api.ops.copyCampaign(c.id);
                                 if (res.ok) {
                                   toast.success('Campaign copied as Draft — configure distribution');
-                                  await onRefresh();
+                                  await onRefresh(['campaigns']);
                                   // Open distribute modal for the new draft campaign
                                   if (res.campaign) {
                                     setSelectedDealType(res.campaign.dealType || 'Discount');
@@ -2410,7 +2410,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                           try {
                             await api.ops.declineOffer(c.id);
                             toast.success('Offer declined');
-                            onRefresh();
+                            onRefresh(['campaigns']);
                           } catch (err) {
                             toast.error(formatErrorMessage(err, 'Failed to decline offer'));
                           } finally {
@@ -3095,7 +3095,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
       toast.success('Proof rejected — buyer has been notified');
       setRejectModal(null);
       setRejectReason('');
-      onRefresh();
+      onRefresh(['orders']);
     } catch (e: any) {
       toast.error(formatErrorMessage(e, 'Failed to reject proof'));
     } finally {
@@ -3108,7 +3108,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
     try {
       await api.ops.forceApproveOrder(order.id, 'Agency approved');
       toast.success('Order approved — moved to cooling period');
-      onRefresh();
+      onRefresh(['orders']);
     } catch (e: any) {
       toast.error(formatErrorMessage(e, 'Failed to approve order'));
     } finally {
@@ -3530,7 +3530,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
     try {
       if (action === 'approve') await api.ops.approveMediator(id);
       else await api.ops.rejectMediator(id);
-      onRefresh();
+      onRefresh(['mediators']);
     } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to update mediator request'));
     }
@@ -3549,7 +3549,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
       toast.success(`Sent ${amount} to ${selectedMediator.name}`);
       setPayoutAmount('');
       setPayoutRef('');
-      onRefresh();
+      onRefresh(['mediators']);
       setSelectedMediator(null);
     } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to payout mediator'));
@@ -4381,15 +4381,20 @@ export const AgencyDashboard: React.FC = () => {
   const tabDataNeedsRef = useRef(tabDataNeeds);
   tabDataNeedsRef.current = tabDataNeeds;
 
-  const fetchData = useCallback(async (opts?: { force?: boolean; silent?: boolean }) => {
+  const fetchData = useCallback(async (opts?: { force?: boolean; silent?: boolean; keys?: string[] }) => {
     if (!user?.mediatorCode) return;
     if (fetchRef.current) return;
     const force = opts?.force ?? false;
     const silent = opts?.silent ?? false;
+    const invalidateKeys = opts?.keys;
+
+    if (invalidateKeys) {
+      for (const k of invalidateKeys) loadedRef.current.delete(k);
+    }
 
     // Determine which data sets are actually needed but not yet loaded
     const currentNeeds = tabDataNeedsRef.current;
-    const needed = force
+    const needed = (force && !invalidateKeys)
       ? currentNeeds
       : currentNeeds.filter((k) => !loadedRef.current.has(k));
     if (needed.length === 0) return;
@@ -4489,7 +4494,10 @@ export const AgencyDashboard: React.FC = () => {
   }, [user?.id, fetchData]);
 
   // Force refresh for child component mutation callbacks
-  const refreshData = useCallback(() => fetchData({ force: true }), [fetchData]);
+  const refreshData = useCallback((keys?: string[]) => {
+    if (keys) return fetchData({ keys });
+    return fetchData({ force: true });
+  }, [fetchData]);
 
   return (
     <DesktopShell
@@ -4804,10 +4812,10 @@ export const AgencyDashboard: React.FC = () => {
                           className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
                         <div className="flex items-center gap-2">
                           <button type="button" onClick={async () => {
-                            try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ force: true }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
+                            try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
                           }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✓ Resolve</button>
                           <button type="button" onClick={async () => {
-                            try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ force: true }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
+                            try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
                           }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
                           <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
                             className="px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 hover:bg-slate-200">Cancel</button>
@@ -4822,7 +4830,7 @@ export const AgencyDashboard: React.FC = () => {
                             try {
                               await api.tickets.update(t.id, 'Open');
                               toast.success('Ticket reopened.');
-                              fetchData({ force: true });
+                              fetchData({ keys: ['tickets'] });
                             } catch (err: any) {
                               toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
                             }
@@ -4837,7 +4845,7 @@ export const AgencyDashboard: React.FC = () => {
                             try {
                               await api.tickets.delete(t.id);
                               toast.success('Ticket deleted.');
-                              fetchData({ force: true });
+                              fetchData({ keys: ['tickets'] });
                             } catch (err: any) {
                               toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
                             }
