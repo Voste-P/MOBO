@@ -290,6 +290,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   }, [user?.role]);
 
   // Realtime: only refresh when the event is relevant to the current view
+  const lastRealtimeRefreshRef = useRef(0);
   useEffect(() => {
     if (!user?.id || user.role !== 'admin') return;
     let timer: any = null;
@@ -309,6 +310,10 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
+        // Skip if just refreshed < 2s ago (prevents SSE double-fetch after explicit action)
+        const now = Date.now();
+        if (now - lastRealtimeRefreshRef.current < 2000) return;
+        lastRealtimeRefreshRef.current = now;
         refreshCurrentViewRef.current();
       }, 800);
     };

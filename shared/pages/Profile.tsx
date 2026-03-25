@@ -85,16 +85,18 @@ export const Profile: React.FC = () => {
   }, [user?.id]);
 
   // Refresh stats when orders change via realtime
+  const lastStatsRefreshAt = useRef(0);
   useEffect(() => {
     if (!user?.id) return;
     if (user.role !== 'user') return;
-
 
     let timer: any = null;
     const schedule = () => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
+        // Skip if just refreshed < 2s ago (prevents double-fetch after mutations)
+        if (Date.now() - lastStatsRefreshAt.current < 2000) return;
         refreshStats({ silent: true });
       }, 800);
     };
@@ -113,6 +115,7 @@ export const Profile: React.FC = () => {
     if (!user) return;
     if (statsLoadingRef.current) return;
     statsLoadingRef.current = true;
+    lastStatsRefreshAt.current = Date.now();
     setIsStatsLoading(true);
     try {
       const userOrders = asArray<Order>(await api.orders.getUserOrders(user.id));

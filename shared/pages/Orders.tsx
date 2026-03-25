@@ -189,6 +189,7 @@ export const Orders: React.FC = () => {
   const [proofToView, setProofToView] = useState<Order | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const submittingRef = useRef(false);
+  const ordersLoadingRef = useRef(false);
   const [inputValue, setInputValue] = useState('');
 
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
@@ -385,6 +386,8 @@ export const Orders: React.FC = () => {
 
   const loadOrders = async () => {
     if (!user?.id) return;
+    if (ordersLoadingRef.current) return;
+    ordersLoadingRef.current = true;
     try {
       const data = asArray<Order>(await api.orders.getUserOrders(user.id));
       setOrders(data);
@@ -405,6 +408,7 @@ export const Orders: React.FC = () => {
       toast.error('Failed to load orders. Please try again.');
     } finally {
       setIsLoading(false);
+      ordersLoadingRef.current = false;
     }
   };
 

@@ -318,16 +318,56 @@ function wrapFetchError(err: unknown): never {
 // Deduplication map: concurrent identical GET requests share one in-flight promise
 const inflightGets = new Map<string, Promise<any>>();
 
+// --- GET Response Cache with TTL ---
+// Prevents redundant network calls when switching tabs or rapid navigation.
+// Default TTL: 5 seconds. Automatically invalidated on any mutation.
+interface GETCacheEntry { data: any; expiresAt: number }
+const getCache = new Map<string, GETCacheEntry>();
+const GET_CACHE_TTL_MS = 5_000;
+
+function getCachedResponse(path: string): any | undefined {
+  const entry = getCache.get(path);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) { getCache.delete(path); return undefined; }
+  return entry.data;
+}
+
+function cacheResponse(path: string, data: any) {
+  getCache.set(path, { data, expiresAt: Date.now() + GET_CACHE_TTL_MS });
+  // Cap cache size to prevent unbounded memory growth
+  if (getCache.size > 100) {
+    const oldest = getCache.keys().next().value;
+    if (oldest) getCache.delete(oldest);
+  }
+}
+
+/** Invalidate GET cache. Called automatically on mutations. */
+export function invalidateGetCache(pathPrefix?: string) {
+  if (!pathPrefix) { getCache.clear(); return; }
+  for (const key of getCache.keys()) {
+    if (key.startsWith(pathPrefix)) getCache.delete(key);
+  }
+}
+
 async function fetchJson(path: string, init?: RequestInit): Promise<any> {
-  // Deduplicate concurrent GET requests with the same path+headers
   const method = (init?.method || 'GET').toUpperCase();
   if (method === 'GET') {
+    // 1. Check response cache (TTL-based, serves instant data for rapid tab switches)
+    const cached = getCachedResponse(path);
+    if (cached !== undefined) return cached;
+    // 2. Deduplicate concurrent in-flight GET requests
     const dedup = inflightGets.get(path);
     if (dedup) return dedup;
-    const promise = fetchJsonInner(path, init).finally(() => { inflightGets.delete(path); });
+    // 3. Network request → cache result on success
+    const promise = fetchJsonInner(path, init).then(data => {
+      cacheResponse(path, data);
+      return data;
+    }).finally(() => { inflightGets.delete(path); });
     inflightGets.set(path, promise);
     return promise;
   }
+  // Any mutation invalidates the GET cache to prevent stale reads
+  getCache.clear();
   return fetchJsonInner(path, init);
 }
 
@@ -371,6 +411,8 @@ async function fetchJsonInner(path: string, init?: RequestInit): Promise<any> {
 }
 
 async function fetchOk(path: string, init?: RequestInit): Promise<void> {
+  // Mutations invalidate GET cache to prevent stale reads after writes
+  getCache.clear();
   assertOnlineForWrite(init);
   const res = await fetchWithRetry(`${API_URL}${path}`, withRequestId(init));
   const payload = await readPayloadSafe(res);
