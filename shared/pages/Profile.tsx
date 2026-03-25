@@ -125,7 +125,7 @@ export const Profile: React.FC = () => {
         .reduce((acc: number, o: Order) => acc + o.total, 0);
       setTotalSpent(spent);
     } catch (e) {
-      console.error(e);
+      if (process.env.NODE_ENV !== 'production') console.error(e);
       if (!opts?.silent) {
         toast.error(formatErrorMessage(e, 'Failed to refresh wallet stats.'));
       }

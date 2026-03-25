@@ -1595,7 +1595,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
       setForm(initialForm);
       onRefresh(['campaigns']);
     } catch (err) {
-      console.error('Failed to save campaign:', err);
+      if (process.env.NODE_ENV !== 'production') console.error('Failed to save campaign:', err);
       toast.error(formatErrorMessage(err, 'Failed to save campaign'));
     }
   };
@@ -1631,7 +1631,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
       toast.success(next === 'paused' ? 'Campaign paused' : 'Campaign resumed');
       onRefresh(['campaigns']);
     } catch (err) {
-      console.error('Failed to update campaign status:', err);
+      if (process.env.NODE_ENV !== 'production') console.error('Failed to update campaign status:', err);
       toast.error(formatErrorMessage(err, 'Failed to update campaign status'));
     } finally {
       setStatusUpdatingId(null);
@@ -2258,7 +2258,7 @@ export const BrandDashboard: React.FC = () => {
         }
       });
     } catch (e) {
-      console.error('Dashboard data fetch failed', e);
+      if (process.env.NODE_ENV !== 'production') console.error('Dashboard data fetch failed', e);
       if (!silent) toast.error(formatErrorMessage(e, 'Failed to load dashboard data'));
     } finally {
       fetchRef.current = false;
@@ -2986,7 +2986,7 @@ export const BrandDashboard: React.FC = () => {
                             await updateUser({ pendingConnections: newPending });
                             fetchData({ keys: ['agencies'] });
                           } catch (e) {
-                            console.error('Failed to decline', e);
+                            if (process.env.NODE_ENV !== 'production') console.error('Failed to decline', e);
                             toast.error(formatErrorMessage(e, 'Failed to decline connection'));
                           }
                         }}
@@ -3016,7 +3016,7 @@ export const BrandDashboard: React.FC = () => {
                             });
                             fetchData({ keys: ['agencies'] });
                           } catch (e) {
-                            console.error('Failed to approve', e);
+                            if (process.env.NODE_ENV !== 'production') console.error('Failed to approve', e);
                             toast.error(formatErrorMessage(e, 'Failed to approve connection'));
                           }
                         }}

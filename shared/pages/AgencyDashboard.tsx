@@ -193,7 +193,7 @@ const AgencyProfile = ({ user }: any) => {
       setIsEditing(false);
       toast.success('Profile updated');
     } catch (err) {
-      console.error('Failed to update profile:', err);
+      if (process.env.NODE_ENV !== 'production') console.error('Failed to update profile:', err);
       toast.error(formatErrorMessage(err, 'Failed to update profile.'));
     } finally {
       setLoading(false);
@@ -518,7 +518,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
       setEditingOrder(null);
       onRefresh(['orders']);
     } catch (err) {
-      console.error('Ledger update failed:', err);
+      if (process.env.NODE_ENV !== 'production') console.error('Ledger update failed:', err);
       toast.error(formatErrorMessage(err, 'Failed to update ledger. Please try again.'));
     } finally {
       setIsUpdating(false);
@@ -4451,7 +4451,7 @@ export const AgencyDashboard: React.FC = () => {
         setStats({ revenue, totalMediators: safeMeds.length, activeCampaigns: activeCount });
       }
     } catch (e) {
-      console.error('Dashboard data fetch failed', e);
+      if (process.env.NODE_ENV !== 'production') console.error('Dashboard data fetch failed', e);
       if (!silent) toast.error(formatErrorMessage(e, 'Failed to load dashboard data'));
     } finally {
       fetchRef.current = false;

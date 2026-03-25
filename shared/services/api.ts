@@ -318,27 +318,42 @@ function wrapFetchError(err: unknown): never {
 // Deduplication map: concurrent identical GET requests share one in-flight promise
 const inflightGets = new Map<string, Promise<any>>();
 
-// --- GET Response Cache with TTL ---
+// --- GET Response Cache with TTL + LRU eviction ---
 // Prevents redundant network calls when switching tabs or rapid navigation.
 // Default TTL: 5 seconds. Automatically invalidated on any mutation.
+// LRU eviction when capacity exceeded (promotes on read, evicts least-recently-accessed).
 interface GETCacheEntry { data: any; expiresAt: number }
 const getCache = new Map<string, GETCacheEntry>();
 const GET_CACHE_TTL_MS = 5_000;
+const GET_CACHE_MAX = 200;
 
 function getCachedResponse(path: string): any | undefined {
   const entry = getCache.get(path);
   if (!entry) return undefined;
   if (Date.now() > entry.expiresAt) { getCache.delete(path); return undefined; }
+  // LRU promotion: move to end of Map iteration order
+  getCache.delete(path);
+  getCache.set(path, entry);
   return entry.data;
 }
 
 function cacheResponse(path: string, data: any) {
   getCache.set(path, { data, expiresAt: Date.now() + GET_CACHE_TTL_MS });
-  // Cap cache size to prevent unbounded memory growth
-  if (getCache.size > 100) {
-    const oldest = getCache.keys().next().value;
-    if (oldest) getCache.delete(oldest);
+  // Evict least-recently-used entry when over capacity
+  if (getCache.size > GET_CACHE_MAX) {
+    const first = getCache.keys().next().value;
+    if (first) getCache.delete(first);
   }
+}
+
+// Periodic cleanup of expired entries (every 30s)
+if (typeof window !== 'undefined') {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of getCache) {
+      if (now > entry.expiresAt) getCache.delete(key);
+    }
+  }, 30_000);
 }
 
 /** Invalidate GET cache. Called automatically on mutations. */

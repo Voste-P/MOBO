@@ -1995,7 +1995,7 @@ export const MediatorDashboard: React.FC = () => {
         }
       });
     } catch (e) {
-      console.error(e);
+      if (process.env.NODE_ENV !== 'production') console.error(e);
       if (!silent) {
         const msg = (e as any)?.message ? String((e as any).message) : 'Failed to refresh dashboard.';
         toast.error(msg.includes('fetch') || msg.includes('network') ? 'Network error. Please check your connection.' : msg);
@@ -2075,7 +2075,7 @@ export const MediatorDashboard: React.FC = () => {
       toast.success('Deal saved');
       loadData({ keys: ['campaigns', 'deals'] });
     } catch (e) {
-      console.error(e);
+      if (process.env.NODE_ENV !== 'production') console.error(e);
       const msg = (e as any)?.message ? String((e as any).message) : 'Failed to publish deal.';
       toast.error(msg);
     }

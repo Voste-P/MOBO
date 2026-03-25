@@ -64,7 +64,6 @@ export function getApiBaseUrl(): string {
 
   // Defense-in-depth: reject obviously unsafe URL schemes
   if (base && !base.startsWith('/') && !base.startsWith('http://') && !base.startsWith('https://')) {
-    console.warn('[MOBO] Ignoring unsafe API base URL scheme:', base);
     base = '/api';
   }
 

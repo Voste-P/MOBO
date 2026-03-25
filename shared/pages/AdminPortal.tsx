@@ -277,7 +277,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       const cfg = await api.admin.getConfig();
       if (cfg?.adminContactEmail) setConfigEmail(String(cfg.adminContactEmail));
     } catch (e) {
-      console.error('Admin Config Fetch Error:', e);
+      if (process.env.NODE_ENV !== 'production') console.error('Admin Config Fetch Error:', e);
       toast.error(formatErrorMessage(e, 'Failed to load system configuration.'));
     }
   };
@@ -356,7 +356,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         setAuditLogs(asArray(res));
         setAuditPagination(extractPaginationMeta(res));
       })
-      .catch((e) => { console.error('Audit Logs Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to load audit logs.')); })
+      .catch((e) => { if (process.env.NODE_ENV !== 'production') console.error('Audit Logs Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to load audit logs.')); })
       .finally(() => setAuditLoading(false));
   }, [user?.id, view, auditActionFilter, auditDateFrom, auditDateTo, auditPage]);
 
@@ -373,7 +373,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         setUsers(asArray(res));
         setUsersPagination(extractPaginationMeta(res));
       })
-      .catch((e) => { if (seq === userSearchSeqRef.current) { console.error('Admin Users Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh users list.')); } });
+      .catch((e) => { if (seq === userSearchSeqRef.current) { if (process.env.NODE_ENV !== 'production') console.error('Admin Users Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh users list.')); } });
   }, [user?.id, view, usersPage, userRoleFilter, debouncedUserSearch]);
 
   useEffect(() => {
@@ -385,7 +385,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         setInvites(asArray(res));
         setInvitesPagination(extractPaginationMeta(res));
       })
-      .catch((e) => { console.error('Admin Invites Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh invites.')); });
+      .catch((e) => { if (process.env.NODE_ENV !== 'production') console.error('Admin Invites Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh invites.')); });
   }, [user?.id, view, invitesPage]);
 
   // Fetch orders when switching to orders/finance view or when page changes
@@ -401,7 +401,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         const updated = safeOrders.find((ord: Order) => ord.id === prev.id);
         return updated || prev; // Keep modal open with previous data if order not on current page
       });
-    }).catch((e) => { console.error('Admin Orders Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh orders.')); });
+    }).catch((e) => { if (process.env.NODE_ENV !== 'production') console.error('Admin Orders Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh orders.')); });
   }, [user?.id, view, ordersPage]);
 
   // Fetch products when switching to inventory view or when page changes
@@ -411,7 +411,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     api.admin.getProducts({ page: productsPage, limit: PAGE_SIZE }).then((res) => {
       setProducts(asArray(res));
       setProductsPagination(extractPaginationMeta(res));
-    }).catch((e) => { console.error('Admin Products Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh products.')); });
+    }).catch((e) => { if (process.env.NODE_ENV !== 'production') console.error('Admin Products Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh products.')); });
   }, [user?.id, view, productsPage]);
 
   useEffect(() => {
@@ -426,7 +426,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     if (view !== 'support' && view !== 'feedback') return;
     api.tickets.getAll({ issueType: view === 'feedback' ? 'Feedback' : 'Support' })
       .then((res) => setTickets(asArray(res)))
-      .catch((e) => { console.error('Admin Tickets Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to load tickets.')); });
+      .catch((e) => { if (process.env.NODE_ENV !== 'production') console.error('Admin Tickets Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to load tickets.')); });
   }, [user?.id, view]);
 
   /** Refresh only the data needed for the active tab/view (instead of ALL endpoints). */
@@ -481,7 +481,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
           break;
       }
     } catch (e) {
-      console.error('Admin Realtime Refresh Error:', e);
+      if (process.env.NODE_ENV !== 'production') console.error('Admin Realtime Refresh Error:', e);
     }
   };
   refreshCurrentViewRef.current = refreshCurrentView;
@@ -492,7 +492,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     try {
       await refreshCurrentView();
     } catch (e) {
-      console.error('Admin Data Fetch Error:', e);
+      if (process.env.NODE_ENV !== 'production') console.error('Admin Data Fetch Error:', e);
       toast.error(formatErrorMessage(e, 'Failed to load admin data. Please refresh the page.'));
     } finally {
       setIsLoading(false);
@@ -2199,7 +2199,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         setAuditLogs(asArray(res));
                         setAuditPagination(extractPaginationMeta(res));
                       } catch (e) {
-                        console.error(e);
+                        if (process.env.NODE_ENV !== 'production') console.error(e);
                         toast.error(formatErrorMessage(e, 'Failed to load audit logs'));
                       } finally {
                         setAuditLoading(false);
