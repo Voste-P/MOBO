@@ -315,7 +315,23 @@ function wrapFetchError(err: unknown): never {
   throw err;
 }
 
+// Deduplication map: concurrent identical GET requests share one in-flight promise
+const inflightGets = new Map<string, Promise<any>>();
+
 async function fetchJson(path: string, init?: RequestInit): Promise<any> {
+  // Deduplicate concurrent GET requests with the same path+headers
+  const method = (init?.method || 'GET').toUpperCase();
+  if (method === 'GET') {
+    const dedup = inflightGets.get(path);
+    if (dedup) return dedup;
+    const promise = fetchJsonInner(path, init).finally(() => { inflightGets.delete(path); });
+    inflightGets.set(path, promise);
+    return promise;
+  }
+  return fetchJsonInner(path, init);
+}
+
+async function fetchJsonInner(path: string, init?: RequestInit): Promise<any> {
   assertOnlineForWrite(init);
   const res = await fetchWithRetry(`${API_URL}${path}`, withRequestId(init));
   const payload = await readPayloadSafe(res);

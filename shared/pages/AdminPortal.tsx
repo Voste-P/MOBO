@@ -257,6 +257,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   // Debounced user search: input state for immediate UI, debounced value for API calls
   const [debouncedUserSearch, setDebouncedUserSearch] = useState('');
   const userSearchTimerRef = useRef<any>(null);
+  const userSearchSeqRef = useRef(0);
   const handleUserSearchChange = (value: string) => {
     setUserSearch(value);
     if (userSearchTimerRef.current) clearTimeout(userSearchTimerRef.current);
@@ -345,15 +346,17 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   useEffect(() => {
     if (!user?.id || user.role !== 'admin') return;
     if (view !== 'users') return;
+    const seq = ++userSearchSeqRef.current;
     const role = userRoleFilter === 'All' ? 'all' : userRoleFilter.toLowerCase();
     const search = debouncedUserSearch.trim() || undefined;
     api.admin
       .getUsers(role, { page: usersPage, limit: PAGE_SIZE, search })
       .then((res) => {
+        if (seq !== userSearchSeqRef.current) return; // Ignore stale response
         setUsers(asArray(res));
         setUsersPagination(extractPaginationMeta(res));
       })
-      .catch((e) => { console.error('Admin Users Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh users list.')); });
+      .catch((e) => { if (seq === userSearchSeqRef.current) { console.error('Admin Users Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh users list.')); } });
   }, [user?.id, view, usersPage, userRoleFilter, debouncedUserSearch]);
 
   useEffect(() => {
@@ -379,7 +382,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       setProofModal((prev) => {
         if (!prev) return prev;
         const updated = safeOrders.find((ord: Order) => ord.id === prev.id);
-        return updated || null;
+        return updated || prev; // Keep modal open with previous data if order not on current page
       });
     }).catch((e) => { console.error('Admin Orders Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh orders.')); });
   }, [user?.id, view, ordersPage]);
@@ -437,7 +440,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
             setProofModal((prev) => {
               if (!prev) return prev;
               const updated = safeOrders.find((ord: Order) => ord.id === prev.id);
-              return updated || null;
+              return updated || prev; // Keep modal open with previous data
             });
           }).catch(() => {});
           break;

@@ -413,7 +413,7 @@ export const Orders: React.FC = () => {
     if (!user) return;
 
     let timer: any = null;
-    let pendingKeys = new Set<string>();
+    const pendingKeys = new Set<string>();
     const schedule = (key: string) => {
       pendingKeys.add(key);
       if (timer) clearTimeout(timer);

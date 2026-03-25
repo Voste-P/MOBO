@@ -2245,15 +2245,20 @@ export const BrandDashboard: React.FC = () => {
     }
   }, [activeTab]);
 
+  // Keep a ref so fetchData callback stays stable across tab switches
+  const tabDataNeedsRef = useRef(tabDataNeeds);
+  tabDataNeedsRef.current = tabDataNeeds;
+
   const fetchData = useCallback(async (opts?: { force?: boolean; silent?: boolean }) => {
     if (!user) return;
     if (fetchRef.current) return;
     const force = opts?.force ?? false;
     const silent = opts?.silent ?? false;
 
+    const currentNeeds = tabDataNeedsRef.current;
     const needed = force
-      ? tabDataNeeds
-      : tabDataNeeds.filter((k) => !loadedRef.current.has(k));
+      ? currentNeeds
+      : currentNeeds.filter((k) => !loadedRef.current.has(k));
     if (needed.length === 0) return;
 
     fetchRef.current = true;
@@ -2286,11 +2291,12 @@ export const BrandDashboard: React.FC = () => {
       fetchRef.current = false;
       setIsDataLoading(false);
     }
-  }, [user?.id, activeTab, tabDataNeeds]);
+  }, [user?.id]);
 
+  // Trigger data load on mount and tab change
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, activeTab]);
 
   // Realtime: only invalidate data keys relevant to the SSE event, then refetch
   useEffect(() => {
@@ -2316,7 +2322,7 @@ export const BrandDashboard: React.FC = () => {
       const keys = eventToKeys[msg.type];
       if (keys) {
         // Only refetch if the active tab actually needs these keys
-        const relevant = keys.filter((k) => tabDataNeeds.includes(k));
+        const relevant = keys.filter((k) => tabDataNeedsRef.current.includes(k));
         if (relevant.length > 0) schedule(relevant);
       }
     });
@@ -2324,7 +2330,7 @@ export const BrandDashboard: React.FC = () => {
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [user?.id, fetchData, tabDataNeeds]);
+  }, [user?.id, fetchData]);
 
   const refreshData = useCallback(() => fetchData({ force: true }), [fetchData]);
 
