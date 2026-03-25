@@ -828,12 +828,7 @@ export function makeAdminController() {
           db().auditLog.count({ where }),
         ]);
 
-        res.json({
-          logs,
-          total,
-          page,
-          pages: Math.ceil(total / limit),
-        });
+        res.json(paginatedResponse(logs, total, page, limit, true));
         businessLog.info('Audit logs viewed', { userId: req.auth?.userId, resultCount: logs.length, total, page, limit, ip: req.ip });
         logAccessEvent('ADMIN_ACTION', {
           userId: req.auth?.userId,

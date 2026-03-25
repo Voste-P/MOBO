@@ -266,15 +266,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
 
   useEffect(() => {
     if (user?.role === 'admin') {
-      // Only fetch the current view's data + stats, not everything upfront
       refreshCurrentView();
-      if (view === 'dashboard') {
-        Promise.allSettled([api.admin.getStats(), api.admin.getGrowthAnalytics()]).then(([s, g]) => {
-          if (s.status === 'fulfilled') setStats(s.value);
-          if (g.status === 'fulfilled') setChartData(asArray(g.value));
-        });
-      }
-      fetchSystemConfig();
     }
   }, [user]);
 
@@ -394,7 +386,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
     if (view !== 'support' && view !== 'feedback') return;
-    api.tickets.getAll()
+    api.tickets.getAll({ issueType: view === 'feedback' ? 'Feedback' : 'Support' })
       .then((res) => setTickets(asArray(res)))
       .catch((e) => { console.error('Admin Tickets Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to load tickets.')); });
   }, [user, view]);
@@ -436,7 +428,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
           break;
         case 'support':
         case 'feedback':
-          api.tickets.getAll().then((t) => setTickets(asArray(t))).catch(() => {});
+          api.tickets.getAll({ issueType: view === 'feedback' ? 'Feedback' : 'Support' }).then((t) => setTickets(asArray(t))).catch(() => {});
           break;
         case 'invites':
           api.admin.getInvites({ page: invitesPage, limit: PAGE_SIZE }).then((res) => {

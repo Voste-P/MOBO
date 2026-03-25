@@ -410,6 +410,7 @@ export const Orders: React.FC = () => {
     if (!user) return;
 
     let timer: any = null;
+    let ticketTimer: any = null;
     const schedule = () => {
       if (timer) return;
       timer = setTimeout(() => {
@@ -417,9 +418,16 @@ export const Orders: React.FC = () => {
         loadOrders();
       }, 500);
     };
+    const scheduleTickets = () => {
+      if (ticketTimer) return;
+      ticketTimer = setTimeout(() => {
+        ticketTimer = null;
+        loadMyTickets();
+      }, 500);
+    };
     const unsub = subscribeRealtime((msg: any) => {
       if (msg.type === 'orders.changed') schedule();
-      if (msg.type === 'tickets.changed') loadMyTickets();
+      if (msg.type === 'tickets.changed') scheduleTickets();
       if (msg.type === 'deals.changed') {
         // Refresh products only if modal was already opened
         if (productsLoadedRef.current) {
@@ -433,6 +441,7 @@ export const Orders: React.FC = () => {
     return () => {
       unsub();
       if (timer) clearTimeout(timer);
+      if (ticketTimer) clearTimeout(ticketTimer);
     };
   }, [user]);
 

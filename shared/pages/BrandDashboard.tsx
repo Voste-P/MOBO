@@ -641,7 +641,6 @@ const OrdersView = ({ user }: any) => {
       const data = await api.brand.getBrandOrders(user.name);
       const safeData = asArray<Order>(data);
       setOrders(safeData);
-      // Keep proof modal in sync with refreshed data
       setViewProofOrder((prev) => {
         if (!prev) return prev;
         const updated = safeData.find((o: Order) => o.id === prev.id);
@@ -658,8 +657,6 @@ const OrdersView = ({ user }: any) => {
   useEffect(() => {
     fetchOrders();
   }, [user]);
-
-
 
   // Real-time: refresh orders when any order/deal changes.
   useEffect(() => {
@@ -2237,7 +2234,7 @@ export const BrandDashboard: React.FC = () => {
     switch (activeTab) {
       case 'dashboard': return ['campaigns', 'agencies', 'orders'];
       case 'campaigns': return ['campaigns'];
-      case 'orders': return ['orders'];
+      case 'orders': return []; // OrdersView manages its own orders state
       case 'agencies': return ['agencies', 'transactions'];
       case 'requests': return ['agencies'];
       case 'tickets': return ['tickets'];

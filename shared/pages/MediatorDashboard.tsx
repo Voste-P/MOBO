@@ -1829,6 +1829,8 @@ export const MediatorDashboard: React.FC = () => {
   const [slideDir, setSlideDir] = useState<'left' | 'right'>('right');
   const prevTabIdx = useRef(0);
   const [showNotifications, setShowNotifications] = useState(false);
+  const showNotificationsRef = useRef(showNotifications);
+  useEffect(() => { showNotificationsRef.current = showNotifications; }, [showNotifications]);
 
   const TAB_ORDER = ['inbox', 'market', 'squad', 'profile'] as const;
 
@@ -2010,12 +2012,12 @@ export const MediatorDashboard: React.FC = () => {
         timer = null;
         for (const k of keysToInvalidate) loadedRef.current.delete(k);
         loadData({ silent: true });
-        if (showNotifications) refreshNotifications();
+        if (showNotificationsRef.current) refreshNotifications();
       }, 600);
     };
     const unsub = subscribeRealtime((msg) => {
       if (msg.type === 'notifications.changed') {
-        if (showNotifications) refreshNotifications();
+        if (showNotificationsRef.current) refreshNotifications();
         return;
       }
       const keys = eventToKeys[msg.type];
@@ -2028,7 +2030,7 @@ export const MediatorDashboard: React.FC = () => {
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [user, showNotifications, refreshNotifications, loadData, tabDataNeeds]);
+  }, [user, refreshNotifications, loadData, tabDataNeeds]);
 
   const refreshData = useCallback(() => loadData({ force: true }), [loadData]);
 
