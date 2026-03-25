@@ -390,6 +390,15 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     fetchSystemConfig();
   }, [user, view]);
 
+  // Fetch tickets when switching to support/feedback view
+  useEffect(() => {
+    if (!user || user.role !== 'admin') return;
+    if (view !== 'support' && view !== 'feedback') return;
+    api.tickets.getAll()
+      .then((res) => setTickets(asArray(res)))
+      .catch((e) => { console.error('Admin Tickets Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to load tickets.')); });
+  }, [user, view]);
+
   /** Refresh only the data needed for the active tab/view (instead of ALL endpoints). */
   const refreshCurrentView = async () => {
     try {

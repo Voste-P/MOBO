@@ -333,7 +333,7 @@ export const Orders: React.FC = () => {
   }, [isNewOrderModalOpen]);
 
   const handlePullRefresh = useCallback(async () => {
-    await loadOrders();
+    await Promise.all([loadOrders(), loadMyTickets()]);
   }, [user]);
   const { handlers: pullHandlers, pullDistance, isRefreshing: isPullRefreshing } = usePullToRefresh({ onRefresh: handlePullRefresh });
 

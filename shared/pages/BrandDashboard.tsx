@@ -2238,7 +2238,7 @@ export const BrandDashboard: React.FC = () => {
       case 'dashboard': return ['campaigns', 'agencies', 'orders'];
       case 'campaigns': return ['campaigns'];
       case 'orders': return ['orders'];
-      case 'agencies': return ['agencies'];
+      case 'agencies': return ['agencies', 'transactions'];
       case 'requests': return ['agencies'];
       case 'tickets': return ['tickets'];
       case 'profile': return [];

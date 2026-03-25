@@ -1135,10 +1135,11 @@ export const api = {
   },
   /** [FIX] Added missing tickets object used across various dashboards */
   tickets: {
-    getAll: async (opts?: { page?: number; limit?: number }) => {
+    getAll: async (opts?: { page?: number; limit?: number; issueType?: string }) => {
       const params = new URLSearchParams();
       if (opts?.page) params.set('page', String(opts.page));
       if (opts?.limit) params.set('limit', String(opts.limit));
+      if (opts?.issueType) params.set('issueType', opts.issueType);
       const qs = params.toString();
       return fetchJson(`/tickets${qs ? '?' + qs : ''}`, {
         headers: { ...authHeaders() },
