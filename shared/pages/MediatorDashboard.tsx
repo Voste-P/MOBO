@@ -1848,6 +1848,13 @@ export const MediatorDashboard: React.FC = () => {
     onChangeTab: (t) => handleTabChange(t as typeof activeTab),
   });
 
+  const mediatorTabItems = useMemo(() => [
+    { id: 'inbox', label: 'Home', ariaLabel: 'Home', icon: <LayoutGrid size={22} strokeWidth={activeTab === 'inbox' ? 2.5 : 2} />, badge: unreadCount },
+    { id: 'market', label: 'Market', ariaLabel: 'Market', icon: <Tag size={22} strokeWidth={activeTab === 'market' ? 2.5 : 2} /> },
+    { id: 'squad', label: 'Squad', ariaLabel: 'Squad', icon: <Users size={22} strokeWidth={activeTab === 'squad' ? 2.5 : 2} /> },
+    { id: 'profile', label: 'Profile', ariaLabel: 'Profile', icon: <UserIcon size={22} strokeWidth={activeTab === 'profile' ? 2.5 : 2} /> },
+  ], [activeTab, unreadCount]);
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [deals, setDeals] = useState<Product[]>([]);
@@ -2249,33 +2256,7 @@ export const MediatorDashboard: React.FC = () => {
 
       <div className="fixed left-1/2 -translate-x-1/2 z-40 w-[92vw] max-w-[360px] bottom-[calc(0.75rem+env(safe-area-inset-bottom))]">
         <MobileTabBar
-          items={[
-            {
-              id: 'inbox',
-              label: 'Home',
-              ariaLabel: 'Home',
-              icon: <LayoutGrid size={22} strokeWidth={activeTab === 'inbox' ? 2.5 : 2} />,
-              badge: unreadCount,
-            },
-            {
-              id: 'market',
-              label: 'Market',
-              ariaLabel: 'Market',
-              icon: <Tag size={22} strokeWidth={activeTab === 'market' ? 2.5 : 2} />,
-            },
-            {
-              id: 'squad',
-              label: 'Squad',
-              ariaLabel: 'Squad',
-              icon: <Users size={22} strokeWidth={activeTab === 'squad' ? 2.5 : 2} />,
-            },
-            {
-              id: 'profile',
-              label: 'Profile',
-              ariaLabel: 'Profile',
-              icon: <UserIcon size={22} strokeWidth={activeTab === 'profile' ? 2.5 : 2} />,
-            },
-          ]}
+          items={mediatorTabItems}
           activeId={activeTab}
           onChange={(id) => {
             handleTabChange(id as any);

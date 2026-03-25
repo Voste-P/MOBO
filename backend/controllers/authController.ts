@@ -39,15 +39,17 @@ export function makeAuthController(env: Env) {
           throw new AppError(401, 'UNAUTHENTICATED', 'Missing auth context');
         }
 
-        const user = await withDbRetry(() => db().user.findFirst({
-          where: { ...idWhere(userId), isDeleted: false },
-          include: { pendingConnections: true },
-        }));
+        // Auth middleware already verified user exists, so run both in parallel.
+        const [user, wallet] = await Promise.all([
+          withDbRetry(() => db().user.findFirst({
+            where: { ...idWhere(userId), isDeleted: false },
+            include: { pendingConnections: true },
+          })),
+          ensureWallet(req.auth!.pgUserId),
+        ]);
         if (!user) {
           throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
         }
-
-        const wallet = await ensureWallet(user.id);
         businessLog.info('Session viewed', { userId: user.id, role: user.role, ip: req.ip });
         logAccessEvent('RESOURCE_ACCESS', {
           userId: user.id,

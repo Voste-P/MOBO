@@ -100,7 +100,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
     tickets: Ticket[];
     fetchedAt: number;
   } | null>(null);
-  const CONTEXT_CACHE_TTL = 60_000; // 1 minute
+  const CONTEXT_CACHE_TTL = 5 * 60_000; // 5 minutes — products/orders rarely change mid-chat
 
   // Track navigation timer for cleanup on unmount
   const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

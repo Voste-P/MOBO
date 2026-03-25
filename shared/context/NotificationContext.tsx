@@ -54,14 +54,14 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
 
-  // Realtime: refresh on relevant events
+  // Realtime: refresh on relevant events (batch all events with clearTimeout)
   useEffect(() => {
     if (!user?.id) return;
     let timer: any = null;
     const unsub = subscribeRealtime((msg: any) => {
       if (['orders.changed', 'notifications.changed', 'tickets.changed', 'wallets.changed'].includes(msg.type)) {
-        if (timer) return;
-        timer = setTimeout(() => { timer = null; fetchNotifications(); }, 600);
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => { timer = null; fetchNotifications(); }, 800);
       }
     });
     return () => { unsub(); if (timer) clearTimeout(timer); };

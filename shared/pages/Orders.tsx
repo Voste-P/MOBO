@@ -318,15 +318,9 @@ export const Orders: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Defer product loading until the New Order modal is opened; reset stale flag on close
+  // Defer product loading until the New Order modal is opened; cache for session
   const productsLoadedRef = useRef(false);
-  const prevModalOpen = useRef(false);
   useEffect(() => {
-    if (!isNewOrderModalOpen && prevModalOpen.current) {
-      // Mark stale so the next open refreshes products
-      productsLoadedRef.current = false;
-    }
-    prevModalOpen.current = isNewOrderModalOpen;
     if (!isNewOrderModalOpen || productsLoadedRef.current) return;
     productsLoadedRef.current = true;
     api.products.getAll().then((data) => {
@@ -336,6 +330,7 @@ export const Orders: React.FC = () => {
       if (process.env.NODE_ENV !== 'production') console.error('Failed to load products:', err);
       setAvailableProducts([]);
       setProductsLoadError(true);
+      productsLoadedRef.current = false; // Reset only on error so next open retries
       toast.error('Failed to load available deals. Pull down to retry.');
     });
   }, [isNewOrderModalOpen]);
@@ -420,18 +415,18 @@ export const Orders: React.FC = () => {
     let timer: any = null;
     let ticketTimer: any = null;
     const schedule = () => {
-      if (timer) return;
+      if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
         loadOrders();
-      }, 500);
+      }, 800);
     };
     const scheduleTickets = () => {
-      if (ticketTimer) return;
+      if (ticketTimer) clearTimeout(ticketTimer);
       ticketTimer = setTimeout(() => {
         ticketTimer = null;
         loadMyTickets();
-      }, 500);
+      }, 800);
     };
     const unsub = subscribeRealtime((msg: any) => {
       if (msg.type === 'orders.changed') schedule();

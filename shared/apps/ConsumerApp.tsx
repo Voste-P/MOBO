@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, Suspense } from 'react';
+﻿import React, { useState, useRef, useMemo, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { CartProvider } from '../context/CartContext';
 import { ChatProvider } from '../context/ChatContext';
@@ -48,6 +48,13 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
     activeTab,
     onChangeTab: (t) => handleTabChange(t as typeof activeTab),
   });
+
+  const tabItems = useMemo(() => [
+    { id: 'explore', label: 'Home', ariaLabel: 'Home', icon: <HomeIcon size={22} strokeWidth={2.5} /> },
+    { id: 'home', label: 'Chat', ariaLabel: 'Chat', icon: <Bot size={22} strokeWidth={2.5} /> },
+    { id: 'orders', label: 'Orders', ariaLabel: 'Orders', icon: <Package size={22} strokeWidth={2.5} /> },
+    { id: 'profile', label: 'Profile', ariaLabel: 'Profile', icon: <User size={22} strokeWidth={2.5} /> },
+  ], []);
 
   if (!user) return <AuthScreen onBack={onBack} />;
 
@@ -129,12 +136,7 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
 
               <div className="absolute bottom-[calc(0.75rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 w-[92vw] max-w-[360px]">
                 <MobileTabBar
-                  items={[
-                    { id: 'explore', label: 'Home', ariaLabel: 'Home', icon: <HomeIcon size={22} strokeWidth={2.5} /> },
-                    { id: 'home', label: 'Chat', ariaLabel: 'Chat', icon: <Bot size={22} strokeWidth={2.5} /> },
-                    { id: 'orders', label: 'Orders', ariaLabel: 'Orders', icon: <Package size={22} strokeWidth={2.5} /> },
-                    { id: 'profile', label: 'Profile', ariaLabel: 'Profile', icon: <User size={22} strokeWidth={2.5} /> },
-                  ]}
+                  items={tabItems}
                   activeId={activeTab}
                   onChange={(id) => handleTabChange(id as any)}
                   variant="glass"

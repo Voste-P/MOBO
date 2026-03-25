@@ -69,8 +69,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (msg.type === 'users.changed') {
         const changedId = msg.payload?.userId;
         if (!changedId || String(changedId) === String(user.id)) scheduleRefresh();
+      } else if (msg.type === 'wallets.changed') {
+        scheduleRefresh();
       }
-      if (msg.type === 'wallets.changed') scheduleRefresh();
     });
 
     return () => {

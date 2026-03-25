@@ -40,13 +40,13 @@ export const Explore: React.FC = () => {
 
   useEffect(() => { loadProducts(); }, [loadProducts]);
 
-  // Realtime: refresh products on deals.changed
+  // Realtime: refresh products on deals.changed (debounce 1.5s to batch rapid changes)
   useEffect(() => {
     let timer: any = null;
     const unsub = subscribeRealtime((msg: any) => {
       if (msg.type === 'deals.changed') {
-        if (timer) return;
-        timer = setTimeout(() => { timer = null; loadProducts(); }, 500);
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => { timer = null; loadProducts(); }, 1500);
       }
     });
     return () => { unsub(); if (timer) clearTimeout(timer); };

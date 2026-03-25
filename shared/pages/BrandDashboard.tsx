@@ -664,11 +664,11 @@ const OrdersView = ({ user }: any) => {
   useEffect(() => {
     let timer: any = null;
     const schedule = () => {
-      if (timer) return;
+      if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
         fetchOrders();
-      }, 700);
+      }, 800);
     };
     const unsub = subscribeRealtime((msg) => {
       if (msg.type === 'orders.changed' || msg.type === 'deals.changed') schedule();

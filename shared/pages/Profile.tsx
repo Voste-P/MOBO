@@ -92,11 +92,11 @@ export const Profile: React.FC = () => {
 
     let timer: any = null;
     const schedule = () => {
-      if (timer) return;
+      if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
         refreshStats({ silent: true });
-      }, 600);
+      }, 800);
     };
 
     const unsub = subscribeRealtime((msg: any) => {
