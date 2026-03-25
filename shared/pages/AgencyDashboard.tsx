@@ -1225,7 +1225,7 @@ const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
     try {
       await api.ops.deletePayout(payoutId);
       toast.success('Payout deleted');
-      onRefresh?.();
+      onRefresh?.(['ledger']);
     } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to delete payout'));
     } finally {

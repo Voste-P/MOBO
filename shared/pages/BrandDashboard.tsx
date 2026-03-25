@@ -595,9 +595,8 @@ const DashboardView = ({
   );
 };
 
-const OrdersView = ({ user }: any) => {
+const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean }) => {
   const { toast } = useToast();
-  const [orders, setOrders] = useState<Order[]>([]);
   const [viewProofOrder, setViewProofOrder] = useState<Order | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
@@ -605,7 +604,6 @@ const OrdersView = ({ user }: any) => {
   const [mediatorFilter, setMediatorFilter] = useState<string>('All');
   const [productFilter, setProductFilter] = useState<string>('All');
   const [orderViewMode, setOrderViewMode] = useState<'orders' | 'orderSheet' | 'financeSheet'>('orders');
-  const [isLoading, setIsLoading] = useState(true);
   const [sheetsExporting, setSheetsExporting] = useState(false);
   const [ordersPage, setOrdersPage] = useState(1);
   const ORDERS_PER_PAGE = 25;
@@ -637,47 +635,14 @@ const OrdersView = ({ user }: any) => {
     );
   };
 
-  const fetchOrders = async () => {
-    setIsLoading(true);
-    try {
-      const data = await api.brand.getBrandOrders(user.name);
-      const safeData = asArray<Order>(data);
-      setOrders(safeData);
-      setViewProofOrder((prev) => {
-        if (!prev) return prev;
-        const updated = safeData.find((o: Order) => o.id === prev.id);
-        return updated || null;
-      });
-    } catch (err) {
-      console.error('Failed to fetch orders', err);
-      toast.error(formatErrorMessage(err, 'Failed to load orders'));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Sync viewProofOrder when parent orders update
   useEffect(() => {
-    fetchOrders();
-  }, [user?.id]);
-
-  // Real-time: refresh orders when any order/deal changes.
-  useEffect(() => {
-    let timer: any = null;
-    const schedule = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        timer = null;
-        fetchOrders();
-      }, 800);
-    };
-    const unsub = subscribeRealtime((msg) => {
-      if (msg.type === 'orders.changed' || msg.type === 'deals.changed') schedule();
+    setViewProofOrder((prev) => {
+      if (!prev) return prev;
+      const updated = orders.find((o: Order) => o.id === prev.id);
+      return updated || null;
     });
-    return () => {
-      unsub();
-      if (timer) clearTimeout(timer);
-    };
-  }, [user?.id]);
+  }, [orders]);
 
   // Unique mediators and products for filter dropdowns
   const mediatorOptions = useMemo(() => {
@@ -2236,7 +2201,7 @@ export const BrandDashboard: React.FC = () => {
     switch (activeTab) {
       case 'dashboard': return ['campaigns', 'agencies', 'orders'];
       case 'campaigns': return ['campaigns'];
-      case 'orders': return []; // OrdersView manages its own orders state
+      case 'orders': return ['orders'];
       case 'agencies': return ['agencies', 'transactions'];
       case 'requests': return ['agencies'];
       case 'tickets': return ['tickets'];
@@ -2605,7 +2570,7 @@ export const BrandDashboard: React.FC = () => {
             onRefresh={refreshData}
           />
         )}
-        {activeTab === 'orders' && <OrdersView user={user} />}
+        {activeTab === 'orders' && <OrdersView orders={orders} isLoading={isDataLoading} />}
         {activeTab === 'profile' && <BrandProfileView />}
         {activeTab === 'tickets' && (
           <div className="max-w-3xl mx-auto animate-enter pb-12">
