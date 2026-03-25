@@ -124,7 +124,7 @@ export async function applyWalletCredit(input: WalletMutationInput) {
 
     if (updated === 0) {
       // Distinguish wallet-not-found from limit exceeded
-      const existing = await tx.wallet.findUnique({ where: { ownerUserId: input.ownerUserId } });
+      const existing = await tx.wallet.findUnique({ where: { ownerUserId: input.ownerUserId }, select: { id: true, isDeleted: true } });
       if (!existing || existing.isDeleted) {
         logErrorEvent({ category: 'BUSINESS_LOGIC', severity: 'high', message: 'Wallet credit failed — wallet not found', operation: 'applyWalletCredit', userId: input.ownerUserId, metadata: { type: input.type, amountPaise: input.amountPaise } });
         throw new AppError(404, 'WALLET_NOT_FOUND', 'Wallet not found');
@@ -134,7 +134,7 @@ export async function applyWalletCredit(input: WalletMutationInput) {
     }
 
     // Re-read wallet to get walletId for the transaction record
-    const wallet = await tx.wallet.findUnique({ where: { ownerUserId: input.ownerUserId } });
+    const wallet = await tx.wallet.findUnique({ where: { ownerUserId: input.ownerUserId }, select: { id: true } });
     if (!wallet) throw new AppError(404, 'WALLET_NOT_FOUND', 'Wallet disappeared during credit');
 
     const txn = await tx.transaction.create({
@@ -213,6 +213,7 @@ export async function applyWalletDebit(input: WalletMutationInput) {
       // Distinguish wallet-not-found from insufficient-funds
       const existing = await tx.wallet.findUnique({
         where: { ownerUserId: input.ownerUserId },
+        select: { id: true, isDeleted: true, availablePaise: true },
       });
       if (!existing || existing.isDeleted) {
         logErrorEvent({ category: 'BUSINESS_LOGIC', severity: 'high', message: 'Wallet debit failed — wallet not found', operation: 'applyWalletDebit', userId: input.ownerUserId, metadata: { type: input.type, amountPaise: input.amountPaise } });
@@ -225,7 +226,7 @@ export async function applyWalletDebit(input: WalletMutationInput) {
     }
 
     // Re-read wallet to get the walletId for the transaction record
-    const wallet = await tx.wallet.findUnique({ where: { ownerUserId: input.ownerUserId } });
+    const wallet = await tx.wallet.findUnique({ where: { ownerUserId: input.ownerUserId }, select: { id: true } });
     if (!wallet) {
       logErrorEvent({ category: 'BUSINESS_LOGIC', severity: 'critical', message: 'Wallet disappeared during debit', operation: 'applyWalletDebit', userId: input.ownerUserId, metadata: { type: input.type, amountPaise: input.amountPaise } });
       throw new AppError(500, 'WALLET_NOT_FOUND', 'Wallet disappeared during debit');

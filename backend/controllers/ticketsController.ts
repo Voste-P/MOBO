@@ -540,7 +540,7 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
         const { roles, pgUserId, user } = getRequester(req);
         const db = prisma();
 
-        const ticket = await db.ticket.findFirst({ where: { ...idWhere(ticketId), isDeleted: false } });
+        const ticket = await db.ticket.findFirst({ where: { ...idWhere(ticketId), isDeleted: false }, select: { id: true, userId: true, targetRole: true, orderId: true } });
         if (!ticket) throw new AppError(404, 'TICKET_NOT_FOUND', 'Ticket not found');
 
         // Access check — allow targeted role managers
@@ -550,6 +550,8 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
         const comments = await db.ticketComment.findMany({
           where: { ticketId: ticket.id, isDeleted: false },
           orderBy: { createdAt: 'asc' },
+          take: 200,
+          select: { id: true, userId: true, userName: true, role: true, message: true, createdAt: true },
         });
 
         res.json({

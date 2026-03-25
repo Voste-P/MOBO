@@ -4459,9 +4459,16 @@ export const AgencyDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load when tab changes — only fetch keys not yet loaded
+  // Trigger data load on mount and tab change — force re-fetch on tab switch
+  const prevTabRef = useRef(activeTab);
   useEffect(() => {
-    fetchData();
+    const tabChanged = prevTabRef.current !== activeTab;
+    prevTabRef.current = activeTab;
+    if (tabChanged) {
+      fetchData({ force: true, silent: true });
+    } else {
+      fetchData();
+    }
   }, [fetchData, activeTab]);
 
   // Realtime: only invalidate data keys relevant to the SSE event, then refetch

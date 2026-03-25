@@ -10,7 +10,7 @@ import { Search, AlertTriangle, ShoppingBag } from 'lucide-react';
 import { EmptyState, Input } from '../components/ui';
 import { Product } from '../types';
 
-export const Explore: React.FC = () => {
+export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -38,7 +38,7 @@ export const Explore: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => { loadProducts(); }, [loadProducts]);
+  useEffect(() => { if (isActive) loadProducts(); }, [loadProducts, isActive]);
 
   // Realtime: refresh products on deals.changed (debounce 1.5s to batch rapid changes)
   useEffect(() => {

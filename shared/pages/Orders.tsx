@@ -178,7 +178,7 @@ const isValidReviewLink = (value: string) => {
   }
 };
 
-export const Orders: React.FC = () => {
+export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -312,12 +312,13 @@ export const Orders: React.FC = () => {
   }, [availableProducts, dealTypeFilter, formSearch]);
 
   useEffect(() => {
+    if (!isActive) return;
     if (user) {
       Promise.all([loadOrders(), loadMyTickets()]);
     } else {
       setIsLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, isActive]);
 
   // Defer product loading until the New Order modal is opened; cache for session
   const productsLoadedRef = useRef(false);

@@ -2006,9 +2006,16 @@ export const MediatorDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load on mount and tab change — only fetch keys not yet loaded
+  // Trigger data load on mount and tab change — force re-fetch on tab switch
+  const prevTabRef = useRef(activeTab);
   useEffect(() => {
-    loadData();
+    const tabChanged = prevTabRef.current !== activeTab;
+    prevTabRef.current = activeTab;
+    if (tabChanged) {
+      loadData({ force: true, silent: true });
+    } else {
+      loadData();
+    }
   }, [loadData, activeTab]);
 
   useEffect(() => {

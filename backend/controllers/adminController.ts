@@ -512,7 +512,7 @@ export function makeAdminController() {
         const user = await db().user.findFirst({ where: { ...idWhere(userId), isDeleted: false }, select: { id: true, mongoId: true } });
         if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
-        const wallet = await db().wallet.findFirst({ where: { ownerUserId: user.id, isDeleted: false } });
+        const wallet = await db().wallet.findFirst({ where: { ownerUserId: user.id, isDeleted: false }, select: { id: true, mongoId: true, availablePaise: true, pendingPaise: true, lockedPaise: true } });
         if (!wallet) throw new AppError(404, 'WALLET_NOT_FOUND', 'Wallet not found');
 
         const available = Number(wallet.availablePaise ?? 0);

@@ -149,7 +149,6 @@ export async function exportToGoogleSheet(opts: SheetsExportOptions): Promise<vo
       if (!didConnect) {
         // User cancelled or popup blocked — still proceed with service account fallback.
         // Service account will auto-share the sheet with the user's email.
-        console.info('Google OAuth not completed — backend will use service account with auto-sharing.');
       }
     }
 

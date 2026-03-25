@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { Order } from '../types';
 
-export const Profile: React.FC = () => {
+export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) => {
   const { user, updateUser, logout } = useAuth();
   const { toast } = useToast();
 
@@ -81,8 +81,9 @@ export const Profile: React.FC = () => {
   }
 
   useEffect(() => {
+    if (!isActive) return;
     if (user) refreshStats();
-  }, [user?.id]);
+  }, [user?.id, isActive]);
 
   // Refresh stats when orders change via realtime
   const lastStatsRefreshAt = useRef(0);

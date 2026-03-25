@@ -123,16 +123,16 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
               <div className="flex-1 overflow-hidden overscroll-none" {...swipeHandlers}>
                 <Suspense fallback={<TabSkeleton />}>
                   <div className={`h-full ${activeTab === 'explore' ? '' : 'hidden'}`}>
-                    <div className="h-full overflow-y-auto scrollbar-styled"><Explore /></div>
+                    <div className="h-full overflow-y-auto scrollbar-styled"><Explore isActive={activeTab === 'explore'} /></div>
                   </div>
                   <div className={`h-full ${activeTab === 'home' ? '' : 'hidden'}`}>
                     <div className="h-full overflow-y-auto scrollbar-styled"><Home onVoiceNavigate={handleTabChange} /></div>
                   </div>
                   <div className={`h-full ${activeTab === 'orders' ? '' : 'hidden'}`}>
-                    <div className="h-full overflow-y-auto scrollbar-styled"><Orders /></div>
+                    <div className="h-full overflow-y-auto scrollbar-styled"><Orders isActive={activeTab === 'orders'} /></div>
                   </div>
                   <div className={`h-full ${activeTab === 'profile' ? '' : 'hidden'}`}>
-                    <div className="h-full overflow-y-auto scrollbar-styled"><Profile /></div>
+                    <div className="h-full overflow-y-auto scrollbar-styled"><Profile isActive={activeTab === 'profile'} /></div>
                   </div>
                 </Suspense>
               </div>

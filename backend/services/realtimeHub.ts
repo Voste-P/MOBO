@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 import type { Role } from '../middleware/auth.js';
+import { logErrorEvent } from '../config/appLogs.js';
 
 export type RealtimeEvent = {
   type: string;
@@ -56,7 +57,7 @@ export function publishRealtime(evt: RealtimeEvent) {
     emitter.emit('event', evt);
   } catch (err) {
     // Prevent a listener error from crashing the whole process
-    console.error('[RealtimeHub] emit error:', err);
+    logErrorEvent({ category: 'SYSTEM', severity: 'medium', message: '[RealtimeHub] emit error', error: err instanceof Error ? err : new Error(String(err)) });
   }
 }
 
