@@ -278,10 +278,22 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     }
   }, [user]);
 
-  // Realtime: refresh only the data relevant to the current view.
+  // Realtime: only refresh when the event is relevant to the current view
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
     let timer: any = null;
+    const viewRelevantEvents: Record<string, string[]> = {
+      dashboard: ['orders.changed', 'users.changed', 'wallets.changed'],
+      users: ['users.changed'],
+      orders: ['orders.changed'],
+      finance: ['orders.changed', 'wallets.changed'],
+      inventory: ['deals.changed'],
+      support: ['tickets.changed'],
+      feedback: ['tickets.changed'],
+      invites: ['invites.changed'],
+      'audit-logs': [],
+      settings: [],
+    };
     const schedule = () => {
       if (timer) return;
       timer = setTimeout(() => {
@@ -290,15 +302,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       }, 800);
     };
     const unsub = subscribeRealtime((msg) => {
-      if (
-        msg.type === 'orders.changed' ||
-        msg.type === 'users.changed' ||
-        msg.type === 'wallets.changed' ||
-        msg.type === 'deals.changed' ||
-        msg.type === 'invites.changed' ||
-        msg.type === 'notifications.changed' ||
-        msg.type === 'tickets.changed'
-      ) {
+      const relevant = viewRelevantEvents[view] || [];
+      if (relevant.includes(msg.type)) {
         schedule();
       }
     });

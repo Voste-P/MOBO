@@ -1993,34 +1993,42 @@ export const MediatorDashboard: React.FC = () => {
     refreshNotifications();
   }, [showNotifications, refreshNotifications]);
 
-  // Realtime: refresh only active tab's data
+  // Realtime: only invalidate data keys relevant to the SSE event, then refetch
   useEffect(() => {
     if (!user) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const schedule = () => {
+    const eventToKeys: Record<string, string[]> = {
+      'orders.changed': ['orders'],
+      'deals.changed': ['campaigns', 'deals'],
+      'users.changed': ['pending', 'verified'],
+      'tickets.changed': ['tickets'],
+      'notifications.changed': [],
+    };
+    const schedule = (keysToInvalidate: string[]) => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        loadData({ force: true, silent: true });
+        for (const k of keysToInvalidate) loadedRef.current.delete(k);
+        loadData({ silent: true });
         if (showNotifications) refreshNotifications();
       }, 600);
     };
     const unsub = subscribeRealtime((msg) => {
-      if (
-        msg.type === 'orders.changed' ||
-        msg.type === 'users.changed' ||
-        msg.type === 'wallets.changed' ||
-        msg.type === 'deals.changed' ||
-        msg.type === 'notifications.changed' ||
-        msg.type === 'tickets.changed'
-      )
-        schedule();
+      if (msg.type === 'notifications.changed') {
+        if (showNotifications) refreshNotifications();
+        return;
+      }
+      const keys = eventToKeys[msg.type];
+      if (keys) {
+        const relevant = keys.filter((k) => tabDataNeeds.includes(k));
+        if (relevant.length > 0) schedule(relevant);
+      }
     });
     return () => {
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [user, showNotifications, refreshNotifications, loadData]);
+  }, [user, showNotifications, refreshNotifications, loadData, tabDataNeeds]);
 
   const refreshData = useCallback(() => loadData({ force: true }), [loadData]);
 

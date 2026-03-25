@@ -4446,34 +4446,37 @@ export const AgencyDashboard: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
-  // Realtime: refresh only active tab's data
+  // Realtime: only invalidate data keys relevant to the SSE event, then refetch
   useEffect(() => {
     if (!user) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const schedule = () => {
+    const eventToKeys: Record<string, string[]> = {
+      'orders.changed': ['orders'],
+      'deals.changed': ['campaigns'],
+      'users.changed': ['mediators'],
+      'wallets.changed': ['ledger'],
+      'tickets.changed': ['tickets'],
+    };
+    const schedule = (keysToInvalidate: string[]) => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        fetchData({ force: true, silent: true });
+        for (const k of keysToInvalidate) loadedRef.current.delete(k);
+        fetchData({ silent: true });
       }, 900);
     };
     const unsub = subscribeRealtime((msg) => {
-      if (
-        msg.type === 'orders.changed' ||
-        msg.type === 'users.changed' ||
-        msg.type === 'wallets.changed' ||
-        msg.type === 'deals.changed' ||
-        msg.type === 'notifications.changed' ||
-        msg.type === 'tickets.changed'
-      ) {
-        schedule();
+      const keys = eventToKeys[msg.type];
+      if (keys) {
+        const relevant = keys.filter((k) => tabDataNeeds.includes(k));
+        if (relevant.length > 0) schedule(relevant);
       }
     });
     return () => {
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [user, fetchData]);
+  }, [user, fetchData, tabDataNeeds]);
 
   // Force refresh for child component mutation callbacks
   const refreshData = useCallback(() => fetchData({ force: true }), [fetchData]);

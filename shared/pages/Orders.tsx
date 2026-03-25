@@ -304,16 +304,21 @@ export const Orders: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      loadOrders();
-      loadMyTickets();
+      Promise.all([loadOrders(), loadMyTickets()]);
     } else {
       setIsLoading(false);
     }
   }, [user]);
 
-  // Defer product loading until the New Order modal is opened
+  // Defer product loading until the New Order modal is opened; reset stale flag on close
   const productsLoadedRef = useRef(false);
+  const prevModalOpen = useRef(false);
   useEffect(() => {
+    if (!isNewOrderModalOpen && prevModalOpen.current) {
+      // Mark stale so the next open refreshes products
+      productsLoadedRef.current = false;
+    }
+    prevModalOpen.current = isNewOrderModalOpen;
     if (!isNewOrderModalOpen || productsLoadedRef.current) return;
     productsLoadedRef.current = true;
     api.products.getAll().then((data) => {

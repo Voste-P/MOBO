@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Loader2, Send, MessageCircle, ArrowUpCircle, RotateCcw, CheckCircle2, XCircle, Trash2 } from 'lucide-react';
 import { api } from '../services/api';
+import { subscribeRealtime } from '../services/realtime';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
@@ -94,11 +95,14 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
     }
   }, [open, ticket, loadComments]);
 
-  // Auto-poll comments every 30 seconds when modal is open
+  // Realtime: refresh comments on tickets.changed, with 60s fallback poll
   useEffect(() => {
     if (!open || !ticket) return;
-    const interval = setInterval(loadComments, 30000);
-    return () => clearInterval(interval);
+    const unsub = subscribeRealtime((msg) => {
+      if (msg.type === 'tickets.changed') loadComments();
+    });
+    const interval = setInterval(loadComments, 60000);
+    return () => { unsub(); clearInterval(interval); };
   }, [open, ticket, loadComments]);
 
   useEffect(() => {
