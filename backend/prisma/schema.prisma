@@ -620,6 +620,7 @@ model Order {
   @@index([buyerMobile, isDeleted])                  // velocity check lookups
   @@index([workflowStatus, affiliateStatus, createdAt(sort: Desc)]) // admin filtered order listing
   @@index([managerName, workflowStatus, isDeleted])  // ops dashboard mediator-scoped queries
+  @@index([affiliateStatus, workflowStatus, expectedSettlementDate, frozen, isDeleted]) // cooling period auto-settlement
   @@map("orders")
 }
 

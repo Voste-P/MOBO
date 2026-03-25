@@ -580,6 +580,7 @@ export function makeOrdersController(env: Env) {
         }
 
         let aiOrderConfidence = 0;
+        let aiUnavailable = false;
         if (allowE2eBypass) {
           // E2E/dev runs should not rely on external AI services.
         } else if (isGeminiConfigured(env)) {
@@ -596,54 +597,68 @@ export function makeOrdersController(env: Env) {
           }
           // Product name from deal/item for AI matching (user said 100% product name match required)
           const expectedProductName = String(item.title || '').trim();
-          const aiStart = Date.now();
-          const verification = await verifyProofWithAi(env, {
-            imageBase64: body.screenshots.order,
-            expectedOrderId: resolvedExternalOrderId || body.externalOrderId || '',
-            expectedAmount,
-            ...(expectedProductName ? { expectedProductName } : {}),
-          });
-          logPerformance({
-            operation: 'AI_ORDER_PROOF_VERIFICATION',
-            durationMs: Date.now() - aiStart,
-            metadata: { orderId: resolvedExternalOrderId, confidenceScore: verification?.confidenceScore },
-          });
+          try {
+            const aiStart = Date.now();
+            const verification = await verifyProofWithAi(env, {
+              imageBase64: body.screenshots.order,
+              expectedOrderId: resolvedExternalOrderId || body.externalOrderId || '',
+              expectedAmount,
+              ...(expectedProductName ? { expectedProductName } : {}),
+            });
+            logPerformance({
+              operation: 'AI_ORDER_PROOF_VERIFICATION',
+              durationMs: Date.now() - aiStart,
+              metadata: { orderId: resolvedExternalOrderId, confidenceScore: verification?.confidenceScore },
+            });
 
-          const confidenceThreshold = env.AI_PROOF_CONFIDENCE_THRESHOLD ?? 75;
-          // Amount mismatch is expected (shipping, discounts, taxes) — don't hard-block.
-          // Only require orderIdMatch + confidence threshold.
-          if (!verification?.orderIdMatch || (verification?.confidenceScore ?? 0) < confidenceThreshold) {
-            throw new AppError(
-              422,
-              'INVALID_ORDER_PROOF',
-              'Your order proof could not be verified. Please upload a clear screenshot showing the order ID.'
-            );
+            const confidenceThreshold = env.AI_PROOF_CONFIDENCE_THRESHOLD ?? 75;
+            // Amount mismatch is expected (shipping, discounts, taxes) — don't hard-block.
+            // Only require orderIdMatch + confidence threshold.
+            if (!verification?.orderIdMatch || (verification?.confidenceScore ?? 0) < confidenceThreshold) {
+              throw new AppError(
+                422,
+                'INVALID_ORDER_PROOF',
+                'Your order proof could not be verified. Please upload a clear screenshot showing the order ID.'
+              );
+            }
+            // Hard-block: product name must POSITIVELY match when expected product name is available.
+            // Use !== true (not === false) so undefined/null also blocks — safety first.
+            if (expectedProductName && verification?.productNameMatch !== true) {
+              throw new AppError(
+                422,
+                'PRODUCT_NAME_MISMATCH',
+                'The product in the screenshot does not match the selected deal. ' +
+                `Expected "${expectedProductName}"` +
+                (verification?.detectedProductName ? `, detected "${verification.detectedProductName}"` : '') +
+                '. Please upload the correct order screenshot.'
+              );
+            }
+            // Hard-block: cropped/incomplete screenshots are not acceptable
+            if (verification?.screenshotCropped === true) {
+              throw new AppError(
+                422,
+                'SCREENSHOT_INCOMPLETE',
+                'Your order screenshot appears to be cropped or incomplete. ' +
+                'Please upload a FULL screenshot showing the complete order page including the page header. ' +
+                (verification?.discrepancyNote || '')
+              );
+            }
+            aiOrderConfidence = verification?.confidenceScore ?? 0;
+          } catch (aiErr: any) {
+            // Re-throw validation errors (422s) — those are intentional user-facing blocks
+            if (aiErr instanceof AppError) throw aiErr;
+            // Infrastructure failure (Gemini down, OCR crash, timeout) — let order proceed
+            // for manual review instead of blocking the buyer
+            orderLog.warn('[createOrder] AI verification unavailable, proceeding for manual review', {
+              error: aiErr?.message,
+              orderId: resolvedExternalOrderId,
+            });
+            aiUnavailable = true;
           }
-          // Hard-block: product name must POSITIVELY match when expected product name is available.
-          // Use !== true (not === false) so undefined/null also blocks — safety first.
-          if (expectedProductName && verification?.productNameMatch !== true) {
-            throw new AppError(
-              422,
-              'PRODUCT_NAME_MISMATCH',
-              'The product in the screenshot does not match the selected deal. ' +
-              `Expected "${expectedProductName}"` +
-              (verification?.detectedProductName ? `, detected "${verification.detectedProductName}"` : '') +
-              '. Please upload the correct order screenshot.'
-            );
-          }
-          // Hard-block: cropped/incomplete screenshots are not acceptable
-          if (verification?.screenshotCropped === true) {
-            throw new AppError(
-              422,
-              'SCREENSHOT_INCOMPLETE',
-              'Your order screenshot appears to be cropped or incomplete. ' +
-              'Please upload a FULL screenshot showing the complete order page including the page header. ' +
-              (verification?.discrepancyNote || '')
-            );
-          }
-          aiOrderConfidence = verification?.confidenceScore ?? 0;
         } else {
-          throw new AppError(503, 'AI_NOT_CONFIGURED', 'Proof verification is temporarily unavailable. Please try again later.');
+          // AI not configured — proceed for manual review instead of hard-blocking
+          orderLog.warn('[createOrder] AI not configured, order will require manual review');
+          aiUnavailable = true;
         }
         const campaignWhere = UUID_RE.test(item.campaignId)
           ? { OR: [{ id: item.campaignId }, { mongoId: item.campaignId }], isDeleted: false }
@@ -995,6 +1010,24 @@ export function makeOrdersController(env: Env) {
                   finalOrder = updated;
                 }
               }
+            }
+          }
+
+          // Mark order verification data when AI was unavailable so reviewers know
+          if (aiUnavailable) {
+            const aiUnavailableOrder = await db().order.findFirst({
+              where: { mongoId: orderMongoId, isDeleted: false },
+              select: { id: true, verification: true },
+            });
+            if (aiUnavailableOrder) {
+              const v = (aiUnavailableOrder.verification && typeof aiUnavailableOrder.verification === 'object')
+                ? { ...(aiUnavailableOrder.verification as any) } : {} as any;
+              v.aiUnavailable = true;
+              v.aiUnavailableAt = new Date().toISOString();
+              await db().order.update({
+                where: { id: aiUnavailableOrder.id },
+                data: { verification: v },
+              });
             }
           }
         }

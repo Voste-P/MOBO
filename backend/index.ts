@@ -8,6 +8,7 @@ import type { Server } from 'node:http';
 import { startupLog, logEvent, getSystemMetrics } from './config/logger.js';
 import { logAvailabilityEvent, logDatabaseEvent, startAvailabilityMonitor, stopAvailabilityMonitor } from './config/appLogs.js';
 import { setReady, setShuttingDown } from './config/lifecycle.js';
+import { startCoolingPeriodSettler, stopCoolingPeriodSettler } from './services/coolingPeriodSettler.js';
 
 // ── Lifecycle state ──────────────────────────────────────────────────
 let server: Server | null = null;
@@ -64,6 +65,7 @@ async function shutdown(signal: string) {
   } finally {
     clearTimeout(forceTimer);
     stopAvailabilityMonitor();
+    stopCoolingPeriodSettler();
     logAvailabilityEvent('APPLICATION_SHUTDOWN_COMPLETE', {
       component: 'backend',
       status: 'down',
@@ -168,6 +170,9 @@ async function main() {
 
     // Start periodic health/memory monitoring (every 5 min, warn at 512MB RSS)
     startAvailabilityMonitor();
+
+    // Start cooling period auto-settlement (every hour)
+    startCoolingPeriodSettler(env);
   });
 }
 

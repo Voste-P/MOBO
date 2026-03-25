@@ -6,6 +6,7 @@ import { prisma, withDbRetry } from '../database/prisma.js';
 import { idWhere } from '../utils/idWhere.js';
 import { authCacheGet, authCacheSet } from '../utils/authCache.js';
 import { logAuthEvent, logSecurityIncident, logAccessEvent } from '../config/appLogs.js';
+import { isMediatorActive, isAgencyActive, getAgencyCodeForMediatorCode } from '../services/lineage.js';
 
 export type Role = 'shopper' | 'mediator' | 'agency' | 'brand' | 'admin' | 'ops';
 
@@ -101,19 +102,13 @@ async function resolveAuthFromToken(token: string, env: Env): Promise<AuthContex
   // Upstream suspension enforcement (non-negotiable):
   // - Buyer loses access immediately when their mediator or agency is suspended.
   // - Mediator loses access immediately when their agency is suspended.
+  // Uses lineage cache (60s TTL) to avoid 1-3 DB queries per request.
   const parentCode = String(user.parentCode || '').trim();
 
   if (roles.includes('mediator')) {
     if (parentCode) {
-      const agency = await db.user.findFirst({
-        where: {
-          mediatorCode: parentCode,
-          roles: { has: 'agency' as any },
-          isDeleted: false,
-        },
-        select: { status: true },
-      });
-      if (!agency || agency.status !== 'active') {
+      const agencyActive = await isAgencyActive(parentCode);
+      if (!agencyActive) {
         logAccessEvent('RESOURCE_DENIED', {
           userId,
           roles: roles as string[],
@@ -127,15 +122,8 @@ async function resolveAuthFromToken(token: string, env: Env): Promise<AuthContex
 
   if (roles.includes('shopper')) {
     if (parentCode) {
-      const mediator = await db.user.findFirst({
-        where: {
-          mediatorCode: parentCode,
-          roles: { has: 'mediator' as any },
-          isDeleted: false,
-        },
-        select: { status: true, parentCode: true },
-      });
-      if (!mediator || mediator.status !== 'active') {
+      const mediatorActive = await isMediatorActive(parentCode);
+      if (!mediatorActive) {
         logAccessEvent('RESOURCE_DENIED', {
           userId,
           roles: roles as string[],
@@ -145,17 +133,10 @@ async function resolveAuthFromToken(token: string, env: Env): Promise<AuthContex
         throw new AppError(403, 'UPSTREAM_SUSPENDED', 'Upstream mediator is not active');
       }
 
-      const agencyCode = String(mediator.parentCode || '').trim();
+      const agencyCode = await getAgencyCodeForMediatorCode(parentCode);
       if (agencyCode) {
-        const agency = await db.user.findFirst({
-          where: {
-            mediatorCode: agencyCode,
-            roles: { has: 'agency' as any },
-            isDeleted: false,
-          },
-          select: { status: true },
-        });
-        if (!agency || agency.status !== 'active') {
+        const agencyActive = await isAgencyActive(agencyCode);
+        if (!agencyActive) {
           logAccessEvent('RESOURCE_DENIED', {
             userId,
             roles: roles as string[],
