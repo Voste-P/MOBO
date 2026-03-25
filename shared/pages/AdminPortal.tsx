@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../components/ui/ConfirmDialog';
@@ -254,6 +254,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   const [auditDateFrom, setAuditDateFrom] = useState('');
   const [auditDateTo, setAuditDateTo] = useState('');
 
+  // Ref to always call the latest refreshCurrentView (avoids stale closures in realtime handler)
+  const refreshCurrentViewRef = useRef<() => void>(() => {});
+
   const fetchSystemConfig = async () => {
     try {
       const cfg = await api.admin.getConfig();
@@ -290,7 +293,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       if (timer) return;
       timer = setTimeout(() => {
         timer = null;
-        refreshCurrentView();
+        refreshCurrentViewRef.current();
       }, 800);
     };
     const unsub = subscribeRealtime((msg) => {
@@ -401,12 +404,15 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
             if (g.status === 'fulfilled') setChartData(asArray(g.value));
           });
           break;
-        case 'users':
-          api.admin.getUsers('all', { page: usersPage, limit: PAGE_SIZE }).then((res) => {
+        case 'users': {
+          const role = userRoleFilter === 'All' ? 'all' : userRoleFilter.toLowerCase();
+          const search = userSearch.trim() || undefined;
+          api.admin.getUsers(role, { page: usersPage, limit: PAGE_SIZE, search }).then((res) => {
             setUsers(asArray(res));
             setUsersPagination(extractPaginationMeta(res));
           }).catch(() => {});
           break;
+        }
         case 'orders':
         case 'finance':
           api.admin.getFinancials({ page: ordersPage, limit: PAGE_SIZE }).then((res) => {
@@ -443,6 +449,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       console.error('Admin Realtime Refresh Error:', e);
     }
   };
+  refreshCurrentViewRef.current = refreshCurrentView;
 
   /** Refresh only the current tab's data (used by DesktopShell onRefresh) */
   const fetchAllData = async () => {
@@ -492,8 +499,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     setIsLoading(true);
     try {
       await api.admin.generateInvite(inviteRole, inviteLabel);
-      const updated = await api.admin.getInvites();
+      const updated = await api.admin.getInvites({ page: invitesPage, limit: PAGE_SIZE });
       setInvites(asArray(updated));
+      setInvitesPagination(extractPaginationMeta(updated));
       setInviteLabel('');
       toast.success('Invite generated');
     } catch (e) {
@@ -562,8 +570,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     try {
       await api.admin.deleteProduct(productId);
       toast.success('Product deleted');
-      const updated = await api.admin.getProducts();
+      const updated = await api.admin.getProducts({ page: productsPage, limit: PAGE_SIZE });
       setProducts(asArray(updated));
+      setProductsPagination(extractPaginationMeta(updated));
     } catch (e: any) {
       toast.error(formatErrorMessage(e, 'Failed to delete product'));
     } finally {

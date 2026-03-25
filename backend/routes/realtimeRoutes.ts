@@ -34,26 +34,25 @@ function shouldDeliver(evt: RealtimeEvent, ctx: { userId: string; roles: Role[];
   if (Array.isArray(aud.userIds) && aud.userIds.includes(ctx.userId)) return true;
   if (Array.isArray(aud.roles) && aud.roles.some((r) => ctx.roles.includes(r))) return true;
 
-  // Multi-tenant audience targeting by code fields
-  const normalizeCode = (v: string) => String(v || '').trim().toLowerCase();
-  const mediatorCodeNorm = normalizeCode(ctx.mediatorCode || '');
-  const parentCodeNorm = normalizeCode(ctx.parentCode || '');
-  const brandCodeNorm = normalizeCode(ctx.brandCode || '');
+  // Multi-tenant audience targeting by code fields — use pre-normalised Sets for O(1) lookups
+  const mediatorCodeNorm = (ctx.mediatorCode || '').trim().toLowerCase();
+  const parentCodeNorm = (ctx.parentCode || '').trim().toLowerCase();
+  const brandCodeNorm = (ctx.brandCode || '').trim().toLowerCase();
 
-  if (mediatorCodeNorm && ctx.roles.includes('agency') && Array.isArray(aud.agencyCodes) &&
-      aud.agencyCodes.map((c) => normalizeCode(c)).includes(mediatorCodeNorm)) return true;
-  if (mediatorCodeNorm && ctx.roles.includes('mediator') && Array.isArray(aud.mediatorCodes) &&
-      aud.mediatorCodes.map((c) => normalizeCode(c)).includes(mediatorCodeNorm)) return true;
-  if (brandCodeNorm && ctx.roles.includes('brand') && Array.isArray(aud.brandCodes) &&
-      aud.brandCodes.map((c) => normalizeCode(c)).includes(brandCodeNorm)) return true;
-  if (parentCodeNorm && Array.isArray(aud.parentCodes) &&
-      aud.parentCodes.map((c) => normalizeCode(c)).includes(parentCodeNorm)) return true;
+  if (mediatorCodeNorm && ctx.roles.includes('agency') && aud._agencySet?.has(mediatorCodeNorm)) return true;
+  if (mediatorCodeNorm && ctx.roles.includes('mediator') && aud._mediatorSet?.has(mediatorCodeNorm)) return true;
+  if (brandCodeNorm && ctx.roles.includes('brand') && aud._brandSet?.has(brandCodeNorm)) return true;
+  if (parentCodeNorm && aud._parentSet?.has(parentCodeNorm)) return true;
 
   return false;
 }
 
 export function realtimeRoutes(env: Env) {
   const r = Router();
+
+  /** Per-user SSE connection tracker — prevents a single user from exhausting server resources. */
+  const userConnections = new Map<string, number>();
+  const MAX_SSE_PER_USER = 5;
 
   // Lightweight health check for the realtime subsystem.
   // Does not require auth and does not open a long-lived SSE stream.
@@ -95,6 +94,15 @@ export function realtimeRoutes(env: Env) {
     const mediatorCode = String((req.auth?.user as any)?.mediatorCode || '').trim();
     const parentCode = String((req.auth?.user as any)?.parentCode || '').trim();
     const brandCode = String((req.auth?.user as any)?.brandCode || '').trim();
+
+    // Enforce per-user connection limit to prevent resource exhaustion
+    const currentCount = userConnections.get(userId) || 0;
+    if (currentCount >= MAX_SSE_PER_USER) {
+      realtimeLog.warn('SSE per-user limit reached', { userId, currentCount });
+      res.status(429).json({ error: 'Too many SSE connections' });
+      return;
+    }
+    userConnections.set(userId, currentCount + 1);
 
     realtimeLog.info('SSE stream opened', { requestId, userId, roles });
 
@@ -141,6 +149,11 @@ export function realtimeRoutes(env: Env) {
       } catch {
         // ignore
       }
+      // Decrement per-user connection count
+      const remaining = (userConnections.get(userId) || 1) - 1;
+      if (remaining <= 0) userConnections.delete(userId);
+      else userConnections.set(userId, remaining);
+
       realtimeLog.info('SSE stream closed', { requestId, userId, eventsDelivered });
 
       logPerformance({

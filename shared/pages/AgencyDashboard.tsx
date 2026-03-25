@@ -4355,6 +4355,9 @@ export const AgencyDashboard: React.FC = () => {
   // Track which data sets have been loaded to avoid redundant fetches
   const loadedRef = useRef<Set<string>>(new Set());
   const fetchRef = useRef(false);
+  // Ref to always read current state for stats computation (avoids stale closures)
+  const dataRef = useRef({ mediators, campaigns, orders });
+  dataRef.current = { mediators, campaigns, orders };
 
   // Compute which data sets the active tab needs
   const tabDataNeeds = useMemo<string[]>(() => {
@@ -4398,10 +4401,10 @@ export const AgencyDashboard: React.FC = () => {
 
       const results = await Promise.all(promises);
 
-      // Map results back to state
-      let safeMeds = mediators;
-      let safeCamps = campaigns;
-      let safeOrds = orders;
+      // Map results back to state — read current values from ref to avoid stale closures
+      let safeMeds = dataRef.current.mediators;
+      let safeCamps = dataRef.current.campaigns;
+      let safeOrds = dataRef.current.orders;
 
       keys.forEach((key, i) => {
         loadedRef.current.add(key);

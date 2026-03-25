@@ -269,6 +269,14 @@ export const Orders: React.FC = () => {
   const ratingAbortRef = useRef<AbortController | null>(null);
   const rwAbortRef = useRef<AbortController | null>(null);
 
+  // Cleanup abort controllers on unmount
+  useEffect(() => {
+    return () => {
+      ratingAbortRef.current?.abort();
+      rwAbortRef.current?.abort();
+    };
+  }, []);
+
   // Order list search & filter
   const [orderListSearch, setOrderListSearch] = useState('');
   const [orderListStatus, setOrderListStatus] = useState<string>('All');
@@ -443,7 +451,7 @@ export const Orders: React.FC = () => {
       if (timer) clearTimeout(timer);
       if (ticketTimer) clearTimeout(ticketTimer);
     };
-  }, [user]);
+  }, [user?.id]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0] || !selectedOrder || isUploading || submittingRef.current) return;

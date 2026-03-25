@@ -656,7 +656,7 @@ const OrdersView = ({ user }: any) => {
 
   useEffect(() => {
     fetchOrders();
-  }, [user]);
+  }, [user?.id]);
 
   // Real-time: refresh orders when any order/deal changes.
   useEffect(() => {
@@ -675,7 +675,7 @@ const OrdersView = ({ user }: any) => {
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [user]);
+  }, [user?.id]);
 
   // Unique mediators and products for filter dropdowns
   const mediatorOptions = useMemo(() => {

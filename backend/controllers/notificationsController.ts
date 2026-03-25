@@ -6,7 +6,7 @@ import { getRequester } from '../services/authz.js';
 import { safeIso } from '../utils/uiMappers.js';
 import { businessLog } from '../config/logger.js';
 import { logAccessEvent, logErrorEvent } from '../config/appLogs.js';
-import { orderNotificationSelect } from '../utils/querySelect.js';
+import { orderNotificationSelect, getProofFlags } from '../utils/querySelect.js';
 
 function db() { return prisma(); }
 
@@ -42,19 +42,24 @@ export function makeNotificationsController() {
         const notifications: UiNotification[] = [];
 
         if (isShopper) {
+          const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
           const orders = await db().order.findMany({
-            where: { userId: pgUserId, isDeleted: false },
+            where: { userId: pgUserId, isDeleted: false, updatedAt: { gte: sevenDaysAgo } },
             select: orderNotificationSelect,
             orderBy: { updatedAt: 'desc' },
-            take: 100,
+            take: 50,
           });
+
+          // Fetch lightweight boolean proof flags (avoids transferring MB-sized base64 columns)
+          const proofMap = await getProofFlags(db(), orders.map(o => o.id));
 
           for (const o of orders) {
             const shortId = safeOrderShortId(o);
             const wf = String(o.workflowStatus || '').trim();
             const pay = String(o.paymentStatus || '').trim();
             const aff = String(o.affiliateStatus || '').trim();
-            const hasPurchaseProof = !!o.screenshotOrder;
+            const flags = proofMap.get(o.id);
+            const hasPurchaseProof = !!flags?.hasOrderProof;
             const ts = safeIso(o.updatedAt) ?? nowIso();
 
             const dealTypes = Array.isArray(o.items)
@@ -62,8 +67,8 @@ export function makeNotificationsController() {
               : [];
             const requiresReview = dealTypes.includes('Review');
             const requiresRating = dealTypes.includes('Rating');
-            const hasReviewProof = !!(o.reviewLink || o.screenshotReview);
-            const hasRatingProof = !!o.screenshotRating;
+            const hasReviewProof = !!(o.reviewLink || flags?.hasReviewProof);
+            const hasRatingProof = !!flags?.hasRatingProof;
             const verification = o.verification as any;
             const orderVerifiedAt = verification?.order?.verifiedAt
               ? new Date(verification.order.verifiedAt)
@@ -298,6 +303,7 @@ export function makeNotificationsController() {
         });
 
         businessLog.info(`[${isShopper ? 'Buyer' : isMediator ? 'Mediator' : 'User'}] User ${userId} listed notifications — ${Math.min(notifications.length, 50)} results`, { actorUserId: userId, role: isShopper ? 'shopper' : isMediator ? 'mediator' : 'other', count: Math.min(notifications.length, 50), ip: req.ip });
+        res.set('Cache-Control', 'private, max-age=30');
         res.json(notifications.slice(0, 50));
       } catch (err) {
         logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'DATABASE', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'notifications/list' } });

@@ -6,6 +6,9 @@ import { isNetworkError, isTimeoutError, httpStatusToFriendlyMessage } from '../
 // Real API Base URL
 const API_URL = getApiBaseUrl();
 
+/** Tracks whether the server has responded at least once this session (skip redundant warmups). */
+let _serverWarmedUp = false;
+
 /**
  * Extract a plain array from an API response that may be a paginated envelope
  * `{ data: T[] }` or a plain `T[]`.  Always returns a safe array.
@@ -614,12 +617,15 @@ export const api = {
       // Render free tier spins down after 15min idle; cold start takes 15-30s.
       // Wake the server FIRST with a lightweight health check, so extraction
       // doesn't waste its timeout budget waiting for the container to start.
-      try {
-        const warmupCtrl = new AbortController();
-        const warmupTimer = setTimeout(() => warmupCtrl.abort(), 40_000);
-        await fetch(`${API_URL}/health`, { signal: warmupCtrl.signal, method: 'GET' }).catch(() => {});
-        clearTimeout(warmupTimer);
-      } catch { /* ignore — extraction will retry anyway */ }
+      if (!_serverWarmedUp) {
+        try {
+          const warmupCtrl = new AbortController();
+          const warmupTimer = setTimeout(() => warmupCtrl.abort(), 40_000);
+          await fetch(`${API_URL}/health`, { signal: warmupCtrl.signal, method: 'GET' }).catch(() => {});
+          clearTimeout(warmupTimer);
+          _serverWarmedUp = true;
+        } catch { /* ignore — extraction will retry anyway */ }
+      }
 
       // --- EXTRACTION WITH AUTO-RETRY ---
       // Attempt extraction up to 2 times. First attempt has generous 60s timeout.

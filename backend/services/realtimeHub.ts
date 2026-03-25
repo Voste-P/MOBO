@@ -17,6 +17,11 @@ export type RealtimeEvent = {
     brandCodes?: string[];
     // Deliver to users that have this parentCode (e.g., shoppers with parentCode=mediatorCode).
     parentCodes?: string[];
+    // Pre-normalised Sets for O(1) delivery checks (populated at publish time)
+    _agencySet?: Set<string>;
+    _mediatorSet?: Set<string>;
+    _brandSet?: Set<string>;
+    _parentSet?: Set<string>;
   };
 };
 
@@ -33,8 +38,21 @@ export function getActiveListenerCount(): number {
   return _activeListeners;
 }
 
+function normalizeCodeSet(codes?: string[]): Set<string> | undefined {
+  if (!Array.isArray(codes) || codes.length === 0) return undefined;
+  return new Set(codes.map(c => String(c || '').trim().toLowerCase()));
+}
+
 export function publishRealtime(evt: RealtimeEvent) {
   try {
+    // Pre-normalise audience code arrays into Sets for O(1) lookups in shouldDeliver
+    const aud = evt.audience;
+    if (aud && !aud.broadcast) {
+      aud._agencySet = normalizeCodeSet(aud.agencyCodes);
+      aud._mediatorSet = normalizeCodeSet(aud.mediatorCodes);
+      aud._brandSet = normalizeCodeSet(aud.brandCodes);
+      aud._parentSet = normalizeCodeSet(aud.parentCodes);
+    }
     emitter.emit('event', evt);
   } catch (err) {
     // Prevent a listener error from crashing the whole process
