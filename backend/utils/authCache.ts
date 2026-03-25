@@ -10,7 +10,7 @@
  * Design:
  * - Per-userId keying (not per-token) — so a user switching devices is still fast.
  * - 30s TTL by default (configurable via AUTH_CACHE_TTL_MS env var).
- * - FIFO eviction when MAX_ENTRIES is exceeded (prevents unbounded memory growth).
+ * - LRU eviction when MAX_ENTRIES is exceeded (promotes on read, evicts least-recently-accessed).
  * - Call `authCacheInvalidate(userId)` after role/suspension changes.
  */
 
@@ -38,6 +38,10 @@ export function authCacheGet(userId: string): any | undefined {
     misses++;
     return undefined;
   }
+  // LRU promotion: move to end of Map iteration order so frequently-accessed
+  // entries survive eviction under high concurrency.
+  cache.delete(userId);
+  cache.set(userId, entry);
   hits++;
   return entry.value;
 }

@@ -146,7 +146,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
       setPlaceholderIndex((prev) => (prev + 1) % placeholders.length);
     }, 6000);
     return () => clearInterval(interval);
-  }, [isInputFocused, inputText, placeholders.length]);
+  }, [isInputFocused, inputText]);
 
   useEffect(() => {
     if (!isVisible) return;
