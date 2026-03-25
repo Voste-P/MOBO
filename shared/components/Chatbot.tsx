@@ -100,7 +100,16 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
     tickets: Ticket[];
     fetchedAt: number;
   } | null>(null);
-  const CONTEXT_CACHE_TTL = 5 * 60_000; // 5 minutes — products/orders rarely change mid-chat
+  const CONTEXT_CACHE_TTL = 15 * 60_000; // 15 minutes — products/orders rarely change mid-chat
+
+  // Clear context cache when user changes (prevents data leaking across accounts)
+  const prevUserIdRef = useRef<string | null | undefined>(user?.id);
+  useEffect(() => {
+    if (prevUserIdRef.current !== user?.id) {
+      contextCacheRef.current = null;
+      prevUserIdRef.current = user?.id;
+    }
+  }, [user?.id]);
 
   // Track navigation timer for cleanup on unmount
   const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

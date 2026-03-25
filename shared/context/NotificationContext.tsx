@@ -40,7 +40,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   const fetchingRef = useRef(false);
 
   const fetchNotifications = useCallback(async () => {
-    if (!user?.id || fetchingRef.current) return;
+    if (fetchingRef.current) return;
     fetchingRef.current = true;
     try {
       const data = await api.notifications.list();
@@ -50,9 +50,12 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     } finally {
       fetchingRef.current = false;
     }
-  }, [user?.id]);
+  }, []);
 
-  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchNotifications();
+  }, [user?.id, fetchNotifications]);
 
   // Realtime: refresh on relevant events (batch all events with clearTimeout)
   useEffect(() => {

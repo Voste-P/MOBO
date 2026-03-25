@@ -1,4 +1,4 @@
-﻿import type { NextFunction, Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import type { Env } from '../config/env.js';
 import { AppError } from '../middleware/errors.js';
 import type { Role } from '../middleware/auth.js';
@@ -54,13 +54,19 @@ async function buildOrderAudience(order: any, agencyCode?: string) {
   const managerCode = String(order?.managerName || '').trim();
   const normalizedAgencyCode = String(agencyCode || '').trim();
 
-  // Resolve PG UUIDs â†’ mongoIds for realtime (frontend matches by JWT sub = mongoId)
-  const [buyerUser, brandUser] = await Promise.all([
-    order?.userId ? db().user.findUnique({ where: { id: order.userId }, select: { mongoId: true } }) : null,
-    order?.brandUserId ? db().user.findUnique({ where: { id: order.brandUserId }, select: { mongoId: true } }) : null,
-  ]);
-  const buyerMongoId = buyerUser?.mongoId ?? '';
-  const brandMongoId = brandUser?.mongoId ?? '';
+  // Use pre-included relations when available (zero-cost); otherwise single batched lookup
+  let buyerMongoId = order?.user?.mongoId ?? '';
+  let brandMongoId = order?.brandUser?.mongoId ?? '';
+  if (!buyerMongoId || !brandMongoId) {
+    const ids = [!buyerMongoId && order?.userId, !brandMongoId && order?.brandUserId].filter(Boolean) as string[];
+    if (ids.length) {
+      const users = await db().user.findMany({ where: { id: { in: ids } }, select: { id: true, mongoId: true } });
+      for (const u of users) {
+        if (u.id === order?.userId) buyerMongoId = u.mongoId ?? '';
+        if (u.id === order?.brandUserId) brandMongoId = u.mongoId ?? '';
+      }
+    }
+  }
 
   return {
     roles: privilegedRoles,
