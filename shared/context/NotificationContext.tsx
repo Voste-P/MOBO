@@ -59,7 +59,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     if (!user?.id) return;
     let timer: any = null;
     const unsub = subscribeRealtime((msg: any) => {
-      if (['orders.changed', 'notifications.changed', 'tickets.changed', 'wallets.changed'].includes(msg.type)) {
+      if (['orders.changed', 'notifications.changed', 'tickets.changed'].includes(msg.type)) {
         if (timer) clearTimeout(timer);
         timer = setTimeout(() => { timer = null; fetchNotifications(); }, 800);
       }

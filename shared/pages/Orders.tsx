@@ -413,24 +413,23 @@ export const Orders: React.FC = () => {
     if (!user) return;
 
     let timer: any = null;
-    let ticketTimer: any = null;
-    const schedule = () => {
+    let pendingKeys = new Set<string>();
+    const schedule = (key: string) => {
+      pendingKeys.add(key);
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        loadOrders();
-      }, 800);
-    };
-    const scheduleTickets = () => {
-      if (ticketTimer) clearTimeout(ticketTimer);
-      ticketTimer = setTimeout(() => {
-        ticketTimer = null;
-        loadMyTickets();
+        const keys = new Set(pendingKeys);
+        pendingKeys.clear();
+        const tasks: Promise<any>[] = [];
+        if (keys.has('orders')) tasks.push(loadOrders());
+        if (keys.has('tickets')) tasks.push(loadMyTickets());
+        Promise.all(tasks).catch(() => {});
       }, 800);
     };
     const unsub = subscribeRealtime((msg: any) => {
-      if (msg.type === 'orders.changed') schedule();
-      if (msg.type === 'tickets.changed') scheduleTickets();
+      if (msg.type === 'orders.changed') schedule('orders');
+      if (msg.type === 'tickets.changed') schedule('tickets');
       if (msg.type === 'deals.changed') {
         // Refresh products only if modal was already opened
         if (productsLoadedRef.current) {
@@ -444,7 +443,6 @@ export const Orders: React.FC = () => {
     return () => {
       unsub();
       if (timer) clearTimeout(timer);
-      if (ticketTimer) clearTimeout(ticketTimer);
     };
   }, [user?.id]);
 

@@ -4377,6 +4377,10 @@ export const AgencyDashboard: React.FC = () => {
     }
   }, [activeTab]);
 
+  // Keep a ref so fetchData callback stays stable across tab switches
+  const tabDataNeedsRef = useRef(tabDataNeeds);
+  tabDataNeedsRef.current = tabDataNeeds;
+
   const fetchData = useCallback(async (opts?: { force?: boolean; silent?: boolean }) => {
     if (!user?.mediatorCode) return;
     if (fetchRef.current) return;
@@ -4384,9 +4388,10 @@ export const AgencyDashboard: React.FC = () => {
     const silent = opts?.silent ?? false;
 
     // Determine which data sets are actually needed but not yet loaded
+    const currentNeeds = tabDataNeedsRef.current;
     const needed = force
-      ? tabDataNeeds
-      : tabDataNeeds.filter((k) => !loadedRef.current.has(k));
+      ? currentNeeds
+      : currentNeeds.filter((k) => !loadedRef.current.has(k));
     if (needed.length === 0) return;
 
     fetchRef.current = true;
@@ -4444,12 +4449,12 @@ export const AgencyDashboard: React.FC = () => {
       fetchRef.current = false;
       setIsDataLoading(false);
     }
-  }, [user?.id, activeTab, tabDataNeeds]);
+  }, [user?.id]);
 
-  // Single effect: fetch on mount, tab change, and realtime events
+  // Trigger data load when tab changes (separate from the stable callback)
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, activeTab]);
 
   // Realtime: only invalidate data keys relevant to the SSE event, then refetch
   useEffect(() => {
@@ -4473,7 +4478,7 @@ export const AgencyDashboard: React.FC = () => {
     const unsub = subscribeRealtime((msg) => {
       const keys = eventToKeys[msg.type];
       if (keys) {
-        const relevant = keys.filter((k) => tabDataNeeds.includes(k));
+        const relevant = keys.filter((k) => tabDataNeedsRef.current.includes(k));
         if (relevant.length > 0) schedule(relevant);
       }
     });
@@ -4481,7 +4486,7 @@ export const AgencyDashboard: React.FC = () => {
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [user?.id, fetchData, tabDataNeeds]);
+  }, [user?.id, fetchData]);
 
   // Force refresh for child component mutation callbacks
   const refreshData = useCallback(() => fetchData({ force: true }), [fetchData]);
