@@ -23,7 +23,7 @@ async function enrichTicketsWithResolverNames(tickets: any[]): Promise<any[]> {
   const resolverIds = [...new Set(tickets.map(t => t.resolvedBy).filter(Boolean))];
   if (!resolverIds.length) return tickets;
   const resolvers = await db.user.findMany({
-    where: { id: { in: resolverIds } },
+    where: { id: { in: resolverIds.slice(0, 500) } },
     select: { id: true, name: true },
   });
   const nameMap = new Map(resolvers.map(r => [r.id, r.name]));

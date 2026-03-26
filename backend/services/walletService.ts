@@ -51,6 +51,7 @@ export async function ensureWallet(ownerUserId: string) {
         lockedPaise: 0,
         version: 0,
       },
+      select: { id: true, ownerUserId: true, availablePaise: true, pendingPaise: true, lockedPaise: true, currency: true, version: true },
     });
   } catch (err: any) {
     // Handle P2002 (unique constraint violation)

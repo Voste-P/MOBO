@@ -35,6 +35,20 @@ export function clearLineageCache(): void {
   agencyCodeCache.clear();
   activeCache.clear();
 }
+
+/** Purge expired entries from all lineage caches */
+function purgeExpiredEntries(): void {
+  const now = Date.now();
+  for (const cache of [mediatorCodesCache, agencyCodeCache, activeCache]) {
+    for (const [key, entry] of cache) {
+      if (now > (entry as CacheEntry<unknown>).expiresAt) cache.delete(key);
+    }
+  }
+}
+
+// Background cleanup every 5 minutes to prevent stale entry accumulation
+const _lineageCacheCleanup = setInterval(purgeExpiredEntries, 5 * 60_000);
+if (typeof _lineageCacheCleanup.unref === 'function') _lineageCacheCleanup.unref();
 // ───────────────────────────────────────────────────────────────────────
 
 export async function listMediatorCodesForAgency(agencyCode: string): Promise<string[]> {
