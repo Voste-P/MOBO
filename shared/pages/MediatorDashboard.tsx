@@ -1862,7 +1862,6 @@ export const MediatorDashboard: React.FC = () => {
   const [verifiedUsers, setVerifiedUsers] = useState<User[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
-  const loadingRef = useRef(false);
 
   // Modals
   const [proofModal, setProofModal] = useState<Order | null>(null);
@@ -1904,6 +1903,7 @@ export const MediatorDashboard: React.FC = () => {
   // AI Analysis — now reads stored data from order, no Gemini calls needed
 
   const loadedRef = useRef<Set<string>>(new Set());
+  const inFlightRef = useRef<Set<string>>(new Set());
   const lastFetchedAt = useRef<Record<string, number>>({});
 
   const tabDataNeeds = useMemo<string[]>(() => {
@@ -1922,7 +1922,6 @@ export const MediatorDashboard: React.FC = () => {
 
   const loadData = useCallback(async (opts?: { force?: boolean; silent?: boolean; keys?: string[] }) => {
     if (!user) return;
-    if (loadingRef.current) return;
     const force = opts?.force ?? false;
     const silent = !!opts?.silent;
     const invalidateKeys = opts?.keys;
@@ -1935,10 +1934,10 @@ export const MediatorDashboard: React.FC = () => {
     if (force && !invalidateKeys) {
       for (const k of currentNeeds) loadedRef.current.delete(k);
     }
-    const needed = currentNeeds.filter((k) => !loadedRef.current.has(k));
+    const needed = currentNeeds.filter((k) => !loadedRef.current.has(k) && !inFlightRef.current.has(k));
     if (needed.length === 0) return;
 
-    loadingRef.current = true;
+    for (const k of needed) inFlightRef.current.add(k);
     setLoading(true);
     try {
       const promises: Promise<any>[] = [];
@@ -2002,8 +2001,8 @@ export const MediatorDashboard: React.FC = () => {
         toast.error(msg.includes('fetch') || msg.includes('network') ? 'Network error. Please check your connection.' : msg);
       }
     } finally {
-      loadingRef.current = false;
-      setLoading(false);
+      for (const k of needed) inFlightRef.current.delete(k);
+      if (inFlightRef.current.size === 0) setLoading(false);
     }
   }, [user?.id]);
 

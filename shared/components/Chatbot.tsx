@@ -67,7 +67,7 @@ const FormattedText: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, isActive: _isActive = true, onNavigate }) => {
+export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }) => {
   const { messages, addMessage, setUserId, clearChat } = useChat();
   const { notifications, removeNotification, unreadCount, markAllRead } = useNotification();
   const [inputText, setInputText] = useState('');

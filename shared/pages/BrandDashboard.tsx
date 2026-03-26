@@ -2195,7 +2195,7 @@ export const BrandDashboard: React.FC = () => {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
   const loadedRef = useRef<Set<string>>(new Set());
-  const fetchRef = useRef(false);
+  const inFlightRef = useRef<Set<string>>(new Set());
   const lastFetchedAt = useRef<Record<string, number>>({});
 
   const tabDataNeeds = useMemo<string[]>(() => {
@@ -2217,7 +2217,6 @@ export const BrandDashboard: React.FC = () => {
 
   const fetchData = useCallback(async (opts?: { force?: boolean; silent?: boolean; keys?: string[] }) => {
     if (!user) return;
-    if (fetchRef.current) return;
     const force = opts?.force ?? false;
     const silent = opts?.silent ?? false;
     const invalidateKeys = opts?.keys;
@@ -2230,10 +2229,10 @@ export const BrandDashboard: React.FC = () => {
     if (force && !invalidateKeys) {
       for (const k of currentNeeds) loadedRef.current.delete(k);
     }
-    const needed = currentNeeds.filter((k) => !loadedRef.current.has(k));
+    const needed = currentNeeds.filter((k) => !loadedRef.current.has(k) && !inFlightRef.current.has(k));
     if (needed.length === 0) return;
 
-    fetchRef.current = true;
+    for (const k of needed) inFlightRef.current.add(k);
     if (!silent) setIsDataLoading(true);
     try {
       const promises: Promise<any>[] = [];
@@ -2262,8 +2261,8 @@ export const BrandDashboard: React.FC = () => {
       if (process.env.NODE_ENV !== 'production') console.error('Dashboard data fetch failed', e);
       if (!silent) toast.error(formatErrorMessage(e, 'Failed to load dashboard data'));
     } finally {
-      fetchRef.current = false;
-      setIsDataLoading(false);
+      for (const k of needed) inFlightRef.current.delete(k);
+      if (inFlightRef.current.size === 0) setIsDataLoading(false);
     }
   }, [user?.id]);
 
