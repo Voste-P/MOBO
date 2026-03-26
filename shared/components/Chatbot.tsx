@@ -67,7 +67,7 @@ const FormattedText: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, isActive = true, onNavigate }) => {
+export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, isActive: _isActive = true, onNavigate }) => {
   const { messages, addMessage, setUserId, clearChat } = useChat();
   const { notifications, removeNotification, unreadCount, markAllRead } = useNotification();
   const [inputText, setInputText] = useState('');
@@ -111,23 +111,6 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, isActive = t
       prevUserIdRef.current = user?.id;
     }
   }, [user?.id]);
-
-  // Pre-fetch context when tab becomes active; respect TTL for cache freshness
-  useEffect(() => {
-    if (!isActive || !user?.id) return;
-    // Skip if cache is still fresh (within TTL)
-    const cache = contextCacheRef.current;
-    if (cache && (Date.now() - cache.fetchedAt) < CONTEXT_CACHE_TTL) return;
-    contextCacheRef.current = null; // clear stale/missing cache before re-fetching
-    // Warm the context cache so the first message is instant
-    Promise.all([
-      api.products.getAll(user?.mediatorCode).catch(() => []),
-      api.orders.getUserOrders(user.id).catch(() => []),
-      api.tickets.getAll().catch(() => []),
-    ]).then(([products, orders, tickets]) => {
-      contextCacheRef.current = { products, orders, tickets, fetchedAt: Date.now() };
-    });
-  }, [isActive, user?.id]);
 
   // Track navigation timer for cleanup on unmount
   const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

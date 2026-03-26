@@ -4356,8 +4356,6 @@ export const AgencyDashboard: React.FC = () => {
 
   // Track which data sets have been loaded to avoid redundant fetches
   const loadedRef = useRef<Set<string>>(new Set());
-  // Track which tabs have had their first visit (per-tab fetch on first switch)
-  const loadedTabsRef = useRef<Set<string>>(new Set());
   const fetchRef = useRef(false);
   const lastFetchedAt = useRef<Record<string, number>>({});
   // Ref to always read current state for stats computation (avoids stale closures)
@@ -4462,17 +4460,11 @@ export const AgencyDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load on mount and tab change — first visit per tab forces fetch
+  // Trigger data load on tab change — only fetches keys not already cached
   const prevTabRef = useRef(activeTab);
   useEffect(() => {
     const tabChanged = prevTabRef.current !== activeTab;
     prevTabRef.current = activeTab;
-    // First visit to this tab: clear its data keys so they produce real API calls
-    if (!loadedTabsRef.current.has(activeTab)) {
-      loadedTabsRef.current.add(activeTab);
-      const needs = tabDataNeedsRef.current;
-      for (const k of needs) loadedRef.current.delete(k);
-    }
     fetchData({ silent: tabChanged });
   }, [fetchData, activeTab]);
 

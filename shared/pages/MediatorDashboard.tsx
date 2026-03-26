@@ -1904,8 +1904,6 @@ export const MediatorDashboard: React.FC = () => {
   // AI Analysis — now reads stored data from order, no Gemini calls needed
 
   const loadedRef = useRef<Set<string>>(new Set());
-  // Track which tabs have had their first visit (per-tab fetch on first switch)
-  const loadedTabsRef = useRef<Set<string>>(new Set());
   const lastFetchedAt = useRef<Record<string, number>>({});
 
   const tabDataNeeds = useMemo<string[]>(() => {
@@ -2009,17 +2007,11 @@ export const MediatorDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load on mount and tab change — first visit per tab forces fetch
+  // Trigger data load on tab change — only fetches keys not already cached
   const prevTabRef = useRef(activeTab);
   useEffect(() => {
     const tabChanged = prevTabRef.current !== activeTab;
     prevTabRef.current = activeTab;
-    // First visit to this tab: clear its data keys so they produce real API calls
-    if (!loadedTabsRef.current.has(activeTab)) {
-      loadedTabsRef.current.add(activeTab);
-      const needs = tabDataNeedsRef.current;
-      for (const k of needs) loadedRef.current.delete(k);
-    }
     loadData({ silent: tabChanged });
   }, [loadData, activeTab]);
 
