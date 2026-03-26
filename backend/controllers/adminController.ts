@@ -512,7 +512,14 @@ export function makeAdminController() {
         const user = await db().user.findFirst({ where: { ...idWhere(userId), isDeleted: false }, select: { id: true, mongoId: true } });
         if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
-        const wallet = await db().wallet.findFirst({ where: { ownerUserId: user.id, isDeleted: false }, select: { id: true, mongoId: true, availablePaise: true, pendingPaise: true, lockedPaise: true } });
+        // Wallet + payout checks are independent — run in parallel
+        const [wallet, hasPendingPayout] = await Promise.all([
+          db().wallet.findFirst({ where: { ownerUserId: user.id, isDeleted: false }, select: { id: true, mongoId: true, availablePaise: true, pendingPaise: true, lockedPaise: true } }),
+          db().payout.findFirst({
+            where: { beneficiaryUserId: user.id, status: { in: ['requested', 'processing'] as any }, isDeleted: false },
+            select: { id: true },
+          }),
+        ]);
         if (!wallet) throw new AppError(404, 'WALLET_NOT_FOUND', 'Wallet not found');
 
         const available = Number(wallet.availablePaise ?? 0);
@@ -521,11 +528,6 @@ export function makeAdminController() {
         if (available > 0 || pending > 0 || locked > 0) {
           throw new AppError(409, 'WALLET_NOT_EMPTY', 'Wallet has funds; cannot delete');
         }
-
-        const hasPendingPayout = await db().payout.findFirst({
-          where: { beneficiaryUserId: user.id, status: { in: ['requested', 'processing'] as any }, isDeleted: false },
-          select: { id: true },
-        });
         if (hasPendingPayout) {
           throw new AppError(409, 'PAYOUT_PENDING', 'User has pending payouts; cannot delete wallet');
         }
@@ -824,7 +826,7 @@ export function makeAdminController() {
         }
 
         const [logs, total] = await Promise.all([
-          db().auditLog.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take: limit }),
+          db().auditLog.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take: limit, select: { id: true, mongoId: true, actorUserId: true, actorRoles: true, action: true, entityType: true, entityId: true, ip: true, metadata: true, createdAt: true } }),
           db().auditLog.count({ where }),
         ]);
 

@@ -23,7 +23,7 @@ async function enrichTicketsWithResolverNames(tickets: any[]): Promise<any[]> {
   const resolverIds = [...new Set(tickets.map(t => t.resolvedBy).filter(Boolean))];
   if (!resolverIds.length) return tickets;
   const resolvers = await db.user.findMany({
-    where: { id: { in: resolverIds } },
+    where: { id: { in: resolverIds.slice(0, 500) } },
     select: { id: true, name: true },
   });
   const nameMap = new Map(resolvers.map(r => [r.id, r.name]));
@@ -663,8 +663,9 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
           if (issueTypeFilter === 'Feedback') ticketWhere.issueType = 'Feedback';
           else if (issueTypeFilter === 'support') ticketWhere.issueType = { not: 'Feedback' };
           const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
+          const ticketSelect = { id: true, mongoId: true, userId: true, userName: true, role: true, orderId: true, issueType: true, description: true, status: true, targetRole: true, resolutionNote: true, resolvedBy: true, resolvedAt: true, createdAt: true } as const;
           const [tickets, total] = await Promise.all([
-            db.ticket.findMany({ where: ticketWhere, orderBy: { createdAt: 'desc' }, skip, take: limit }),
+            db.ticket.findMany({ where: ticketWhere, orderBy: { createdAt: 'desc' }, skip, take: limit, select: ticketSelect }),
             db.ticket.count({ where: ticketWhere }),
           ]);
           const enriched = await enrichTickets(tickets);
@@ -676,8 +677,9 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
         if (roles.includes('shopper')) {
           const shopperWhere = { userId: pgUserId, isDeleted: false };
           const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
+          const ticketSelect = { id: true, mongoId: true, userId: true, userName: true, role: true, orderId: true, issueType: true, description: true, status: true, targetRole: true, resolutionNote: true, resolvedBy: true, resolvedAt: true, createdAt: true } as const;
           const [tickets, total] = await Promise.all([
-            db.ticket.findMany({ where: shopperWhere, orderBy: { createdAt: 'desc' }, skip, take: limit }),
+            db.ticket.findMany({ where: shopperWhere, orderBy: { createdAt: 'desc' }, skip, take: limit, select: ticketSelect }),
             db.ticket.count({ where: shopperWhere }),
           ]);
           const enriched = await enrichTickets(tickets);
@@ -800,12 +802,14 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
             OR: cascadeTargets,
         };
         const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
+        const ticketSelect = { id: true, mongoId: true, userId: true, userName: true, role: true, orderId: true, issueType: true, description: true, status: true, targetRole: true, resolutionNote: true, resolvedBy: true, resolvedAt: true, createdAt: true } as const;
         const [tickets, total] = await Promise.all([
           db.ticket.findMany({
             where: ticketWhere,
             orderBy: { createdAt: 'desc' },
             skip,
             take: limit,
+            select: ticketSelect,
           }),
           db.ticket.count({ where: ticketWhere }),
         ]);
