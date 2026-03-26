@@ -364,6 +364,34 @@ export function invalidateGetCache(pathPrefix?: string) {
   }
 }
 
+/**
+ * Derive which cache prefixes a mutation path affects.
+ * Returns an array of path prefixes to invalidate.
+ * This prevents a profile update from nuking the products/orders cache.
+ */
+function mutationCachePrefixes(path: string): string[] | null {
+  // Extract the first path segment: /auth/profile → 'auth'
+  const seg = path.split('/').filter(Boolean)[0];
+  if (!seg) return null; // fallback: clear all
+  // Map mutation paths to the cache prefixes they can affect
+  const scopeMap: Record<string, string[]> = {
+    auth:          ['/auth'],
+    orders:        ['/orders', '/ops', '/brand', '/admin'],
+    products:      ['/products'],
+    brand:         ['/brand', '/products'],
+    ops:           ['/ops', '/products', '/orders'],
+    admin:         ['/admin', '/auth'],
+    tickets:       ['/tickets'],
+    invites:       ['/invites'],
+    notifications: ['/notifications'],
+    ai:            ['/ai', '/orders'],
+    sheets:        [],
+    google:        [],
+    media:         [],
+  };
+  return scopeMap[seg] ?? null; // null = unknown → clear all
+}
+
 async function fetchJson(path: string, init?: RequestInit): Promise<any> {
   const method = (init?.method || 'GET').toUpperCase();
   if (method === 'GET') {
@@ -381,8 +409,13 @@ async function fetchJson(path: string, init?: RequestInit): Promise<any> {
     inflightGets.set(path, promise);
     return promise;
   }
-  // Any mutation invalidates the GET cache to prevent stale reads
-  getCache.clear();
+  // Semantic cache invalidation: only clear cache entries related to the mutated resource
+  const prefixes = mutationCachePrefixes(path);
+  if (prefixes === null) {
+    getCache.clear(); // unknown path — full clear for safety
+  } else {
+    for (const p of prefixes) invalidateGetCache(p);
+  }
   return fetchJsonInner(path, init);
 }
 
@@ -426,8 +459,13 @@ async function fetchJsonInner(path: string, init?: RequestInit): Promise<any> {
 }
 
 async function fetchOk(path: string, init?: RequestInit): Promise<void> {
-  // Mutations invalidate GET cache to prevent stale reads after writes
-  getCache.clear();
+  // Semantic cache invalidation: only clear cache entries related to the mutated resource
+  const prefixes = mutationCachePrefixes(path);
+  if (prefixes === null) {
+    getCache.clear();
+  } else {
+    for (const p of prefixes) invalidateGetCache(p);
+  }
   assertOnlineForWrite(init);
   const res = await fetchWithRetry(`${API_URL}${path}`, withRequestId(init));
   const payload = await readPayloadSafe(res);

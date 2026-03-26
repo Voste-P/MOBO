@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useMemo, Suspense } from 'react';
+﻿import React, { useState, useRef, useMemo, Suspense, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { CartProvider } from '../context/CartContext';
 import { ChatProvider } from '../context/ChatContext';
@@ -43,10 +43,23 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
     setActiveTab(tab);
   };
 
+  // Track which tabs have been visited so we only mount them on first visit
+  // but keep them mounted (CSS-hidden) afterwards to preserve scroll position.
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(['explore']));
+  const handleTabChangeWrapped = useCallback((tab: typeof activeTab) => {
+    setVisitedTabs(prev => {
+      if (prev.has(tab)) return prev;
+      const next = new Set(prev);
+      next.add(tab);
+      return next;
+    });
+    handleTabChange(tab);
+  }, [activeTab]);
+
   const swipeHandlers = useSwipeTabs({
     tabs: TAB_ORDER as unknown as string[],
     activeTab,
-    onChangeTab: (t) => handleTabChange(t as typeof activeTab),
+    onChangeTab: (t) => handleTabChangeWrapped(t as typeof activeTab),
   });
 
   const tabItems = useMemo(() => [
@@ -122,18 +135,26 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
             <div className="flex flex-col h-full bg-[#F2F2F7] relative overflow-hidden font-sans">
               <div className="flex-1 overflow-hidden overscroll-none" {...swipeHandlers}>
                 <Suspense fallback={<TabSkeleton />}>
-                  <div className={`h-full ${activeTab === 'explore' ? '' : 'hidden'}`}>
-                    <div className="h-full overflow-y-auto scrollbar-styled"><Explore isActive={activeTab === 'explore'} /></div>
-                  </div>
-                  <div className={`h-full ${activeTab === 'home' ? '' : 'hidden'}`}>
-                    <div className="h-full overflow-y-auto scrollbar-styled"><Home onVoiceNavigate={handleTabChange} isActive={activeTab === 'home'} /></div>
-                  </div>
-                  <div className={`h-full ${activeTab === 'orders' ? '' : 'hidden'}`}>
-                    <div className="h-full overflow-y-auto scrollbar-styled"><Orders isActive={activeTab === 'orders'} /></div>
-                  </div>
-                  <div className={`h-full ${activeTab === 'profile' ? '' : 'hidden'}`}>
-                    <div className="h-full overflow-y-auto scrollbar-styled"><Profile isActive={activeTab === 'profile'} /></div>
-                  </div>
+                  {visitedTabs.has('explore') && (
+                    <div className={`h-full ${activeTab === 'explore' ? '' : 'hidden'}`}>
+                      <div className="h-full overflow-y-auto scrollbar-styled"><Explore isActive={activeTab === 'explore'} /></div>
+                    </div>
+                  )}
+                  {visitedTabs.has('home') && (
+                    <div className={`h-full ${activeTab === 'home' ? '' : 'hidden'}`}>
+                      <div className="h-full overflow-y-auto scrollbar-styled"><Home onVoiceNavigate={handleTabChangeWrapped} isActive={activeTab === 'home'} /></div>
+                    </div>
+                  )}
+                  {visitedTabs.has('orders') && (
+                    <div className={`h-full ${activeTab === 'orders' ? '' : 'hidden'}`}>
+                      <div className="h-full overflow-y-auto scrollbar-styled"><Orders isActive={activeTab === 'orders'} /></div>
+                    </div>
+                  )}
+                  {visitedTabs.has('profile') && (
+                    <div className={`h-full ${activeTab === 'profile' ? '' : 'hidden'}`}>
+                      <div className="h-full overflow-y-auto scrollbar-styled"><Profile isActive={activeTab === 'profile'} /></div>
+                    </div>
+                  )}
                 </Suspense>
               </div>
 
@@ -141,7 +162,7 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
                 <MobileTabBar
                   items={tabItems}
                   activeId={activeTab}
-                  onChange={(id) => handleTabChange(id as any)}
+                  onChange={(id) => handleTabChangeWrapped(id as any)}
                   variant="glass"
                   showLabels={false}
                 />

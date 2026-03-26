@@ -322,6 +322,8 @@ model User {
   @@index([mobile, isDeleted])               // fast login lookup
   @@index([username, isDeleted])             // fast username login lookup
   @@index([isDeleted, createdAt(sort: Desc)]) // admin user listing
+  @@index([mediatorCode, isDeleted, status]) // ops dashboard mediator-scoped queries
+  @@index([parentCode, isDeleted, status])   // agency team listing  
   @@map("users")
 }
 
@@ -703,6 +705,7 @@ model Transaction {
   @@index([status, type, createdAt(sort: Desc)])
   @@index([isDeleted, createdAt(sort: Desc)])
   @@index([walletId, createdAt(sort: Desc)])
+  @@index([walletId, type, createdAt(sort: Desc)])     // ledger queries with type filter
   @@index([orderId])
   @@index([campaignId])
   @@index([payoutId])
@@ -823,6 +826,8 @@ model Ticket {
   @@index([isDeleted, createdAt(sort: Desc)])          // admin ticket listing
   @@index([orderId])                                   // settlement dispute lookups
   @@index([targetRole, isDeleted, createdAt(sort: Desc)]) // cascade routing lookups
+  @@index([userId, orderId, isDeleted])                // ticket permission checks
+  @@index([role, status, isDeleted])                   // role-scoped ticket queries
   @@map("tickets")
 }
 

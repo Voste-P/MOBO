@@ -78,7 +78,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const changedId = msg.payload?.userId;
         if (!changedId || String(changedId) === String(user.id)) scheduleRefresh();
       } else if (msg.type === 'wallets.changed') {
-        scheduleRefresh();
+        // Only refresh if the wallet change is for the current user
+        const changedOwner = msg.payload?.userId || msg.payload?.ownerUserId;
+        if (!changedOwner || String(changedOwner) === String(user.id)) scheduleRefresh();
       }
     });
 

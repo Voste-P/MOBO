@@ -38,7 +38,16 @@ export function ordersRoutes(env: Env): Router {
   router.post('/orders', requireAuth(env), orderWriteLimiter, orders.createOrder);
   router.post('/orders/claim', requireAuth(env), requireRoles('shopper'), orderWriteLimiter, orders.submitClaim);
   router.patch('/orders/:orderId/reviewer-name', requireAuth(env), orderWriteLimiter, orders.setReviewerName);
-  router.get('/orders/:orderId/proof/:type', requireAuth(env), (_req, res, next) => {
+  // Rate limit proof retrieval to prevent brute-force enumeration
+  const proofReadLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: env.NODE_ENV === 'production' ? 60 : 5000,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req: any) => String(req.auth?.userId || req.ip || 'unknown'),
+  });
+
+  router.get('/orders/:orderId/proof/:type', requireAuth(env), proofReadLimiter, (_req, res, next) => {
     // Proof screenshots are immutable once uploaded — cache aggressively
     res.setHeader('Cache-Control', 'private, max-age=3600, immutable');
     next();
