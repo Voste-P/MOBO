@@ -4356,6 +4356,8 @@ export const AgencyDashboard: React.FC = () => {
 
   // Track which data sets have been loaded to avoid redundant fetches
   const loadedRef = useRef<Set<string>>(new Set());
+  // Track which tabs have had their first visit (per-tab fetch on first switch)
+  const loadedTabsRef = useRef<Set<string>>(new Set());
   const fetchRef = useRef(false);
   const lastFetchedAt = useRef<Record<string, number>>({});
   // Ref to always read current state for stats computation (avoids stale closures)
@@ -4460,11 +4462,17 @@ export const AgencyDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load on mount and tab change — only fetch keys not yet loaded
+  // Trigger data load on mount and tab change — first visit per tab forces fetch
   const prevTabRef = useRef(activeTab);
   useEffect(() => {
     const tabChanged = prevTabRef.current !== activeTab;
     prevTabRef.current = activeTab;
+    // First visit to this tab: clear its data keys so they produce real API calls
+    if (!loadedTabsRef.current.has(activeTab)) {
+      loadedTabsRef.current.add(activeTab);
+      const needs = tabDataNeedsRef.current;
+      for (const k of needs) loadedRef.current.delete(k);
+    }
     fetchData({ silent: tabChanged });
   }, [fetchData, activeTab]);
 
@@ -4487,16 +4495,16 @@ export const AgencyDashboard: React.FC = () => {
         const now = Date.now();
         const stale = keysToInvalidate.filter(k => (now - (lastFetchedAt.current[k] || 0)) > 2000);
         if (stale.length === 0) return;
+        // Always invalidate globally so other tabs see fresh data on next visit
         for (const k of stale) loadedRef.current.delete(k);
-        fetchData({ silent: true });
+        // Only re-fetch if current tab actually needs these keys
+        const relevant = stale.filter(k => tabDataNeedsRef.current.includes(k));
+        if (relevant.length > 0) fetchData({ silent: true });
       }, 900);
     };
     const unsub = subscribeRealtime((msg) => {
       const keys = eventToKeys[msg.type];
-      if (keys) {
-        const relevant = keys.filter((k) => tabDataNeedsRef.current.includes(k));
-        if (relevant.length > 0) schedule(relevant);
-      }
+      if (keys && keys.length > 0) schedule(keys);
     });
     return () => {
       unsub();

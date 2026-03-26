@@ -112,13 +112,13 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, isActive = t
     }
   }, [user?.id]);
 
-  // Pre-fetch context when tab becomes active; clear cache on leave for freshness
+  // Pre-fetch context when tab becomes active; respect TTL for cache freshness
   useEffect(() => {
-    if (!isActive) {
-      contextCacheRef.current = null;
-      return;
-    }
-    if (contextCacheRef.current || !user?.id) return;
+    if (!isActive || !user?.id) return;
+    // Skip if cache is still fresh (within TTL)
+    const cache = contextCacheRef.current;
+    if (cache && (Date.now() - cache.fetchedAt) < CONTEXT_CACHE_TTL) return;
+    contextCacheRef.current = null; // clear stale/missing cache before re-fetching
     // Warm the context cache so the first message is instant
     Promise.all([
       api.products.getAll(user?.mediatorCode).catch(() => []),
