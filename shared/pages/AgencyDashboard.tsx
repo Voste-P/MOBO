@@ -7,7 +7,7 @@ import { ProxiedImage } from '../components/ProxiedImage';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
 import TicketDetailModal from '../components/TicketDetailModal';
 import { FeedbackCard } from '../components/FeedbackCard';
-import { api, asArray, invalidateGetCache } from '../services/api';
+import { api, asArray } from '../services/api';
 import { getDirectBackendUrl } from '../utils/apiBaseUrl';
 import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
@@ -4395,13 +4395,12 @@ export const AgencyDashboard: React.FC = () => {
 
     // Determine which data sets are actually needed but not yet loaded
     const currentNeeds = tabDataNeedsRef.current;
+    const STALE_MS = 5_000;
+    const now = Date.now();
     const needed = (force && !invalidateKeys)
-      ? currentNeeds
+      ? currentNeeds.filter(k => (now - (lastFetchedAt.current[k] || 0)) > STALE_MS)
       : currentNeeds.filter((k) => !loadedRef.current.has(k));
     if (needed.length === 0) return;
-
-    // Bypass the GET response cache so tab switches produce real network requests
-    if (force) invalidateGetCache();
 
     fetchRef.current = true;
     if (!silent) setIsDataLoading(true);

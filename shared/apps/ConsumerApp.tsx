@@ -126,7 +126,7 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
                     <div className="h-full overflow-y-auto scrollbar-styled"><Explore isActive={activeTab === 'explore'} /></div>
                   </div>
                   <div className={`h-full ${activeTab === 'home' ? '' : 'hidden'}`}>
-                    <div className="h-full overflow-y-auto scrollbar-styled"><Home onVoiceNavigate={handleTabChange} /></div>
+                    <div className="h-full overflow-y-auto scrollbar-styled"><Home onVoiceNavigate={handleTabChange} isActive={activeTab === 'home'} /></div>
                   </div>
                   <div className={`h-full ${activeTab === 'orders' ? '' : 'hidden'}`}>
                     <div className="h-full overflow-y-auto scrollbar-styled"><Orders isActive={activeTab === 'orders'} /></div>

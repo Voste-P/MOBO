@@ -313,7 +313,8 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
 
   useEffect(() => {
     if (!isActive) return;
-    invalidateGetCache();
+    invalidateGetCache('/orders');
+    invalidateGetCache('/tickets');
     if (user) {
       Promise.all([loadOrders(), loadMyTickets()]);
     } else {

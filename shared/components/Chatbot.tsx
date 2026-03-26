@@ -19,6 +19,7 @@ import { ProxiedImage } from './ProxiedImage';
 
 interface ChatbotProps {
   isVisible?: boolean;
+  isActive?: boolean;
   onNavigate?: (tab: 'home' | 'explore' | 'orders' | 'profile') => void;
 }
 
@@ -66,7 +67,7 @@ const FormattedText: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }) => {
+export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, isActive = true, onNavigate }) => {
   const { messages, addMessage, setUserId, clearChat } = useChat();
   const { notifications, removeNotification, unreadCount, markAllRead } = useNotification();
   const [inputText, setInputText] = useState('');
@@ -100,7 +101,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
     tickets: Ticket[];
     fetchedAt: number;
   } | null>(null);
-  const CONTEXT_CACHE_TTL = 15 * 60_000; // 15 minutes — products/orders rarely change mid-chat
+  const CONTEXT_CACHE_TTL = 2 * 60_000; // 2 minutes — keep context fresh across tab switches
 
   // Clear context cache when user changes (prevents data leaking across accounts)
   const prevUserIdRef = useRef<string | null | undefined>(user?.id);
@@ -110,6 +111,13 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
       prevUserIdRef.current = user?.id;
     }
   }, [user?.id]);
+
+  // Clear context cache when leaving this tab so next message fetches fresh data
+  useEffect(() => {
+    if (!isActive) {
+      contextCacheRef.current = null;
+    }
+  }, [isActive]);
 
   // Track navigation timer for cleanup on unmount
   const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

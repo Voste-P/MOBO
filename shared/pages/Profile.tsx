@@ -82,7 +82,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
 
   useEffect(() => {
     if (!isActive) return;
-    invalidateGetCache();
+    invalidateGetCache('/orders');
     if (user) refreshStats();
   }, [user?.id, isActive]);
 

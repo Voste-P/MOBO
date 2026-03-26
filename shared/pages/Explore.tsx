@@ -40,7 +40,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
 
   useEffect(() => {
     if (!isActive) return;
-    invalidateGetCache();
+    invalidateGetCache('/products');
     loadProducts();
   }, [loadProducts, isActive]);
 
