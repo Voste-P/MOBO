@@ -38,8 +38,12 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
     }
   }, []);
 
+  const loadedOnceRef = useRef(false);
+
   useEffect(() => {
     if (!isActive) return;
+    if (loadedOnceRef.current) return;
+    loadedOnceRef.current = true;
     invalidateGetCache('/products');
     loadProducts();
   }, [loadProducts, isActive]);

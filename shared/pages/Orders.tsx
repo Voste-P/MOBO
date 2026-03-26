@@ -311,8 +311,12 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
     });
   }, [availableProducts, dealTypeFilter, formSearch]);
 
+  const loadedOnceRef = useRef(false);
+
   useEffect(() => {
     if (!isActive) return;
+    if (loadedOnceRef.current) return;
+    loadedOnceRef.current = true;
     invalidateGetCache('/orders');
     invalidateGetCache('/tickets');
     if (user) {

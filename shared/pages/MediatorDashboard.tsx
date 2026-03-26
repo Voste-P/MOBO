@@ -1932,11 +1932,10 @@ export const MediatorDashboard: React.FC = () => {
     }
 
     const currentNeeds = tabDataNeedsRef.current;
-    const STALE_MS = 5_000;
-    const now = Date.now();
-    const needed = (force && !invalidateKeys)
-      ? currentNeeds.filter(k => (now - (lastFetchedAt.current[k] || 0)) > STALE_MS)
-      : currentNeeds.filter((k) => !loadedRef.current.has(k));
+    if (force && !invalidateKeys) {
+      for (const k of currentNeeds) loadedRef.current.delete(k);
+    }
+    const needed = currentNeeds.filter((k) => !loadedRef.current.has(k));
     if (needed.length === 0) return;
 
     loadingRef.current = true;
@@ -2008,16 +2007,12 @@ export const MediatorDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load on mount and tab change — force re-fetch on tab switch
+  // Trigger data load on mount and tab change — only fetch keys not yet loaded
   const prevTabRef = useRef(activeTab);
   useEffect(() => {
     const tabChanged = prevTabRef.current !== activeTab;
     prevTabRef.current = activeTab;
-    if (tabChanged) {
-      loadData({ force: true, silent: true });
-    } else {
-      loadData();
-    }
+    loadData({ silent: tabChanged });
   }, [loadData, activeTab]);
 
   useEffect(() => {

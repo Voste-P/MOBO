@@ -112,12 +112,22 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, isActive = t
     }
   }, [user?.id]);
 
-  // Clear context cache when leaving this tab so next message fetches fresh data
+  // Pre-fetch context when tab becomes active; clear cache on leave for freshness
   useEffect(() => {
     if (!isActive) {
       contextCacheRef.current = null;
+      return;
     }
-  }, [isActive]);
+    if (contextCacheRef.current || !user?.id) return;
+    // Warm the context cache so the first message is instant
+    Promise.all([
+      api.products.getAll(user?.mediatorCode).catch(() => []),
+      api.orders.getUserOrders(user.id).catch(() => []),
+      api.tickets.getAll().catch(() => []),
+    ]).then(([products, orders, tickets]) => {
+      contextCacheRef.current = { products, orders, tickets, fetchedAt: Date.now() };
+    });
+  }, [isActive, user?.id]);
 
   // Track navigation timer for cleanup on unmount
   const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

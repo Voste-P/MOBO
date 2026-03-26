@@ -187,7 +187,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
 
 
   const switchView = (next: ViewMode) => {
-    invalidateGetCache();
+    invalidateGetCache('/admin/');
+    invalidateGetCache('/tickets');
     setView(next);
     setIsSidebarOpen(false);
   };

@@ -80,8 +80,12 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
     return '';
   }
 
+  const profileLoadedRef = useRef(false);
+
   useEffect(() => {
     if (!isActive) return;
+    if (profileLoadedRef.current) return;
+    profileLoadedRef.current = true;
     invalidateGetCache('/orders');
     if (user) refreshStats();
   }, [user?.id, isActive]);
