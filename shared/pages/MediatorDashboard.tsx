@@ -1909,7 +1909,7 @@ export const MediatorDashboard: React.FC = () => {
 
   const tabDataNeeds = useMemo<string[]>(() => {
     switch (activeTab) {
-      case 'inbox': return ['orders', 'campaigns', 'deals', 'pending', 'verified', 'tickets'];
+      case 'inbox': return ['orders', 'campaigns', 'deals', 'pending', 'tickets'];
       case 'market': return ['campaigns', 'deals'];
       case 'squad': return ['pending', 'verified'];
       case 'profile': return [];

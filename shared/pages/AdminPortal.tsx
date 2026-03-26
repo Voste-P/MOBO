@@ -273,6 +273,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   const initialLoadRef = useRef(false);
   // Sequence counter to discard stale fetch responses on rapid view switches
   const viewSeqRef = useRef(0);
+  // Track which views have been loaded (with param fingerprint) to avoid re-fetching on revisit
+  const loadedViewsRef = useRef<Map<string, string>>(new Map());
 
   const fetchSystemConfig = async () => {
     try {
@@ -297,7 +299,12 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     if (!user?.id || user.role !== 'admin') return;
     if (view !== 'dashboard') { dashboardMountedRef.current = true; return; }
     if (!dashboardMountedRef.current) { dashboardMountedRef.current = true; return; } // skip first mount
+    const fp = 'dashboard';
+    if (loadedViewsRef.current.get('dashboard') === fp) return;
+    const seq = ++viewSeqRef.current;
     Promise.allSettled([api.admin.getStats(), api.admin.getGrowthAnalytics()]).then(([s, g]) => {
+      if (viewSeqRef.current !== seq) return;
+      loadedViewsRef.current.set('dashboard', fp);
       if (s.status === 'fulfilled') setStats(s.value);
       if (g.status === 'fulfilled') setChartData(asArray(g.value));
     });
@@ -328,6 +335,10 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         const now = Date.now();
         if (now - lastRealtimeRefreshRef.current < 2000) return;
         lastRealtimeRefreshRef.current = now;
+        // Invalidate cached fingerprint for current view so the useEffect re-fetches
+        loadedViewsRef.current.delete(view);
+        if (view === 'orders' || view === 'finance') loadedViewsRef.current.delete('orders');
+        if (view === 'support' || view === 'feedback') loadedViewsRef.current.delete('tickets');
         refreshCurrentViewRef.current();
       }, 800);
     };
@@ -347,6 +358,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   useEffect(() => {
     if (!user?.id || user.role !== 'admin') return;
     if (view !== 'audit-logs') return;
+    const fp = `audit:${auditPage}:${auditActionFilter}:${auditDateFrom}:${auditDateTo}`;
+    if (loadedViewsRef.current.get('audit-logs') === fp) return;
     setAuditLoading(true);
     const seq = ++viewSeqRef.current;
     const params: any = { limit: PAGE_SIZE, page: auditPage };
@@ -357,6 +370,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       .getAuditLogs(params)
       .then((res) => {
         if (viewSeqRef.current !== seq) return;
+        loadedViewsRef.current.set('audit-logs', fp);
         setAuditLogs(asArray(res));
         setAuditPagination(extractPaginationMeta(res));
       })
@@ -367,13 +381,16 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   useEffect(() => {
     if (!user?.id || user.role !== 'admin') return;
     if (view !== 'users') return;
-    const seq = ++userSearchSeqRef.current;
     const role = userRoleFilter === 'All' ? 'all' : userRoleFilter.toLowerCase();
     const search = debouncedUserSearch.trim() || undefined;
+    const fp = `users:${usersPage}:${role}:${search || ''}`;
+    if (loadedViewsRef.current.get('users') === fp) return;
+    const seq = ++userSearchSeqRef.current;
     api.admin
       .getUsers(role, { page: usersPage, limit: PAGE_SIZE, search })
       .then((res) => {
-        if (seq !== userSearchSeqRef.current) return; // Ignore stale response
+        if (seq !== userSearchSeqRef.current) return;
+        loadedViewsRef.current.set('users', fp);
         setUsers(asArray(res));
         setUsersPagination(extractPaginationMeta(res));
       })
@@ -383,11 +400,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   useEffect(() => {
     if (!user?.id || user.role !== 'admin') return;
     if (view !== 'invites') return;
+    const fp = `invites:${invitesPage}`;
+    if (loadedViewsRef.current.get('invites') === fp) return;
     const seq = ++viewSeqRef.current;
     api.admin
       .getInvites({ page: invitesPage, limit: PAGE_SIZE })
       .then((res) => {
         if (viewSeqRef.current !== seq) return;
+        loadedViewsRef.current.set('invites', fp);
         setInvites(asArray(res));
         setInvitesPagination(extractPaginationMeta(res));
       })
@@ -398,9 +418,12 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   useEffect(() => {
     if (!user?.id || user.role !== 'admin') return;
     if (view !== 'orders' && view !== 'finance') return;
+    const fp = `orders:${ordersPage}`;
+    if (loadedViewsRef.current.get('orders') === fp) return;
     const seq = ++viewSeqRef.current;
     api.admin.getFinancials({ page: ordersPage, limit: PAGE_SIZE }).then((res) => {
       if (viewSeqRef.current !== seq) return;
+      loadedViewsRef.current.set('orders', fp);
       const safeOrders = asArray<Order>(res);
       setOrders(safeOrders);
       setOrdersPagination(extractPaginationMeta(res));
@@ -416,9 +439,12 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   useEffect(() => {
     if (!user?.id || user.role !== 'admin') return;
     if (view !== 'inventory') return;
+    const fp = `inventory:${productsPage}`;
+    if (loadedViewsRef.current.get('inventory') === fp) return;
     const seq = ++viewSeqRef.current;
     api.admin.getProducts({ page: productsPage, limit: PAGE_SIZE }).then((res) => {
       if (viewSeqRef.current !== seq) return;
+      loadedViewsRef.current.set('inventory', fp);
       setProducts(asArray(res));
       setProductsPagination(extractPaginationMeta(res));
     }).catch((e) => { if (viewSeqRef.current === seq) { if (process.env.NODE_ENV !== 'production') console.error('Admin Products Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh products.')); } });
@@ -427,6 +453,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   useEffect(() => {
     if (!user?.id || user.role !== 'admin') return;
     if (view !== 'settings') return;
+    if (loadedViewsRef.current.has('settings')) return;
+    loadedViewsRef.current.set('settings', 'loaded');
     fetchSystemConfig();
   }, [user?.id, view]);
 
@@ -434,14 +462,20 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   useEffect(() => {
     if (!user?.id || user.role !== 'admin') return;
     if (view !== 'support' && view !== 'feedback') return;
+    const fp = `tickets:${view}`;
+    if (loadedViewsRef.current.get('tickets') === fp) return;
     const seq = ++viewSeqRef.current;
     api.tickets.getAll({ issueType: view === 'feedback' ? 'Feedback' : 'Support' })
-      .then((res) => { if (viewSeqRef.current === seq) setTickets(asArray(res)); })
+      .then((res) => { if (viewSeqRef.current === seq) { loadedViewsRef.current.set('tickets', fp); setTickets(asArray(res)); } })
       .catch((e) => { if (viewSeqRef.current === seq) { if (process.env.NODE_ENV !== 'production') console.error('Admin Tickets Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to load tickets.')); } });
   }, [user?.id, view]);
 
   /** Refresh only the data needed for the active tab/view (instead of ALL endpoints). */
   const refreshCurrentView = async () => {
+    // Clear cached fingerprint so the view re-fetches even if params haven't changed
+    loadedViewsRef.current.delete(view);
+    if (view === 'orders' || view === 'finance') loadedViewsRef.current.delete('orders');
+    if (view === 'support' || view === 'feedback') loadedViewsRef.current.delete('tickets');
     try {
       switch (view) {
         case 'dashboard': {
@@ -545,6 +579,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     setIsLoading(true);
     try {
       await api.admin.generateInvite(inviteRole, inviteLabel);
+      loadedViewsRef.current.delete('invites');
       const updated = await api.admin.getInvites({ page: invitesPage, limit: PAGE_SIZE });
       setInvites(asArray(updated));
       setInvitesPagination(extractPaginationMeta(updated));
@@ -581,6 +616,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     try {
       await api.admin.deleteWallet(target.id);
       toast.success('Wallet deleted');
+      loadedViewsRef.current.delete('users');
       const updated = await api.admin.getUsers('all', { page: usersPage, limit: PAGE_SIZE });
       setUsers(asArray(updated));
       setUsersPagination(extractPaginationMeta(updated));
@@ -599,6 +635,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     try {
       await api.admin.deleteUser(target.id);
       toast.success('User deleted');
+      loadedViewsRef.current.delete('users');
       const updated = await api.admin.getUsers('all', { page: usersPage, limit: PAGE_SIZE });
       setUsers(asArray(updated));
       setUsersPagination(extractPaginationMeta(updated));
@@ -616,6 +653,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     try {
       await api.admin.deleteProduct(productId);
       toast.success('Product deleted');
+      loadedViewsRef.current.delete('inventory');
       const updated = await api.admin.getProducts({ page: productsPage, limit: PAGE_SIZE });
       setProducts(asArray(updated));
       setProductsPagination(extractPaginationMeta(updated));
