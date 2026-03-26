@@ -2934,6 +2934,7 @@ export function makeOpsController(env: Env) {
             orderBy: { createdAt: 'desc' },
             take: limit,
             skip,
+            select: { id: true, mongoId: true, idempotencyKey: true, type: true, status: true, amountPaise: true, currency: true, orderId: true, campaignId: true, payoutId: true, walletId: true, fromUserId: true, toUserId: true, createdAt: true },
           }),
           db().transaction.count({ where }),
         ]);

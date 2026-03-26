@@ -123,7 +123,7 @@ export function makeInviteController() {
       try {
         const { page, limit, skip, isPaginated } = parsePagination(req.query, { limit: 50, maxLimit: 200 });
         const [invites, total] = await Promise.all([
-          db().invite.findMany({ orderBy: { createdAt: 'desc' }, take: limit, skip }),
+          db().invite.findMany({ orderBy: { createdAt: 'desc' }, take: limit, skip, select: { id: true, mongoId: true, code: true, role: true, label: true, parentCode: true, status: true, maxUses: true, useCount: true, expiresAt: true, createdBy: true, usedBy: true, usedAt: true, uses: true, revokedBy: true, revokedAt: true, createdAt: true } }),
           db().invite.count(),
         ]);
         res.json(paginatedResponse(invites.map(pgInvite), total, page, limit, isPaginated));

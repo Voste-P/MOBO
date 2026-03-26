@@ -826,7 +826,7 @@ export function makeAdminController() {
         }
 
         const [logs, total] = await Promise.all([
-          db().auditLog.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take: limit }),
+          db().auditLog.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take: limit, select: { id: true, mongoId: true, actorUserId: true, actorRoles: true, action: true, entityType: true, entityId: true, ip: true, metadata: true, createdAt: true } }),
           db().auditLog.count({ where }),
         ]);
 
