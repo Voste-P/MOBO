@@ -4,7 +4,7 @@ import { ProductCard } from '../components/ProductCard';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
-import { api, asArray } from '../services/api';
+import { api, asArray, invalidateGetCache } from '../services/api';
 import { subscribeRealtime } from '../services/realtime';
 import { Search, AlertTriangle, ShoppingBag } from 'lucide-react';
 import { EmptyState, Input } from '../components/ui';
@@ -38,7 +38,11 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
     }
   }, []);
 
-  useEffect(() => { if (isActive) loadProducts(); }, [loadProducts, isActive]);
+  useEffect(() => {
+    if (!isActive) return;
+    invalidateGetCache();
+    loadProducts();
+  }, [loadProducts, isActive]);
 
   // Realtime: refresh products on deals.changed (debounce 1.5s to batch rapid changes)
   useEffect(() => {

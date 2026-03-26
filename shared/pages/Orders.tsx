@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { api, asArray } from '../services/api';
+import { api, asArray, invalidateGetCache } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
@@ -313,6 +313,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
 
   useEffect(() => {
     if (!isActive) return;
+    invalidateGetCache();
     if (user) {
       Promise.all([loadOrders(), loadMyTickets()]);
     } else {

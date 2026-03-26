@@ -6,7 +6,7 @@ import { useConfirm } from '../components/ui/ConfirmDialog';
 import { useSwipeTabs } from '../hooks/useSwipeTabs';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
-import { api, asArray } from '../services/api';
+import { api, asArray, invalidateGetCache } from '../services/api';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 import { normalizeMobileTo10Digits, maskMobile } from '../utils/mobiles';
@@ -1936,6 +1936,9 @@ export const MediatorDashboard: React.FC = () => {
       ? currentNeeds
       : currentNeeds.filter((k) => !loadedRef.current.has(k));
     if (needed.length === 0) return;
+
+    // Bypass the GET response cache so tab switches produce real network requests
+    if (force) invalidateGetCache();
 
     loadingRef.current = true;
     setLoading(true);

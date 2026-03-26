@@ -7,7 +7,7 @@ import { ProxiedImage } from '../components/ProxiedImage';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
 import TicketDetailModal from '../components/TicketDetailModal';
 import { FeedbackCard } from '../components/FeedbackCard';
-import { api, asArray } from '../services/api';
+import { api, asArray, invalidateGetCache } from '../services/api';
 import { getDirectBackendUrl } from '../utils/apiBaseUrl';
 import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
@@ -4399,6 +4399,9 @@ export const AgencyDashboard: React.FC = () => {
       ? currentNeeds
       : currentNeeds.filter((k) => !loadedRef.current.has(k));
     if (needed.length === 0) return;
+
+    // Bypass the GET response cache so tab switches produce real network requests
+    if (force) invalidateGetCache();
 
     fetchRef.current = true;
     if (!silent) setIsDataLoading(true);

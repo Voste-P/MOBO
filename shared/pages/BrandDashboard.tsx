@@ -53,7 +53,7 @@ import {
   Sparkles,
   HelpCircle,
 } from 'lucide-react';
-import { api, asArray } from '../services/api';
+import { api, asArray, invalidateGetCache } from '../services/api';
 import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
@@ -2231,6 +2231,9 @@ export const BrandDashboard: React.FC = () => {
       ? currentNeeds
       : currentNeeds.filter((k) => !loadedRef.current.has(k));
     if (needed.length === 0) return;
+
+    // Bypass the GET response cache so tab switches produce real network requests
+    if (force) invalidateGetCache();
 
     fetchRef.current = true;
     if (!silent) setIsDataLoading(true);

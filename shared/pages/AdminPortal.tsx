@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../components/ui/ConfirmDialog';
-import { api, asArray, extractPaginationMeta } from '../services/api';
+import { api, asArray, extractPaginationMeta, invalidateGetCache } from '../services/api';
 import type { PaginationMeta } from '../services/api';
 import { getDirectBackendUrl } from '../utils/apiBaseUrl';
 import { maskMobile } from '../utils/mobiles';
@@ -187,6 +187,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
 
 
   const switchView = (next: ViewMode) => {
+    invalidateGetCache();
     setView(next);
     setIsSidebarOpen(false);
   };

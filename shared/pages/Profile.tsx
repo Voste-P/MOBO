@@ -4,7 +4,7 @@ import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
 import { maskMobile } from '../utils/mobiles';
 import { ProxiedImage } from '../components/ProxiedImage';
-import { api, asArray } from '../services/api';
+import { api, asArray, invalidateGetCache } from '../services/api';
 import { BetaLock } from '../components/BetaLock';
 import { subscribeRealtime } from '../services/realtime';
 import {
@@ -82,6 +82,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
 
   useEffect(() => {
     if (!isActive) return;
+    invalidateGetCache();
     if (user) refreshStats();
   }, [user?.id, isActive]);
 
