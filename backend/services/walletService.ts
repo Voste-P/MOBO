@@ -55,7 +55,7 @@ export async function ensureWallet(ownerUserId: string) {
   } catch (err: any) {
     // Handle P2002 (unique constraint violation)
     if (err?.code === 'P2002') {
-      const existing = await db.wallet.findUnique({ where: { ownerUserId } });
+      const existing = await db.wallet.findUnique({ where: { ownerUserId }, select: { id: true, ownerUserId: true, availablePaise: true, pendingPaise: true, lockedPaise: true, currency: true, version: true } });
       if (existing) return existing;
     }
     throw err;
@@ -73,6 +73,7 @@ export async function applyWalletCredit(input: WalletMutationInput) {
     // Idempotency: if a transaction with this key already exists, return it.
     const existingTx = await tx.transaction.findUnique({
       where: { idempotencyKey: input.idempotencyKey },
+      select: { id: true, type: true, amountPaise: true, idempotencyKey: true, createdAt: true },
     });
     if (existingTx) {
       if (existingTx.type !== input.type) {
@@ -185,6 +186,7 @@ export async function applyWalletDebit(input: WalletMutationInput) {
     // Idempotency: if a transaction with this key already exists, return it.
     const existingTx = await tx.transaction.findUnique({
       where: { idempotencyKey: input.idempotencyKey },
+      select: { id: true, type: true, amountPaise: true, idempotencyKey: true, createdAt: true },
     });
     if (existingTx) {
       // Verify the existing transaction matches the expected type to prevent
