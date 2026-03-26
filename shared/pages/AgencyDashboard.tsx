@@ -4358,6 +4358,7 @@ export const AgencyDashboard: React.FC = () => {
   const loadedRef = useRef<Set<string>>(new Set());
   const inFlightRef = useRef<Set<string>>(new Set());
   const lastFetchedAt = useRef<Record<string, number>>({});
+  const fetchSeqRef = useRef(0);
   // Ref to always read current state for stats computation (avoids stale closures)
   const dataRef = useRef({ mediators, campaigns, orders });
   dataRef.current = { mediators, campaigns, orders };
@@ -4402,6 +4403,7 @@ export const AgencyDashboard: React.FC = () => {
 
     for (const k of needed) inFlightRef.current.add(k);
     if (!silent) setIsDataLoading(true);
+    const seq = ++fetchSeqRef.current;
     try {
       const promises: Promise<any>[] = [];
       const keys: string[] = [];
@@ -4412,7 +4414,10 @@ export const AgencyDashboard: React.FC = () => {
       if (needed.includes('ledger')) { promises.push(api.ops.getAgencyLedger()); keys.push('ledger'); }
       if (needed.includes('tickets')) { promises.push(api.tickets.getAll().catch(() => [])); keys.push('tickets'); }
 
-      const results = await Promise.all(promises);
+      const settled = await Promise.allSettled(promises);
+
+      // Discard stale results if a newer fetch was started (rapid tab switch)
+      if (fetchSeqRef.current !== seq) return;
 
       // Map results back to state — read current values from ref to avoid stale closures
       let safeMeds = dataRef.current.mediators;
@@ -4421,14 +4426,19 @@ export const AgencyDashboard: React.FC = () => {
 
       const now = Date.now();
       keys.forEach((key, i) => {
+        const result = settled[i];
+        if (result.status !== 'fulfilled') {
+          if (process.env.NODE_ENV !== 'production') console.warn(`[AgencyDashboard] fetch '${key}' failed`, result.reason);
+          return;
+        }
         loadedRef.current.add(key);
         lastFetchedAt.current[key] = now;
         switch (key) {
-          case 'mediators': safeMeds = asArray<User>(results[i]); setMediators(safeMeds); break;
-          case 'campaigns': safeCamps = asArray<Campaign>(results[i]); setCampaigns(safeCamps); break;
-          case 'orders': safeOrds = asArray<Order>(results[i]); setOrders(safeOrds); break;
-          case 'ledger': setPayouts(asArray(results[i])); break;
-          case 'tickets': setTickets(asArray<Ticket>(results[i]).filter((t: Ticket) => t.issueType !== 'Feedback')); break;
+          case 'mediators': safeMeds = asArray<User>(result.value); setMediators(safeMeds); break;
+          case 'campaigns': safeCamps = asArray<Campaign>(result.value); setCampaigns(safeCamps); break;
+          case 'orders': safeOrds = asArray<Order>(result.value); setOrders(safeOrds); break;
+          case 'ledger': setPayouts(asArray(result.value)); break;
+          case 'tickets': setTickets(asArray<Ticket>(result.value).filter((t: Ticket) => t.issueType !== 'Feedback')); break;
         }
       });
 

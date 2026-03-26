@@ -2197,6 +2197,7 @@ export const BrandDashboard: React.FC = () => {
   const loadedRef = useRef<Set<string>>(new Set());
   const inFlightRef = useRef<Set<string>>(new Set());
   const lastFetchedAt = useRef<Record<string, number>>({});
+  const fetchSeqRef = useRef(0);
 
   const tabDataNeeds = useMemo<string[]>(() => {
     switch (activeTab) {
@@ -2234,6 +2235,7 @@ export const BrandDashboard: React.FC = () => {
 
     for (const k of needed) inFlightRef.current.add(k);
     if (!silent) setIsDataLoading(true);
+    const seq = ++fetchSeqRef.current;
     try {
       const promises: Promise<any>[] = [];
       const keys: string[] = [];
@@ -2244,17 +2246,26 @@ export const BrandDashboard: React.FC = () => {
       if (needed.includes('transactions')) { promises.push(api.brand.getTransactions(user.id)); keys.push('transactions'); }
       if (needed.includes('tickets')) { promises.push(api.tickets.getAll().catch(() => [])); keys.push('tickets'); }
 
-      const results = await Promise.all(promises);
+      const settled = await Promise.allSettled(promises);
+
+      // Discard stale results if a newer fetch was started (rapid tab switch)
+      if (fetchSeqRef.current !== seq) return;
+
       const now = Date.now();
       keys.forEach((key, i) => {
+        const result = settled[i];
+        if (result.status !== 'fulfilled') {
+          if (process.env.NODE_ENV !== 'production') console.warn(`[BrandDashboard] fetch '${key}' failed`, result.reason);
+          return;
+        }
         loadedRef.current.add(key);
         lastFetchedAt.current[key] = now;
         switch (key) {
-          case 'campaigns': setCampaigns(asArray(results[i])); break;
-          case 'agencies': setAgencies(asArray(results[i])); break;
-          case 'orders': setOrders(asArray(results[i])); break;
-          case 'transactions': setTransactions(asArray(results[i])); break;
-          case 'tickets': setTickets(asArray<Ticket>(results[i]).filter((t: Ticket) => t.issueType !== 'Feedback')); break;
+          case 'campaigns': setCampaigns(asArray(result.value)); break;
+          case 'agencies': setAgencies(asArray(result.value)); break;
+          case 'orders': setOrders(asArray(result.value)); break;
+          case 'transactions': setTransactions(asArray(result.value)); break;
+          case 'tickets': setTickets(asArray<Ticket>(result.value).filter((t: Ticket) => t.issueType !== 'Feedback')); break;
         }
       });
     } catch (e) {

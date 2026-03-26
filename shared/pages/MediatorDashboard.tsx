@@ -1905,6 +1905,7 @@ export const MediatorDashboard: React.FC = () => {
   const loadedRef = useRef<Set<string>>(new Set());
   const inFlightRef = useRef<Set<string>>(new Set());
   const lastFetchedAt = useRef<Record<string, number>>({});
+  const fetchSeqRef = useRef(0);
 
   const tabDataNeeds = useMemo<string[]>(() => {
     switch (activeTab) {
@@ -1939,6 +1940,7 @@ export const MediatorDashboard: React.FC = () => {
 
     for (const k of needed) inFlightRef.current.add(k);
     setLoading(true);
+    const seq = ++fetchSeqRef.current;
     try {
       const promises: Promise<any>[] = [];
       const keys: string[] = [];
@@ -1950,15 +1952,23 @@ export const MediatorDashboard: React.FC = () => {
       if (needed.includes('verified')) { promises.push(api.ops.getVerifiedUsers(user.mediatorCode || '')); keys.push('verified'); }
       if (needed.includes('tickets')) { promises.push(api.tickets.getAll()); keys.push('tickets'); }
 
-      const results = await Promise.all(promises);
+      const settled = await Promise.allSettled(promises);
+
+      // Discard stale results if a newer fetch was started (rapid tab switch)
+      if (fetchSeqRef.current !== seq) return;
 
       const now = Date.now();
       keys.forEach((key, i) => {
+        const result = settled[i];
+        if (result.status !== 'fulfilled') {
+          if (process.env.NODE_ENV !== 'production') console.warn(`[MediatorDashboard] fetch '${key}' failed`, result.reason);
+          return;
+        }
         loadedRef.current.add(key);
         lastFetchedAt.current[key] = now;
         switch (key) {
           case 'orders': {
-            const safeOrds = asArray<Order>(results[i]);
+            const safeOrds = asArray<Order>(result.value);
             setOrders(safeOrds);
             setProofModal((prev) => {
               if (!prev) return prev;
@@ -1967,10 +1977,10 @@ export const MediatorDashboard: React.FC = () => {
             });
             break;
           }
-          case 'campaigns': setCampaigns(asArray<Campaign>(results[i])); break;
-          case 'deals': setDeals(asArray(results[i])); break;
+          case 'campaigns': setCampaigns(asArray<Campaign>(result.value)); break;
+          case 'deals': setDeals(asArray(result.value)); break;
           case 'pending': {
-            const safePend = asArray<User>(results[i]);
+            const safePend = asArray<User>(result.value);
             setPendingUsers(safePend);
             setSelectedBuyer((prev) => {
               if (!prev) return prev;
@@ -1981,7 +1991,7 @@ export const MediatorDashboard: React.FC = () => {
             break;
           }
           case 'verified': {
-            const safeVer = asArray<User>(results[i]);
+            const safeVer = asArray<User>(result.value);
             setVerifiedUsers(safeVer);
             setSelectedBuyer((prev) => {
               if (!prev) return prev;
@@ -1991,7 +2001,7 @@ export const MediatorDashboard: React.FC = () => {
             });
             break;
           }
-          case 'tickets': setTickets(asArray<Ticket>(results[i]).filter((t: Ticket) => t.issueType !== 'Feedback')); break;
+          case 'tickets': setTickets(asArray<Ticket>(result.value).filter((t: Ticket) => t.issueType !== 'Feedback')); break;
         }
       });
     } catch (e) {
