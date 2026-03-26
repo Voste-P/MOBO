@@ -34,7 +34,7 @@ import {
 } from '../validations/ops.js';
 import { rupeesToPaise } from '../utils/money.js';
 import { toUiCampaign, toUiDeal, toUiOrder, toUiOrderSummary, toUiUser, safeIso } from '../utils/uiMappers.js';
-import { orderListSelectLite, getProofFlags, userListSelect } from '../utils/querySelect.js';
+import { orderListSelectLite, getProofFlags, userListSelect, campaignListSelect, dealListSelect } from '../utils/querySelect.js';
 import { idWhere } from '../utils/idWhere.js';
 import { ensureWallet, applyWalletDebit, applyWalletCredit } from '../services/walletService.js';
 import { getRequester, isPrivileged, requireAnyRole } from '../services/authz.js';
@@ -54,13 +54,19 @@ async function buildOrderAudience(order: any, agencyCode?: string) {
   const managerCode = String(order?.managerName || '').trim();
   const normalizedAgencyCode = String(agencyCode || '').trim();
 
-  // Resolve PG UUIDs → mongoIds for realtime (frontend matches by JWT sub = mongoId)
-  const [buyerUser, brandUser] = await Promise.all([
-    order?.userId ? db().user.findUnique({ where: { id: order.userId }, select: { mongoId: true } }) : null,
-    order?.brandUserId ? db().user.findUnique({ where: { id: order.brandUserId }, select: { mongoId: true } }) : null,
-  ]);
-  const buyerMongoId = buyerUser?.mongoId ?? '';
-  const brandMongoId = brandUser?.mongoId ?? '';
+  // Use pre-included relations when available (zero-cost); otherwise single batched lookup
+  let buyerMongoId = order?.user?.mongoId ?? '';
+  let brandMongoId = order?.brandUser?.mongoId ?? '';
+  if (!buyerMongoId || !brandMongoId) {
+    const ids = [!buyerMongoId && order?.userId, !brandMongoId && order?.brandUserId].filter(Boolean) as string[];
+    if (ids.length) {
+      const users = await db().user.findMany({ where: { id: { in: ids } }, select: { id: true, mongoId: true } });
+      for (const u of users) {
+        if (u.id === order?.userId) buyerMongoId = u.mongoId ?? '';
+        if (u.id === order?.brandUserId) brandMongoId = u.mongoId ?? '';
+      }
+    }
+  }
 
   return {
     roles: privilegedRoles,
@@ -160,7 +166,7 @@ export async function finalizeApprovalIfReady(order: any, actorUserId: string, e
   settleDate.setDate(settleDate.getDate() + COOLING_PERIOD_DAYS);
   const currentEvents = Array.isArray(order.events) ? (order.events as any[]) : [];
 
-  orderLog.info('All proofs verified — approving order', {
+  orderLog.info('All proofs verified â€” approving order', {
     orderId: order.mongoId,
     coolingDays: COOLING_PERIOD_DAYS,
     settlementDate: settleDate.toISOString(),
@@ -168,7 +174,8 @@ export async function finalizeApprovalIfReady(order: any, actorUserId: string, e
     actorUserId,
   });
 
-  // Use updateMany with workflowStatus guard to prevent duplicate events on concurrent verify
+  // Use updateMany with workflowStatus guard to prevent duplicate events on concurrent verify.
+  // If count is 0, another request already approved or modified the order — idempotent return.
   const updated = await db().order.updateMany({
     where: { id: order.id, workflowStatus: 'UNDER_REVIEW' },
     data: {
@@ -184,6 +191,14 @@ export async function finalizeApprovalIfReady(order: any, actorUserId: string, e
   });
 
   if (updated.count === 0) {
+    // Re-check: if the order was already APPROVED by a concurrent request, treat as success
+    const recheck = await db().order.findFirst({
+      where: { id: order.id, isDeleted: false },
+      select: { workflowStatus: true },
+    });
+    if (recheck?.workflowStatus === 'APPROVED') {
+      return { approved: true, reason: 'ALREADY_APPROVED' };
+    }
     return { approved: false, reason: 'CONCURRENT_UPDATE' };
   }
 
@@ -304,9 +319,7 @@ export function makeOpsController(env: Env) {
           ];
         }
 
-        const page = queryParams.page ?? 1;
-        const limit = queryParams.limit ?? 200;
-        const skip = (page - 1) * limit;
+        const { limit, skip } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
 
         const mediators = await db().user.findMany({
           where,
@@ -344,8 +357,7 @@ export function makeOpsController(env: Env) {
         const requested = queryParams.mediatorCode || undefined;
         const code = isPrivileged(roles) ? requested : String((user as any)?.mediatorCode || '');
 
-        const cPage = queryParams.page ?? 1;
-        const cLimit = queryParams.limit ?? 200;
+        const { limit: cLimit, skip: cSkip } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
         const statusFilter = queryParams.status && queryParams.status !== 'all' ? queryParams.status : null;
 
         let campaigns: any[];
@@ -359,11 +371,13 @@ export function makeOpsController(env: Env) {
               ? await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false AND status = ${statusFilter}
                   AND (${code} = ANY("allowed_agency_codes")
+                       OR "open_to_all" = true
                        OR EXISTS (SELECT 1 FROM unnest(${allCodes}::text[]) AS mc WHERE jsonb_exists(assignments, mc)))
                 `
               : await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false
                   AND (${code} = ANY("allowed_agency_codes")
+                       OR "open_to_all" = true
                        OR EXISTS (SELECT 1 FROM unnest(${allCodes}::text[]) AS mc WHERE jsonb_exists(assignments, mc)))
                 `;
             matchingIds = rows.map((r) => r.id);
@@ -371,11 +385,11 @@ export function makeOpsController(env: Env) {
             const rows = statusFilter
               ? await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false AND status = ${statusFilter}
-                  AND (${code} = ANY("allowed_agency_codes") OR jsonb_exists(assignments, ${code}))
+                  AND (${code} = ANY("allowed_agency_codes") OR jsonb_exists(assignments, ${code}) OR "open_to_all" = true)
                 `
               : await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false
-                  AND (${code} = ANY("allowed_agency_codes") OR jsonb_exists(assignments, ${code}))
+                  AND (${code} = ANY("allowed_agency_codes") OR jsonb_exists(assignments, ${code}) OR "open_to_all" = true)
                 `;
             matchingIds = rows.map((r) => r.id);
           }
@@ -384,8 +398,9 @@ export function makeOpsController(env: Env) {
             ? await db().campaign.findMany({
               where: { id: { in: matchingIds } },
               orderBy: { createdAt: 'desc' },
-              skip: (cPage - 1) * cLimit,
+              skip: cSkip,
               take: cLimit,
+              select: campaignListSelect,
             })
             : [];
         } else {
@@ -395,8 +410,9 @@ export function makeOpsController(env: Env) {
               ...(statusFilter ? { status: statusFilter as any } : {}),
             },
             orderBy: { createdAt: 'desc' },
-            skip: (cPage - 1) * cLimit,
+            skip: cSkip,
             take: cLimit,
+            select: campaignListSelect,
           });
         }
 
@@ -472,16 +488,16 @@ export function makeOpsController(env: Env) {
           return;
         }
 
-        const dPage = queryParams.page ?? 1;
-        const dLimit = queryParams.limit ?? 200;
+        const { limit: dLimit, skip: dSkip } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
         const deals = await db().deal.findMany({
           where: {
             mediatorCode: { in: mediatorCodes },
             isDeleted: false,
           },
           orderBy: { createdAt: 'desc' },
-          skip: (dPage - 1) * dLimit,
+          skip: dSkip,
           take: dLimit,
+          select: dealListSelect,
         });
 
         const dealList = deals.map((d: any) => toUiDeal(pgDeal(d)));
@@ -530,9 +546,11 @@ export function makeOpsController(env: Env) {
           return;
         }
 
-        const { page: oPage, limit: oLimit, skip: oSkip, isPaginated: oIsPaginated } = parsePagination(req.query, { limit: 200 });
+        const { page: oPage, limit: oLimit, skip: oSkip, isPaginated: oIsPaginated } = parsePagination(req.query, { limit: 50, maxLimit: 200 });
         const oWhere = { managerName: { in: managerCodes }, isDeleted: false };
-        const [orders, oTotal] = await Promise.all([
+        const uniqueCodes = [...new Set(managerCodes)];
+        // Orders, count, and mediator names are all independent — run in parallel
+        const [orders, oTotal, mediatorUsers] = await Promise.all([
           db().order.findMany({
             where: oWhere,
             select: orderListSelectLite,
@@ -541,6 +559,12 @@ export function makeOpsController(env: Env) {
             take: oLimit,
           }),
           db().order.count({ where: oWhere }),
+          uniqueCodes.length > 0
+            ? db().user.findMany({
+                where: { mediatorCode: { in: uniqueCodes }, isDeleted: false },
+                select: { mediatorCode: true, name: true },
+              })
+            : Promise.resolve([]),
         ]);
 
         // Fetch lightweight proof boolean flags (avoids transferring base64 blobs)
@@ -564,12 +588,7 @@ export function makeOpsController(env: Env) {
         }).filter(Boolean);
 
         // Enrich orders with actual mediator display names (managerName stores mediator code)
-        const uniqueCodes = [...new Set(managerCodes)];
         if (uniqueCodes.length > 0) {
-          const mediatorUsers = await db().user.findMany({
-            where: { mediatorCode: { in: uniqueCodes }, isDeleted: false },
-            select: { mediatorCode: true, name: true },
-          });
           const codeToName = new Map<string, string>();
           for (const m of mediatorUsers) {
             if (m.mediatorCode && m.name) codeToName.set(m.mediatorCode, m.name);
@@ -623,12 +642,11 @@ export function makeOpsController(env: Env) {
           ];
         }
 
-        const puPage = queryParams.page ?? 1;
-        const puLimit = queryParams.limit ?? 200;
+        const { limit: puLimit, skip: puSkip } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
         const users = await db().user.findMany({
           where,
           orderBy: { createdAt: 'desc' },
-          skip: (puPage - 1) * puLimit,
+          skip: puSkip,
           take: puLimit,
           select: { ...userListSelect, wallets: { where: { isDeleted: false }, take: 1, select: { id: true, availablePaise: true, pendingPaise: true } } },
         });
@@ -667,12 +685,11 @@ export function makeOpsController(env: Env) {
           ];
         }
 
-        const vuPage = queryParams.page ?? 1;
-        const vuLimit = queryParams.limit ?? 200;
+        const { limit: vuLimit, skip: vuSkip } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
         const users = await db().user.findMany({
           where,
           orderBy: { createdAt: 'desc' },
-          skip: (vuPage - 1) * vuLimit,
+          skip: vuSkip,
           take: vuLimit,
           select: { ...userListSelect, wallets: { where: { isDeleted: false }, take: 1, select: { id: true, availablePaise: true, pendingPaise: true } } },
         });
@@ -712,15 +729,15 @@ export function makeOpsController(env: Env) {
               res.json([]);
               return;
             }
-            const mediatorCodes = await listMediatorCodesForAgency(agencyCode);
-            if (!mediatorCodes.length) {
+            // Single query: directly find mediator IDs by parentCode instead of two hops
+            const mediators = await db().user.findMany({
+              where: { roles: { has: 'mediator' as any }, parentCode: agencyCode, isDeleted: false },
+              select: { id: true },
+            });
+            if (!mediators.length) {
               res.json([]);
               return;
             }
-            const mediators = await db().user.findMany({
-              where: { roles: { has: 'mediator' as any }, mediatorCode: { in: mediatorCodes }, isDeleted: false },
-              select: { id: true },
-            });
             payoutWhere.beneficiaryUserId = { in: mediators.map((m: any) => m.id) };
           } else {
             throw new AppError(403, 'FORBIDDEN', 'Insufficient role');
@@ -734,20 +751,17 @@ export function makeOpsController(env: Env) {
             orderBy: { requestedAt: 'desc' },
             take: limit,
             skip,
-            select: { id: true, mongoId: true, beneficiaryUserId: true, amountPaise: true, requestedAt: true, createdAt: true, status: true, providerRef: true },
+            select: {
+              id: true, mongoId: true, beneficiaryUserId: true, amountPaise: true,
+              requestedAt: true, createdAt: true, status: true, providerRef: true,
+              beneficiary: { select: { id: true, mongoId: true, name: true, mediatorCode: true } },
+            },
           }),
           db().payout.count({ where: payoutWhere }),
         ]);
 
-        const beneficiaryIds = payouts.map((p: any) => p.beneficiaryUserId).filter(Boolean);
-        const users = await db().user.findMany({
-          where: { id: { in: beneficiaryIds }, isDeleted: false },
-          select: { id: true, mongoId: true, name: true, mediatorCode: true },
-        });
-        const byId = new Map(users.map((u: any) => [String(u.id), u]));
-
         const mapped = payouts.map((p: any) => {
-          const u = byId.get(String(p.beneficiaryUserId));
+          const u = p.beneficiary;
           return {
             id: p.mongoId ?? p.id,
             mediatorName: u?.name ?? 'Mediator',
@@ -918,6 +932,9 @@ export function makeOpsController(env: Env) {
           where: { id: buyerBefore.id },
           data: { isVerifiedByMediator: true },
         });
+
+        authCacheInvalidate(buyerBefore.id);
+        authCacheInvalidate(buyerBefore.mongoId!);
 
         const userMongoId = user.mongoId ?? '';
         await writeAuditLog({ req, action: 'BUYER_APPROVED', entityType: 'User', entityId: userMongoId });
@@ -1424,7 +1441,7 @@ export function makeOpsController(env: Env) {
             userId: buyerId,
             app: 'buyer',
             payload: {
-              title: wasApproved ? 'Proof recalled — re-upload needed' : 'Proof rejected',
+              title: wasApproved ? 'Proof recalled â€” re-upload needed' : 'Proof rejected',
               body: body.reason || 'Please re-upload the required proof.',
               url: '/orders',
             },
@@ -1663,7 +1680,7 @@ export function makeOpsController(env: Env) {
 
         const agencyCode = await assertOrderAccess(order, roles, user);
 
-        // Buyer must also be active — order.userId is PG UUID
+        // Buyer must also be active â€” order.userId is PG UUID
         const buyer = await db().user.findUnique({ where: { id: order.userId }, select: { id: true, status: true, isDeleted: true } });
         if (!buyer || buyer.isDeleted || buyer.status !== 'active') {
           throw new AppError(409, 'FROZEN_SUSPENSION', 'Buyer is not active; settlement is blocked');
@@ -1704,7 +1721,7 @@ export function makeOpsController(env: Env) {
         const productId = String(order.items?.[0]?.productId || '').trim();
         const mediatorCode = String(order.managerName || '').trim();
 
-        const campaign = campaignId ? await db().campaign.findFirst({ where: { id: campaignId, isDeleted: false } }) : null;
+        const campaign = campaignId ? await db().campaign.findFirst({ where: { id: campaignId, isDeleted: false }, select: { id: true, assignments: true, brandUserId: true } }) : null;
 
         let isOverLimit = false;
         if (campaignId && mediatorCode) {
@@ -1737,7 +1754,7 @@ export function makeOpsController(env: Env) {
             throw new AppError(409, 'MISSING_DEAL_ID', 'Order is missing deal reference');
           }
 
-          const deal = await db().deal.findFirst({ where: { ...idWhere(productId), isDeleted: false } });
+          const deal = await db().deal.findFirst({ where: { ...idWhere(productId), isDeleted: false }, select: { id: true, payoutPaise: true } });
           if (!deal) {
             throw new AppError(409, 'DEAL_NOT_FOUND', 'Cannot settle: deal not found');
           }
@@ -1777,7 +1794,7 @@ export function makeOpsController(env: Env) {
             }
           }
 
-          // Atomic settlement using Prisma transaction — wallet + order status in one commit
+          // Atomic settlement using Prisma transaction â€” wallet + order status in one commit
           await db().$transaction(async (tx: any) => {
             await applyWalletDebit({
               idempotencyKey: `order-settlement-debit-${order.mongoId}`,
@@ -1951,7 +1968,7 @@ export function makeOpsController(env: Env) {
         const campaignId = order.items?.[0]?.campaignId;
         const mediatorCode = String(order.managerName || '').trim();
 
-        const campaign = campaignId ? await db().campaign.findFirst({ where: { id: campaignId, isDeleted: false } }) : null;
+        const campaign = campaignId ? await db().campaign.findFirst({ where: { id: campaignId, isDeleted: false }, select: { id: true, assignments: true, brandUserId: true } }) : null;
         const brandId = String(order.brandUserId || campaign?.brandUserId || '').trim();
 
         const isCapExceeded = String(order.affiliateStatus) === 'Cap_Exceeded';
@@ -1988,7 +2005,7 @@ export function makeOpsController(env: Env) {
 
         if (!isCapExceeded && settlementMode !== 'external') {
           if (!productId) throw new AppError(409, 'MISSING_DEAL_ID', 'Order is missing deal reference');
-          const deal = await db().deal.findFirst({ where: { ...idWhere(productId), isDeleted: false } });
+          const deal = await db().deal.findFirst({ where: { ...idWhere(productId), isDeleted: false }, select: { id: true, payoutPaise: true } });
           if (!deal) throw new AppError(409, 'DEAL_NOT_FOUND', 'Cannot revert: deal not found');
 
           const payoutPaise = Number(deal.payoutPaise ?? 0);
@@ -2220,7 +2237,7 @@ export function makeOpsController(env: Env) {
         }
 
         const { roles, pgUserId, user: requester } = getRequester(req);
-        const campaign = await db().campaign.findFirst({ where: { ...idWhere(campaignId), isDeleted: false } });
+        const campaign = await db().campaign.findFirst({ where: { ...idWhere(campaignId), isDeleted: false }, select: { id: true, mongoId: true, status: true, brandUserId: true, allowedAgencyCodes: true, title: true } });
         if (!campaign) {
           throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
         }
@@ -2306,7 +2323,7 @@ export function makeOpsController(env: Env) {
 
         const { roles, pgUserId } = getRequester(req);
 
-        const campaign = await db().campaign.findFirst({ where: { ...idWhere(campaignId), isDeleted: false } });
+        const campaign = await db().campaign.findFirst({ where: { ...idWhere(campaignId), isDeleted: false }, select: { id: true, mongoId: true, brandUserId: true, title: true, allowedAgencyCodes: true, assignments: true } });
         if (!campaign) {
           throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
         }
@@ -2355,7 +2372,7 @@ export function makeOpsController(env: Env) {
           ? Object.keys(assignments)
           : [];
 
-        // Resolve brandUserId (PG UUID) → mongoId for realtime audience
+        // Resolve brandUserId (PG UUID) â†’ mongoId for realtime audience
         const brandUser = await db().user.findUnique({ where: { id: campaign.brandUserId }, select: { mongoId: true } });
         const brandMongoId = brandUser?.mongoId || '';
 
@@ -2397,12 +2414,15 @@ export function makeOpsController(env: Env) {
         const campaign = await db().campaign.findFirst({ where: { ...idWhere(body.id), isDeleted: false } });
         if (!campaign) throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
 
-        // Campaign must be active to accept new assignments.
-        if (String(campaign.status || '').toLowerCase() !== 'active') {
-          throw new AppError(409, 'CAMPAIGN_NOT_ACTIVE', 'Campaign must be active to assign slots');
+        // Campaign must be active or draft to accept new assignments.
+        // Draft campaigns get auto-activated upon successful distribution.
+        const campStatus = String(campaign.status || '').toLowerCase();
+        if (!['active', 'draft'].includes(campStatus)) {
+          throw new AppError(409, 'CAMPAIGN_NOT_ACTIVE', 'Campaign must be active or draft to assign slots');
         }
+        const wasDraft = campStatus === 'draft';
 
-        // Check if orders exist – if so, only block term changes (price, dealType),
+        // Check if orders exist â€“ if so, only block term changes (price, dealType),
         // but still allow adding/modifying mediator assignments.
         const hasOrders = await db().orderItem.findFirst({
           where: { campaignId: campaign.id, isDeleted: false, order: { isDeleted: false } },
@@ -2431,17 +2451,20 @@ export function makeOpsController(env: Env) {
           }
         }
 
+        // â”€â”€ "Open to All" mode: skip per-mediator allocation â”€â”€
+        const isOpenToAll = body.openToAll === true;
+
         const positiveEntries = Object.entries(body.assignments || {}).filter(([, assignment]) => {
           if (typeof assignment === 'number') return assignment > 0;
           const limit = Number((assignment as any)?.limit ?? 0);
           return Number.isFinite(limit) && limit > 0;
         });
-        if (positiveEntries.length === 0) {
+        if (!isOpenToAll && positiveEntries.length === 0) {
           throw new AppError(400, 'NO_ASSIGNMENTS', 'At least one allocation (limit > 0) is required');
         }
 
         // Security: agency can only assign to active mediators under its own code.
-        if (agencyCode) {
+        if (agencyCode && !isOpenToAll) {
           const assignmentCodes = positiveEntries.map(([code]) => String(code).trim()).filter(Boolean);
           const mediators = await db().user.findMany({
             where: {
@@ -2472,6 +2495,7 @@ export function makeOpsController(env: Env) {
           : {};
 
         for (const [code, assignment] of positiveEntries) {
+          const normCode = code.toLowerCase();
           const assignmentObj = typeof assignment === 'number'
             ? { limit: assignment, payout: payoutOverridePaise ?? campaign.payoutPaise }
             : {
@@ -2484,15 +2508,15 @@ export function makeOpsController(env: Env) {
           if (typeof commissionPaise !== 'undefined') {
             (assignmentObj as any).commissionPaise = commissionPaise;
           }
-          current[code] = assignmentObj;
+          current[normCode] = assignmentObj;
         }
 
-        // Enforce totalSlots
+        // Enforce totalSlots (skip for openToAll since no per-mediator allocation)
         const totalAssigned = Object.values(current).reduce(
           (sum: number, a: any) => sum + Number(typeof a === 'number' ? a : a?.limit ?? 0),
           0
         );
-        if (totalAssigned > (campaign.totalSlots ?? 0)) {
+        if (!isOpenToAll && totalAssigned > (campaign.totalSlots ?? 0)) {
           throw new AppError(
             409,
             'ASSIGNMENT_EXCEEDS_TOTAL_SLOTS',
@@ -2501,11 +2525,17 @@ export function makeOpsController(env: Env) {
         }
 
         const updateData: any = {
-          assignments: current,
+          assignments: isOpenToAll ? {} : current,
+          openToAll: isOpenToAll,
         };
 
         if (body.dealType) updateData.dealType = body.dealType;
         if (typeof body.price !== 'undefined') updateData.pricePaise = rupeesToPaise(body.price);
+
+        // Auto-activate draft campaigns upon first distribution
+        if (wasDraft) {
+          updateData.status = 'active';
+        }
 
         if (!campaign.locked) {
           updateData.locked = true;
@@ -2513,7 +2543,7 @@ export function makeOpsController(env: Env) {
           updateData.lockedReason = 'SLOT_ASSIGNMENT';
         }
 
-        // Optimistic concurrency via updatedAt check — prevents slot overwrites
+        // Optimistic concurrency via updatedAt check â€” prevents slot overwrites
         // when two requests try to assign simultaneously.
         try {
           const updated = await db().campaign.updateMany({
@@ -2548,7 +2578,7 @@ export function makeOpsController(env: Env) {
           ])
         ).filter(Boolean);
 
-        // Resolve brandUserId → mongoId for audience
+        // Resolve brandUserId â†’ mongoId for audience
         const brandUser = await db().user.findUnique({ where: { id: campaign.brandUserId }, select: { mongoId: true } });
         const brandMongoId = brandUser?.mongoId || '';
 
@@ -2614,7 +2644,10 @@ export function makeOpsController(env: Env) {
           const slotAssignment = findAssignmentForMediator(campaign.assignments, requestedCode);
           const hasAssignment = !!slotAssignment && Number((slotAssignment as any)?.limit ?? 0) > 0;
 
-          const isAllowed = (agencyCode && allowedCodes.has(agencyCode.toLowerCase())) || allowedCodes.has(selfCode.toLowerCase()) || hasAssignment;
+          // "Open to All" campaigns: allow any mediator whose agency is in allowedAgencyCodes
+          const campaignIsOpenToAll = (campaign as any).openToAll === true;
+
+          const isAllowed = campaignIsOpenToAll || (agencyCode && allowedCodes.has(agencyCode.toLowerCase())) || allowedCodes.has(selfCode.toLowerCase()) || hasAssignment;
           if (!isAllowed) {
             throw new AppError(403, 'FORBIDDEN', 'Campaign not assigned to your network');
           }
@@ -2752,7 +2785,7 @@ export function makeOpsController(env: Env) {
         const amountPaise = rupeesToPaise(body.amount);
 
         if (canAny && wallet.availablePaise < amountPaise) {
-          throw new AppError(409, 'INSUFFICIENT_FUNDS', `Wallet only has ₹${(wallet.availablePaise / 100).toFixed(2)} available but payout is ₹${body.amount}`);
+          throw new AppError(409, 'INSUFFICIENT_FUNDS', `Wallet only has â‚¹${(wallet.availablePaise / 100).toFixed(2)} available but payout is â‚¹${body.amount}`);
         }
 
         const requestId = String(
@@ -2819,7 +2852,7 @@ export function makeOpsController(env: Env) {
           throw new AppError(403, 'FORBIDDEN', 'Insufficient role');
         }
 
-        const payout = await db().payout.findFirst({ where: { ...idWhere(payoutId), isDeleted: false } });
+        const payout = await db().payout.findFirst({ where: { ...idWhere(payoutId), isDeleted: false }, select: { id: true, mongoId: true, beneficiaryUserId: true, amountPaise: true, status: true } });
         if (!payout) throw new AppError(404, 'PAYOUT_NOT_FOUND', 'Payout not found');
 
         const beneficiary = await db().user.findUnique({ where: { id: payout.beneficiaryUserId }, select: { id: true, mongoId: true, isDeleted: true, parentCode: true } });
@@ -2977,7 +3010,23 @@ export function makeOpsController(env: Env) {
         logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Campaign', entityId: newDisplayId, action: 'CAMPAIGN_COPIED', changedFields: ['id'], before: { sourceCampaignId: id }, after: { newCampaignId: newDisplayId, status: 'draft', usedSlots: 0 } });
         logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_COPIED', newCampaignId: newDisplayId, sourceCampaignId: id } });
 
-        res.json({ ok: true, id: newDisplayId });
+        res.json({
+          ok: true,
+          id: newDisplayId,
+          campaign: {
+            id: newDisplayId,
+            title: newCampaign.title,
+            image: newCampaign.image,
+            dealType: newCampaign.dealType,
+            totalSlots: newCampaign.totalSlots,
+            usedSlots: 0,
+            status: 'draft',
+            price: (newCampaign.pricePaise ?? 0) / 100,
+            payout: (newCampaign.payoutPaise ?? 0) / 100,
+            assignments: {},
+            brandId: newCampaign.brandUserId,
+          },
+        });
       } catch (err) {
         logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'BUSINESS_LOGIC', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'ops/copyCampaign' } });
         next(err);

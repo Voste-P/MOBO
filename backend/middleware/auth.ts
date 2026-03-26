@@ -6,6 +6,7 @@ import { prisma, withDbRetry } from '../database/prisma.js';
 import { idWhere } from '../utils/idWhere.js';
 import { authCacheGet, authCacheSet } from '../utils/authCache.js';
 import { logAuthEvent, logSecurityIncident, logAccessEvent } from '../config/appLogs.js';
+import { isMediatorActive, isAgencyActive, getAgencyCodeForMediatorCode } from '../services/lineage.js';
 
 export type Role = 'shopper' | 'mediator' | 'agency' | 'brand' | 'admin' | 'ops';
 
@@ -45,6 +46,12 @@ function validateJwtPayload(decoded: unknown): { sub: string; role?: string } {
   const payload = decoded as Record<string, unknown>;
   const sub = typeof payload.sub === 'string' ? payload.sub : typeof payload.sub === 'number' ? String(payload.sub) : '';
   if (!sub) throw new AppError(401, 'UNAUTHENTICATED', 'Invalid token: missing subject');
+  // Require valid UUID v4 or MongoDB ObjectId format
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const MONGO_ID_RE = /^[0-9a-fA-F]{24}$/;
+  if (!UUID_RE.test(sub) && !MONGO_ID_RE.test(sub)) {
+    throw new AppError(401, 'UNAUTHENTICATED', 'Invalid token subject format');
+  }
   const role = typeof payload.role === 'string' ? payload.role : undefined;
   return { sub, role };
 }
@@ -95,19 +102,13 @@ async function resolveAuthFromToken(token: string, env: Env): Promise<AuthContex
   // Upstream suspension enforcement (non-negotiable):
   // - Buyer loses access immediately when their mediator or agency is suspended.
   // - Mediator loses access immediately when their agency is suspended.
+  // Uses lineage cache (60s TTL) to avoid 1-3 DB queries per request.
   const parentCode = String(user.parentCode || '').trim();
 
   if (roles.includes('mediator')) {
     if (parentCode) {
-      const agency = await db.user.findFirst({
-        where: {
-          mediatorCode: parentCode,
-          roles: { has: 'agency' as any },
-          isDeleted: false,
-        },
-        select: { status: true },
-      });
-      if (!agency || agency.status !== 'active') {
+      const agencyActive = await isAgencyActive(parentCode);
+      if (!agencyActive) {
         logAccessEvent('RESOURCE_DENIED', {
           userId,
           roles: roles as string[],
@@ -121,15 +122,8 @@ async function resolveAuthFromToken(token: string, env: Env): Promise<AuthContex
 
   if (roles.includes('shopper')) {
     if (parentCode) {
-      const mediator = await db.user.findFirst({
-        where: {
-          mediatorCode: parentCode,
-          roles: { has: 'mediator' as any },
-          isDeleted: false,
-        },
-        select: { status: true, parentCode: true },
-      });
-      if (!mediator || mediator.status !== 'active') {
+      const mediatorActive = await isMediatorActive(parentCode);
+      if (!mediatorActive) {
         logAccessEvent('RESOURCE_DENIED', {
           userId,
           roles: roles as string[],
@@ -139,17 +133,10 @@ async function resolveAuthFromToken(token: string, env: Env): Promise<AuthContex
         throw new AppError(403, 'UPSTREAM_SUSPENDED', 'Upstream mediator is not active');
       }
 
-      const agencyCode = String(mediator.parentCode || '').trim();
+      const agencyCode = await getAgencyCodeForMediatorCode(parentCode);
       if (agencyCode) {
-        const agency = await db.user.findFirst({
-          where: {
-            mediatorCode: agencyCode,
-            roles: { has: 'agency' as any },
-            isDeleted: false,
-          },
-          select: { status: true },
-        });
-        if (!agency || agency.status !== 'active') {
+        const agencyActive = await isAgencyActive(agencyCode);
+        if (!agencyActive) {
           logAccessEvent('RESOURCE_DENIED', {
             userId,
             roles: roles as string[],

@@ -67,7 +67,7 @@ describe('ops campaigns: assign slots', () => {
         assignments: { [E2E_ACCOUNTS.mediator.mediatorCode]: 5 },
       });
 
-    expect(okRes.status).toBe(200);
+      expect(okRes.status).toBe(200);
 
     // Verify campaign updated in PG
     const updated = await db.campaign.findUnique({ where: { id: pgCampaign.id } });
@@ -75,8 +75,9 @@ describe('ops campaigns: assign slots', () => {
     expect(updated?.locked).toBe(true);
 
     const assignmentsObj = updated?.assignments as any;
-    expect(assignmentsObj?.[E2E_ACCOUNTS.mediator.mediatorCode]).toBeTruthy();
-    expect(assignmentsObj?.[E2E_ACCOUNTS.mediator.mediatorCode]?.limit).toBe(5);
+    const normCode = E2E_ACCOUNTS.mediator.mediatorCode.toLowerCase();
+    expect(assignmentsObj?.[normCode]).toBeTruthy();
+    expect(assignmentsObj?.[normCode]?.limit).toBe(5);
   });
 
   it('prevents agencies from assigning to non-active mediators', async () => {

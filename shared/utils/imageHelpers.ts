@@ -13,7 +13,6 @@ export async function urlToBase64(url: string): Promise<string> {
     const allowed = apiBase.startsWith('http') ? new URL(apiBase).origin : window.location.origin;
     const target = new URL(url, window.location.origin);
     if (target.origin !== allowed && target.origin !== window.location.origin) {
-      console.warn('urlToBase64: blocked non-API origin', target.origin);
       return '';
     }
     const response = await fetch(url);
@@ -24,8 +23,7 @@ export async function urlToBase64(url: string): Promise<string> {
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
-  } catch (err) {
-    console.warn('urlToBase64 failed:', url, err);
+  } catch {
     return '';
   }
 }

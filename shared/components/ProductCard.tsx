@@ -220,10 +220,6 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
   const handleLinkClick = () => {
     if (product.productUrl && /^https?:\/\//i.test(product.productUrl)) {
       window.open(product.productUrl, '_blank', 'noopener,noreferrer');
-    } else if (product.productUrl) {
-      console.warn('Blocked non-HTTP URL:', product.productUrl);
-    } else {
-      console.warn('No redirection link found for this product.');
     }
   };
 

@@ -11,7 +11,7 @@ export default defineConfig({
   test: {
     root: rootDir,
     include: ['tests/**/*.spec.ts'],
-    exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/build/**', '**/coverage/**'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/build/**', '**/coverage/**', '**/e2e/**'],
     environment: 'node',
     globals: true,
     setupFiles: ['./tests/setup.ts'],

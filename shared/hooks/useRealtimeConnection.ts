@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { subscribeRealtime } from '../services/realtime';
 
 export type RealtimeConnectionStatus = {
@@ -16,7 +16,8 @@ export function useRealtimeConnection(): RealtimeConnectionStatus {
   const [lastEventAt, setLastEventAt] = useState<number | null>(null);
   const [lastAuthErrorAt, setLastAuthErrorAt] = useState<number | null>(null);
   const [lastAuthErrorStatus, setLastAuthErrorStatus] = useState<number | null>(null);
-  const [tick, setTick] = useState(0);
+  const [connected, setConnected] = useState(false);
+  const lastEventAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     const unsub = subscribeRealtime((msg) => {
@@ -24,7 +25,9 @@ export function useRealtimeConnection(): RealtimeConnectionStatus {
 
       // Any event implies the stream is alive.
       if (msg.type === 'ping' || msg.type === 'ready' || msg.type === 'message') {
+        lastEventAtRef.current = now;
         setLastEventAt(now);
+        setConnected(true);
         return;
       }
 
@@ -36,7 +39,9 @@ export function useRealtimeConnection(): RealtimeConnectionStatus {
       }
 
       // Domain events (orders.changed, etc) also imply liveness.
+      lastEventAtRef.current = now;
       setLastEventAt(now);
+      setConnected(true);
     });
 
     return () => {
@@ -44,23 +49,24 @@ export function useRealtimeConnection(): RealtimeConnectionStatus {
     };
   }, []);
 
+  // Only update `connected` when staleness threshold is crossed, not on a fixed timer
   useEffect(() => {
     const t = setInterval(() => {
-      // Periodic re-render so `connected` updates when stream goes stale.
-      // 10s is sufficient given the 45s stale threshold; avoids ~10× fewer
-      // re-renders compared to the previous 1s cadence.
-      setTick((x) => (x + 1) % 1_000_000);
+      const ts = lastEventAtRef.current;
+      const isStale = !ts || Date.now() - ts >= STALE_AFTER_MS;
+      setConnected((prev) => {
+        if (isStale && prev) return false;
+        if (!isStale && !prev) return true;
+        return prev; // no state change — no re-render
+      });
     }, 10_000);
     return () => clearInterval(t);
   }, []);
 
-  return useMemo(() => {
-    const connected = lastEventAt ? Date.now() - lastEventAt < STALE_AFTER_MS : false;
-    return {
-      connected,
-      lastEventAt,
-      lastAuthErrorAt,
-      lastAuthErrorStatus,
-    };
-  }, [lastEventAt, lastAuthErrorAt, lastAuthErrorStatus, tick]);
+  return useMemo(() => ({
+    connected,
+    lastEventAt,
+    lastAuthErrorAt,
+    lastAuthErrorStatus,
+  }), [connected, lastEventAt, lastAuthErrorAt, lastAuthErrorStatus]);
 }

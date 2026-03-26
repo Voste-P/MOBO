@@ -18,14 +18,16 @@
     "types/**/*.d.ts",
     "config/**/*.ts",
     "database/**/*.ts",
-    "modules/**/*.ts",
     "services/**/*.ts",
     "controllers/**/*.ts",
     "routes/**/*.ts",
     "middleware/**/*.ts",
     "validations/**/*.ts",
     "utils/**/*.ts",
-    "tests/**/*.ts"
+    "tests/**/*.ts",
+    "seeds/**/*.ts",
+    "scripts/**/*.ts",
+    "prisma.config.ts"
   ],
   "exclude": ["dist", "node_modules"]
 }

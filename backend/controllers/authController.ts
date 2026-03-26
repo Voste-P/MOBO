@@ -39,15 +39,17 @@ export function makeAuthController(env: Env) {
           throw new AppError(401, 'UNAUTHENTICATED', 'Missing auth context');
         }
 
-        const user = await withDbRetry(() => db().user.findFirst({
-          where: { ...idWhere(userId), isDeleted: false },
-          include: { pendingConnections: true },
-        }));
+        // Auth middleware already verified user exists, so run both in parallel.
+        const [user, wallet] = await Promise.all([
+          withDbRetry(() => db().user.findFirst({
+            where: { ...idWhere(userId), isDeleted: false },
+            include: { pendingConnections: true },
+          })),
+          ensureWallet(req.auth!.pgUserId),
+        ]);
         if (!user) {
           throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
         }
-
-        const wallet = await ensureWallet(user.id);
         businessLog.info('Session viewed', { userId: user.id, role: user.role, ip: req.ip });
         logAccessEvent('RESOURCE_ACCESS', {
           userId: user.id,
@@ -185,7 +187,7 @@ export function makeAuthController(env: Env) {
           entityType: 'User',
           entityId: user.id,
           metadata: { role: 'shopper', mobile: user.mobile, parentCode: String(user.parentCode || '') },
-        }).catch(() => {});
+        }).catch((err) => { businessLog.warn('Failed to audit registration', { error: err?.message }); });
 
         businessLog.info('Buyer registered', { userId: user.id, mobile: user.mobile, parentCode: String(user.parentCode || ''), inviteUsed: !!consumed, ip: req.ip });
         logAuthEvent('REGISTRATION', {
@@ -417,7 +419,7 @@ export function makeAuthController(env: Env) {
             actorUserId: authUser.id,
             actorRoles: authUser.roles as any,
             metadata: { role: authUser.role },
-          }).catch(() => {}),
+          }).catch((err: any) => { businessLog.warn('Failed to audit login', { error: err?.message }); }),
         ]);
 
         businessLog.info('Login successful', { userId: authUser.id, role: authUser.role, identifier: mobile || username, ip: req.ip });
@@ -666,7 +668,7 @@ export function makeAuthController(env: Env) {
           entityType: 'User',
           entityId: user.mongoId!,
           metadata: { role: user.role, mobile: user.mobile, pendingApproval },
-        }).catch(() => {});
+        }).catch((err) => { businessLog.warn('Failed to audit registration', { error: err?.message }); });
 
         businessLog.info(`${String(user.role).charAt(0).toUpperCase() + String(user.role).slice(1)} registered`, { userId: user.id, role: user.role, mobile: user.mobile, mediatorCode: user.mediatorCode, parentCode: String(user.parentCode || ''), pendingApproval, inviteUsed: !!consumed, ip: req.ip });
         logAuthEvent('REGISTRATION', {
@@ -808,7 +810,7 @@ export function makeAuthController(env: Env) {
           entityType: 'User',
           entityId: user.mongoId!,
           metadata: { role: 'brand', mobile: user.mobile },
-        }).catch(() => {});
+        }).catch((err) => { businessLog.warn('Failed to audit registration', { error: err?.message }); });
 
         businessLog.info('Brand registered', { userId: user.id, mobile: user.mobile, brandCode: user.brandCode, inviteUsed: true, ip: req.ip });
         logAuthEvent('REGISTRATION', {

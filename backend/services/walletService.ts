@@ -55,7 +55,7 @@ export async function ensureWallet(ownerUserId: string) {
   } catch (err: any) {
     // Handle P2002 (unique constraint violation)
     if (err?.code === 'P2002') {
-      const existing = await db.wallet.findUnique({ where: { ownerUserId } });
+      const existing = await db.wallet.findUnique({ where: { ownerUserId }, select: { id: true, ownerUserId: true, availablePaise: true, pendingPaise: true, lockedPaise: true, currency: true, version: true } });
       if (existing) return existing;
     }
     throw err;
@@ -73,6 +73,7 @@ export async function applyWalletCredit(input: WalletMutationInput) {
     // Idempotency: if a transaction with this key already exists, return it.
     const existingTx = await tx.transaction.findUnique({
       where: { idempotencyKey: input.idempotencyKey },
+      select: { id: true, type: true, amountPaise: true, idempotencyKey: true, createdAt: true },
     });
     if (existingTx) {
       if (existingTx.type !== input.type) {
@@ -124,7 +125,7 @@ export async function applyWalletCredit(input: WalletMutationInput) {
 
     if (updated === 0) {
       // Distinguish wallet-not-found from limit exceeded
-      const existing = await tx.wallet.findUnique({ where: { ownerUserId: input.ownerUserId } });
+      const existing = await tx.wallet.findUnique({ where: { ownerUserId: input.ownerUserId }, select: { id: true, isDeleted: true } });
       if (!existing || existing.isDeleted) {
         logErrorEvent({ category: 'BUSINESS_LOGIC', severity: 'high', message: 'Wallet credit failed — wallet not found', operation: 'applyWalletCredit', userId: input.ownerUserId, metadata: { type: input.type, amountPaise: input.amountPaise } });
         throw new AppError(404, 'WALLET_NOT_FOUND', 'Wallet not found');
@@ -134,7 +135,7 @@ export async function applyWalletCredit(input: WalletMutationInput) {
     }
 
     // Re-read wallet to get walletId for the transaction record
-    const wallet = await tx.wallet.findUnique({ where: { ownerUserId: input.ownerUserId } });
+    const wallet = await tx.wallet.findUnique({ where: { ownerUserId: input.ownerUserId }, select: { id: true } });
     if (!wallet) throw new AppError(404, 'WALLET_NOT_FOUND', 'Wallet disappeared during credit');
 
     const txn = await tx.transaction.create({
@@ -185,6 +186,7 @@ export async function applyWalletDebit(input: WalletMutationInput) {
     // Idempotency: if a transaction with this key already exists, return it.
     const existingTx = await tx.transaction.findUnique({
       where: { idempotencyKey: input.idempotencyKey },
+      select: { id: true, type: true, amountPaise: true, idempotencyKey: true, createdAt: true },
     });
     if (existingTx) {
       // Verify the existing transaction matches the expected type to prevent
@@ -213,6 +215,7 @@ export async function applyWalletDebit(input: WalletMutationInput) {
       // Distinguish wallet-not-found from insufficient-funds
       const existing = await tx.wallet.findUnique({
         where: { ownerUserId: input.ownerUserId },
+        select: { id: true, isDeleted: true, availablePaise: true },
       });
       if (!existing || existing.isDeleted) {
         logErrorEvent({ category: 'BUSINESS_LOGIC', severity: 'high', message: 'Wallet debit failed — wallet not found', operation: 'applyWalletDebit', userId: input.ownerUserId, metadata: { type: input.type, amountPaise: input.amountPaise } });
@@ -225,7 +228,7 @@ export async function applyWalletDebit(input: WalletMutationInput) {
     }
 
     // Re-read wallet to get the walletId for the transaction record
-    const wallet = await tx.wallet.findUnique({ where: { ownerUserId: input.ownerUserId } });
+    const wallet = await tx.wallet.findUnique({ where: { ownerUserId: input.ownerUserId }, select: { id: true } });
     if (!wallet) {
       logErrorEvent({ category: 'BUSINESS_LOGIC', severity: 'critical', message: 'Wallet disappeared during debit', operation: 'applyWalletDebit', userId: input.ownerUserId, metadata: { type: input.type, amountPaise: input.amountPaise } });
       throw new AppError(500, 'WALLET_NOT_FOUND', 'Wallet disappeared during debit');

@@ -1,22 +1,24 @@
 ﻿'use client';
 
-import React, { lazy, Suspense } from 'react';
+import React, { Suspense } from 'react';
 import { AuthProvider } from '../../../shared/context/AuthContext';
 import { ToastProvider } from '../../../shared/context/ToastContext';
 import { ErrorBoundary } from '../../../shared/components/ErrorBoundary';
 import { PageSkeleton } from '../../../shared/components/ui/PageSkeleton';
+import { lazyRetry } from '../../../shared/utils/lazyRetry';
 
-// Lazy-load the 98KB AdminPortal — only fetched after initial render
-const AdminPortal = lazy(() => import('../../../shared/pages/AdminPortal').then(m => ({ default: m.AdminPortal })));
+const AdminPortal = lazyRetry(() =>
+  import('../../../shared/pages/AdminPortal').then((m) => ({ default: m.AdminPortal })),
+);
 
 export default function Page() {
   return (
     <ErrorBoundary>
       <AuthProvider>
         <ToastProvider>
-          <Suspense fallback={<PageSkeleton variant="dashboard" />}>
-            <AdminPortal onBack={() => {}} />
-          </Suspense>
+        <Suspense fallback={<PageSkeleton variant="dashboard" />}>
+          <AdminPortal onBack={() => {}} />
+        </Suspense>
         </ToastProvider>
       </AuthProvider>
     </ErrorBoundary>

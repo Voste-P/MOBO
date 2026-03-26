@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../components/ui/ConfirmDialog';
-import { api, asArray } from '../services/api';
+import { api, asArray, extractPaginationMeta, invalidateGetCache } from '../services/api';
+import type { PaginationMeta } from '../services/api';
 import { getDirectBackendUrl } from '../utils/apiBaseUrl';
 import { maskMobile } from '../utils/mobiles';
 import { formatErrorMessage } from '../utils/errors';
@@ -10,7 +11,7 @@ import { ProxiedImage } from '../components/ProxiedImage';
 
 import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
-import { Button, EmptyState, IconButton, Input, Spinner } from '../components/ui';
+import { Button, EmptyState, IconButton, Input, Spinner, Pagination } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { RatingVerificationBadge, ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
 import { DesktopShell } from '../components/DesktopShell';
@@ -186,6 +187,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
 
 
   const switchView = (next: ViewMode) => {
+    invalidateGetCache('/admin/');
+    invalidateGetCache('/tickets');
     setView(next);
     setIsSidebarOpen(false);
   };
@@ -223,6 +226,19 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   const [inventorySearch, setInventorySearch] = useState('');
   const [proofModal, setProofModal] = useState<Order | null>(null);
 
+  // --- Pagination state per tab ---
+  const PAGE_SIZE = 50;
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersPagination, setUsersPagination] = useState<PaginationMeta | null>(null);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [ordersPagination, setOrdersPagination] = useState<PaginationMeta | null>(null);
+  const [productsPage, setProductsPage] = useState(1);
+  const [productsPagination, setProductsPagination] = useState<PaginationMeta | null>(null);
+  const [invitesPage, setInvitesPage] = useState(1);
+  const [invitesPagination, setInvitesPagination] = useState<PaginationMeta | null>(null);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditPagination, setAuditPagination] = useState<PaginationMeta | null>(null);
+
 
   // Admin-specific: show up to 2 decimal places
   const formatCurrency = (amount: number) => formatCurrencyBase(amount, { maximumFractionDigits: 2 });
@@ -240,44 +256,84 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   const [auditDateFrom, setAuditDateFrom] = useState('');
   const [auditDateTo, setAuditDateTo] = useState('');
 
+  // Debounced user search: input state for immediate UI, debounced value for API calls
+  const [debouncedUserSearch, setDebouncedUserSearch] = useState('');
+  const userSearchTimerRef = useRef<any>(null);
+  const userSearchSeqRef = useRef(0);
+  const handleUserSearchChange = (value: string) => {
+    setUserSearch(value);
+    if (userSearchTimerRef.current) clearTimeout(userSearchTimerRef.current);
+    userSearchTimerRef.current = setTimeout(() => {
+      setDebouncedUserSearch(value);
+      setUsersPage(1);
+    }, 350);
+  };
+
+  // Ref to always call the latest refreshCurrentView (avoids stale closures in realtime handler)
+  const refreshCurrentViewRef = useRef<() => void>(() => {});
+  // Guard: only run initial data fetch once when admin session is established
+  const initialLoadRef = useRef(false);
+
   const fetchSystemConfig = async () => {
     try {
       const cfg = await api.admin.getConfig();
       if (cfg?.adminContactEmail) setConfigEmail(String(cfg.adminContactEmail));
     } catch (e) {
-      console.error('Admin Config Fetch Error:', e);
-      toast.error('Failed to load system configuration.');
+      if (process.env.NODE_ENV !== 'production') console.error('Admin Config Fetch Error:', e);
+      toast.error(formatErrorMessage(e, 'Failed to load system configuration.'));
     }
   };
 
   useEffect(() => {
-    if (user?.role === 'admin') {
-      fetchAllData();
-      fetchSystemConfig();
+    if (user?.role === 'admin' && !initialLoadRef.current) {
+      initialLoadRef.current = true;
+      refreshCurrentView();
     }
-  }, [user]);
+  }, [user?.role]);
 
-  // Realtime: refresh only the data relevant to the current view.
+  // Fetch dashboard stats when switching to dashboard view (skip initial mount — handled above)
+  const dashboardMountedRef = useRef(false);
   useEffect(() => {
-    if (!user || user.role !== 'admin') return;
+    if (!user?.id || user.role !== 'admin') return;
+    if (view !== 'dashboard') { dashboardMountedRef.current = true; return; }
+    if (!dashboardMountedRef.current) { dashboardMountedRef.current = true; return; } // skip first mount
+    Promise.allSettled([api.admin.getStats(), api.admin.getGrowthAnalytics()]).then(([s, g]) => {
+      if (s.status === 'fulfilled') setStats(s.value);
+      if (g.status === 'fulfilled') setChartData(asArray(g.value));
+    });
+  }, [user?.id, view]);
+
+  // Realtime: only refresh when the event is relevant to the current view
+  const lastRealtimeRefreshRef = useRef(0);
+  useEffect(() => {
+    if (!user?.id || user.role !== 'admin') return;
     let timer: any = null;
+    const viewRelevantEvents: Record<string, string[]> = {
+      dashboard: ['orders.changed', 'users.changed', 'wallets.changed'],
+      users: ['users.changed'],
+      orders: ['orders.changed'],
+      finance: ['orders.changed', 'wallets.changed'],
+      inventory: ['deals.changed'],
+      support: ['tickets.changed'],
+      feedback: ['tickets.changed'],
+      invites: ['invites.changed'],
+      'audit-logs': [],
+      settings: [],
+    };
     const schedule = () => {
-      if (timer) return;
+      if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        refreshCurrentView();
+        // Skip if just refreshed < 2s ago (prevents SSE double-fetch after explicit action)
+        const now = Date.now();
+        if (now - lastRealtimeRefreshRef.current < 2000) return;
+        lastRealtimeRefreshRef.current = now;
+        refreshCurrentViewRef.current();
       }, 800);
     };
     const unsub = subscribeRealtime((msg) => {
-      if (
-        msg.type === 'orders.changed' ||
-        msg.type === 'users.changed' ||
-        msg.type === 'wallets.changed' ||
-        msg.type === 'deals.changed' ||
-        msg.type === 'invites.changed' ||
-        msg.type === 'notifications.changed' ||
-        msg.type === 'tickets.changed'
-      ) {
+      const relevant = viewRelevantEvents[view] || [];
+      if (relevant.includes(msg.type)) {
         schedule();
       }
     });
@@ -285,143 +341,161 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [user, view]);
+  }, [user?.id, view]);
 
   // Auto-fetch audit logs when switching to audit-logs view or when filters change
   useEffect(() => {
-    if (!user || user.role !== 'admin') return;
+    if (!user?.id || user.role !== 'admin') return;
     if (view !== 'audit-logs') return;
     setAuditLoading(true);
-    const params: any = { limit: 200 };
+    const params: any = { limit: PAGE_SIZE, page: auditPage };
     if (auditActionFilter) params.action = auditActionFilter;
     if (auditDateFrom) params.from = new Date(auditDateFrom).toISOString();
     if (auditDateTo) params.to = new Date(auditDateTo + 'T23:59:59').toISOString();
     api.admin
       .getAuditLogs(params)
-      .then((data) => setAuditLogs(Array.isArray(data) ? data : data?.logs ?? []))
-      .catch((e) => { console.error('Audit Logs Fetch Error:', e); toast.error('Failed to load audit logs.'); })
+      .then((res) => {
+        setAuditLogs(asArray(res));
+        setAuditPagination(extractPaginationMeta(res));
+      })
+      .catch((e) => { if (process.env.NODE_ENV !== 'production') console.error('Audit Logs Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to load audit logs.')); })
       .finally(() => setAuditLoading(false));
-  }, [user, view, auditActionFilter, auditDateFrom, auditDateTo]);
+  }, [user?.id, view, auditActionFilter, auditDateFrom, auditDateTo, auditPage]);
 
   useEffect(() => {
-    if (!user || user.role !== 'admin') return;
+    if (!user?.id || user.role !== 'admin') return;
     if (view !== 'users') return;
+    const seq = ++userSearchSeqRef.current;
+    const role = userRoleFilter === 'All' ? 'all' : userRoleFilter.toLowerCase();
+    const search = debouncedUserSearch.trim() || undefined;
     api.admin
-      .getUsers('all')
-      .then((u) => setUsers(u))
-      .catch((e) => { console.error('Admin Users Fetch Error:', e); toast.error('Failed to refresh users list.'); });
-  }, [user, view]);
+      .getUsers(role, { page: usersPage, limit: PAGE_SIZE, search })
+      .then((res) => {
+        if (seq !== userSearchSeqRef.current) return; // Ignore stale response
+        setUsers(asArray(res));
+        setUsersPagination(extractPaginationMeta(res));
+      })
+      .catch((e) => { if (seq === userSearchSeqRef.current) { if (process.env.NODE_ENV !== 'production') console.error('Admin Users Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh users list.')); } });
+  }, [user?.id, view, usersPage, userRoleFilter, debouncedUserSearch]);
 
   useEffect(() => {
-    if (!user || user.role !== 'admin') return;
+    if (!user?.id || user.role !== 'admin') return;
     if (view !== 'invites') return;
     api.admin
-      .getInvites()
-      .then((i) => setInvites(i))
-      .catch((e) => { console.error('Admin Invites Fetch Error:', e); toast.error('Failed to refresh invites.'); });
-  }, [user, view]);
+      .getInvites({ page: invitesPage, limit: PAGE_SIZE })
+      .then((res) => {
+        setInvites(asArray(res));
+        setInvitesPagination(extractPaginationMeta(res));
+      })
+      .catch((e) => { if (process.env.NODE_ENV !== 'production') console.error('Admin Invites Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh invites.')); });
+  }, [user?.id, view, invitesPage]);
+
+  // Fetch orders when switching to orders/finance view or when page changes
+  useEffect(() => {
+    if (!user?.id || user.role !== 'admin') return;
+    if (view !== 'orders' && view !== 'finance') return;
+    api.admin.getFinancials({ page: ordersPage, limit: PAGE_SIZE }).then((res) => {
+      const safeOrders = asArray<Order>(res);
+      setOrders(safeOrders);
+      setOrdersPagination(extractPaginationMeta(res));
+      setProofModal((prev) => {
+        if (!prev) return prev;
+        const updated = safeOrders.find((ord: Order) => ord.id === prev.id);
+        return updated || prev; // Keep modal open with previous data if order not on current page
+      });
+    }).catch((e) => { if (process.env.NODE_ENV !== 'production') console.error('Admin Orders Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh orders.')); });
+  }, [user?.id, view, ordersPage]);
+
+  // Fetch products when switching to inventory view or when page changes
+  useEffect(() => {
+    if (!user?.id || user.role !== 'admin') return;
+    if (view !== 'inventory') return;
+    api.admin.getProducts({ page: productsPage, limit: PAGE_SIZE }).then((res) => {
+      setProducts(asArray(res));
+      setProductsPagination(extractPaginationMeta(res));
+    }).catch((e) => { if (process.env.NODE_ENV !== 'production') console.error('Admin Products Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh products.')); });
+  }, [user?.id, view, productsPage]);
 
   useEffect(() => {
-    if (!user || user.role !== 'admin') return;
+    if (!user?.id || user.role !== 'admin') return;
     if (view !== 'settings') return;
     fetchSystemConfig();
-  }, [user, view]);
+  }, [user?.id, view]);
+
+  // Fetch tickets when switching to support/feedback view
+  useEffect(() => {
+    if (!user?.id || user.role !== 'admin') return;
+    if (view !== 'support' && view !== 'feedback') return;
+    api.tickets.getAll({ issueType: view === 'feedback' ? 'Feedback' : 'Support' })
+      .then((res) => setTickets(asArray(res)))
+      .catch((e) => { if (process.env.NODE_ENV !== 'production') console.error('Admin Tickets Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to load tickets.')); });
+  }, [user?.id, view]);
 
   /** Refresh only the data needed for the active tab/view (instead of ALL endpoints). */
   const refreshCurrentView = async () => {
     try {
       switch (view) {
-        case 'dashboard':
-          Promise.allSettled([api.admin.getStats(), api.admin.getGrowthAnalytics()]).then(([s, g]) => {
-            if (s.status === 'fulfilled') setStats(s.value);
-            if (g.status === 'fulfilled') setChartData(asArray(g.value));
-          });
+        case 'dashboard': {
+          const [s, g] = await Promise.allSettled([api.admin.getStats(), api.admin.getGrowthAnalytics()]);
+          if (s.status === 'fulfilled') setStats(s.value);
+          if (g.status === 'fulfilled') setChartData(asArray(g.value));
           break;
-        case 'users':
-          api.admin.getUsers('all').then((u) => setUsers(u)).catch(() => {});
+        }
+        case 'users': {
+          const role = userRoleFilter === 'All' ? 'all' : userRoleFilter.toLowerCase();
+          const search = debouncedUserSearch.trim() || undefined;
+          api.admin.getUsers(role, { page: usersPage, limit: PAGE_SIZE, search }).then((res) => {
+            setUsers(asArray(res));
+            setUsersPagination(extractPaginationMeta(res));
+          }).catch(() => {});
           break;
+        }
         case 'orders':
         case 'finance':
-          api.admin.getFinancials().then((o) => {
-            const safeOrders = asArray<Order>(o);
+          api.admin.getFinancials({ page: ordersPage, limit: PAGE_SIZE }).then((res) => {
+            const safeOrders = asArray<Order>(res);
             setOrders(safeOrders);
+            setOrdersPagination(extractPaginationMeta(res));
             setProofModal((prev) => {
               if (!prev) return prev;
               const updated = safeOrders.find((ord: Order) => ord.id === prev.id);
-              return updated || null;
+              return updated || prev; // Keep modal open with previous data
             });
           }).catch(() => {});
           break;
         case 'inventory':
-          api.admin.getProducts().then((p) => setProducts(asArray(p))).catch(() => {});
+          api.admin.getProducts({ page: productsPage, limit: PAGE_SIZE }).then((res) => {
+            setProducts(asArray(res));
+            setProductsPagination(extractPaginationMeta(res));
+          }).catch(() => {});
           break;
         case 'support':
         case 'feedback':
-          api.tickets.getAll().then((t) => setTickets(asArray(t))).catch(() => {});
+          api.tickets.getAll({ issueType: view === 'feedback' ? 'Feedback' : 'Support' }).then((t) => setTickets(asArray(t))).catch(() => {});
           break;
         case 'invites':
-          api.admin.getInvites().then((i) => setInvites(asArray(i))).catch(() => {});
+          api.admin.getInvites({ page: invitesPage, limit: PAGE_SIZE }).then((res) => {
+            setInvites(asArray(res));
+            setInvitesPagination(extractPaginationMeta(res));
+          }).catch(() => {});
           break;
         default:
           break;
       }
     } catch (e) {
-      console.error('Admin Realtime Refresh Error:', e);
+      if (process.env.NODE_ENV !== 'production') console.error('Admin Realtime Refresh Error:', e);
     }
   };
+  refreshCurrentViewRef.current = refreshCurrentView;
 
+  /** Refresh only the current tab's data (used by DesktopShell onRefresh) */
   const fetchAllData = async () => {
     setIsLoading(true);
     try {
-      const results = await Promise.allSettled([
-        api.admin.getUsers('all'),
-        api.admin.getFinancials(),
-        api.admin.getProducts(),
-        api.admin.getStats(),
-        api.admin.getGrowthAnalytics(),
-        api.admin.getInvites(),
-        api.tickets.getAll(),
-      ]);
-
-      const [u, o, p, s, g, i, t] = results;
-
-      const failures: string[] = [];
-
-      if (u.status === 'fulfilled') setUsers(asArray(u.value));
-      else { console.error('Admin Users Fetch Error:', u.reason); failures.push('users'); }
-
-      if (o.status === 'fulfilled') {
-        const safeOrders = asArray<Order>(o.value);
-        setOrders(safeOrders);
-        // Keep proof modal in sync with refreshed data
-        setProofModal((prev) => {
-          if (!prev) return prev;
-          const updated = safeOrders.find((ord: Order) => ord.id === prev.id);
-          return updated || null;
-        });
-      } else { console.error('Admin Financials Fetch Error:', o.reason); failures.push('financials'); }
-
-      if (p.status === 'fulfilled') setProducts(asArray(p.value));
-      else { console.error('Admin Products Fetch Error:', p.reason); failures.push('products'); }
-
-      if (s.status === 'fulfilled') setStats(s.value);
-      else { console.error('Admin Stats Fetch Error:', s.reason); failures.push('stats'); }
-
-      if (g.status === 'fulfilled') setChartData(asArray(g.value));
-      else { console.error('Admin Growth Fetch Error:', g.reason); failures.push('analytics'); }
-
-      if (i.status === 'fulfilled') setInvites(asArray(i.value));
-      else { console.error('Admin Invites Fetch Error:', i.reason); failures.push('invites'); }
-
-      if (t.status === 'fulfilled') setTickets(asArray(t.value));
-      else { console.error('Admin Tickets Fetch Error:', t.reason); failures.push('tickets'); }
-
-      if (failures.length > 0) {
-        toast.error(`Failed to load: ${failures.join(', ')}. Some data may be stale.`);
-      }
+      await refreshCurrentView();
     } catch (e) {
-      console.error('Admin Data Fetch Error:', e);
-      toast.error('Failed to load admin data. Please refresh the page.');
+      if (process.env.NODE_ENV !== 'production') console.error('Admin Data Fetch Error:', e);
+      toast.error(formatErrorMessage(e, 'Failed to load admin data. Please refresh the page.'));
     } finally {
       setIsLoading(false);
     }
@@ -462,8 +536,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     setIsLoading(true);
     try {
       await api.admin.generateInvite(inviteRole, inviteLabel);
-      const updated = await api.admin.getInvites();
-      setInvites(updated);
+      const updated = await api.admin.getInvites({ page: invitesPage, limit: PAGE_SIZE });
+      setInvites(asArray(updated));
+      setInvitesPagination(extractPaginationMeta(updated));
       setInviteLabel('');
       toast.success('Invite generated');
     } catch (e) {
@@ -497,8 +572,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     try {
       await api.admin.deleteWallet(target.id);
       toast.success('Wallet deleted');
-      const updated = await api.admin.getUsers('all');
-      setUsers(updated);
+      const updated = await api.admin.getUsers('all', { page: usersPage, limit: PAGE_SIZE });
+      setUsers(asArray(updated));
+      setUsersPagination(extractPaginationMeta(updated));
     } catch (e: any) {
       toast.error(formatErrorMessage(e, 'Failed to delete wallet'));
     } finally {
@@ -514,8 +590,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     try {
       await api.admin.deleteUser(target.id);
       toast.success('User deleted');
-      const updated = await api.admin.getUsers('all');
-      setUsers(updated);
+      const updated = await api.admin.getUsers('all', { page: usersPage, limit: PAGE_SIZE });
+      setUsers(asArray(updated));
+      setUsersPagination(extractPaginationMeta(updated));
     } catch (e: any) {
       toast.error(formatErrorMessage(e, 'Failed to delete user'));
     } finally {
@@ -530,8 +607,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     try {
       await api.admin.deleteProduct(productId);
       toast.success('Product deleted');
-      const updated = await api.admin.getProducts();
-      setProducts(updated);
+      const updated = await api.admin.getProducts({ page: productsPage, limit: PAGE_SIZE });
+      setProducts(asArray(updated));
+      setProductsPagination(extractPaginationMeta(updated));
     } catch (e: any) {
       toast.error(formatErrorMessage(e, 'Failed to delete product'));
     } finally {
@@ -978,14 +1056,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                 label="Users"
                 active={view === 'users'}
                 onClick={() => switchView('users')}
-                badge={users.length}
+                badge={usersPagination?.total ?? users.length}
               />
               <SidebarItem
                 icon={ShoppingCart}
                 label="Orders"
                 active={view === 'orders'}
                 onClick={() => switchView('orders')}
-                badge={orders.length}
+                badge={ordersPagination?.total ?? orders.length}
               />
               <SidebarItem
                 icon={Package}
@@ -1195,7 +1273,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                           return (
                             <div key={role}>
                               <div className="flex justify-between text-xs font-bold text-slate-600 mb-1">
-                                <span>{role}s</span>
+                                <span>{role === 'Agency' ? 'Agencies' : `${role}s`}</span>
                                 <span>
                                   {count} ({pct}%)
                                 </span>
@@ -1326,7 +1404,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 max-h-[70vh] overflow-y-auto scrollbar-styled">
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 max-h-[70dvh] overflow-y-auto scrollbar-styled">
                   {isLoading ? (
                     <div className="col-span-full">
                       <EmptyState
@@ -1576,7 +1654,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         <button
                           key={role}
                           type="button"
-                          onClick={() => setUserRoleFilter(role)}
+                          onClick={() => { setUserRoleFilter(role); setUsersPage(1); }}
                           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
                             userRoleFilter === role
                               ? 'bg-slate-900 text-white border-slate-900 shadow-md'
@@ -1588,7 +1666,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       ))}
                     </div>
                     <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                      {filteredUsers.length} Records
+                      {usersPagination ? `${usersPagination.total.toLocaleString()} Total` : `${filteredUsers.length} Records`}
                     </div>
                   </div>
                   <div className="relative">
@@ -1597,13 +1675,13 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       type="text"
                       placeholder="Search by name, mobile, email, or code..."
                       value={userSearch}
-                      onChange={(e) => setUserSearch(e.target.value)}
+                      onChange={(e) => handleUserSearchChange(e.target.value)}
                       className="w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all bg-white placeholder:text-slate-400"
                     />
                     {userSearch && (
                       <button
                         type="button"
-                        onClick={() => setUserSearch('')}
+                        onClick={() => handleUserSearchChange('')}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                         aria-label="Clear search"
                       >
@@ -1612,7 +1690,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     )}
                   </div>
                 </div>
-                <div className="overflow-x-auto max-h-[70vh] overflow-y-auto scrollbar-styled">
+                <div className="overflow-x-auto max-h-[70dvh] overflow-y-auto scrollbar-styled">
                   <table className="w-full text-left">
                     <thead className="bg-slate-50/80 text-xs font-extrabold uppercase text-slate-400 tracking-wider sticky top-0 z-10 backdrop-blur-sm">
                       <tr>
@@ -1624,7 +1702,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 text-sm font-medium">
-                      {filteredUsers.map((u) => (
+                      {filteredUsers.length === 0 ? (
+                        <tr><td colSpan={5} className="p-12 text-center text-slate-400 text-sm font-bold">No users match the current filter.</td></tr>
+                      ) : filteredUsers.map((u) => (
                         <tr key={u.id} className="hover:bg-slate-50/50 transition-colors group">
                           <td className="p-5">
                             <div className="flex items-center gap-3">
@@ -1717,6 +1797,15 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     </tbody>
                   </table>
                 </div>
+                {usersPagination && usersPagination.totalPages > 1 && (
+                  <Pagination
+                    page={usersPage}
+                    totalPages={usersPagination.totalPages}
+                    total={usersPagination.total}
+                    limit={usersPagination.limit}
+                    onPageChange={(p) => { setUsersPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  />
+                )}
               </div>
             )}
 
@@ -1813,6 +1902,15 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     </tbody>
                   </table>
                 </div>
+                {invitesPagination && invitesPagination.totalPages > 1 && (
+                  <Pagination
+                    page={invitesPage}
+                    totalPages={invitesPagination.totalPages}
+                    total={invitesPagination.total}
+                    limit={invitesPagination.limit}
+                    onPageChange={(p) => { setInvitesPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  />
+                )}
               </div>
             )}
 
@@ -1863,7 +1961,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     <option value="Rejected_Expired">Expired</option>
                     <option value="Paid">Paid</option>
                   </select>
-                  <span className="text-xs text-slate-400 font-bold">{filteredOrders.length} orders</span>
+                  <span className="text-xs text-slate-400 font-bold">{ordersPagination ? `${ordersPagination.total.toLocaleString()} total` : `${filteredOrders.length} orders`}</span>
                 </div>
                 <div className="overflow-x-auto max-h-[600px] overflow-y-auto scrollbar-styled">
                   <table className="w-full text-left">
@@ -1880,12 +1978,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 text-sm font-medium">
-                      {filteredOrders.length > 200 && (
-                        <tr><td colSpan={8} className="p-3 text-center text-xs text-amber-600 bg-amber-50 font-semibold">
-                          Showing 200 of {filteredOrders.length} orders. Use filters to narrow results.
-                        </td></tr>
-                      )}
-                      {filteredOrders.slice(0, 200).map((o) => (
+                      {filteredOrders.length === 0 ? (
+                        <tr><td colSpan={6} className="p-12 text-center text-slate-400 text-sm font-bold">No orders match the current filter.</td></tr>
+                      ) : filteredOrders.map((o) => (
                         <tr key={o.id} className="hover:bg-slate-50/50 transition-colors">
                           <td className="p-5">
                             <div className="font-mono text-slate-500">
@@ -1922,6 +2017,15 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     </tbody>
                   </table>
                 </div>
+                {ordersPagination && ordersPagination.totalPages > 1 && (
+                  <Pagination
+                    page={ordersPage}
+                    totalPages={ordersPagination.totalPages}
+                    total={ordersPagination.total}
+                    limit={ordersPagination.limit}
+                    onPageChange={(p) => { setOrdersPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  />
+                )}
               </div>
             )}
 
@@ -1930,7 +2034,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
               <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden animate-enter">
                 <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                   <h3 className="font-extrabold text-lg text-slate-900">Live Inventory</h3>
-                  <span className="text-xs text-slate-400 font-bold">{filteredProducts.length} products</span>
+                  <span className="text-xs text-slate-400 font-bold">{productsPagination ? `${productsPagination.total.toLocaleString()} total` : `${filteredProducts.length} products`}</span>
                 </div>
                 <div className="p-4 border-b border-slate-100">
                   <Input
@@ -1940,7 +2044,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     className="text-sm"
                   />
                 </div>
-                <div className="overflow-x-auto max-h-[70vh] overflow-y-auto scrollbar-styled">
+                <div className="overflow-x-auto max-h-[70dvh] overflow-y-auto scrollbar-styled">
                 <table className="w-full text-left">
                   <thead className="bg-slate-50 text-xs font-extrabold uppercase text-slate-400 tracking-wider sticky top-0 z-10">
                     <tr>
@@ -1955,7 +2059,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50 text-sm font-medium">
-                    {filteredProducts.map((p) => (
+                    {filteredProducts.length === 0 ? (
+                      <tr><td colSpan={7} className="p-12 text-center text-slate-400 text-sm font-bold">No products match the current filter.</td></tr>
+                    ) : filteredProducts.map((p) => (
                       <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="p-5">
                           <div className="flex items-center gap-3">
@@ -2019,6 +2125,15 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   </tbody>
                 </table>
                 </div>
+                {productsPagination && productsPagination.totalPages > 1 && (
+                  <Pagination
+                    page={productsPage}
+                    totalPages={productsPagination.totalPages}
+                    total={productsPagination.total}
+                    limit={productsPagination.limit}
+                    onPageChange={(p) => { setProductsPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  />
+                )}
               </div>
             )}
 
@@ -2078,15 +2193,16 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     onClick={async () => {
                       setAuditLoading(true);
                       try {
-                        const params: any = { limit: 10000 };
+                        const params: any = { limit: PAGE_SIZE, page: auditPage };
                         if (auditActionFilter) params.action = auditActionFilter;
                         if (auditDateFrom) params.from = new Date(auditDateFrom).toISOString();
                         if (auditDateTo) params.to = new Date(auditDateTo + 'T23:59:59').toISOString();
-                        const data = await api.admin.getAuditLogs(params);
-                        setAuditLogs(Array.isArray(data) ? data : data?.logs ?? []);
+                        const res = await api.admin.getAuditLogs(params);
+                        setAuditLogs(asArray(res));
+                        setAuditPagination(extractPaginationMeta(res));
                       } catch (e) {
-                        console.error(e);
-                        toast.error('Failed to load audit logs');
+                        if (process.env.NODE_ENV !== 'production') console.error(e);
+                        toast.error(formatErrorMessage(e, 'Failed to load audit logs'));
                       } finally {
                         setAuditLoading(false);
                       }
@@ -2106,7 +2222,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   />
                   <select
                     value={auditActionFilter}
-                    onChange={(e) => setAuditActionFilter(e.target.value)}
+                    onChange={(e) => { setAuditActionFilter(e.target.value); setAuditPage(1); }}
                     aria-label="Filter by audit action"
                     className="px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-slate-300"
                   >
@@ -2139,7 +2255,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   />
                 </div>
                 <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                  <div className="overflow-x-auto max-h-[70vh] overflow-y-auto scrollbar-styled">
+                  <div className="overflow-x-auto max-h-[70dvh] overflow-y-auto scrollbar-styled">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
@@ -2187,7 +2303,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       {auditLogs.length === 0 && (
                         <tr>
                           <td colSpan={5} className="p-8 text-center text-sm text-slate-400 font-bold">
-                            Click Refresh to load audit logs.
+                            {auditLoading ? 'Loading audit logs…' : 'No audit logs found for the selected filters.'}
                           </td>
                         </tr>
                       )}
@@ -2195,6 +2311,16 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   </table>
                   </div>
                 </div>
+                {auditPagination && auditPagination.totalPages > 1 && (
+                  <Pagination
+                    page={auditPage}
+                    totalPages={auditPagination.totalPages}
+                    total={auditPagination.total}
+                    limit={auditPagination.limit}
+                    onPageChange={(p) => { setAuditPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    className="rounded-b-2xl"
+                  />
+                )}
               </div>
             )}
           </div>
@@ -2203,7 +2329,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       {/* Proof Viewer Modal */}
       {proofModal && (
         <div className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => { setProofModal(null); }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto scrollbar-styled" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90dvh] overflow-y-auto scrollbar-styled" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
               <div>
                 <h3 className="font-extrabold text-lg text-slate-900">Order Proofs</h3>

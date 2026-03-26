@@ -9,15 +9,24 @@ const agencyCodeCache = new Map<string, CacheEntry<string | null>>();
 const activeCache = new Map<string, CacheEntry<boolean>>();
 
 function getCached<T>(cache: Map<string, CacheEntry<T>>, key: string): T | undefined {
-  const entry = cache.get(key);
-  if (!entry) return undefined;
-  if (Date.now() > entry.expiresAt) { cache.delete(key); return undefined; }
-  return entry.value;
+  return getCachedLRU(cache, key);
 }
 
 function setCached<T>(cache: Map<string, CacheEntry<T>>, key: string, value: T): void {
-  if (cache.size > 2000) cache.delete(cache.keys().next().value!); // FIFO eviction
+  // LRU eviction: first key is least-recently-accessed (promoted on read in getCached)
+  if (cache.size > 2000) cache.delete(cache.keys().next().value!);
   cache.set(key, { value, expiresAt: Date.now() + LINEAGE_TTL_MS });
+}
+
+/** Promote entry on read for LRU behaviour */
+function getCachedLRU<T>(cache: Map<string, CacheEntry<T>>, key: string): T | undefined {
+  const entry = cache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) { cache.delete(key); return undefined; }
+  // LRU promotion: move to end of Map iteration order
+  cache.delete(key);
+  cache.set(key, entry);
+  return entry.value;
 }
 
 /** Clear all lineage caches (call on user/role mutations) */

@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, lazy, Suspense } from 'react';
+﻿import React, { useState, useRef, useMemo, Suspense, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { CartProvider } from '../context/CartContext';
 import { ChatProvider } from '../context/ChatContext';
@@ -12,13 +12,12 @@ import { PageSkeleton } from '../components/ui/PageSkeleton';
 import { AuthScreen } from '../pages/Auth';
 import { useSwipeTabs } from '../hooks/useSwipeTabs';
 import { Package, User, LogOut, Home as HomeIcon, Bot } from 'lucide-react';
+import { lazyRetry } from '../utils/lazyRetry';
 
-// Lazy-load heavy page components to reduce initial bundle size.
-// Orders alone is 102KB, Explore and Profile are also significant.
-const Home = lazy(() => import('../pages/Home').then(m => ({ default: m.Home })));
-const Explore = lazy(() => import('../pages/Explore').then(m => ({ default: m.Explore })));
-const Orders = lazy(() => import('../pages/Orders').then(m => ({ default: m.Orders })));
-const Profile = lazy(() => import('../pages/Profile').then(m => ({ default: m.Profile })));
+const Home = lazyRetry(() => import('../pages/Home').then(m => ({ default: m.Home })));
+const Explore = lazyRetry(() => import('../pages/Explore').then(m => ({ default: m.Explore })));
+const Orders = lazyRetry(() => import('../pages/Orders').then(m => ({ default: m.Orders })));
+const Profile = lazyRetry(() => import('../pages/Profile').then(m => ({ default: m.Profile })));
 
 function TabSkeleton() {
   return <PageSkeleton variant="cards" />;
@@ -31,7 +30,7 @@ interface ConsumerAppProps {
 export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'home' | 'explore' | 'orders' | 'profile'>('explore');
-  const [slideDir, setSlideDir] = useState<'left' | 'right'>('right');
+  const [_slideDir, setSlideDir] = useState<'left' | 'right'>('right');
   const prevTabIdx = useRef(0);
 
   const TAB_ORDER = ['explore', 'home', 'orders', 'profile'] as const;
@@ -44,11 +43,31 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
     setActiveTab(tab);
   };
 
+  // Track which tabs have been visited so we only mount them on first visit
+  // but keep them mounted (CSS-hidden) afterwards to preserve scroll position.
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(['explore']));
+  const handleTabChangeWrapped = useCallback((tab: typeof activeTab) => {
+    setVisitedTabs(prev => {
+      if (prev.has(tab)) return prev;
+      const next = new Set(prev);
+      next.add(tab);
+      return next;
+    });
+    handleTabChange(tab);
+  }, [activeTab]);
+
   const swipeHandlers = useSwipeTabs({
     tabs: TAB_ORDER as unknown as string[],
     activeTab,
-    onChangeTab: (t) => handleTabChange(t as typeof activeTab),
+    onChangeTab: (t) => handleTabChangeWrapped(t as typeof activeTab),
   });
+
+  const tabItems = useMemo(() => [
+    { id: 'explore', label: 'Home', ariaLabel: 'Home', icon: <HomeIcon size={22} strokeWidth={2.5} /> },
+    { id: 'home', label: 'Chat', ariaLabel: 'Chat', icon: <Bot size={22} strokeWidth={2.5} /> },
+    { id: 'orders', label: 'Orders', ariaLabel: 'Orders', icon: <Package size={22} strokeWidth={2.5} /> },
+    { id: 'profile', label: 'Profile', ariaLabel: 'Profile', icon: <User size={22} strokeWidth={2.5} /> },
+  ], []);
 
   if (!user) return <AuthScreen onBack={onBack} />;
 
@@ -116,28 +135,34 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
             <div className="flex flex-col h-full bg-[#F2F2F7] relative overflow-hidden font-sans">
               <div className="flex-1 overflow-hidden overscroll-none" {...swipeHandlers}>
                 <Suspense fallback={<TabSkeleton />}>
-                  <div
-                    key={activeTab}
-                    className={`h-full overflow-y-auto scrollbar-styled animate-slide-tab ${slideDir === 'left' ? 'slide-from-right' : 'slide-from-left'}`}
-                  >
-                    {activeTab === 'home' && <Home onVoiceNavigate={handleTabChange} />}
-                    {activeTab === 'explore' && <Explore />}
-                    {activeTab === 'orders' && <Orders />}
-                    {activeTab === 'profile' && <Profile />}
-                  </div>
+                  {visitedTabs.has('explore') && (
+                    <div className={`h-full ${activeTab === 'explore' ? '' : 'hidden'}`}>
+                      <div className="h-full overflow-y-auto scrollbar-styled"><Explore isActive={activeTab === 'explore'} /></div>
+                    </div>
+                  )}
+                  {visitedTabs.has('home') && (
+                    <div className={`h-full ${activeTab === 'home' ? '' : 'hidden'}`}>
+                      <div className="h-full overflow-y-auto scrollbar-styled"><Home onVoiceNavigate={handleTabChangeWrapped} isActive={activeTab === 'home'} /></div>
+                    </div>
+                  )}
+                  {visitedTabs.has('orders') && (
+                    <div className={`h-full ${activeTab === 'orders' ? '' : 'hidden'}`}>
+                      <div className="h-full overflow-y-auto scrollbar-styled"><Orders isActive={activeTab === 'orders'} /></div>
+                    </div>
+                  )}
+                  {visitedTabs.has('profile') && (
+                    <div className={`h-full ${activeTab === 'profile' ? '' : 'hidden'}`}>
+                      <div className="h-full overflow-y-auto scrollbar-styled"><Profile isActive={activeTab === 'profile'} /></div>
+                    </div>
+                  )}
                 </Suspense>
               </div>
 
               <div className="absolute bottom-[calc(0.75rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 w-[92vw] max-w-[360px]">
                 <MobileTabBar
-                  items={[
-                    { id: 'explore', label: 'Home', ariaLabel: 'Home', icon: <HomeIcon size={22} strokeWidth={2.5} /> },
-                    { id: 'home', label: 'Chat', ariaLabel: 'Chat', icon: <Bot size={22} strokeWidth={2.5} /> },
-                    { id: 'orders', label: 'Orders', ariaLabel: 'Orders', icon: <Package size={22} strokeWidth={2.5} /> },
-                    { id: 'profile', label: 'Profile', ariaLabel: 'Profile', icon: <User size={22} strokeWidth={2.5} /> },
-                  ]}
+                  items={tabItems}
                   activeId={activeTab}
-                  onChange={(id) => handleTabChange(id as any)}
+                  onChange={(id) => handleTabChangeWrapped(id as any)}
                   variant="glass"
                   showLabels={false}
                 />

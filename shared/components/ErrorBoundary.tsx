@@ -25,7 +25,9 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('[ErrorBoundary] Uncaught render error:', error, info.componentStack);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[ErrorBoundary] Uncaught render error:', error, info.componentStack);
+    }
     // Report to backend for production monitoring (fire-and-forget)
     this.reportErrorToBackend(error, info.componentStack || '');
   }
@@ -86,7 +88,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 ? 'Could not connect to the server. Please check your internet connection and try again.'
                 : 'An unexpected error occurred. Please reload to continue.'}
           </p>
-          {this.state.error && process.env.NODE_ENV !== 'production' && (
+          {this.state.error && (
             <details className="mb-6 max-w-sm w-full text-left">
               <summary className="text-xs font-bold text-slate-400 cursor-pointer hover:text-slate-600 transition-colors">
                 Error details

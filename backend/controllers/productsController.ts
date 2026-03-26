@@ -111,18 +111,19 @@ export function makeProductsController() {
         });
         if (!deal) throw new AppError(404, 'DEAL_NOT_FOUND', 'Deal not found');
 
+        // [PERF] Parallelize campaign + brand user lookup — campaign depends on deal.campaignId
+        // but brand user lookup only needs campaign.brandUserId, so fetch campaign first then
+        // brand user in parallel with order creation prep.
         const campaign = await db().campaign.findFirst({
           where: { id: deal.campaignId },
           select: { id: true, brandUserId: true, brandName: true, isDeleted: true },
         });
         if (!campaign || campaign.isDeleted) throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
 
-        // Look up brand user's mongoId for realtime audience
-        let brandUserMongoId: string | undefined;
-        if (campaign.brandUserId) {
-          const bu = await db().user.findFirst({ where: { id: campaign.brandUserId }, select: { mongoId: true } });
-          brandUserMongoId = bu?.mongoId ?? undefined;
-        }
+        // Fire brand user lookup in parallel — don't block order creation
+        const brandUserPromise = campaign.brandUserId
+          ? db().user.findFirst({ where: { id: campaign.brandUserId }, select: { mongoId: true } })
+          : Promise.resolve(null);
 
         const mongoId = randomUUID();
         const _preOrder = await db().order.create({
@@ -178,6 +179,9 @@ export function makeProductsController() {
         logChangeEvent({ actorUserId: requesterId, entityType: 'Order', entityId: mongoId, action: 'STATUS_CHANGE', changedFields: ['workflowStatus'], before: {}, after: { workflowStatus: 'REDIRECTED' } });
 
         const ts = new Date().toISOString();
+        // Resolve the parallel brand user lookup
+        const brandUser = await brandUserPromise;
+        const brandUserMongoId = brandUser?.mongoId ?? undefined;
         publishRealtime({
           type: 'orders.changed',
           ts,

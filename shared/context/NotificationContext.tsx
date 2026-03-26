@@ -6,12 +6,12 @@
   useCallback,
   useEffect,
   useMemo,
+  useRef,
 } from 'react';
 import { AppNotification } from '../types';
 import { useAuth } from './AuthContext';
-import { api } from '../services/api';
+import { api, asArray } from '../services/api';
 import { subscribeRealtime } from '../services/realtime';
-import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 
 interface NotificationContextType {
   notifications: AppNotification[];
@@ -29,13 +29,59 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 
 export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const { connected } = useRealtimeConnection();
-  const [inbox, setInbox] = useState<AppNotification[]>([]);
   const [local, setLocal] = useState<AppNotification[]>([]);
   const [lastSeenAt, setLastSeenAt] = useState<number>(0);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
 
   const storageScope = user?.id ? `:${user.id}` : ':anon';
+
+  // Native fetch for notifications (replaces React Query)
+  const [rawInbox, setRawInbox] = useState<any[]>([]);
+  const fetchingRef = useRef(false);
+
+  const fetchNotifications = useCallback(async () => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+    try {
+      const data = await api.notifications.list();
+      setRawInbox(asArray(data));
+    } catch {
+      // silent — notifications are non-critical
+    } finally {
+      fetchingRef.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchNotifications();
+  }, [user?.id, fetchNotifications]);
+
+  // Realtime: refresh on relevant events (batch all events with clearTimeout)
+  useEffect(() => {
+    if (!user?.id) return;
+    let timer: any = null;
+    const unsub = subscribeRealtime((msg: any) => {
+      if (['notifications.changed', 'tickets.changed'].includes(msg.type)) {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => { timer = null; fetchNotifications(); }, 800);
+      }
+    });
+    return () => { unsub(); if (timer) clearTimeout(timer); };
+  }, [user?.id, fetchNotifications]);
+
+  const inbox = useMemo<AppNotification[]>(() => {
+    const data = rawInbox;
+    if (!Array.isArray(data)) return [];
+    return data.map((n: any) => ({
+      id: String(n.id),
+      title: String(n.title || 'Notification'),
+      message: String(n.message || ''),
+      type: (n.type === 'success' || n.type === 'alert' || n.type === 'info') ? n.type : 'info',
+      createdAt: typeof n.createdAt === 'string' ? n.createdAt : undefined,
+      source: 'inbox' as const,
+    }));
+  }, [rawInbox]);
 
   // Load per-user read/dismiss state
   useEffect(() => {
@@ -56,68 +102,8 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   }, [user?.id]);
 
   const refresh = useCallback(async () => {
-    if (!user) {
-      setInbox([]);
-      return;
-    }
-    try {
-      const data = await api.notifications.list();
-      const list: AppNotification[] = (Array.isArray(data) ? data : []).map((n: any) => ({
-        id: String(n.id),
-        title: String(n.title || 'Notification'),
-        message: String(n.message || ''),
-        type: (n.type === 'success' || n.type === 'alert' || n.type === 'info') ? n.type : 'info',
-        createdAt: typeof n.createdAt === 'string' ? n.createdAt : undefined,
-        source: 'inbox',
-      }));
-      setInbox(list);
-    } catch (e) {
-      // Keep UI resilient: don't break app if notifications fail.
-      // Preserve stale inbox data on transient network errors instead of clearing.
-      console.error('Failed to load notifications', e);
-    }
-  }, [user?.id]);
-
-  // Refresh on login; poll only as a fallback when realtime is disconnected.
-  useEffect(() => {
-    if (!user) return;
-    refresh();
-
-    if (connected) return;
-    // Poll more frequently (30s) when realtime is disconnected as a fallback
-    const t = setInterval(() => {
-      refresh();
-    }, 30_000);
-    return () => clearInterval(t);
-  }, [user, refresh, connected]);
-
-  // Realtime refresh for anything that impacts derived notifications.
-  useEffect(() => {
-    if (!user) return;
-    let timer: any = null;
-    const schedule = () => {
-      if (timer) return;
-      timer = setTimeout(() => {
-        timer = null;
-        refresh();
-      }, 400);
-    };
-    const unsub = subscribeRealtime((msg) => {
-      if (msg.type === 'orders.changed' || msg.type === 'users.changed' || msg.type === 'wallets.changed') {
-        schedule();
-      }
-      if (msg.type === 'notifications.changed') {
-        schedule();
-      }
-      if (msg.type === 'tickets.changed') {
-        schedule();
-      }
-    });
-    return () => {
-      unsub();
-      if (timer) clearTimeout(timer);
-    };
-  }, [user, refresh]);
+    await fetchNotifications();
+  }, [fetchNotifications]);
 
   const notifications = useMemo(() => {
     const safeParse = (v: string | undefined) => {
@@ -156,7 +142,6 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   const removeNotification = useCallback((id: string) => {
     setLocal((prev) => prev.filter((n) => n.id !== id));
-    setInbox((prev) => prev.filter((n) => n.id !== id));
     setDismissedIds((prev) => {
       const next = new Set(prev);
       next.add(id);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../components/ui/ConfirmDialog';
@@ -13,7 +13,7 @@ import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 import { User, Campaign, Order, Ticket } from '../types';
-import { EmptyState, Spinner } from '../components/ui';
+import { EmptyState, Spinner, Pagination } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { DesktopShell } from '../components/DesktopShell';
 import { formatCurrency } from '../utils/formatCurrency';
@@ -158,20 +158,22 @@ const AgencyProfile = ({ user }: any) => {
   });
   const [avatar, setAvatar] = useState(user?.avatar);
 
+  const prevUserIdRef = useRef(user?.id);
   useEffect(() => {
-    if (user) {
-      setForm({
-        name: user.name || '',
-        mobile: user.mobile || '',
-        upiId: user.upiId || '',
-        bankName: user.bankDetails?.bankName || '',
-        accountNumber: user.bankDetails?.accountNumber || '',
-        ifsc: user.bankDetails?.ifsc || '',
-        holderName: user.bankDetails?.holderName || '',
-      });
-      setAvatar(user.avatar);
-    }
-  }, [user]);
+    if (!user) return;
+    if (prevUserIdRef.current === user.id) return;
+    prevUserIdRef.current = user.id;
+    setForm({
+      name: user.name || '',
+      mobile: user.mobile || '',
+      upiId: user.upiId || '',
+      bankName: user.bankDetails?.bankName || '',
+      accountNumber: user.bankDetails?.accountNumber || '',
+      ifsc: user.bankDetails?.ifsc || '',
+      holderName: user.bankDetails?.holderName || '',
+    });
+    setAvatar(user.avatar);
+  }, [user?.id]);
 
   const handleSave = async () => {
     setLoading(true);
@@ -191,8 +193,8 @@ const AgencyProfile = ({ user }: any) => {
       setIsEditing(false);
       toast.success('Profile updated');
     } catch (err) {
-      console.error('Failed to update profile:', err);
-      toast.error('Failed to update profile.');
+      if (process.env.NODE_ENV !== 'production') console.error('Failed to update profile:', err);
+      toast.error(formatErrorMessage(err, 'Failed to update profile.'));
     } finally {
       setLoading(false);
     }
@@ -212,12 +214,12 @@ const AgencyProfile = ({ user }: any) => {
     <div className="max-w-5xl mx-auto animate-enter pb-12">
       {/* Header */}
       <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden relative mb-8 group">
-        <div className="h-32 bg-gradient-to-r from-purple-600 to-indigo-600 relative">
-          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
+        <div className="h-28 sm:h-32 bg-gradient-to-r from-purple-600 to-indigo-600 relative">
+          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.7\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\'/%3E%3C/svg%3E")' }} />
         </div>
-        <div className="px-8 pb-8 flex flex-col md:flex-row items-end -mt-12 gap-6">
+        <div className="px-4 sm:px-8 pb-6 sm:pb-8 flex flex-col md:flex-row items-end -mt-10 sm:-mt-12 gap-4 sm:gap-6">
           <div className="relative">
-            <div className="w-32 h-32 rounded-[2rem] bg-white p-2 shadow-lg border border-slate-100 flex-shrink-0">
+            <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-[1.5rem] sm:rounded-[2rem] bg-white p-2 shadow-lg border border-slate-100 flex-shrink-0">
               <div className="w-full h-full bg-slate-900 rounded-[1.5rem] flex items-center justify-center text-4xl font-black text-white overflow-hidden relative group-hover:scale-[1.02] transition-transform duration-500">
                 {avatar ? (
                   <ProxiedImage
@@ -514,10 +516,10 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
 
       toast.success('Ledger updated');
       setEditingOrder(null);
-      onRefresh();
+      onRefresh(['orders']);
     } catch (err) {
-      console.error('Ledger update failed:', err);
-      toast.error('Update failed');
+      if (process.env.NODE_ENV !== 'production') console.error('Ledger update failed:', err);
+      toast.error(formatErrorMessage(err, 'Failed to update ledger. Please try again.'));
     } finally {
       setIsUpdating(false);
     }
@@ -783,6 +785,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
             aria-label="Filter by status"
             className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white"
           >
+            <option value="All">All Status</option>
             <option value="Pending">Pending</option>
             <option value="Pending_Cooling">Cooling</option>
             <option value="Approved_Settled">Settled</option>
@@ -794,6 +797,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
             aria-label="Filter by deal type"
             className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white"
           >
+            <option value="All">All Types</option>
             <option value="Discount">Order Deal</option>
             <option value="Rating">Rating Deal</option>
             <option value="Review">Review Deal</option>
@@ -804,6 +808,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
             aria-label="Filter by mediator"
             className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white max-w-[160px]"
           >
+            <option value="All">All Mediators</option>
             {mediatorOptions.map((m) => (
               <option key={m} value={m}>{m}</option>
             ))}
@@ -814,6 +819,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
             aria-label="Filter by product"
             className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white max-w-[200px] truncate"
           >
+            <option value="All">All Products</option>
             {productOptions.map((p) => (
               <option key={p} value={p}>{p.length > 30 ? p.slice(0, 30) + '…' : p}</option>
             ))}
@@ -886,7 +892,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
                         {o.brandName || 'Brand'}
                       </div>
                       <div className="text-[10px] text-slate-500 truncate max-w-[180px]">
-                        {o.items[0]?.title}
+                        {o.items?.[0]?.title || 'Unknown Product'}
                       </div>
                       {o.soldBy && o.soldBy !== 'null' && o.soldBy !== 'undefined' && (
                         <div className="text-[9px] text-slate-400 mt-0.5">Seller: {o.soldBy}</div>
@@ -1219,7 +1225,7 @@ const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
     try {
       await api.ops.deletePayout(payoutId);
       toast.success('Payout deleted');
-      onRefresh?.();
+      onRefresh?.(['ledger']);
     } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to delete payout'));
     } finally {
@@ -1668,6 +1674,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
   const [commissionOnDeal, setCommissionOnDeal] = useState<string>('');
   const [commissionToMediator, setCommissionToMediator] = useState<string>('');
   const [mediatorPayouts, setMediatorPayouts] = useState<Record<string, string>>({});
+  const [openToAll, setOpenToAll] = useState(false);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copyingId, setCopyingId] = useState<string | null>(null);
@@ -1684,11 +1691,12 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     setAssignments(normalized);
     setAssignSearch('');
     setMediatorPayouts({});
+    setOpenToAll(assignModal.openToAll ?? false);
   }, [assignModal]);
 
-  // Get list of mediator codes for this agency to verify if campaign is active in network
+  // Get list of mediator codes for this agency (lowercase for case-insensitive matching with assignment keys)
   const myMediatorCodes = useMemo(
-    () => mediators.map((m: any) => m.mediatorCode).filter(Boolean),
+    () => mediators.map((m: any) => (m.mediatorCode || '').toLowerCase()).filter(Boolean),
     [mediators]
   );
 
@@ -1727,26 +1735,33 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     return Array.from(brands).sort();
   }, [campaigns]);
 
-  // Active Inventory = what agency is already managing (at least one sub-mediator has assignments)
+  // Active Inventory = agency-created campaigns OR campaigns with sub-mediator assignments OR openToAll distributed
   const activeInventory = useMemo(() => {
     const base = campaigns.filter(
       (c: Campaign) =>
         c.allowedAgencies.includes(user.mediatorCode) &&
-        (c.status === 'Draft' || Object.keys(c.assignments || {}).some((code) => myMediatorCodes.includes(code)))
+        (
+          c.status === 'Draft' ||
+          String(c.brandId || '') === String(user.id || '') ||
+          c.openToAll ||
+          Object.keys(c.assignments || {}).some((code) => myMediatorCodes.includes(code.toLowerCase()))
+        )
     );
     return applyFilters(base);
-  }, [campaigns, user.mediatorCode, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
+  }, [campaigns, user.mediatorCode, user.id, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
 
-  // Filter campaigns for "Offered by Brands" (where agency is allowed but no sub-mediators have slots yet)
+  // Offered by Brands = external brand campaigns without assignments, not self-created, not openToAll distributed
   const offeredCampaigns = useMemo(() => {
     const base = campaigns.filter(
       (c: Campaign) =>
         c.allowedAgencies.includes(user.mediatorCode) &&
         c.status !== 'Draft' &&
-        !Object.keys(c.assignments || {}).some((code) => myMediatorCodes.includes(code))
+        String(c.brandId || '') !== String(user.id || '') &&
+        !c.openToAll &&
+        !Object.keys(c.assignments || {}).some((code) => myMediatorCodes.includes(code.toLowerCase()))
     );
     return applyFilters(base);
-  }, [campaigns, user.mediatorCode, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
+  }, [campaigns, user.mediatorCode, user.id, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
 
   // New Campaign Form
   const [newCampaign, setNewCampaign] = useState({
@@ -1764,6 +1779,26 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
 
   const handleAssign = async () => {
     if (!assignModal) return;
+
+    // "Open to All" mode: no per-mediator allocation needed
+    if (openToAll) {
+      const isInternal = String(assignModal.brandId || '') === String(user?.id || '');
+      const commission = isInternal ? 0 : commissionOnDeal.trim() ? Number(commissionOnDeal) : 0;
+      const dealType = selectedDealType !== (assignModal.dealType || 'Discount') ? selectedDealType : undefined;
+      try {
+        await api.ops.assignSlots(assignModal.id, {}, dealType, undefined, undefined, commission, true);
+        toast.success('Open to All distribution saved — all mediators can now publish this deal');
+        setAssignModal(null);
+        setAssignments({});
+        setMediatorPayouts({});
+        setOpenToAll(false);
+        onRefresh(['campaigns']);
+      } catch (err) {
+        toast.error(formatErrorMessage(err, 'Failed to distribute inventory'));
+      }
+      return;
+    }
+
     const positiveAssignments = Object.fromEntries(
       Object.entries(assignments || {}).filter(([, v]) => Number(v) > 0)
     );
@@ -1804,12 +1839,12 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
 
     try {
       // Send rich assignments with per-mediator payout, plus commission on deal
-      await api.ops.assignSlots(assignModal.id, richAssignments, dealType, undefined, undefined, commission);
+      await api.ops.assignSlots(assignModal.id, richAssignments, dealType, undefined, undefined, commission, false);
       toast.success('Distribution saved');
       setAssignModal(null);
       setAssignments({});
       setMediatorPayouts({});
-      onRefresh();
+      onRefresh(['campaigns']);
     } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to distribute inventory'));
     }
@@ -1877,7 +1912,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
         productUrl: '',
         brandName: '',
       });
-      onRefresh();
+      onRefresh(['campaigns']);
     } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to create campaign'));
     }
@@ -1935,7 +1970,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     try {
       await api.ops.updateCampaignStatus(campaign.id, next);
       toast.success(next === 'paused' ? 'Campaign paused' : 'Campaign resumed');
-      onRefresh();
+      onRefresh(['campaigns']);
     } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to update campaign status'));
     } finally {
@@ -1950,7 +1985,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     try {
       await api.ops.deleteCampaign(campaign.id);
       toast.success('Campaign deleted');
-      onRefresh();
+      onRefresh(['campaigns']);
     } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to delete campaign'));
     } finally {
@@ -2042,6 +2077,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
           aria-label="Filter by deal type"
           className="px-3 py-3 rounded-xl border border-slate-200 text-xs font-bold bg-white"
         >
+          <option value="All">All Types</option>
           <option value="Discount">Discount</option>
           <option value="Review">Review</option>
           <option value="Rating">Rating</option>
@@ -2052,6 +2088,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
           aria-label="Filter by brand"
           className="px-3 py-3 rounded-xl border border-slate-200 text-xs font-bold bg-white"
         >
+          <option value="All">All Brands</option>
           {brandOptions.map((b) => (
             <option key={b} value={b}>{b}</option>
           ))}
@@ -2186,6 +2223,11 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                         </span>
                       </td>
                       <td className="p-5 text-right font-mono text-slate-700 font-bold">
+                        {c.openToAll && (
+                          <span className="text-[9px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 mr-2">
+                            🌐 Open to All
+                          </span>
+                        )}
                         <span className="text-slate-400 mr-1">SOLD:</span> {c.usedSlots}{' '}
                         <span className="text-slate-300 mx-1">/</span> {c.totalSlots}
                       </td>
@@ -2249,8 +2291,20 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                               try {
                                 const res = await api.ops.copyCampaign(c.id);
                                 if (res.ok) {
-                                  toast.success('Campaign copied as Draft — see Active Inventory');
-                                  await onRefresh();
+                                  toast.success('Campaign copied as Draft — configure distribution');
+                                  await onRefresh(['campaigns']);
+                                  // Open distribute modal for the new draft campaign
+                                  if (res.campaign) {
+                                    setSelectedDealType(res.campaign.dealType || 'Discount');
+                                    setCustomPrice(String(res.campaign.price ?? 0));
+                                    setCustomPayout(String(res.campaign.payout ?? 0));
+                                    setCommissionOnDeal('0');
+                                    setCommissionToMediator(String(res.campaign.payout ?? 0));
+                                    setAssignments({});
+                                    setMediatorPayouts({});
+                                    setOpenToAll(false);
+                                    setAssignModal(res.campaign);
+                                  }
                                   setSubTab('inventory');
                                 } else {
                                   toast.error((res as any).error || 'Copy failed');
@@ -2356,7 +2410,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                           try {
                             await api.ops.declineOffer(c.id);
                             toast.success('Offer declined');
-                            onRefresh();
+                            onRefresh(['campaigns']);
                           } catch (err) {
                             toast.error(formatErrorMessage(err, 'Failed to decline offer'));
                           } finally {
@@ -2387,7 +2441,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
           onClick={() => setCreateModal(false)}
         >
           <div
-            className="bg-white w-[95%] md:w-full max-w-lg rounded-[2rem] p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto scrollbar-styled animate-slide-up"
+            className="bg-white w-[95%] md:w-full max-w-lg rounded-[2rem] p-8 shadow-2xl relative max-h-[90dvh] overflow-y-auto scrollbar-styled animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-6">
@@ -2545,16 +2599,16 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
           onClick={() => setAssignModal(null)}
         >
           <div
-            className="bg-white w-[98%] md:w-full max-w-7xl rounded-2xl p-4 sm:p-5 lg:p-6 2xl:p-7 shadow-2xl relative h-[95vh] flex flex-col min-h-0 animate-slide-up"
+            className="bg-white w-[98%] md:w-full max-w-7xl rounded-2xl p-3 sm:p-4 lg:p-5 shadow-2xl relative max-h-[98dvh] flex flex-col min-h-0 animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex justify-between items-start gap-4 mb-2 shrink-0">
+            <div className="flex justify-between items-center gap-4 mb-1 shrink-0">
               <div>
-                <h3 className="text-xl 2xl:text-2xl font-black text-slate-900 tracking-tight">
+                <h3 className="text-lg 2xl:text-xl font-black text-slate-900 tracking-tight leading-tight">
                   Distribute Inventory
                 </h3>
-                <p className="text-[11px] sm:text-xs text-slate-500 font-bold mt-0.5">
+                <p className="text-[10px] sm:text-[11px] text-slate-500 font-bold">
                   Allocate campaign slots to your team.
                 </p>
               </div>
@@ -2568,7 +2622,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
             </div>
 
             {/* Campaign Summary & Global Config */}
-            <div className="bg-slate-50 p-3 2xl:p-4 rounded-2xl mb-2 border border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3 shrink-0">
+            <div className="bg-slate-50 p-2 rounded-xl mb-1 border border-slate-100 flex flex-col lg:flex-row lg:items-start justify-between gap-1.5 shrink-0">
               <div className="flex gap-3 items-center min-w-0">
                 <div className="w-10 h-10 bg-white rounded-lg p-1.5 border border-slate-200 shadow-sm flex-shrink-0">
                   <ProxiedImage
@@ -2641,83 +2695,77 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-end gap-2">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
-                        Deal Price (₹)
-                      </label>
-                      <div className="bg-slate-50 border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center">
-                        <span className="text-xs font-bold text-slate-400 mr-2"></span>
-                        <input
-                          type="number"
-                          value={customPrice}
-                          readOnly
-                          aria-readonly="true"
-                          tabIndex={-1}
-                          className="w-12 bg-transparent text-[11px] font-bold text-slate-600 outline-none cursor-not-allowed"
-                          placeholder="0"
-                        />
-                      </div>
-                    </div>
-
-                    {!isAgencyCampaign && (
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
-                          Commission from Brand (₹)
-                        </label>
-                        <div className="bg-slate-50 border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center">
-                          <span className="text-xs font-bold text-slate-400 mr-2"></span>
-                          <input
-                            type="number"
-                            value={customPayout}
-                            readOnly
-                            aria-readonly="true"
-                            tabIndex={-1}
-                            className="w-12 bg-transparent text-[11px] font-bold text-slate-600 outline-none cursor-not-allowed"
-                            placeholder="0"
-                          />
-                        </div>
-                      </div>
-                    )}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
+                    Deal Price (₹)
+                  </label>
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center">
+                    <span className="text-xs font-bold text-slate-400 mr-2"></span>
+                    <input
+                      type="number"
+                      value={customPrice}
+                      readOnly
+                      aria-readonly="true"
+                      tabIndex={-1}
+                      className="w-12 bg-transparent text-[11px] font-bold text-slate-600 outline-none cursor-not-allowed"
+                      placeholder="0"
+                    />
                   </div>
+                </div>
 
-                  <div className="flex items-end gap-2">
-                    {!isAgencyCampaign && (
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
-                          Commission on Deal (₹)
-                        </label>
-                        <div className="bg-white border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center focus-within:ring-2 focus-within:ring-purple-100 transition-all">
-                          <span className="text-xs font-bold text-slate-400 mr-2"></span>
-                          <input
-                            type="number"
-                            value={commissionOnDeal}
-                            onChange={(e) => setCommissionOnDeal(e.target.value)}
-                            className="w-16 bg-transparent text-[11px] font-bold text-slate-900 outline-none"
-                            placeholder="0"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
-                        Default Commission to Mediator (₹)
-                      </label>
-                      <div className="bg-white border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center focus-within:ring-2 focus-within:ring-purple-100 transition-all">
-                        <span className="text-xs font-bold text-slate-400 mr-2"></span>
-                        <input
-                          type="number"
-                          value={commissionToMediator}
-                          onChange={(e) => setCommissionToMediator(e.target.value)}
-                          className="w-16 bg-transparent text-[11px] font-bold text-slate-900 outline-none"
-                          placeholder="0"
-                        />
-                      </div>
+                {!isAgencyCampaign && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
+                      Commission from Brand (₹)
+                    </label>
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center">
+                      <span className="text-xs font-bold text-slate-400 mr-2"></span>
+                      <input
+                        type="number"
+                        value={customPayout}
+                        readOnly
+                        aria-readonly="true"
+                        tabIndex={-1}
+                        className="w-12 bg-transparent text-[11px] font-bold text-slate-600 outline-none cursor-not-allowed"
+                        placeholder="0"
+                      />
                     </div>
                   </div>
-              </div>
+                )}
+
+                {!isAgencyCampaign && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
+                      Commission on Deal (₹)
+                    </label>
+                    <div className="bg-white border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center focus-within:ring-2 focus-within:ring-purple-100 transition-all">
+                      <span className="text-xs font-bold text-slate-400 mr-2"></span>
+                      <input
+                        type="number"
+                        value={commissionOnDeal}
+                        onChange={(e) => setCommissionOnDeal(e.target.value)}
+                        className="w-16 bg-transparent text-[11px] font-bold text-slate-900 outline-none"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
+                    Default Commission to Mediator (₹)
+                  </label>
+                  <div className="bg-white border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center focus-within:ring-2 focus-within:ring-purple-100 transition-all">
+                    <span className="text-xs font-bold text-slate-400 mr-2"></span>
+                    <input
+                      type="number"
+                      value={commissionToMediator}
+                      onChange={(e) => setCommissionToMediator(e.target.value)}
+                      className="w-16 bg-transparent text-[11px] font-bold text-slate-900 outline-none"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
 
                 <div className="flex gap-2 ml-auto">
                   <button
@@ -2737,8 +2785,36 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
               </div>
             </div>
 
-              <div className="flex items-center justify-between gap-4 mb-1 shrink-0">
-              <div className="flex-1 max-w-md">
+            {/* ── Open to All Toggle ── */}
+            <div className={`px-3 py-1.5 rounded-xl mb-1 border transition-all shrink-0 ${openToAll ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'}`}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setOpenToAll(!openToAll)}
+                    className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${openToAll ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                    aria-label="Toggle Open to All"
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${openToAll ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                  <p className="text-xs font-black text-slate-900">🌐 Open to All Mediators</p>
+                  <p className="text-[10px] text-slate-400 font-medium hidden sm:block">
+                    {openToAll
+                      ? 'All mediators can publish. First-come-first-serve.'
+                      : 'Skip individual allocation.'}
+                  </p>
+                </div>
+                {openToAll && (
+                  <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-1 rounded-full border border-emerald-200 whitespace-nowrap">
+                    {assignModal?.totalSlots ?? 0} slots shared
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Mediator list hidden when Open to All */}
+            {!openToAll && (<>
+              <div className="flex items-center justify-between gap-3 mb-1 shrink-0">
+              <div className="flex-1 max-w-sm">
                 <div className="relative">
                   <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
@@ -2746,7 +2822,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                     value={assignSearch}
                     onChange={(e) => setAssignSearch(e.target.value)}
                     placeholder="Search mediators by name or code..."
-                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-purple-100 outline-none transition-all placeholder:text-slate-400"
+                    className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-xs font-bold focus:ring-2 focus:ring-purple-100 outline-none transition-all placeholder:text-slate-400"
                   />
                 </div>
               </div>
@@ -2755,8 +2831,8 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
               </div>
             </div>
 
-            {/* List Header */}
-            <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-slate-50 rounded-xl border border-slate-100 mb-2 shrink-0">
+            {/* List Header — sticky so column names stay visible when scrolling 50+ mediators */}
+            <div className="grid grid-cols-12 gap-3 px-4 py-1 bg-slate-50 rounded-lg border border-slate-100 mb-1 shrink-0 sticky top-0 z-10">
               <div className="col-span-4 text-xs font-extrabold text-slate-400 uppercase tracking-wider pl-2">
                 Mediator Profile
               </div>
@@ -2771,8 +2847,8 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
               </div>
             </div>
 
-            {/* Mediator List */}
-            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-styled space-y-2 pr-1 mb-2">
+            {/* Mediator List — scrollable container sized to fill modal */}
+            <div className="flex-1 min-h-[280px] overflow-y-auto scrollbar-styled space-y-1 pr-2 mb-1">
               {activeMediatorsForAssign.length === 0 ? (
                 loading ? (
                   <EmptyState
@@ -2804,11 +2880,11 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                   return (
                     <div
                       key={m.id}
-                      className={`grid grid-cols-12 gap-4 items-center p-2 border border-slate-100 rounded-2xl transition-all bg-white shadow-sm group ${isActive ? 'hover:border-purple-200 hover:bg-purple-50/10' : 'opacity-70'}`}
+                      className={`grid grid-cols-12 gap-3 items-center p-1.5 border border-slate-100 rounded-xl transition-all bg-white shadow-sm group ${isActive ? 'hover:border-purple-200 hover:bg-purple-50/10' : 'opacity-70'}`}
                     >
                       {/* Profile */}
-                      <div className="col-span-4 flex items-center gap-4 pl-2">
-                        <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center font-black text-sm group-hover:bg-purple-100 group-hover:text-purple-600 transition-colors shadow-inner overflow-hidden">
+                      <div className="col-span-4 flex items-center gap-3 pl-2">
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center font-black text-xs group-hover:bg-purple-100 group-hover:text-purple-600 transition-colors shadow-inner overflow-hidden">
                           {m.avatar ? (
                             <ProxiedImage src={m.avatar} alt={m.name ? `${m.name} avatar` : 'Avatar'} className="w-full h-full object-cover" />
                           ) : (
@@ -2916,21 +2992,39 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                 })
               )}
             </div>
+            </>)}
+
+            {/* Open to All info panel */}
+            {openToAll && (
+              <div className="flex-1 min-h-0 flex items-center justify-center">
+                <div className="text-center py-4">
+                  <div className="text-4xl mb-2">🌐</div>
+                  <h4 className="text-base font-black text-slate-900 mb-1">Open to All Mediators</h4>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                    All <strong>{mediators.filter((m: any) => m.status === 'active').length}</strong> connected mediators will be able to publish and sell this deal.
+                    Buyers can purchase on a first-come-first-serve basis until all <strong>{assignModal?.totalSlots ?? 0}</strong> slots are filled.
+                  </p>
+                  <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-bold border border-emerald-200">
+                    <span>Remaining: {(assignModal?.totalSlots ?? 0) - (assignModal?.usedSlots ?? 0)} slots</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Footer */}
-            <div className="pt-4 border-t border-slate-100 flex justify-end gap-3 shrink-0">
+            <div className="pt-2 border-t border-slate-100 flex justify-end gap-3 shrink-0">
               <button
                 onClick={() => setAssignModal(null)}
-                className="px-5 py-3 text-slate-500 font-bold text-sm hover:text-slate-800 hover:bg-slate-50 rounded-2xl transition-colors"
+                className="px-4 py-2.5 text-slate-500 font-bold text-sm hover:text-slate-800 hover:bg-slate-50 rounded-xl transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAssign}
-                disabled={assignedTotal <= 0 || assignedTotal > availableForAssign}
-                className="px-8 py-3 bg-purple-600 text-white font-bold rounded-2xl hover:bg-purple-700 transition-all shadow-xl hover:shadow-2xl hover:shadow-purple-200 active:scale-95 flex items-center gap-2"
+                disabled={!openToAll && (assignedTotal <= 0 || assignedTotal > availableForAssign)}
+                className={`px-6 py-2.5 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center gap-2 ${openToAll ? 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-emerald-200' : 'bg-purple-600 hover:bg-purple-700 hover:shadow-purple-200'}`}
               >
-                Confirm Distribution <CheckCircle size={18} />
+                {openToAll ? '🌐 Confirm Open to All' : 'Confirm Distribution'} <CheckCircle size={18} />
               </button>
             </div>
           </div>
@@ -2953,6 +3047,8 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
   const [rejectReason, setRejectReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
   const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [reviewPage, setReviewPage] = useState(1);
+  const REVIEW_PER_PAGE = 25;
 
   useEffect(() => {
     setProofOrder((prev) => {
@@ -2985,6 +3081,12 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
     });
   }, [allOrders, campaignFilter, mediatorFilter, approvalFilter, statusFilter, searchTerm]);
 
+  // Reset page when filters change
+  useEffect(() => { setReviewPage(1); }, [campaignFilter, mediatorFilter, approvalFilter, statusFilter, searchTerm]);
+
+  const totalReviewPages = Math.max(1, Math.ceil(filtered.length / REVIEW_PER_PAGE));
+  const paginatedReviewOrders = filtered.slice((reviewPage - 1) * REVIEW_PER_PAGE, reviewPage * REVIEW_PER_PAGE);
+
   const handleReject = async () => {
     if (!rejectModal || rejectReason.trim().length < 5) return;
     setRejecting(true);
@@ -2993,7 +3095,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
       toast.success('Proof rejected — buyer has been notified');
       setRejectModal(null);
       setRejectReason('');
-      onRefresh();
+      onRefresh(['orders']);
     } catch (e: any) {
       toast.error(formatErrorMessage(e, 'Failed to reject proof'));
     } finally {
@@ -3006,7 +3108,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
     try {
       await api.ops.forceApproveOrder(order.id, 'Agency approved');
       toast.success('Order approved — moved to cooling period');
-      onRefresh();
+      onRefresh(['orders']);
     } catch (e: any) {
       toast.error(formatErrorMessage(e, 'Failed to approve order'));
     } finally {
@@ -3041,7 +3143,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
           <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Order Review</h2>
           <p className="text-xs text-slate-500 mt-1">{filtered.length} orders · {manualCount} manually approved</p>
         </div>
-        <button onClick={onRefresh} disabled={loading} className="text-xs font-bold text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 px-4 py-2 rounded-xl transition-colors">
+        <button onClick={() => onRefresh(['orders', 'campaigns', 'mediators'])} disabled={loading} className="text-xs font-bold text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 px-4 py-2 rounded-xl transition-colors">
           {loading ? 'Refreshing…' : 'Refresh'}
         </button>
       </div>
@@ -3106,7 +3208,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 text-sm">
-                {filtered.map((o: Order) => {
+                {paginatedReviewOrders.map((o: Order) => {
                   const method = getApprovalMethod(o);
                   const isManual = method === 'manual';
                   const wf = (o.workflowStatus || 'CREATED').toUpperCase();
@@ -3200,6 +3302,17 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
         </div>
       )}
 
+      {/* Pagination */}
+      {totalReviewPages > 1 && (
+        <Pagination
+          page={reviewPage}
+          totalPages={totalReviewPages}
+          total={filtered.length}
+          limit={REVIEW_PER_PAGE}
+          onPageChange={(p) => { setReviewPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+        />
+      )}
+
       {/* Proof Modal (reusable) */}
       {proofOrder && (
         <div
@@ -3207,7 +3320,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
           onClick={() => setProofOrder(null)}
         >
           <div
-            className="bg-white w-full max-w-lg rounded-[2rem] p-6 shadow-2xl relative flex flex-col max-h-[85vh]"
+            className="bg-white w-full max-w-lg rounded-[2rem] p-6 shadow-2xl relative flex flex-col max-h-[90dvh]"
             onClick={(e) => e.stopPropagation()}
           >
             <button type="button" aria-label="Close" onClick={() => setProofOrder(null)} className="absolute top-4 right-4 p-2 bg-slate-50 rounded-full hover:bg-slate-100 transition-colors">
@@ -3313,7 +3426,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-xs font-extrabold text-teal-500 uppercase tracking-widest"><Package size={14} /> Return Window</div>
                   <div className="rounded-2xl border-2 border-teal-100 overflow-hidden shadow-sm">
-                    <ProofImage orderId={proofOrder.id} proofType="returnWindow" existingSrc={proofOrder.screenshots.returnWindow !== 'exists' ? proofOrder.screenshots.returnWindow : undefined} className="w-full h-auto max-h-[60vh] object-contain bg-zinc-50" alt="Return Window" />
+                    <ProofImage orderId={proofOrder.id} proofType="returnWindow" existingSrc={proofOrder.screenshots.returnWindow !== 'exists' ? proofOrder.screenshots.returnWindow : undefined} className="w-full h-auto max-h-[60dvh] object-contain bg-zinc-50" alt="Return Window" />
                   </div>
                 </div>
               )}
@@ -3334,7 +3447,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
       {/* Reject Modal */}
       {rejectModal && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in" onClick={() => { setRejectModal(null); setRejectReason(''); }}>
-          <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl max-h-[90dvh] overflow-y-auto scrollbar-styled" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-extrabold text-lg text-red-600 mb-1 flex items-center gap-2"><AlertTriangle size={20} /> Reject Proof</h3>
             <p className="text-xs text-slate-500 mb-4">Order {getPrimaryOrderId(rejectModal.order)} · Rejecting <strong>{rejectModal.type}</strong> proof</p>
             <textarea
@@ -3365,6 +3478,8 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
   const [payoutAmount, setPayoutAmount] = useState('');
   const [payoutRef, setPayoutRef] = useState('');
   const [proofOrder, setProofOrder] = useState<Order | null>(null);
+  const [teamPage, setTeamPage] = useState(1);
+  const TEAM_PER_PAGE = 25;
 
 
   // Keep proof modal in sync when allOrders updates from real-time
@@ -3388,6 +3503,12 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
       m.mediatorCode?.includes(searchTerm.toUpperCase())
   ), [subTab, activeMediators, pendingMediators, searchTerm]);
 
+  // Reset page when filters change
+  useEffect(() => { setTeamPage(1); }, [subTab, searchTerm]);
+
+  const totalTeamPages = Math.max(1, Math.ceil(filtered.length / TEAM_PER_PAGE));
+  const paginatedTeam = filtered.slice((teamPage - 1) * TEAM_PER_PAGE, teamPage * TEAM_PER_PAGE);
+
   // Filter orders for selected mediator (Sanitized for Privacy)
   const mediatorOrders = useMemo(() => {
     if (!selectedMediator) return [];
@@ -3409,7 +3530,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
     try {
       if (action === 'approve') await api.ops.approveMediator(id);
       else await api.ops.rejectMediator(id);
-      onRefresh();
+      onRefresh(['mediators']);
     } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to update mediator request'));
     }
@@ -3428,7 +3549,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
       toast.success(`Sent ${amount} to ${selectedMediator.name}`);
       setPayoutAmount('');
       setPayoutRef('');
-      onRefresh();
+      onRefresh(['mediators']);
       setSelectedMediator(null);
     } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to payout mediator'));
@@ -3570,7 +3691,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                   </td>
                 </tr>
               ) : (
-                filtered.map((m: User) => (
+                paginatedTeam.map((m: User) => (
                   <tr
                     key={m.id}
                     onClick={() => subTab === 'roster' && setSelectedMediator(m)}
@@ -3652,6 +3773,17 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
         </div>
       </div>
 
+      {/* Team Pagination */}
+      {totalTeamPages > 1 && (
+        <Pagination
+          page={teamPage}
+          totalPages={totalTeamPages}
+          total={filtered.length}
+          limit={TEAM_PER_PAGE}
+          onPageChange={(p) => { setTeamPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+        />
+      )}
+
       {/* DETAIL MODAL */}
       {selectedMediator && (
         <div
@@ -3659,7 +3791,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
           onClick={() => setSelectedMediator(null)}
         >
           <div
-            className="bg-white w-[95%] md:w-full max-w-5xl rounded-[2.5rem] shadow-2xl relative max-h-[90vh] flex flex-col animate-slide-up overflow-hidden"
+            className="bg-white w-[95%] md:w-full max-w-5xl rounded-[2.5rem] shadow-2xl relative max-h-[90dvh] flex flex-col animate-slide-up overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -3906,7 +4038,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
           onClick={() => setProofOrder(null)}
         >
           <div
-            className="bg-white w-full max-w-lg rounded-[2rem] p-6 shadow-2xl relative flex flex-col max-h-[85vh]"
+            className="bg-white w-full max-w-lg rounded-[2rem] p-6 shadow-2xl relative flex flex-col max-h-[90dvh]"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -4128,7 +4260,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                       orderId={proofOrder.id}
                       proofType="returnWindow"
                       existingSrc={proofOrder.screenshots.returnWindow !== 'exists' ? proofOrder.screenshots.returnWindow : undefined}
-                      className="w-full h-auto max-h-[60vh] object-contain bg-zinc-50"
+                      className="w-full h-auto max-h-[60dvh] object-contain bg-zinc-50"
                       alt="Return Window proof"
                     />
                   </div>
@@ -4222,87 +4354,160 @@ export const AgencyDashboard: React.FC = () => {
   const [resolutionNote, setResolutionNote] = useState('');
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
-  const fetchData = async () => {
-    if (!user?.mediatorCode) return;
-    setIsDataLoading(true);
-    try {
-      const [meds, camps, ords, ledger, tix] = await Promise.all([
-        api.ops.getMediators(user.mediatorCode),
-        api.ops.getCampaigns(user.mediatorCode),
-        api.ops.getMediatorOrders(user.mediatorCode, 'agency'),
-        api.ops.getAgencyLedger(),
-        api.tickets.getAll().catch(() => []),
-      ]);
-      const safeMeds = asArray<User>(meds);
-      const safeCamps = asArray<Campaign>(camps);
-      const safeOrds = asArray<Order>(ords);
-      const safeLedger = asArray(ledger);
+  // Track which data sets have been loaded to avoid redundant fetches
+  const loadedRef = useRef<Set<string>>(new Set());
+  const inFlightRef = useRef<Set<string>>(new Set());
+  const lastFetchedAt = useRef<Record<string, number>>({});
+  // Ref to always read current state for stats computation (avoids stale closures)
+  const dataRef = useRef({ mediators, campaigns, orders });
+  dataRef.current = { mediators, campaigns, orders };
 
-      setMediators(safeMeds);
-      setCampaigns(safeCamps);
-      setOrders(safeOrds);
-      setPayouts(safeLedger);
-      setTickets(asArray<Ticket>(tix).filter((t: Ticket) => t.issueType !== 'Feedback'));
-
-      const revenue = safeOrds.reduce((sum: number, o: Order) => sum + (o.total || 0), 0);
-
-      // Fixed logic: Campaign is active if this agency is allowed AND some sub-mediators have assignments
-      const myMediatorCodes: string[] = safeMeds
-        .map((m: User) => m.mediatorCode)
-        .filter((code: string | undefined | null): code is string => Boolean(code));
-      const activeCount = safeCamps.filter(
-        (c: Campaign) =>
-          c.status === 'Active' &&
-          c.allowedAgencies.includes(user.mediatorCode!) &&
-          Object.keys(c.assignments || {}).some((code: string) => myMediatorCodes.includes(code))
-      ).length;
-
-      setStats({
-        revenue,
-        totalMediators: safeMeds.length,
-        activeCampaigns: activeCount,
-      });
-    } catch (e) {
-      console.error('Dashboard data fetch failed', e);
-      toast.error('Failed to load dashboard data');
-    } finally {
-      setIsDataLoading(false);
+  // Compute which data sets the active tab needs
+  const tabDataNeeds = useMemo<string[]>(() => {
+    switch (activeTab) {
+      case 'dashboard': return ['mediators', 'campaigns', 'orders'];
+      case 'team': return ['mediators', 'orders'];
+      case 'inventory': return ['campaigns', 'mediators', 'orders'];
+      case 'orders': return ['orders', 'campaigns', 'mediators'];
+      case 'finance': return ['orders', 'mediators'];
+      case 'payouts': return ['ledger'];
+      case 'tickets': return ['tickets'];
+      case 'brands': return [];
+      case 'profile': return [];
+      default: return [];
     }
-  };
+  }, [activeTab]);
 
+  // Keep a ref so fetchData callback stays stable across tab switches
+  const tabDataNeedsRef = useRef(tabDataNeeds);
+  tabDataNeedsRef.current = tabDataNeeds;
 
+  const fetchData = useCallback(async (opts?: { force?: boolean; silent?: boolean; keys?: string[] }) => {
+    if (!user?.mediatorCode) return;
+    const force = opts?.force ?? false;
+    const silent = opts?.silent ?? false;
+    const invalidateKeys = opts?.keys;
+
+    if (invalidateKeys) {
+      for (const k of invalidateKeys) loadedRef.current.delete(k);
+    }
+
+    // Determine which data sets are actually needed but not yet loaded
+    const currentNeeds = tabDataNeedsRef.current;
+    if (force && !invalidateKeys) {
+      for (const k of currentNeeds) loadedRef.current.delete(k);
+    }
+    const needed = currentNeeds.filter((k) => !loadedRef.current.has(k) && !inFlightRef.current.has(k));
+    if (needed.length === 0) return;
+
+    for (const k of needed) inFlightRef.current.add(k);
+    if (!silent) setIsDataLoading(true);
+    try {
+      const promises: Promise<any>[] = [];
+      const keys: string[] = [];
+
+      if (needed.includes('mediators')) { promises.push(api.ops.getMediators(user.mediatorCode)); keys.push('mediators'); }
+      if (needed.includes('campaigns')) { promises.push(api.ops.getCampaigns(user.mediatorCode)); keys.push('campaigns'); }
+      if (needed.includes('orders')) { promises.push(api.ops.getMediatorOrders(user.mediatorCode, 'agency')); keys.push('orders'); }
+      if (needed.includes('ledger')) { promises.push(api.ops.getAgencyLedger()); keys.push('ledger'); }
+      if (needed.includes('tickets')) { promises.push(api.tickets.getAll().catch(() => [])); keys.push('tickets'); }
+
+      const results = await Promise.all(promises);
+
+      // Map results back to state — read current values from ref to avoid stale closures
+      let safeMeds = dataRef.current.mediators;
+      let safeCamps = dataRef.current.campaigns;
+      let safeOrds = dataRef.current.orders;
+
+      const now = Date.now();
+      keys.forEach((key, i) => {
+        loadedRef.current.add(key);
+        lastFetchedAt.current[key] = now;
+        switch (key) {
+          case 'mediators': safeMeds = asArray<User>(results[i]); setMediators(safeMeds); break;
+          case 'campaigns': safeCamps = asArray<Campaign>(results[i]); setCampaigns(safeCamps); break;
+          case 'orders': safeOrds = asArray<Order>(results[i]); setOrders(safeOrds); break;
+          case 'ledger': setPayouts(asArray(results[i])); break;
+          case 'tickets': setTickets(asArray<Ticket>(results[i]).filter((t: Ticket) => t.issueType !== 'Feedback')); break;
+        }
+      });
+
+      // Recompute stats when relevant data loaded
+      if (keys.includes('orders') || keys.includes('mediators') || keys.includes('campaigns')) {
+        const revenue = safeOrds.reduce((sum: number, o: Order) => sum + (o.total || 0), 0);
+        const myMediatorCodes: string[] = safeMeds
+          .map((m: User) => (m.mediatorCode || '').toLowerCase())
+          .filter((code: string): code is string => Boolean(code));
+        const activeCount = safeCamps.filter(
+          (c: Campaign) =>
+            c.status === 'Active' &&
+            c.allowedAgencies.includes(user.mediatorCode!) &&
+            (
+              String(c.brandId || '') === String(user.id || '') ||
+              c.openToAll ||
+              Object.keys(c.assignments || {}).some((code: string) => myMediatorCodes.includes(code.toLowerCase()))
+            )
+        ).length;
+        setStats({ revenue, totalMediators: safeMeds.length, activeCampaigns: activeCount });
+      }
+    } catch (e) {
+      if (process.env.NODE_ENV !== 'production') console.error('Dashboard data fetch failed', e);
+      if (!silent) toast.error(formatErrorMessage(e, 'Failed to load dashboard data'));
+    } finally {
+      for (const k of needed) inFlightRef.current.delete(k);
+      if (inFlightRef.current.size === 0) setIsDataLoading(false);
+    }
+  }, [user?.id]);
+
+  // Trigger data load on tab change — only fetches keys not already cached
+  const prevTabRef = useRef(activeTab);
   useEffect(() => {
-    fetchData();
-  }, [user]);
+    const tabChanged = prevTabRef.current !== activeTab;
+    prevTabRef.current = activeTab;
+    fetchData({ silent: tabChanged });
+  }, [fetchData, activeTab]);
 
-  // Realtime: refresh when backend data changes.
+  // Realtime: only invalidate data keys relevant to the SSE event, then refetch
   useEffect(() => {
-    if (!user) return;
-    let timer: any = null;
-    const schedule = () => {
-      if (timer) return;
+    if (!user?.id) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const eventToKeys: Record<string, string[]> = {
+      'orders.changed': ['orders'],
+      'deals.changed': ['campaigns'],
+      'users.changed': ['mediators'],
+      'wallets.changed': ['ledger'],
+      'tickets.changed': ['tickets'],
+    };
+    const schedule = (keysToInvalidate: string[]) => {
+      if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        fetchData();
+        // Skip keys that were just fetched by an explicit refresh (prevents double-fetch)
+        const now = Date.now();
+        const stale = keysToInvalidate.filter(k => (now - (lastFetchedAt.current[k] || 0)) > 2000);
+        if (stale.length === 0) return;
+        // Always invalidate globally so other tabs see fresh data on next visit
+        for (const k of stale) loadedRef.current.delete(k);
+        // Only re-fetch if current tab actually needs these keys
+        const relevant = stale.filter(k => tabDataNeedsRef.current.includes(k));
+        if (relevant.length > 0) fetchData({ silent: true });
       }, 900);
     };
     const unsub = subscribeRealtime((msg) => {
-      if (
-        msg.type === 'orders.changed' ||
-        msg.type === 'users.changed' ||
-        msg.type === 'wallets.changed' ||
-        msg.type === 'deals.changed' ||
-        msg.type === 'notifications.changed' ||
-        msg.type === 'tickets.changed'
-      ) {
-        schedule();
-      }
+      const keys = eventToKeys[msg.type];
+      if (keys && keys.length > 0) schedule(keys);
     });
     return () => {
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [user]);
+  }, [user?.id, fetchData]);
+
+  // Force refresh for child component mutation callbacks
+  const refreshData = useCallback((keys?: string[]) => {
+    if (keys) return fetchData({ keys });
+    return fetchData({ force: true });
+  }, [fetchData]);
 
   return (
     <DesktopShell
@@ -4460,7 +4665,7 @@ export const AgencyDashboard: React.FC = () => {
           mediators={mediators}
           user={user}
           loading={isDataLoading}
-          onRefresh={fetchData}
+          onRefresh={refreshData}
           allOrders={orders}
         />
       )}
@@ -4469,7 +4674,7 @@ export const AgencyDashboard: React.FC = () => {
           campaigns={campaigns}
           user={user}
           loading={isDataLoading}
-          onRefresh={fetchData}
+          onRefresh={refreshData}
           mediators={mediators}
           allOrders={orders}
         />
@@ -4480,7 +4685,7 @@ export const AgencyDashboard: React.FC = () => {
           campaigns={campaigns}
           mediators={mediators}
           loading={isDataLoading}
-          onRefresh={fetchData}
+          onRefresh={refreshData}
         />
       )}
       {activeTab === 'finance' && (
@@ -4488,7 +4693,7 @@ export const AgencyDashboard: React.FC = () => {
           allOrders={orders}
           mediators={mediators}
           loading={isDataLoading}
-          onRefresh={fetchData}
+          onRefresh={refreshData}
           user={user}
         />
       )}
@@ -4496,7 +4701,7 @@ export const AgencyDashboard: React.FC = () => {
         <PayoutsView
           payouts={payouts}
           loading={isDataLoading}
-          onRefresh={fetchData}
+          onRefresh={refreshData}
         />
       )}
       {activeTab === 'brands' && <BrandsView />}
@@ -4554,7 +4759,7 @@ export const AgencyDashboard: React.FC = () => {
               icon={<HelpCircle size={22} className="text-slate-400" />}
             />
           ) : (
-            <div className="space-y-3 max-h-[65vh] overflow-y-auto scrollbar-styled">
+            <div className="space-y-3 max-h-[65dvh] overflow-y-auto scrollbar-styled">
               {tickets.filter((t: Ticket) => {
                 if (ticketFilter !== 'All' && String(t.status) !== ticketFilter) return false;
                 if (ticketSearch.trim()) {
@@ -4617,10 +4822,10 @@ export const AgencyDashboard: React.FC = () => {
                           className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
                         <div className="flex items-center gap-2">
                           <button type="button" onClick={async () => {
-                            try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData(); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
+                            try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
                           }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✓ Resolve</button>
                           <button type="button" onClick={async () => {
-                            try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData(); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
+                            try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
                           }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
                           <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
                             className="px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 hover:bg-slate-200">Cancel</button>
@@ -4635,7 +4840,7 @@ export const AgencyDashboard: React.FC = () => {
                             try {
                               await api.tickets.update(t.id, 'Open');
                               toast.success('Ticket reopened.');
-                              fetchData();
+                              fetchData({ keys: ['tickets'] });
                             } catch (err: any) {
                               toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
                             }
@@ -4650,7 +4855,7 @@ export const AgencyDashboard: React.FC = () => {
                             try {
                               await api.tickets.delete(t.id);
                               toast.success('Ticket deleted.');
-                              fetchData();
+                              fetchData({ keys: ['tickets'] });
                             } catch (err: any) {
                               toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
                             }
@@ -4674,7 +4879,7 @@ export const AgencyDashboard: React.FC = () => {
         open={!!selectedTicket}
         onClose={() => setSelectedTicket(null)}
         ticket={selectedTicket}
-        onRefresh={fetchData}
+        onRefresh={refreshData}
       />
     </DesktopShell>
   );

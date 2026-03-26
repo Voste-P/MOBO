@@ -19,6 +19,7 @@ import { ProxiedImage } from './ProxiedImage';
 
 interface ChatbotProps {
   isVisible?: boolean;
+  isActive?: boolean;
   onNavigate?: (tab: 'home' | 'explore' | 'orders' | 'profile') => void;
 }
 
@@ -100,7 +101,16 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
     tickets: Ticket[];
     fetchedAt: number;
   } | null>(null);
-  const CONTEXT_CACHE_TTL = 60_000; // 1 minute
+  const CONTEXT_CACHE_TTL = 2 * 60_000; // 2 minutes — keep context fresh across tab switches
+
+  // Clear context cache when user changes (prevents data leaking across accounts)
+  const prevUserIdRef = useRef<string | null | undefined>(user?.id);
+  useEffect(() => {
+    if (prevUserIdRef.current !== user?.id) {
+      contextCacheRef.current = null;
+      prevUserIdRef.current = user?.id;
+    }
+  }, [user?.id]);
 
   // Track navigation timer for cleanup on unmount
   const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -137,7 +147,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
       setPlaceholderIndex((prev) => (prev + 1) % placeholders.length);
     }, 6000);
     return () => clearInterval(interval);
-  }, [isInputFocused, inputText, placeholders.length]);
+  }, [isInputFocused, inputText]);
 
   useEffect(() => {
     if (!isVisible) return;
@@ -424,7 +434,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                   Close
                 </button>
               </div>
-              <div className="max-h-[360px] overflow-y-auto scrollbar-hide space-y-2 p-1">
+              <div className="max-h-[360px] overflow-y-auto scrollbar-styled space-y-2 p-1">
                 {notifications.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <Bell size={20} className="text-slate-300 mb-2" />
@@ -571,7 +581,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                 </div>
               </div>
             {msg.relatedProducts && msg.relatedProducts.length > 0 && (
-              <div className="w-screen relative left-1/2 -translate-x-1/2 mt-4 pl-4 overflow-x-auto scrollbar-hide snap-x">
+              <div className="w-screen relative left-1/2 -translate-x-1/2 mt-4 pl-4 overflow-x-auto scrollbar-styled snap-x">
                 <div className="flex gap-4 w-max pr-8 pl-4 pb-4">
                   {msg.relatedProducts.map((product) => (
                     <ProductCard key={product.id} product={product} />
@@ -706,7 +716,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
       </div>
 
       <div className="shrink-0 w-full px-4 pb-20 safe-bottom">
-        <div className="flex flex-nowrap gap-2 justify-center pb-3 overflow-x-auto scrollbar-hide">
+        <div className="flex flex-nowrap gap-2 justify-center pb-3 overflow-x-auto scrollbar-styled">
           {quickActions.map((action) => (
             <button
               key={action.command}

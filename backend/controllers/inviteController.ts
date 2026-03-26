@@ -121,7 +121,7 @@ export function makeInviteController() {
 
     adminListInvites: async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const { page, limit, skip, isPaginated } = parsePagination(req.query, { limit: 200, maxLimit: 500 });
+        const { page, limit, skip, isPaginated } = parsePagination(req.query, { limit: 50, maxLimit: 200 });
         const [invites, total] = await Promise.all([
           db().invite.findMany({ orderBy: { createdAt: 'desc' }, take: limit, skip }),
           db().invite.count(),
@@ -194,7 +194,7 @@ export function makeInviteController() {
         const requesterId = req.auth?.userId;
         if (!requesterId) throw new AppError(401, 'UNAUTHENTICATED', 'Missing auth context');
 
-        const requester = await db().user.findFirst({ where: { ...idWhere(requesterId), isDeleted: false } });
+        const requester = await db().user.findFirst({ where: { ...idWhere(requesterId), isDeleted: false }, select: { id: true, mongoId: true, roles: true } });
         if (!requester) throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
 
         // Allow agencies to generate mediator invites for themselves. Admin/Ops can generate for any agency.
@@ -205,7 +205,7 @@ export function makeInviteController() {
           throw new AppError(403, 'FORBIDDEN', 'Cannot generate invites for this agency');
         }
 
-        const agency = await db().user.findFirst({ where: { ...idWhere(body.agencyId), isDeleted: false } });
+        const agency = await db().user.findFirst({ where: { ...idWhere(body.agencyId), isDeleted: false }, select: { id: true, mongoId: true, roles: true, mediatorCode: true } });
         if (!agency || !(agency.roles as string[])?.includes('agency')) {
           throw new AppError(404, 'AGENCY_NOT_FOUND', 'Agency not found');
         }
@@ -269,7 +269,7 @@ export function makeInviteController() {
         const requesterId = req.auth?.userId;
         if (!requesterId) throw new AppError(401, 'UNAUTHENTICATED', 'Missing auth context');
 
-        const requester = await db().user.findFirst({ where: { ...idWhere(requesterId), isDeleted: false } });
+        const requester = await db().user.findFirst({ where: { ...idWhere(requesterId), isDeleted: false }, select: { id: true, mongoId: true, roles: true } });
         if (!requester) throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
 
         const isMediatorSelf = (requester.roles as string[])?.includes('mediator') && requester.mongoId === mediatorId;
@@ -278,7 +278,7 @@ export function makeInviteController() {
           throw new AppError(403, 'FORBIDDEN', 'Cannot generate buyer invites for this mediator');
         }
 
-        const mediator = await db().user.findFirst({ where: { ...idWhere(mediatorId), isDeleted: false } });
+        const mediator = await db().user.findFirst({ where: { ...idWhere(mediatorId), isDeleted: false }, select: { id: true, mongoId: true, roles: true, mediatorCode: true } });
         if (!mediator || !(mediator.roles as string[])?.includes('mediator')) {
           throw new AppError(404, 'MEDIATOR_NOT_FOUND', 'Mediator not found');
         }

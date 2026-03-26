@@ -1,4 +1,4 @@
-import type { NextFunction, Request, Response } from 'express';
+﻿import type { NextFunction, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { AppError } from '../middleware/errors.js';
 import { idWhere } from '../utils/idWhere.js';
@@ -7,7 +7,7 @@ import { orderLog, businessLog, securityLog } from '../config/logger.js';
 import { logChangeEvent, logAccessEvent, logErrorEvent } from '../config/appLogs.js';
 import { adminUsersQuerySchema, adminFinancialsQuerySchema, adminProductsQuerySchema, adminAuditLogsQuerySchema, reactivateOrderSchema, updateUserStatusSchema } from '../validations/admin.js';
 import { toUiOrderSummary, toUiUser, toUiRole, toUiDeal } from '../utils/uiMappers.js';
-import { orderListSelectLite, getProofFlags, userAdminListSelect } from '../utils/querySelect.js';
+import { orderListSelectLite, getProofFlags, userAdminListSelect, dealListSelect } from '../utils/querySelect.js';
 import { parsePagination, paginatedResponse } from '../utils/pagination.js';
 import { writeAuditLog } from '../services/audit.js';
 import { freezeOrders, reactivateOrder as reactivateOrderWorkflow } from '../services/orderWorkflow.js';
@@ -308,7 +308,7 @@ export function makeAdminController() {
             orderBy: { createdAt: 'desc' },
             skip,
             take: limit,
-            include: { campaign: { select: { totalSlots: true, usedSlots: true, createdAt: true } } },
+            select: { ...dealListSelect, campaign: { select: { totalSlots: true, usedSlots: true, createdAt: true } } },
           }),
           db().deal.count({ where }),
         ]);
@@ -348,7 +348,7 @@ export function makeAdminController() {
         const dealId = String(req.params.dealId || '').trim();
         if (!dealId) throw new AppError(400, 'INVALID_DEAL_ID', 'dealId required');
 
-        const deal = await db().deal.findFirst({ where: { ...idWhere(dealId), isDeleted: false } });
+        const deal = await db().deal.findFirst({ where: { ...idWhere(dealId), isDeleted: false }, select: { id: true, mongoId: true, mediatorCode: true, title: true } });
         if (!deal) throw new AppError(404, 'DEAL_NOT_FOUND', 'Deal not found');
 
         // Check for orders referencing this deal via order items
@@ -407,7 +407,7 @@ export function makeAdminController() {
         const userId = String(req.params.userId || '').trim();
         if (!userId) throw new AppError(400, 'INVALID_USER_ID', 'userId required');
 
-        const user = await db().user.findFirst({ where: { ...idWhere(userId), isDeleted: false } });
+        const user = await db().user.findFirst({ where: { ...idWhere(userId), isDeleted: false }, select: { id: true, mongoId: true, roles: true, mediatorCode: true, status: true, name: true } });
         if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
         const roles = Array.isArray(user.roles) ? (user.roles as string[]) : [];
@@ -436,7 +436,7 @@ export function makeAdminController() {
             where: { beneficiaryUserId: user.id, status: { in: ['requested', 'processing'] as any }, isDeleted: false },
             select: { id: true },
           }),
-          db().wallet.findFirst({ where: { ownerUserId: user.id, isDeleted: false } }),
+          db().wallet.findFirst({ where: { ownerUserId: user.id, isDeleted: false }, select: { id: true, availablePaise: true, pendingPaise: true, lockedPaise: true } }),
         ]);
 
         if (hasCampaigns) throw new AppError(409, 'USER_HAS_CAMPAIGNS', 'This user has active campaigns. Please remove them first before deleting.');
@@ -512,7 +512,7 @@ export function makeAdminController() {
         const user = await db().user.findFirst({ where: { ...idWhere(userId), isDeleted: false }, select: { id: true, mongoId: true } });
         if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
-        const wallet = await db().wallet.findFirst({ where: { ownerUserId: user.id, isDeleted: false } });
+        const wallet = await db().wallet.findFirst({ where: { ownerUserId: user.id, isDeleted: false }, select: { id: true, mongoId: true, availablePaise: true, pendingPaise: true, lockedPaise: true } });
         if (!wallet) throw new AppError(404, 'WALLET_NOT_FOUND', 'Wallet not found');
 
         const available = Number(wallet.availablePaise ?? 0);
@@ -578,7 +578,7 @@ export function makeAdminController() {
           throw new AppError(400, 'CANNOT_SELF_SUSPEND', 'Cannot suspend your own account');
         }
 
-        const before = await db().user.findFirst({ where: { ...idWhere(body.userId), isDeleted: false } });
+        const before = await db().user.findFirst({ where: { ...idWhere(body.userId), isDeleted: false }, select: { id: true, mongoId: true, status: true, roles: true, isDeleted: true, name: true, mediatorCode: true } });
         if (!before) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
         if (before.isDeleted) throw new AppError(409, 'USER_DELETED', 'Cannot update status of a deleted user');
 
@@ -828,12 +828,7 @@ export function makeAdminController() {
           db().auditLog.count({ where }),
         ]);
 
-        res.json({
-          logs,
-          total,
-          page,
-          pages: Math.ceil(total / limit),
-        });
+        res.json(paginatedResponse(logs, total, page, limit, true));
         businessLog.info('Audit logs viewed', { userId: req.auth?.userId, resultCount: logs.length, total, page, limit, ip: req.ip });
         logAccessEvent('ADMIN_ACTION', {
           userId: req.auth?.userId,

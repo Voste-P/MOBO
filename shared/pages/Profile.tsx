@@ -4,7 +4,7 @@ import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
 import { maskMobile } from '../utils/mobiles';
 import { ProxiedImage } from '../components/ProxiedImage';
-import { api } from '../services/api';
+import { api, asArray, invalidateGetCache } from '../services/api';
 import { BetaLock } from '../components/BetaLock';
 import { subscribeRealtime } from '../services/realtime';
 import {
@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { Order } from '../types';
 
-export const Profile: React.FC = () => {
+export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) => {
   const { user, updateUser, logout } = useAuth();
   const { toast } = useToast();
 
@@ -55,16 +55,20 @@ export const Profile: React.FC = () => {
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState(false);
 
-  // Re-sync form fields when the user context changes (e.g. after login, token refresh)
-  // but only when the user is NOT currently editing to avoid overwriting in-progress changes.
+  // Re-sync form fields when the user identity changes (login/logout)
+  // but not on every user object refresh from realtime, and not while editing.
+  const prevUserIdRef = useRef(user?.id);
   useEffect(() => {
     if (!user || isEditing) return;
+    // Only re-sync if the user identity changed (login/switch), not on every object refresh
+    if (prevUserIdRef.current === user.id) return;
+    prevUserIdRef.current = user.id;
     setName(user.name || '');
     setMobile(user.mobile || '');
     setUpiId(user.upiId || '');
     setAvatar(user.avatar);
     setQrCode(user.qrCode);
-  }, [user, isEditing]);
+  }, [user?.id, isEditing]);
 
   /** Validate UPI ID format: handle@provider, 3-50 chars */
   function validateUpiId(value: string): string {
@@ -76,25 +80,34 @@ export const Profile: React.FC = () => {
     return '';
   }
 
-  useEffect(() => {
-    if (user) refreshStats();
-  }, [user]);
+  const profileLoadedRef = useRef(false);
 
-  // Realtime: keep buyer stats in sync across sessions.
   useEffect(() => {
-    if (!user) return;
+    if (!isActive) return;
+    if (profileLoadedRef.current) return;
+    profileLoadedRef.current = true;
+    invalidateGetCache('/orders');
+    if (user) refreshStats();
+  }, [user?.id, isActive]);
+
+  // Refresh stats when orders change via realtime
+  const lastStatsRefreshAt = useRef(0);
+  useEffect(() => {
+    if (!user?.id) return;
     if (user.role !== 'user') return;
 
     let timer: any = null;
     const schedule = () => {
-      if (timer) return;
+      if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
+        // Skip if just refreshed < 2s ago (prevents double-fetch after mutations)
+        if (Date.now() - lastStatsRefreshAt.current < 2000) return;
         refreshStats({ silent: true });
-      }, 600);
+      }, 800);
     };
 
-    const unsub = subscribeRealtime((msg) => {
+    const unsub = subscribeRealtime((msg: any) => {
       if (msg.type === 'orders.changed') schedule();
     });
 
@@ -102,22 +115,23 @@ export const Profile: React.FC = () => {
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [user]);
+  }, [user?.id]);
 
   const refreshStats = async (opts?: { silent?: boolean }) => {
     if (!user) return;
     if (statsLoadingRef.current) return;
     statsLoadingRef.current = true;
+    lastStatsRefreshAt.current = Date.now();
     setIsStatsLoading(true);
     try {
-      const userOrders = await api.orders.getUserOrders(user.id);
+      const userOrders = asArray<Order>(await api.orders.getUserOrders(user.id));
       setOrders(userOrders);
       const spent = userOrders
         .filter((o: Order) => o.paymentStatus === 'Paid')
         .reduce((acc: number, o: Order) => acc + o.total, 0);
       setTotalSpent(spent);
     } catch (e) {
-      console.error(e);
+      if (process.env.NODE_ENV !== 'production') console.error(e);
       if (!opts?.silent) {
         toast.error(formatErrorMessage(e, 'Failed to refresh wallet stats.'));
       }

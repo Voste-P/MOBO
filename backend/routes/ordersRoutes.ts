@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import type { Env } from '../config/env.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireRoles } from '../middleware/auth.js';
 import { makeOrdersController } from '../controllers/ordersController.js';
 import { prisma } from '../database/prisma.js';
 import { idWhere } from '../utils/idWhere.js';
@@ -36,9 +36,18 @@ export function ordersRoutes(env: Env): Router {
   // UI expects these endpoints to exist.
   router.get('/orders/user/:userId', requireAuth(env), ownerOrPrivileged, orders.getUserOrders);
   router.post('/orders', requireAuth(env), orderWriteLimiter, orders.createOrder);
-  router.post('/orders/claim', requireAuth(env), orderWriteLimiter, orders.submitClaim);
+  router.post('/orders/claim', requireAuth(env), requireRoles('shopper'), orderWriteLimiter, orders.submitClaim);
   router.patch('/orders/:orderId/reviewer-name', requireAuth(env), orderWriteLimiter, orders.setReviewerName);
-  router.get('/orders/:orderId/proof/:type', requireAuth(env), (_req, res, next) => {
+  // Rate limit proof retrieval to prevent brute-force enumeration
+  const proofReadLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: env.NODE_ENV === 'production' ? 60 : 5000,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req: any) => String(req.auth?.userId || req.ip || 'unknown'),
+  });
+
+  router.get('/orders/:orderId/proof/:type', requireAuth(env), proofReadLimiter, (_req, res, next) => {
     // Proof screenshots are immutable once uploaded — cache aggressively
     res.setHeader('Cache-Control', 'private, max-age=3600, immutable');
     next();
@@ -77,10 +86,17 @@ export function ordersRoutes(env: Env): Router {
       // Everyone except admin/ops must pass ownership checks
       if (!isAdmin) {
         const db = prisma();
-        const order = await db.order.findFirst({
-          where: idWhere(orderId),
-          select: { id: true, userId: true, brandUserId: true, brandName: true, agencyName: true, managerName: true },
-        });
+        // Fetch order and requesting user in parallel — single DB round-trip each
+        const [order, reqUser] = await Promise.all([
+          db.order.findFirst({
+            where: idWhere(orderId),
+            select: { id: true, userId: true, brandUserId: true, brandName: true, agencyName: true, managerName: true },
+          }),
+          db.user.findFirst({
+            where: idWhere(userId),
+            select: { id: true, name: true, mediatorCode: true },
+          }),
+        ]);
         if (!order) {
           return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Order not found' } });
         }
@@ -88,22 +104,18 @@ export function ordersRoutes(env: Env): Router {
         let allowed = false;
 
         if (roles.includes('shopper')) {
-          // Check user owns the order
-          const pgUser = await db.user.findFirst({ where: idWhere(userId), select: { id: true } });
-          allowed = !!pgUser && order.userId === pgUser.id;
+          allowed = !!reqUser && order.userId === reqUser.id;
         }
 
         if (!allowed && roles.includes('brand')) {
-          const user = await db.user.findFirst({ where: idWhere(userId), select: { id: true, name: true } });
-          const sameBrandId = !!user && (order.brandUserId === user.id || order.brandUserId === userId);
-          const sameBrandName = !!user?.name && String(order.brandName || '').trim() === String(user.name || '').trim();
+          const sameBrandId = !!reqUser && (order.brandUserId === reqUser.id || order.brandUserId === userId);
+          const sameBrandName = !!reqUser?.name && String(order.brandName || '').trim() === String(reqUser.name || '').trim();
           allowed = sameBrandId || sameBrandName;
         }
 
         if (!allowed && roles.includes('agency')) {
-          const user = await db.user.findFirst({ where: idWhere(userId), select: { id: true, mediatorCode: true, name: true } });
-          const agencyName = String(user?.name || '').trim();
-          const agencyCode = String(user?.mediatorCode || '').trim();
+          const agencyName = String(reqUser?.name || '').trim();
+          const agencyCode = String(reqUser?.mediatorCode || '').trim();
           if (agencyName && String(order.agencyName || '').trim() === agencyName) {
             allowed = true;
           } else if (agencyCode && order.managerName) {
@@ -121,8 +133,7 @@ export function ordersRoutes(env: Env): Router {
         }
 
         if (!allowed && roles.includes('mediator')) {
-          const user = await db.user.findFirst({ where: idWhere(userId), select: { mediatorCode: true } });
-          const mediatorCode = String(user?.mediatorCode || '').trim();
+          const mediatorCode = String(reqUser?.mediatorCode || '').trim();
           allowed = !!mediatorCode && String(order.managerName || '').trim() === mediatorCode;
         }
 

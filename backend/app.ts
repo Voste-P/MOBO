@@ -332,7 +332,7 @@ export function createApp(env: Env) {
         metadata: { origin },
       });
       return res.status(403).json({
-        error: 'origin_not_allowed',
+        error: { code: 'ORIGIN_NOT_ALLOWED', message: 'This domain is not authorized to access the API. Please check CORS_ORIGINS configuration.' },
       });
     }
     next();
@@ -361,6 +361,16 @@ export function createApp(env: Env) {
   // Security audit: log and block suspicious patterns in requests (after body parsing).
   // Active in all environments for defense-in-depth.
   app.use(securityAuditMiddleware());
+
+  // [PERF] Cache-Control headers for GET endpoints — enables browser & CDN caching.
+  // Private: data is user-specific (auth-gated), stale-while-revalidate lets
+  // the browser serve stale data while refetching in the background.
+  app.use('/api', (req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/realtime')) {
+      res.setHeader('Cache-Control', 'private, max-age=15, stale-while-revalidate=30');
+    }
+    next();
+  });
 
   app.use('/api', healthRoutes(env));
   app.use('/api/auth', authLimiter, authRoutes(env));

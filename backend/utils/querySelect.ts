@@ -117,10 +117,109 @@ export const userListSelect = {
 } as const;
 
 /**
+ * Prisma `select` for Campaign list queries.
+ * Includes all fields needed by toUiCampaign() but EXCLUDES `image` column
+ * which can be a large base64 blob. Frontend should use productUrl or
+ * a separate image proxy endpoint for thumbnails.
+ */
+export const campaignListSelect = {
+  id: true,
+  mongoId: true,
+  title: true,
+  brandUserId: true,
+  brandName: true,
+  platform: true,
+  image: true,
+  productUrl: true,
+  originalPricePaise: true,
+  pricePaise: true,
+  payoutPaise: true,
+  returnWindowDays: true,
+  dealType: true,
+  totalSlots: true,
+  usedSlots: true,
+  status: true,
+  allowedAgencyCodes: true,
+  assignments: true,
+  openToAll: true,
+  locked: true,
+  lockedAt: true,
+  lockedReason: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+  // Excluded: updatedBy, isDeleted (already filtered in WHERE)
+} as const;
+
+/**
+ * Prisma `select` for Deal list queries.
+ * Includes fields needed by toUiDeal() / pgDeal().
+ */
+export const dealListSelect = {
+  id: true,
+  mongoId: true,
+  campaignId: true,
+  mediatorCode: true,
+  title: true,
+  description: true,
+  image: true,
+  productUrl: true,
+  platform: true,
+  brandName: true,
+  dealType: true,
+  originalPricePaise: true,
+  pricePaise: true,
+  commissionPaise: true,
+  payoutPaise: true,
+  rating: true,
+  category: true,
+  active: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+/**
+ * Prisma `select` for Transaction list queries.
+ * Excludes heavy metadata JSONB when listing.
+ */
+export const transactionListSelect = {
+  id: true,
+  mongoId: true,
+  type: true,
+  amountPaise: true,
+  status: true,
+  fromUserId: true,
+  toUserId: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+/**
  * Prisma `select` for Order existence checks.
  */
 export const orderExistsSelect = {
   id: true,
+} as const;
+
+/**
+ * Prisma `select` for Order proof retrieval and authorization.
+ * Only fetches fields needed for proof access checks and screenshot values.
+ * Avoids fetching items, events, AI verification JSONB, and other heavy columns.
+ */
+export const orderProofSelect = {
+  id: true,
+  mongoId: true,
+  userId: true,
+  brandUserId: true,
+  brandName: true,
+  agencyName: true,
+  managerName: true,
+  screenshotOrder: true,
+  screenshotPayment: true,
+  screenshotReview: true,
+  screenshotRating: true,
+  screenshotReturnWindow: true,
+  reviewLink: true,
 } as const;
 
 /**
@@ -133,10 +232,6 @@ export const orderNotificationSelect = {
   workflowStatus: true,
   paymentStatus: true,
   affiliateStatus: true,
-  screenshotOrder: true,
-  screenshotReview: true,
-  screenshotRating: true,
-  screenshotReturnWindow: true,
   reviewLink: true,
   verification: true,
   rejectionReason: true,
@@ -146,7 +241,7 @@ export const orderNotificationSelect = {
   brandName: true,
   updatedAt: true,
   createdAt: true,
-  items: true,
+  items: { where: { isDeleted: false }, select: { id: true, dealType: true, title: true } },
 } as const;
 
 /**

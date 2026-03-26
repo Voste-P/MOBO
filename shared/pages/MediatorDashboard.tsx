@@ -8,6 +8,7 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 import { api, asArray } from '../services/api';
 import { subscribeRealtime } from '../services/realtime';
+import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 import { normalizeMobileTo10Digits, maskMobile } from '../utils/mobiles';
 import { formatCurrency } from '../utils/formatCurrency';
 import { getPrimaryOrderId } from '../utils/orderHelpers';
@@ -50,7 +51,7 @@ import {
   Package,
 } from 'lucide-react';
 
-import { EmptyState, Spinner } from '../components/ui';
+import { EmptyState, Spinner, Pagination } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { RatingVerificationBadge, ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
 import { MobileTabBar } from '../components/MobileTabBar';
@@ -118,8 +119,18 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
   ), [tickets]);
 
   const [viewMode, setViewMode] = useState<'todo' | 'cooling'>('todo');
+  const [orderPage, setOrderPage] = useState(1);
+  const ORDERS_PER_PAGE = 20;
 
-  // [PERF] Memoize all earnings/stats calculations
+  const currentOrders = viewMode === 'todo' ? actionRequiredOrders : coolingOrders;
+  const totalOrderPages = Math.ceil(currentOrders.length / ORDERS_PER_PAGE);
+  const paginatedOrders = useMemo(() => {
+    const safePage = Math.min(orderPage, Math.max(1, totalOrderPages));
+    return currentOrders.slice((safePage - 1) * ORDERS_PER_PAGE, safePage * ORDERS_PER_PAGE);
+  }, [currentOrders, orderPage, totalOrderPages]);
+
+  // Reset order page on view mode change
+  useEffect(() => { setOrderPage(1); }, [viewMode]);
   const { todayEarnings, totalDeals, totalEarnings, totalOrderValue, settledOrders, pendingOrders } = useMemo(() => {
     const todayStr = new Date().toDateString();
     return {
@@ -160,7 +171,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
   return (
     <div className="space-y-6 animate-enter">
       {/* Header Stats */}
-      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide px-1 snap-x">
+      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-styled px-1 snap-x">
         <div className="min-w-[150px] bg-[#18181B] p-4 rounded-[1.5rem] shadow-xl relative overflow-hidden snap-center flex-1">
           <div className="absolute top-0 right-0 w-24 h-24 bg-[#CCF381]/10 rounded-full blur-2xl -mr-6 -mt-6"></div>
           <div className="relative z-10">
@@ -228,7 +239,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
               {pendingUsers.length} requests
             </span>
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide px-1 snap-x">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-styled px-1 snap-x">
             {pendingUsers.map((u: User) => (
               <div
                 key={u.id}
@@ -259,7 +270,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                     onClick={() =>
                       api.ops
                         .approveUser(u.id)
-                        .then(onRefresh)
+                        .then(() => onRefresh(['pending', 'verified']))
                         .catch((e: any) => toast.error(formatErrorMessage(e, 'Failed to approve user')))
                     }
                     className="w-8 h-8 rounded-lg bg-zinc-900 text-white flex items-center justify-center hover:bg-[#CCF381] hover:text-black transition-all shadow-md active:scale-90"
@@ -273,7 +284,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                     onClick={() =>
                       api.ops
                         .rejectUser(u.id)
-                        .then(onRefresh)
+                        .then(() => onRefresh(['pending']))
                         .catch((e: any) => toast.error(formatErrorMessage(e, 'Failed to reject user')))
                     }
                     className="w-8 h-8 rounded-lg bg-zinc-50 text-zinc-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all active:scale-90"
@@ -404,8 +415,9 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
             />
           )
         ) : (
+          <>
           <div className="space-y-3">
-            {(viewMode === 'todo' ? actionRequiredOrders : coolingOrders).map((o: Order) => {
+            {paginatedOrders.map((o: Order) => {
               const dealType = o.items?.[0]?.dealType || 'Discount';
               const settleDate = o.expectedSettlementDate
                 ? new Date(o.expectedSettlementDate).toDateString()
@@ -509,6 +521,17 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
               );
             })}
           </div>
+          {totalOrderPages > 1 && (
+            <Pagination
+              page={orderPage}
+              totalPages={totalOrderPages}
+              total={currentOrders.length}
+              limit={ORDERS_PER_PAGE}
+              onPageChange={setOrderPage}
+              className="mt-3 rounded-xl border border-zinc-100"
+            />
+          )}
+        </>
         )}
       </section>
 
@@ -572,7 +595,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
             icon={<HelpCircle size={22} className="text-zinc-400" />}
           />
         ) : (
-          <div className="space-y-2 max-h-[60vh] overflow-y-auto scrollbar-styled">
+          <div className="space-y-2 max-h-[60dvh] overflow-y-auto scrollbar-styled">
             {tickets.filter((t: Ticket) => {
               if (ticketFilter !== 'All' && String(t.status) !== ticketFilter) return false;
               if (ticketSearch.trim()) {
@@ -645,7 +668,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                                 await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined);
                                 toast.success('Ticket resolved.');
                                 setResolvingTicketId(null); setResolutionNote('');
-                                onRefresh();
+                                onRefresh(['tickets']);
                               } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
                             }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
                               ✓ Resolve
@@ -655,7 +678,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                                 await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined);
                                 toast.success('Ticket rejected.');
                                 setResolvingTicketId(null); setResolutionNote('');
-                                onRefresh();
+                                onRefresh(['tickets']);
                               } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
                             }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-50 border border-red-200 text-red-600 hover:bg-red-100">
                               ✗ Reject
@@ -685,7 +708,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                           try {
                             await api.tickets.update(t.id, 'Open');
                             toast.success('Ticket reopened.');
-                            onRefresh();
+                            onRefresh(['tickets']);
                           } catch (err: any) {
                             toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
                           }
@@ -700,7 +723,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                           try {
                             await api.tickets.delete(t.id);
                             toast.success('Ticket deleted.');
-                            onRefresh();
+                            onRefresh(['tickets']);
                           } catch (err: any) {
                             toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
                           }
@@ -732,6 +755,8 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
   const { toast } = useToast();
   const { confirm, ConfirmDialogElement } = useConfirm();
   const [marketSearch, setMarketSearch] = useState('');
+  const [marketPage, setMarketPage] = useState(1);
+  const MARKET_PER_PAGE = 20;
   const dealByCampaignId = useMemo(() => {
     const m = new Map<string, Product>();
     (deals || []).forEach((d: Product) => {
@@ -757,6 +782,15 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
   }, [deals, marketSearch]);
 
   const [mode, setMode] = useState<'published' | 'unpublished'>('unpublished');
+
+  const currentMarketItems = mode === 'published' ? filteredDeals : unpublishedCampaigns;
+  const totalMarketPages = Math.ceil(currentMarketItems.length / MARKET_PER_PAGE);
+  const paginatedMarketItems = useMemo(() => {
+    const safePage = Math.min(marketPage, Math.max(1, totalMarketPages));
+    return currentMarketItems.slice((safePage - 1) * MARKET_PER_PAGE, safePage * MARKET_PER_PAGE);
+  }, [currentMarketItems, marketPage, totalMarketPages]);
+
+  useEffect(() => { setMarketPage(1); }, [mode, marketSearch]);
 
   return (
     <div className="space-y-5 animate-enter">
@@ -854,7 +888,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
                 )}
               </div>
             ) : (
-              filteredDeals.map((d: Product) => (
+              (paginatedMarketItems as Product[]).map((d: Product) => (
                 <div
                   key={String(d.id)}
                   className="bg-white p-4 rounded-[1.5rem] border border-zinc-100 shadow-sm flex flex-col relative overflow-hidden"
@@ -931,6 +965,16 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
               ))
             )}
           </div>
+          {totalMarketPages > 1 && (
+            <Pagination
+              page={marketPage}
+              totalPages={totalMarketPages}
+              total={filteredDeals.length}
+              limit={MARKET_PER_PAGE}
+              onPageChange={setMarketPage}
+              className="mt-3 rounded-xl border border-zinc-100"
+            />
+          )}
         </div>
       ) : (
         <div>
@@ -961,7 +1005,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
                 )}
               </div>
             ) : (
-              unpublishedCampaigns.map((c: Campaign) => (
+              (paginatedMarketItems as Campaign[]).map((c: Campaign) => (
                 <div
                   key={c.id}
                   className="bg-white p-4 rounded-[1.5rem] border border-zinc-100 shadow-sm flex flex-col relative overflow-hidden hover:shadow-lg transition-all duration-300"
@@ -979,9 +1023,15 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
                         <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest border border-zinc-100 px-1.5 py-0.5 rounded-md">
                           {c.platform}
                         </span>
-                        <span className="bg-[#CCF381]/20 text-[#5f7a28] text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide">
-                          {c.assignments[user.mediatorCode!] || 0} Slots
-                        </span>
+                        {c.openToAll ? (
+                          <span className="bg-emerald-50 text-emerald-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide border border-emerald-200">
+                            🌐 Open to All · {c.totalSlots - c.usedSlots} left
+                          </span>
+                        ) : (
+                          <span className="bg-[#CCF381]/20 text-[#5f7a28] text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide">
+                            {(user.mediatorCode ? c.assignments[(user.mediatorCode || '').toLowerCase()] : 0) || 0} Slots
+                          </span>
+                        )}
                       </div>
                       <h4 className="font-bold text-zinc-900 text-base leading-tight line-clamp-1 mb-1">
                         {c.title}
@@ -1021,7 +1071,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
                           if (!(await confirm({ message: 'Delete this unpublished campaign?', confirmLabel: 'Delete', variant: 'destructive' }))) return;
                           await api.ops.deleteCampaign(String(c.id));
                           toast.success('Campaign deleted.');
-                          onRefresh?.();
+                          onRefresh?.(['campaigns', 'deals']);
                         } catch (err) {
                           toast.error(formatErrorMessage(err, 'Failed to delete campaign'));
                         }
@@ -1035,6 +1085,16 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
               ))
             )}
           </div>
+          {totalMarketPages > 1 && (
+            <Pagination
+              page={marketPage}
+              totalPages={totalMarketPages}
+              total={unpublishedCampaigns.length}
+              limit={MARKET_PER_PAGE}
+              onPageChange={setMarketPage}
+              className="mt-3 rounded-xl border border-zinc-100"
+            />
+          )}
         </div>
       )}
     </div>
@@ -1044,10 +1104,20 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
 const SquadView = ({ user, pendingUsers, verifiedUsers, loading, orders: _orders, onRefresh: _onRefresh, onSelectUser }: any) => {
   const { toast } = useToast();
   const [squadSearch, setSquadSearch] = useState('');
+  const [squadPage, setSquadPage] = useState(1);
+  const SQUAD_PER_PAGE = 25;
   const filteredVerified = useMemo(() =>
     verifiedUsers.filter((u: User) => matchesSearch(squadSearch, u.name, u.mobile)),
     [verifiedUsers, squadSearch]
   );
+  const totalSquadPages = Math.ceil(filteredVerified.length / SQUAD_PER_PAGE);
+  const paginatedSquad = useMemo(() => {
+    const safePage = Math.min(squadPage, Math.max(1, totalSquadPages));
+    return filteredVerified.slice((safePage - 1) * SQUAD_PER_PAGE, safePage * SQUAD_PER_PAGE);
+  }, [filteredVerified, squadPage, totalSquadPages]);
+
+  useEffect(() => { setSquadPage(1); }, [squadSearch]);
+
   const _filteredPending = useMemo(() =>
     pendingUsers.filter((u: User) => matchesSearch(squadSearch, u.name, u.mobile)),
     [pendingUsers, squadSearch]
@@ -1134,7 +1204,7 @@ const SquadView = ({ user, pendingUsers, verifiedUsers, loading, orders: _orders
             </div>
           ) : (
             <div className="divide-y divide-zinc-50">
-              {filteredVerified.map((u: User) => (
+              {paginatedSquad.map((u: User) => (
                 <div
                   key={u.id}
                   onClick={() => onSelectUser(u)}
@@ -1171,6 +1241,16 @@ const SquadView = ({ user, pendingUsers, verifiedUsers, loading, orders: _orders
                 </div>
               ))}
             </div>
+          )}
+          {totalSquadPages > 1 && (
+            <Pagination
+              page={squadPage}
+              totalPages={totalSquadPages}
+              total={filteredVerified.length}
+              limit={SQUAD_PER_PAGE}
+              onPageChange={setSquadPage}
+              className="mt-3 rounded-xl border border-zinc-100"
+            />
           )}
         </div>
       </div>
@@ -1428,7 +1508,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
       await api.ops.settleOrderPayment(settleId, utr.trim() || undefined, 'external');
       setSettleId(null);
       setUtr('');
-      onRefresh();
+      onRefresh(['orders']);
     } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to settle'));
     }
@@ -1438,7 +1518,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
     if (await confirm({ message: 'Undo this settlement? Funds will be reversed.', title: 'Undo Settlement', confirmLabel: 'Undo', variant: 'destructive' })) {
       try {
         await api.ops.unsettleOrderPayment(orderId);
-        onRefresh();
+        onRefresh(['orders']);
       } catch (err) {
         toast.error(formatErrorMessage(err, 'Failed to revert settlement'));
       }
@@ -1447,12 +1527,12 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
 
   return (
     <div
-      className="absolute inset-0 z-[60] bg-black/60 backdrop-blur-md flex items-end animate-fade-in"
+      className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-md flex items-end animate-fade-in"
       onClick={onClose}
     >
       {ConfirmDialogElement}
       <div
-        className="bg-[#F8F9FA] w-full rounded-t-[2.5rem] h-[92%] shadow-2xl animate-slide-up relative flex flex-col"
+        className="bg-[#F8F9FA] w-full rounded-t-[2.5rem] max-h-[92%] h-[92%] shadow-2xl animate-slide-up relative flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex-none p-5 bg-[#18181B] rounded-t-[2.5rem] text-white pb-8">
@@ -1737,6 +1817,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
 export const MediatorDashboard: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  useRealtimeConnection();
   const {
     notifications: inboxNotifications,
     unreadCount,
@@ -1745,9 +1826,11 @@ export const MediatorDashboard: React.FC = () => {
     refresh: refreshNotifications,
   } = useNotification();
   const [activeTab, setActiveTab] = useState<'inbox' | 'market' | 'squad' | 'profile'>('inbox');
-  const [slideDir, setSlideDir] = useState<'left' | 'right'>('right');
+  const [_slideDir, setSlideDir] = useState<'left' | 'right'>('right');
   const prevTabIdx = useRef(0);
   const [showNotifications, setShowNotifications] = useState(false);
+  const showNotificationsRef = useRef(showNotifications);
+  useEffect(() => { showNotificationsRef.current = showNotifications; }, [showNotifications]);
 
   const TAB_ORDER = ['inbox', 'market', 'squad', 'profile'] as const;
 
@@ -1765,6 +1848,13 @@ export const MediatorDashboard: React.FC = () => {
     onChangeTab: (t) => handleTabChange(t as typeof activeTab),
   });
 
+  const mediatorTabItems = useMemo(() => [
+    { id: 'inbox', label: 'Home', ariaLabel: 'Home', icon: <LayoutGrid size={22} strokeWidth={activeTab === 'inbox' ? 2.5 : 2} />, badge: unreadCount },
+    { id: 'market', label: 'Market', ariaLabel: 'Market', icon: <Tag size={22} strokeWidth={activeTab === 'market' ? 2.5 : 2} /> },
+    { id: 'squad', label: 'Squad', ariaLabel: 'Squad', icon: <Users size={22} strokeWidth={activeTab === 'squad' ? 2.5 : 2} /> },
+    { id: 'profile', label: 'Profile', ariaLabel: 'Profile', icon: <UserIcon size={22} strokeWidth={activeTab === 'profile' ? 2.5 : 2} /> },
+  ], [activeTab, unreadCount]);
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [deals, setDeals] = useState<Product[]>([]);
@@ -1772,7 +1862,6 @@ export const MediatorDashboard: React.FC = () => {
   const [verifiedUsers, setVerifiedUsers] = useState<User[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
-  const loadingRef = useRef(false);
 
   // Modals
   const [proofModal, setProofModal] = useState<Order | null>(null);
@@ -1813,110 +1902,171 @@ export const MediatorDashboard: React.FC = () => {
 
   // AI Analysis — now reads stored data from order, no Gemini calls needed
 
+  const loadedRef = useRef<Set<string>>(new Set());
+  const inFlightRef = useRef<Set<string>>(new Set());
+  const lastFetchedAt = useRef<Record<string, number>>({});
+
+  const tabDataNeeds = useMemo<string[]>(() => {
+    switch (activeTab) {
+      case 'inbox': return ['orders', 'campaigns', 'deals', 'pending', 'verified', 'tickets'];
+      case 'market': return ['campaigns', 'deals'];
+      case 'squad': return ['pending', 'verified'];
+      case 'profile': return [];
+      default: return [];
+    }
+  }, [activeTab]);
+
+  // Keep a ref so loadData callback stays stable across tab switches
+  const tabDataNeedsRef = useRef(tabDataNeeds);
+  tabDataNeedsRef.current = tabDataNeeds;
+
+  const loadData = useCallback(async (opts?: { force?: boolean; silent?: boolean; keys?: string[] }) => {
+    if (!user) return;
+    const force = opts?.force ?? false;
+    const silent = !!opts?.silent;
+    const invalidateKeys = opts?.keys;
+
+    if (invalidateKeys) {
+      for (const k of invalidateKeys) loadedRef.current.delete(k);
+    }
+
+    const currentNeeds = tabDataNeedsRef.current;
+    if (force && !invalidateKeys) {
+      for (const k of currentNeeds) loadedRef.current.delete(k);
+    }
+    const needed = currentNeeds.filter((k) => !loadedRef.current.has(k) && !inFlightRef.current.has(k));
+    if (needed.length === 0) return;
+
+    for (const k of needed) inFlightRef.current.add(k);
+    setLoading(true);
+    try {
+      const promises: Promise<any>[] = [];
+      const keys: string[] = [];
+
+      if (needed.includes('orders')) { promises.push(api.ops.getMediatorOrders(user.mediatorCode || '')); keys.push('orders'); }
+      if (needed.includes('campaigns')) { promises.push(api.ops.getCampaigns(user.mediatorCode || '')); keys.push('campaigns'); }
+      if (needed.includes('deals')) { promises.push(api.ops.getDeals(user.mediatorCode || '')); keys.push('deals'); }
+      if (needed.includes('pending')) { promises.push(api.ops.getPendingUsers(user.mediatorCode || '')); keys.push('pending'); }
+      if (needed.includes('verified')) { promises.push(api.ops.getVerifiedUsers(user.mediatorCode || '')); keys.push('verified'); }
+      if (needed.includes('tickets')) { promises.push(api.tickets.getAll()); keys.push('tickets'); }
+
+      const results = await Promise.all(promises);
+
+      const now = Date.now();
+      keys.forEach((key, i) => {
+        loadedRef.current.add(key);
+        lastFetchedAt.current[key] = now;
+        switch (key) {
+          case 'orders': {
+            const safeOrds = asArray<Order>(results[i]);
+            setOrders(safeOrds);
+            setProofModal((prev) => {
+              if (!prev) return prev;
+              const updated = safeOrds.find((o: Order) => o.id === prev.id);
+              return updated || null;
+            });
+            break;
+          }
+          case 'campaigns': setCampaigns(asArray<Campaign>(results[i])); break;
+          case 'deals': setDeals(asArray(results[i])); break;
+          case 'pending': {
+            const safePend = asArray<User>(results[i]);
+            setPendingUsers(safePend);
+            setSelectedBuyer((prev) => {
+              if (!prev) return prev;
+              const updated = safePend.find((u: any) => u?.id === (prev as any).id);
+              if (!updated) return prev;
+              return updated.name !== (prev as any).name || updated.mobile !== (prev as any).mobile || updated.upiId !== (prev as any).upiId || updated.qrCode !== (prev as any).qrCode ? updated : prev;
+            });
+            break;
+          }
+          case 'verified': {
+            const safeVer = asArray<User>(results[i]);
+            setVerifiedUsers(safeVer);
+            setSelectedBuyer((prev) => {
+              if (!prev) return prev;
+              const updated = safeVer.find((u: any) => u?.id === (prev as any).id);
+              if (!updated) return prev;
+              return updated.name !== (prev as any).name || updated.mobile !== (prev as any).mobile || updated.upiId !== (prev as any).upiId || updated.qrCode !== (prev as any).qrCode ? updated : prev;
+            });
+            break;
+          }
+          case 'tickets': setTickets(asArray<Ticket>(results[i]).filter((t: Ticket) => t.issueType !== 'Feedback')); break;
+        }
+      });
+    } catch (e) {
+      if (process.env.NODE_ENV !== 'production') console.error(e);
+      if (!silent) {
+        const msg = (e as any)?.message ? String((e as any).message) : 'Failed to refresh dashboard.';
+        toast.error(msg.includes('fetch') || msg.includes('network') ? 'Network error. Please check your connection.' : msg);
+      }
+    } finally {
+      for (const k of needed) inFlightRef.current.delete(k);
+      if (inFlightRef.current.size === 0) setLoading(false);
+    }
+  }, [user?.id]);
+
+  // Trigger data load on tab change — only fetches keys not already cached
+  const prevTabRef = useRef(activeTab);
   useEffect(() => {
-    loadData();
-  }, [user, selectedBuyer]);
+    const tabChanged = prevTabRef.current !== activeTab;
+    prevTabRef.current = activeTab;
+    loadData({ silent: tabChanged });
+  }, [loadData, activeTab]);
 
   useEffect(() => {
     if (!showNotifications) return;
     refreshNotifications();
   }, [showNotifications, refreshNotifications]);
 
-  const loadData = async (opts?: unknown) => {
-    if (!user) return;
-    if (loadingRef.current) return;
-    const silent =
-      !!opts &&
-      typeof opts === 'object' &&
-      Object.prototype.hasOwnProperty.call(opts, 'silent') &&
-      Boolean((opts as any).silent);
-
-    loadingRef.current = true;
-    setLoading(true);
-    try {
-      const [ords, camps, publishedDeals, pend, ver, tix] = await Promise.all([
-        api.ops.getMediatorOrders(user.mediatorCode || ''),
-        api.ops.getCampaigns(user.mediatorCode || ''),
-        api.ops.getDeals(user.mediatorCode || ''),
-        api.ops.getPendingUsers(user.mediatorCode || ''),
-        api.ops.getVerifiedUsers(user.mediatorCode || ''),
-        api.tickets.getAll(),
-      ]);
-      const safeOrds = asArray<Order>(ords);
-      const safeCamps = asArray<Campaign>(camps);
-      const safeDeals = asArray(publishedDeals);
-      const safePend = asArray<User>(pend);
-      const safeVer = asArray<User>(ver);
-      const safeTix = asArray<Ticket>(tix);
-
-      setOrders(safeOrds);
-      setCampaigns(safeCamps);
-      setDeals(safeDeals);
-      setPendingUsers(safePend);
-      setVerifiedUsers(safeVer);
-      setTickets(safeTix.filter((t: Ticket) => t.issueType !== 'Feedback'));
-
-      // Keep the open proof-verification modal in sync with realtime order updates
-      // (e.g., buyer uploaded a new proof while the modal is open).
-      setProofModal((prev) => {
-        if (!prev) return prev;
-        const updated = safeOrds.find((o: Order) => o.id === prev.id);
-        return updated || null;
-      });
-
-      // Keep the open buyer/ledger view in sync with realtime profile updates
-      // (e.g., UPI/QR updates emitted via `users.changed`).
-      setSelectedBuyer((prev) => {
-        if (!prev) return prev;
-        const updated = [...safePend, ...safeVer].find((u: any) => u?.id === (prev as any).id);
-        if (!updated) return prev;
-        const changed =
-          updated.name !== (prev as any).name ||
-          updated.mobile !== (prev as any).mobile ||
-          updated.upiId !== (prev as any).upiId ||
-          updated.qrCode !== (prev as any).qrCode;
-        return changed ? updated : prev;
-      });
-    } catch (e) {
-      console.error(e);
-      if (!silent) {
-        const msg = (e as any)?.message ? String((e as any).message) : 'Failed to refresh dashboard.';
-        toast.error(msg);
-      }
-    } finally {
-      loadingRef.current = false;
-      setLoading(false);
-    }
-  };
-
-  // Realtime: refresh queue/dashboard when backend state changes.
+  // Realtime: only invalidate data keys relevant to the SSE event, then refetch
   useEffect(() => {
-    if (!user) return;
-    let timer: any = null;
-    const schedule = () => {
-      if (timer) return;
+    if (!user?.id) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const eventToKeys: Record<string, string[]> = {
+      'orders.changed': ['orders'],
+      'deals.changed': ['campaigns', 'deals'],
+      'users.changed': ['pending', 'verified'],
+      'tickets.changed': ['tickets'],
+      'notifications.changed': [],
+    };
+    const schedule = (keysToInvalidate: string[]) => {
+      if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        loadData({ silent: true });
-        if (showNotifications) refreshNotifications();
-      }, 600);
+        // Skip keys that were just fetched by an explicit refresh (prevents double-fetch)
+        const now = Date.now();
+        const stale = keysToInvalidate.filter(k => (now - (lastFetchedAt.current[k] || 0)) > 2000);
+        if (stale.length === 0) {
+          if (showNotificationsRef.current) refreshNotifications();
+          return;
+        }
+        // Always invalidate globally so other tabs see fresh data on next visit
+        for (const k of stale) loadedRef.current.delete(k);
+        // Only re-fetch if current tab actually needs these keys
+        const relevant = stale.filter(k => tabDataNeedsRef.current.includes(k));
+        if (relevant.length > 0) loadData({ silent: true });
+        if (showNotificationsRef.current) refreshNotifications();
+      }, 800);
     };
     const unsub = subscribeRealtime((msg) => {
-      if (
-        msg.type === 'orders.changed' ||
-        msg.type === 'users.changed' ||
-        msg.type === 'wallets.changed' ||
-        msg.type === 'deals.changed' ||
-        msg.type === 'notifications.changed' ||
-        msg.type === 'tickets.changed'
-      )
-        schedule();
+      if (msg.type === 'notifications.changed') {
+        if (showNotificationsRef.current) refreshNotifications();
+        return;
+      }
+      const keys = eventToKeys[msg.type];
+      if (keys && keys.length > 0) schedule(keys);
     });
     return () => {
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [user, showNotifications, refreshNotifications]);
+  }, [user?.id, refreshNotifications, loadData]);
+
+  const refreshData = useCallback((keys?: string[]) => {
+    if (keys) return loadData({ keys });
+    return loadData({ force: true });
+  }, [loadData]);
 
   const handlePublish = async () => {
     if (!dealBuilder || !user?.mediatorCode) return;
@@ -1926,9 +2076,9 @@ export const MediatorDashboard: React.FC = () => {
       setDealBuilder(null);
       setCommission('');
       toast.success('Deal saved');
-      loadData();
+      loadData({ keys: ['campaigns', 'deals'] });
     } catch (e) {
-      console.error(e);
+      if (process.env.NODE_ENV !== 'production') console.error(e);
       const msg = (e as any)?.message ? String((e as any).message) : 'Failed to publish deal.';
       toast.error(msg);
     }
@@ -1937,8 +2087,8 @@ export const MediatorDashboard: React.FC = () => {
   const hasNotifications = unreadCount > 0;
 
   const handlePullRefresh = useCallback(async () => {
-    await loadData();
-  }, [user]);
+    await loadData({ force: true });
+  }, [loadData]);
   const { handlers: pullHandlers, pullDistance, isRefreshing: isPullRefreshing } = usePullToRefresh({ onRefresh: handlePullRefresh });
 
   const unpublishedCount = useMemo(() => {
@@ -2088,17 +2238,14 @@ export const MediatorDashboard: React.FC = () => {
         onTouchEnd={(e) => { swipeHandlers.onTouchEnd(e); pullHandlers.onTouchEnd(); }}
       >
         <PullToRefreshIndicator distance={pullDistance} isRefreshing={isPullRefreshing} />
-        <div
-          key={activeTab}
-          className={`animate-slide-tab ${slideDir === 'left' ? 'slide-from-right' : 'slide-from-left'}`}
-        >
+        <div>
         {activeTab === 'inbox' && (
           <InboxView
             orders={orders}
             pendingUsers={pendingUsers}
             tickets={tickets}
             loading={loading}
-            onRefresh={loadData}
+            onRefresh={refreshData}
             unpublishedCount={unpublishedCount}
             onGoToUnpublished={() => handleTabChange('market')}
             onViewProof={(order: Order) => {
@@ -2112,7 +2259,7 @@ export const MediatorDashboard: React.FC = () => {
             deals={deals}
             loading={loading}
             user={user}
-            onRefresh={loadData}
+            onRefresh={refreshData}
             onPublish={setDealBuilder}
           />
         )}
@@ -2123,7 +2270,7 @@ export const MediatorDashboard: React.FC = () => {
             verifiedUsers={verifiedUsers}
             orders={orders}
             loading={loading}
-            onRefresh={loadData}
+            onRefresh={refreshData}
             onSelectUser={setSelectedBuyer}
           />
         )}
@@ -2133,33 +2280,7 @@ export const MediatorDashboard: React.FC = () => {
 
       <div className="fixed left-1/2 -translate-x-1/2 z-40 w-[92vw] max-w-[360px] bottom-[calc(0.75rem+env(safe-area-inset-bottom))]">
         <MobileTabBar
-          items={[
-            {
-              id: 'inbox',
-              label: 'Home',
-              ariaLabel: 'Home',
-              icon: <LayoutGrid size={22} strokeWidth={activeTab === 'inbox' ? 2.5 : 2} />,
-              badge: unreadCount,
-            },
-            {
-              id: 'market',
-              label: 'Market',
-              ariaLabel: 'Market',
-              icon: <Tag size={22} strokeWidth={activeTab === 'market' ? 2.5 : 2} />,
-            },
-            {
-              id: 'squad',
-              label: 'Squad',
-              ariaLabel: 'Squad',
-              icon: <Users size={22} strokeWidth={activeTab === 'squad' ? 2.5 : 2} />,
-            },
-            {
-              id: 'profile',
-              label: 'Profile',
-              ariaLabel: 'Profile',
-              icon: <UserIcon size={22} strokeWidth={activeTab === 'profile' ? 2.5 : 2} />,
-            },
-          ]}
+          items={mediatorTabItems}
           activeId={activeTab}
           onChange={(id) => {
             handleTabChange(id as any);
@@ -2571,7 +2692,7 @@ export const MediatorDashboard: React.FC = () => {
                       )
                     );
                     toast.success('Buyer notified to upload missing proof.');
-                    await loadData();
+                    await loadData({ keys: ['orders'] });
                   } catch (err) {
                     toast.error(formatErrorMessage(err, 'Failed to request missing proof'));
                   }
@@ -2647,7 +2768,7 @@ export const MediatorDashboard: React.FC = () => {
                       toast.success('Purchase verified.');
                     }
 
-                    await loadData();
+                    await loadData({ keys: ['orders'] });
                     // Keep modal open with refreshed order if more steps needed
                     if (!resp?.approved && resp?.order) {
                       setProofModal(resp.order);
@@ -2678,7 +2799,7 @@ export const MediatorDashboard: React.FC = () => {
                           toast.success('Deal verified ✓');
                         }
 
-                        await loadData();
+                        await loadData({ keys: ['orders'] });
                         if (!resp?.approved && resp?.order) {
                           setProofModal(resp.order);
                         } else if (!resp?.approved) {
@@ -2716,7 +2837,7 @@ export const MediatorDashboard: React.FC = () => {
 
       {rejectModalOpen && proofModal && (
         <div
-          className="absolute inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
           onClick={() => setRejectModalOpen(false)}
         >
           <div
@@ -2777,7 +2898,7 @@ export const MediatorDashboard: React.FC = () => {
                     toast.success('Proof rejected and buyer notified.');
                     setRejectModalOpen(false);
                     setProofModal(null);
-                    await loadData();
+                    await loadData({ keys: ['orders'] });
                   } catch (err) {
                     toast.error(formatErrorMessage(err, 'Failed to reject proof'));
                   }
@@ -2794,7 +2915,7 @@ export const MediatorDashboard: React.FC = () => {
       {/* FORCE APPROVE MODAL */}
       {approveModalOpen && proofModal && (
         <div
-          className="absolute inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
           onClick={() => setApproveModalOpen(false)}
         >
           <div
@@ -2826,7 +2947,7 @@ export const MediatorDashboard: React.FC = () => {
                     toast.success('Order approved → Pending Cooling (14 days)');
                     setApproveModalOpen(false);
                     setProofModal(null);
-                    await loadData();
+                    await loadData({ keys: ['orders'] });
                   } catch (err) {
                     toast.error(formatErrorMessage(err, 'Failed to approve order'));
                   }
@@ -2843,7 +2964,7 @@ export const MediatorDashboard: React.FC = () => {
       {/* CANCEL ORDER MODAL */}
       {cancelModalOpen && proofModal && (
         <div
-          className="absolute inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
           onClick={() => setCancelModalOpen(false)}
         >
           <div
@@ -2879,7 +3000,7 @@ export const MediatorDashboard: React.FC = () => {
                     toast.success('Order cancelled and slot released.');
                     setCancelModalOpen(false);
                     setProofModal(null);
-                    await loadData();
+                    await loadData({ keys: ['orders'] });
                   } catch (err) {
                     toast.error(formatErrorMessage(err, 'Failed to cancel order'));
                   }
@@ -3014,7 +3135,7 @@ export const MediatorDashboard: React.FC = () => {
           orders={orders.filter((o) => o.userId === selectedBuyer.id)}
           loading={loading}
           onClose={() => setSelectedBuyer(null)}
-          onRefresh={loadData}
+          onRefresh={refreshData}
         />
       )}
       <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />

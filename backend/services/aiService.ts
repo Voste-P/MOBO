@@ -35,6 +35,9 @@ let _circuitBreakerCooldownMs = 300_000; // 5 min, overridden by env
 
 /** Circuit state for proper half-open handling. */
 let _circuitState: 'CLOSED' | 'OPEN' | 'HALF_OPEN' = 'CLOSED';
+/** Track consecutive successes in HALF_OPEN before closing the circuit. */
+let _halfOpenSuccessCount = 0;
+const HALF_OPEN_SUCCESS_THRESHOLD = 3; // require 3 consecutive successes to close
 
 function isGeminiCircuitOpen(): boolean {
   if (_circuitState === 'CLOSED') return false;
@@ -53,18 +56,25 @@ function isGeminiCircuitOpen(): boolean {
 
 function recordGeminiSuccess(): void {
   if (_circuitState === 'HALF_OPEN') {
-    aiLog.info('[Circuit Breaker] CLOSED — probe request succeeded');
+    _halfOpenSuccessCount++;
+    if (_halfOpenSuccessCount >= HALF_OPEN_SUCCESS_THRESHOLD) {
+      aiLog.info(`[Circuit Breaker] CLOSED — ${_halfOpenSuccessCount} consecutive probe successes`);
+      _circuitState = 'CLOSED';
+      _halfOpenSuccessCount = 0;
+    } else {
+      aiLog.info(`[Circuit Breaker] HALF_OPEN — probe success ${_halfOpenSuccessCount}/${HALF_OPEN_SUCCESS_THRESHOLD}`);
+    }
   }
   _geminiConsecutiveFails = 0;
-  _circuitState = 'CLOSED';
 }
 
 function recordGeminiFailure(): void {
   _geminiConsecutiveFails++;
   _geminiLastFailTimestamp = Date.now();
   if (_circuitState === 'HALF_OPEN') {
-    // Probe failed — immediately re-open the circuit
+    // Probe failed — immediately re-open the circuit, reset success counter
     _circuitState = 'OPEN';
+    _halfOpenSuccessCount = 0;
     aiLog.warn(`[Circuit Breaker] OPEN (probe failed) — re-opening for ${_circuitBreakerCooldownMs / 1000}s.`);
   } else if (_geminiConsecutiveFails >= _circuitBreakerThreshold) {
     _circuitState = 'OPEN';
@@ -239,7 +249,7 @@ async function releaseOcrWorker(worker: Awaited<ReturnType<typeof createWorker>>
     if (_ocrPool.length < OCR_POOL_SIZE) {
       createWorker('eng', undefined, { langPath: LOCAL_LANG_PATH })
         .then((w) => { if (_ocrPool.length < OCR_POOL_SIZE) _ocrPool.push(w); else w.terminate().catch(() => {}); })
-        .catch(() => { /* pool will be replenished on next acquire */ });
+        .catch((err) => { aiLog.warn('[OCR Pool] Replenishment failed', { error: err?.message }); });
     }
     return;
   }
@@ -869,6 +879,7 @@ type ProofVerificationResult = {
   amountMatch: boolean;
   productNameMatch?: boolean;
   platformMatch?: boolean;
+  screenshotCropped?: boolean;
   confidenceScore: number;
   detectedOrderId?: string;
   detectedAmount?: number;
@@ -916,10 +927,11 @@ async function verifyProofWithOcr(
     const rawData = imageBase64.includes(',') ? imageBase64.split(',')[1]! : imageBase64;
     const imgBuffer = Buffer.from(rawData, 'base64');
 
-    // Preprocess with Sharp for better OCR accuracy
+    // Auto-rotate from EXIF (mobile photos often have rotation metadata) then preprocess for OCR
     let processedBuffer: Buffer;
     try {
       processedBuffer = await sharp(imgBuffer)
+        .rotate()        // auto-rotate based on EXIF orientation
         .greyscale()
         .normalize()
         .sharpen()
@@ -1120,6 +1132,13 @@ async function verifyProofWithOcr(
     if (!amountMatch) detectedNotes.push(`Amount ₹${expectedAmount} not found in screenshot.`);
     if (expectedProductName && productNameMatch === false) detectedNotes.push('Product name mismatch.');
     if (orderIdMatch && amountMatch) detectedNotes.push('Both order ID and amount matched via OCR.');
+
+    // OCR-based cropped screenshot detection:
+    // If OCR extracted very little text (< 200 chars), the screenshot is likely cropped/incomplete.
+    // Full order screenshots typically contain 300+ chars (header, order details, items, amounts).
+    const screenshotCropped = ocrText.length < 200;
+    if (screenshotCropped) detectedNotes.push('Screenshot appears cropped — very little text detected.');
+
     // Server-side platform comparison for OCR path
     let platformMatch: boolean | undefined;
     if (expectedPlatform && detectedPlatform) {
@@ -1142,6 +1161,7 @@ async function verifyProofWithOcr(
       ...(productNameMatch !== undefined ? { productNameMatch } : {}),
       ...(detectedPlatform !== undefined ? { detectedPlatform } : {}),
       ...(platformMatch !== undefined ? { platformMatch } : {}),
+      screenshotCropped,
       confidenceScore,
       discrepancyNote: detectedNotes.join(' ') || 'OCR fallback verification complete.',
     };
@@ -1254,6 +1274,18 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
                 `9. Always fill detectedOrderId, detectedAmount, detectedProductName, and detectedPlatform with what you actually see in the image, even if they don't match the expected values.`,
                 `10. If the screenshot is from a dark mode UI, still extract all text carefully.`,
                 `11. If the order ID has OCR-like digit confusion (O vs 0, I vs 1, S vs 5), normalize before comparing.`,
+                `12. CROPPED/INCOMPLETE SCREENSHOT DETECTION (CRITICAL):`,
+                `   Determine if this screenshot has been intentionally CROPPED, CUT, or is INCOMPLETE.`,
+                `   A VALID order confirmation screenshot MUST show:`,
+                `   - The page header or app header with platform branding/logo at the TOP`,
+                `   - The order ID and amount in context (not just a snippet)`,
+                `   - The product name/details area`,
+                `   Signs of a CROPPED screenshot (set screenshotCropped=true):`,
+                `   - The screenshot starts abruptly in the MIDDLE of a page — no header visible`,
+                `   - Only a small portion of the order page is visible (e.g., just the order ID line)`,
+                `   - The top of the page is CUT OFF — content appears to start mid-section`,
+                `   - Navigation bar, site header/logo, account area are all missing from top`,
+                `   Set screenshotCropped=false ONLY if the screenshot shows a reasonably complete page view.`,
               ].join('\n'),
             },
           ],
@@ -1272,9 +1304,10 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
                 detectedAmount: { type: Type.NUMBER },
                 detectedProductName: { type: Type.STRING },
                 detectedPlatform: { type: Type.STRING },
+                screenshotCropped: { type: Type.BOOLEAN, description: 'true if the screenshot appears cropped, cut off, or incomplete — missing page header, platform branding, or showing only a fragment' },
                 discrepancyNote: { type: Type.STRING },
               },
-              required: ['orderIdMatch', 'amountMatch', 'productNameMatch', 'platformMatch', 'confidenceScore'],
+              required: ['orderIdMatch', 'amountMatch', 'productNameMatch', 'platformMatch', 'confidenceScore', 'screenshotCropped'],
             },
           },
         }));
@@ -1403,6 +1436,7 @@ export type RatingVerificationResult = {
   detectedAccountName?: string;
   detectedPublicName?: string;
   detectedProductName?: string;
+  screenshotCropped?: boolean;
   confidenceScore: number;
   discrepancyNote?: string;
 };
@@ -1418,7 +1452,7 @@ async function verifyRatingWithOcr(
     const imgBuffer = Buffer.from(rawData, 'base64');
     let processedBuffer: Buffer;
     try {
-      processedBuffer = await sharp(imgBuffer).greyscale().normalize().sharpen().toBuffer();
+      processedBuffer = await sharp(imgBuffer).rotate().greyscale().normalize().sharpen().toBuffer();
     } catch { processedBuffer = imgBuffer; }
 
     // Detect orientation for multi-crop
@@ -1508,8 +1542,17 @@ async function verifyRatingWithOcr(
     // Combine all OCR texts
     const ocrText = allTexts.sort((a, b) => b.length - a.length).join('\n');
 
+    // Detect cropped screenshots — multiple heuristics:
+    // 1. Very short OCR text means very little content visible
+    // 2. "Edit public name" visible but no header greeting means top is cropped
+    const textTooShort = ocrText.length < 200;
+    const hasEditPublicName = /edit\s*public\s*name/i.test(ocrText);
+    const hasHeaderGreeting = /\b(hello|hi|hey|welcome|dear|namaste)\s*,?\s*[a-z]/i.test(ocrText);
+    const screenshotCropped = textTooShort || (hasEditPublicName && !hasHeaderGreeting);
+
     if (!ocrText || ocrText.length < 5) {
       return { accountNameMatch: false, productNameMatch: false, confidenceScore: 10,
+        screenshotCropped: true,
         discrepancyNote: 'OCR could not read text from the rating screenshot.' };
     }
 
@@ -1658,15 +1701,19 @@ async function verifyRatingWithOcr(
 
     return {
       accountNameMatch, productNameMatch, confidenceScore,
+      screenshotCropped,
       detectedAccountName: detectedAccountName || detectedPublicName,
       detectedPublicName,
       detectedProductName: matchedTokens.length > 0 ? matchedTokens.join(' ') : undefined,
       discrepancyNote: [
+        screenshotCropped && hasEditPublicName && !hasHeaderGreeting
+          ? 'Screenshot appears cropped: public name visible but account header/greeting is missing.'
+          : '',
         !accountNameMatch ? (expectedReviewerName
           ? `Account name "${expectedBuyerName}" and reviewer name "${expectedReviewerName}" not found in screenshot.`
           : `Account name "${expectedBuyerName}" not found in screenshot.`) : '',
         !productNameMatch ? `Product name not matching in screenshot.` : '',
-        accountNameMatch && productNameMatch ? 'Account name and product matched via OCR.' : '',
+        accountNameMatch && productNameMatch && !screenshotCropped ? 'Account name and product matched via OCR.' : '',
       ].filter(Boolean).join(' '),
     };
   } catch (err) {
@@ -1726,6 +1773,30 @@ export async function verifyRatingScreenshotWithAi(
               `5. Set confidenceScore 0-100 based on how clearly visible and matching both fields are.`,
               `6. Always fill detectedAccountName with the greeting/header name (e.g. from "Hello, Ashok"), and detectedPublicName with the name shown beside "Edit public name" (if visible). Fill detectedProductName with the product text you see.`,
               `7. PARTIAL NAME MATCHING: The name visible in the screenshot may be PARTIAL or truncated. For example, the screenshot may show only "Chetan" but the expected reviewer name is "Chetan Chaudhari". If any significant part of the expected name appears in the screenshot names, set accountNameMatch=true. Similarly, if the expected name is "Chetan" and the screenshot shows "Chetan Chaudhari", that should also match.`,
+              `8. CROPPED/INCOMPLETE SCREENSHOT DETECTION (CRITICAL FOR FRAUD PREVENTION):`,
+              `   Determine if this screenshot has been intentionally CROPPED, CUT, or is INCOMPLETE.`,
+              `   A VALID full rating/review screenshot MUST show:`,
+              `   - The page header or account area at the TOP (e.g. "Hello, <Name>", navigation bar, or Amazon header)`,
+              `   - The product being rated (title, image, or description)`,
+              `   - The star rating and/or review text`,
+              `   Signs of a CROPPED screenshot (set screenshotCropped=true):`,
+              `   - The screenshot starts abruptly in the MIDDLE of a page — no header/top-of-page visible`,
+              `   - Only "Edit public name" or a name label is visible WITHOUT the page header greeting ("Hello, <Name>")`,
+              `   - The top of the page is CUT OFF — content appears to start mid-section`,
+              `   - Critical information like the account name header area is missing/not visible`,
+              `   - The screenshot shows only a FRAGMENT of the review page`,
+              `   - Key UI elements (navigation bar, page title, account icon) are absent from the top`,
+              `   Set screenshotCropped=false ONLY if the screenshot shows a COMPLETE or near-complete page view with the page header/top visible.`,
+              `   When in doubt, set screenshotCropped=true — better to ask for a full screenshot than to let fraud through.`,
+              `9. HEADER GREETING DETECTION (CRITICAL FOR FRAUD PREVENTION):`,
+              `   Look specifically at the VERY TOP of the screenshot for a text greeting like:`,
+              `   "Hello, <Name>", "Hi, <Name>", "Deliver to <Name>", "Account & Lists", or any navigation header showing user identity.`,
+              `   Set headerGreetingVisible=true ONLY if such a greeting or account indicator is visible at the TOP of the page.`,
+              `   Set headerGreetingVisible=false if the screenshot starts with the profile/review area (e.g. starts with a user avatar, "Edit public name", or the product image) WITHOUT showing the page header above it.`,
+              `   IMPORTANT: The "<Name> Edit public name" text is NOT a header greeting — it is the profile section. Do NOT confuse these two.`,
+              `   detectedAccountName MUST come ONLY from the header greeting ("Hello, Ashok" → "Ashok"). If no header greeting is visible, set detectedAccountName to empty string "".`,
+              `   detectedPublicName comes from "<Name> Edit public name" text in the profile area.`,
+              `   headerGreetingText: Copy the EXACT VERBATIM greeting text from the top of the page (e.g. "Hello, Ashok" or "Deliver to Ashok - Mumbai 400001"). If no greeting/header text is visible, set to empty string "". Do NOT copy text from the profile/"Edit public name" area.`,
             ].join('\n') },
           ],
           config: {
@@ -1737,12 +1808,15 @@ export async function verifyRatingScreenshotWithAi(
                 accountNameMatch: { type: Type.BOOLEAN },
                 productNameMatch: { type: Type.BOOLEAN },
                 confidenceScore: { type: Type.INTEGER },
-                detectedAccountName: { type: Type.STRING, description: 'Name from the header/greeting area (e.g. "Hello, Ashok" → "Ashok"). Strip greeting prefix.' },
-                detectedPublicName: { type: Type.STRING, description: 'Name shown beside "Edit public name" on the review/rating page. This is the marketplace public display name. Null if not visible.' },
+                detectedAccountName: { type: Type.STRING, description: 'ONLY from a header/greeting at the VERY TOP of the page like "Hello, Ashok" or "Deliver to Ashok" or account navigation. Extract just the name. If NO header greeting is visible at the top, set to empty string "". Do NOT extract from "Edit public name" area.' },
+                detectedPublicName: { type: Type.STRING, description: 'Name shown beside "Edit public name" on the review/rating page. This is the marketplace public display name. Empty string if not visible.' },
                 detectedProductName: { type: Type.STRING },
+                screenshotCropped: { type: Type.BOOLEAN, description: 'true if the screenshot appears cropped, cut off, or incomplete — missing page header, account area, or showing only a fragment of the page' },
+                headerGreetingVisible: { type: Type.BOOLEAN, description: 'true ONLY if a greeting/header like "Hello, <Name>" or "Deliver to <Name>" or Amazon navigation bar with account name is visible at the TOP of the screenshot. "<Name> Edit public name" is NOT a header greeting — that is the profile section. Set false if the page starts directly with the review/rating content.' },
+                headerGreetingText: { type: Type.STRING, description: 'EXACT VERBATIM text of the greeting/header visible at the TOP of the page, e.g. "Hello, Ashok" or "Deliver to Ashok". If no greeting is visible, set to empty string "". Do NOT copy text from the "Edit public name" profile area.' },
                 discrepancyNote: { type: Type.STRING },
               },
-              required: ['accountNameMatch', 'productNameMatch', 'confidenceScore'],
+              required: ['accountNameMatch', 'productNameMatch', 'confidenceScore', 'screenshotCropped', 'headerGreetingVisible'],
             },
           },
         }));
@@ -1852,6 +1926,34 @@ export async function verifyRatingScreenshotWithAi(
           }
         }
 
+        // BULLETPROOF crop detection — runs ALWAYS, overrides Gemini's screenshotCropped.
+        // We do NOT trust Gemini's boolean fields (screenshotCropped, headerGreetingVisible)
+        // because Gemini is non-deterministic and often gets these wrong.
+        // Instead, we validate using the VERBATIM headerGreetingText field: if it doesn't
+        // contain an actual greeting keyword, the header is not visible → screenshot is cropped.
+        {
+          const hasPublicName = !!parsed.detectedPublicName && parsed.detectedPublicName.length > 0 && !/^(null|undefined|n\/a|none|\s*)$/i.test(parsed.detectedPublicName);
+          const headerText = ((parsed as any).headerGreetingText || '').trim();
+          // Check if headerGreetingText contains a REAL greeting keyword that would only
+          // appear in the Amazon page header, NOT in the "Edit public name" profile area.
+          const GREETING_KEYWORDS = /\b(hello|hi|hey|deliver\s*to|account|welcome|namaste|sign\s*in|returns|orders)\b/i;
+          const hasRealGreeting = headerText.length > 0 && GREETING_KEYWORDS.test(headerText);
+          // Also reject if headerGreetingText just repeats the public name without greeting prefix
+          // (Gemini sometimes copies "ashok" from profile into headerGreetingText too)
+          const headerIsJustName = headerText.length > 0 && !GREETING_KEYWORDS.test(headerText);
+
+          if (hasPublicName && (!hasRealGreeting || headerIsJustName)) {
+            // Public name ("Edit public name") is visible but no real header greeting found
+            // → screenshot is cropped, regardless of what Gemini says
+            parsed.screenshotCropped = true;
+            // Build descriptive note
+            const cropNote = 'Screenshot appears cropped: reviewer public name is visible but the account header/greeting at the top of the page is missing. Please upload a FULL screenshot showing the complete page including the "Hello, <Name>" header.';
+            if (!parsed.discrepancyNote || !parsed.discrepancyNote.includes('cropped')) {
+              parsed.discrepancyNote = (parsed.discrepancyNote ? parsed.discrepancyNote + ' ' : '') + cropNote;
+            }
+          }
+        }
+
         recordGeminiSuccess();
         logPerformance({
           operation: 'AI_VERIFY_RATING',
@@ -1898,6 +2000,7 @@ export type ReturnWindowVerificationResult = {
   soldByMatch: boolean;
   returnWindowClosed: boolean;
   reviewerNameMatch: boolean;
+  screenshotCropped?: boolean;
   confidenceScore: number;
   detectedReturnWindow?: string;
   detectedAccountName?: string;
@@ -1912,7 +2015,7 @@ async function verifyReturnWindowWithOcr(
     const rawData = imageBase64.includes(',') ? imageBase64.split(',')[1]! : imageBase64;
     const imgBuffer = Buffer.from(rawData, 'base64');
     let processedBuffer: Buffer;
-    try { processedBuffer = await sharp(imgBuffer).greyscale().normalize().sharpen().toBuffer(); }
+    try { processedBuffer = await sharp(imgBuffer).rotate().greyscale().normalize().sharpen().toBuffer(); }
     catch { processedBuffer = imgBuffer; }
 
     let worker: any = await acquireOcrWorker();
@@ -1969,8 +2072,12 @@ async function verifyReturnWindowWithOcr(
     if (!ocrText || ocrText.length < 5) {
       return { orderIdMatch: false, productNameMatch: false, amountMatch: false, soldByMatch: false,
         returnWindowClosed: false, reviewerNameMatch: !expected.expectedReviewerName, confidenceScore: 10,
+        screenshotCropped: true,
         discrepancyNote: 'OCR could not read text from the delivery screenshot.' };
     }
+
+    // Detect cropped screenshots — full delivery/return window pages typically have 200+ chars
+    const screenshotCropped = ocrText.length < 200;
 
     const lower = ocrText.toLowerCase();
     const orderIdNorm = expected.expectedOrderId.replace(/[\s\-]/g, '').toLowerCase();
@@ -2080,6 +2187,7 @@ async function verifyReturnWindowWithOcr(
 
     return {
       orderIdMatch, productNameMatch, amountMatch, soldByMatch, returnWindowClosed, reviewerNameMatch, confidenceScore,
+      screenshotCropped,
       discrepancyNote: [
         !orderIdMatch ? `Order ID "${expected.expectedOrderId}" not found.` : '',
         !productNameMatch ? 'Product name mismatch.' : '',
@@ -2151,6 +2259,10 @@ export async function verifyReturnWindowWithAi(
               `7. Set confidenceScore 0-100 based on match quality. Low confidence if fields are hard to read.`,
               `8. CRITICAL: If the screenshot appears to be from a DIFFERENT ORDER than expected, ALL match fields must be false. Do NOT guess or assume — if uncertain, set to false.`,
               `9. CRITICAL PRODUCT NAME RULE: Same brand ≠ same product. "Brand X Product A" and "Brand X Product B" are DIFFERENT products. Compare the FULL product name including model/variant identifiers, not just the brand.`,
+              `10. CROPPED/INCOMPLETE SCREENSHOT DETECTION: Determine if this screenshot is CROPPED or INCOMPLETE.`,
+              `   A valid delivery/return window screenshot should show the page header with platform branding, order details in context, and delivery status.`,
+              `   Set screenshotCropped=true if: the top of the page is cut off, no header/navigation visible, only a fragment of the page is shown.`,
+              `   Set screenshotCropped=false if the screenshot shows a reasonably complete page view.`,
             ].join('\n') },
           ],
           config: {
@@ -2168,9 +2280,10 @@ export async function verifyReturnWindowWithAi(
                 confidenceScore: { type: Type.INTEGER },
                 detectedReturnWindow: { type: Type.STRING },
                 detectedAccountName: { type: Type.STRING, description: 'Name from the header/greeting area (e.g. "Hello, Ashok" → "Ashok"). Strip greeting prefix. Null if not visible.' },
+                screenshotCropped: { type: Type.BOOLEAN, description: 'true if the screenshot appears cropped, cut off, or incomplete' },
                 discrepancyNote: { type: Type.STRING },
               },
-              required: ['orderIdMatch', 'productNameMatch', 'amountMatch', 'soldByMatch', 'returnWindowClosed', 'reviewerNameMatch', 'confidenceScore'],
+              required: ['orderIdMatch', 'productNameMatch', 'amountMatch', 'soldByMatch', 'returnWindowClosed', 'reviewerNameMatch', 'confidenceScore', 'screenshotCropped'],
             },
           },
         }));

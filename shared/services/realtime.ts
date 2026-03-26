@@ -82,7 +82,7 @@ class RealtimeClient {
 
   // If the connection is open but we stop receiving bytes (proxy buffering/hanging),
   // force a reconnect so UI can recover.
-  private readonly idleReconnectMs = 70_000;
+  private readonly idleReconnectMs = 35_000;
 
   /** Whether the SSE stream is currently connected and receiving data. */
   get connected(): boolean { return this._connected; }
@@ -214,7 +214,7 @@ class RealtimeClient {
               // ignore
             }
           }
-        }, 5_000);
+        }, 30_000);
 
         const flushEvent = () => {
           if (!dataLines.length) {

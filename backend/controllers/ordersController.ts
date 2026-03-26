@@ -9,7 +9,7 @@ import { pgOrder } from '../utils/pgMappers.js';
 import { createOrderSchema, submitClaimSchema } from '../validations/orders.js';
 import { rupeesToPaise } from '../utils/money.js';
 import { toUiOrder, toUiOrderSummary } from '../utils/uiMappers.js';
-import { orderListSelectLite, getProofFlags } from '../utils/querySelect.js';
+import { orderListSelectLite, orderProofSelect, getProofFlags } from '../utils/querySelect.js';
 import { parsePagination, paginatedResponse } from '../utils/pagination.js';
 import { pushOrderEvent, isTerminalAffiliateStatus } from '../services/orderEvents.js';
 import { transitionOrderWorkflow } from '../services/orderWorkflow.js';
@@ -53,7 +53,7 @@ export function makeOrdersController(env: Env) {
       : { OR: [{ mongoId: orderId }, { externalOrderId: orderId }] as any, isDeleted: false };
     const found = await db().order.findFirst({
       where: where as any,
-      include: { items: { where: { isDeleted: false } } },
+      select: orderProofSelect,
     });
     return found ? pgOrder(found) : null;
   };
@@ -111,6 +111,7 @@ export function makeOrdersController(env: Env) {
     envRef: Env,
   ): Promise<any> => {
     if (String(freshOrder.workflowStatus) !== 'UNDER_REVIEW') return freshOrder;
+    if (aiConfidence < threshold) return freshOrder; // Below auto-verify threshold
 
     const v = (freshOrder.verification && typeof freshOrder.verification === 'object')
       ? { ...(freshOrder.verification as any) } : {} as any;
@@ -134,11 +135,17 @@ export function makeOrdersController(env: Env) {
         metadata: { step: vKey, autoVerified: true, aiConfidenceScore: aiConfidence },
       },
     );
-    const updated = await db().order.update({
-      where: { id: freshOrder.id },
+    // Guard: only update if order is still UNDER_REVIEW (prevents race conditions)
+    const guardResult = await db().order.updateMany({
+      where: { id: freshOrder.id, workflowStatus: 'UNDER_REVIEW' },
       data: { verification: v, events: evts as any },
+    });
+    if (guardResult.count === 0) return freshOrder; // Order was modified concurrently
+    const updated = await db().order.findFirst({
+      where: { id: freshOrder.id, isDeleted: false },
       include: { items: { where: { isDeleted: false } } },
     });
+    if (!updated) return freshOrder;
 
     const finalize = await finalizeApprovalIfReady(updated!, 'SYSTEM_AI', envRef);
     orderLog.info('Auto-verified step by AI confidence', {
@@ -327,6 +334,8 @@ export function makeOrdersController(env: Env) {
         if (orderIds.length === 0) throw new AppError(400, 'MISSING_ORDER_IDS', 'orderIds array required');
         if (orderIds.length > 500) throw new AppError(400, 'TOO_MANY_ORDERS', 'Max 500 orders per batch');
 
+        const { roles, user: _user, pgUserId } = getRequester(req);
+
         const proofTypes = ['order', 'payment', 'rating', 'review', 'returnwindow'] as const;
         const tokens: Record<string, Record<string, string | null>> = {};
 
@@ -336,7 +345,7 @@ export function makeOrdersController(env: Env) {
             OR: orderIds.map(id => UUID_RE.test(id) ? { id } : { mongoId: id }),
             isDeleted: false,
           },
-          include: { items: { where: { isDeleted: false } } },
+          select: orderProofSelect,
         });
 
         // Map by both id and mongoId for quick lookup
@@ -345,6 +354,20 @@ export function makeOrdersController(env: Env) {
           const mapped = pgOrder(o);
           orderMap.set(String(o.id), mapped);
           if (o.mongoId) orderMap.set(String(o.mongoId), mapped);
+        }
+
+        // Authorization: only privileged roles (admin/ops) can batch across all orders.
+        // Non-privileged users can only generate URLs for their own orders.
+        if (!isPrivileged(roles)) {
+          for (const o of orders) {
+            const mapped = orderMap.get(String(o.id));
+            if (!mapped) continue;
+            const isOwner = String(o.userId) === pgUserId;
+            const isBrand = roles.includes('brand') && String(o.brandUserId) === pgUserId;
+            if (!isOwner && !isBrand) {
+              throw new AppError(403, 'FORBIDDEN', 'You can only generate proof URLs for your own orders');
+            }
+          }
         }
 
         for (const oid of orderIds) {
@@ -557,6 +580,7 @@ export function makeOrdersController(env: Env) {
         }
 
         let aiOrderConfidence = 0;
+        let aiUnavailable = false;
         if (allowE2eBypass) {
           // E2E/dev runs should not rely on external AI services.
         } else if (isGeminiConfigured(env)) {
@@ -573,44 +597,68 @@ export function makeOrdersController(env: Env) {
           }
           // Product name from deal/item for AI matching (user said 100% product name match required)
           const expectedProductName = String(item.title || '').trim();
-          const aiStart = Date.now();
-          const verification = await verifyProofWithAi(env, {
-            imageBase64: body.screenshots.order,
-            expectedOrderId: resolvedExternalOrderId || body.externalOrderId || '',
-            expectedAmount,
-            ...(expectedProductName ? { expectedProductName } : {}),
-          });
-          logPerformance({
-            operation: 'AI_ORDER_PROOF_VERIFICATION',
-            durationMs: Date.now() - aiStart,
-            metadata: { orderId: resolvedExternalOrderId, confidenceScore: verification?.confidenceScore },
-          });
+          try {
+            const aiStart = Date.now();
+            const verification = await verifyProofWithAi(env, {
+              imageBase64: body.screenshots.order,
+              expectedOrderId: resolvedExternalOrderId || body.externalOrderId || '',
+              expectedAmount,
+              ...(expectedProductName ? { expectedProductName } : {}),
+            });
+            logPerformance({
+              operation: 'AI_ORDER_PROOF_VERIFICATION',
+              durationMs: Date.now() - aiStart,
+              metadata: { orderId: resolvedExternalOrderId, confidenceScore: verification?.confidenceScore },
+            });
 
-          const confidenceThreshold = env.AI_PROOF_CONFIDENCE_THRESHOLD ?? 75;
-          // Amount mismatch is expected (shipping, discounts, taxes) — don't hard-block.
-          // Only require orderIdMatch + confidence threshold.
-          if (!verification?.orderIdMatch || (verification?.confidenceScore ?? 0) < confidenceThreshold) {
-            throw new AppError(
-              422,
-              'INVALID_ORDER_PROOF',
-              'Your order proof could not be verified. Please upload a clear screenshot showing the order ID.'
-            );
+            const confidenceThreshold = env.AI_PROOF_CONFIDENCE_THRESHOLD ?? 75;
+            // Amount mismatch is expected (shipping, discounts, taxes) — don't hard-block.
+            // Only require orderIdMatch + confidence threshold.
+            if (!verification?.orderIdMatch || (verification?.confidenceScore ?? 0) < confidenceThreshold) {
+              throw new AppError(
+                422,
+                'INVALID_ORDER_PROOF',
+                'Your order proof could not be verified. Please upload a clear screenshot showing the order ID.'
+              );
+            }
+            // Hard-block: product name must POSITIVELY match when expected product name is available.
+            // Use !== true (not === false) so undefined/null also blocks — safety first.
+            if (expectedProductName && verification?.productNameMatch !== true) {
+              throw new AppError(
+                422,
+                'PRODUCT_NAME_MISMATCH',
+                'The product in the screenshot does not match the selected deal. ' +
+                `Expected "${expectedProductName}"` +
+                (verification?.detectedProductName ? `, detected "${verification.detectedProductName}"` : '') +
+                '. Please upload the correct order screenshot.'
+              );
+            }
+            // Hard-block: cropped/incomplete screenshots are not acceptable
+            if (verification?.screenshotCropped === true) {
+              throw new AppError(
+                422,
+                'SCREENSHOT_INCOMPLETE',
+                'Your order screenshot appears to be cropped or incomplete. ' +
+                'Please upload a FULL screenshot showing the complete order page including the page header. ' +
+                (verification?.discrepancyNote || '')
+              );
+            }
+            aiOrderConfidence = verification?.confidenceScore ?? 0;
+          } catch (aiErr: any) {
+            // Re-throw validation errors (422s) — those are intentional user-facing blocks
+            if (aiErr instanceof AppError) throw aiErr;
+            // Infrastructure failure (Gemini down, OCR crash, timeout) — let order proceed
+            // for manual review instead of blocking the buyer
+            orderLog.warn('[createOrder] AI verification unavailable, proceeding for manual review', {
+              error: aiErr?.message,
+              orderId: resolvedExternalOrderId,
+            });
+            aiUnavailable = true;
           }
-          // Hard-block: product name must POSITIVELY match when expected product name is available.
-          // Use !== true (not === false) so undefined/null also blocks — safety first.
-          if (expectedProductName && verification?.productNameMatch !== true) {
-            throw new AppError(
-              422,
-              'PRODUCT_NAME_MISMATCH',
-              'The product in the screenshot does not match the selected deal. ' +
-              `Expected "${expectedProductName}"` +
-              (verification?.detectedProductName ? `, detected "${verification.detectedProductName}"` : '') +
-              '. Please upload the correct order screenshot.'
-            );
-          }
-          aiOrderConfidence = verification?.confidenceScore ?? 0;
         } else {
-          throw new AppError(503, 'AI_NOT_CONFIGURED', 'Proof verification is temporarily unavailable. Please try again later.');
+          // AI not configured — proceed for manual review instead of hard-blocking
+          orderLog.warn('[createOrder] AI not configured, order will require manual review');
+          aiUnavailable = true;
         }
         const campaignWhere = UUID_RE.test(item.campaignId)
           ? { OR: [{ id: item.campaignId }, { mongoId: item.campaignId }], isDeleted: false }
@@ -649,10 +697,24 @@ export function makeOrdersController(env: Env) {
         const assignmentsRaw = (campaign.assignments && typeof campaign.assignments === 'object' && !Array.isArray(campaign.assignments))
           ? campaign.assignments as Record<string, any>
           : {};
-        const hasMediatorAssignment = upstreamMediatorCode ? (upstreamMediatorCode in assignmentsRaw) : false;
-        const hasAgencyAccess = upstreamAgencyCode ? allowedAgencyCodes.includes(upstreamAgencyCode) : false;
 
-        if (!hasAgencyAccess && !hasMediatorAssignment) {
+        // Case-insensitive assignment lookup — keys are stored lowercase by assignSlots.
+        const findAssignment = (code: string) => {
+          if (!code) return undefined;
+          if (Object.prototype.hasOwnProperty.call(assignmentsRaw, code)) return assignmentsRaw[code];
+          const lower = code.toLowerCase();
+          for (const [k, v] of Object.entries(assignmentsRaw)) {
+            if (k.toLowerCase() === lower) return v;
+          }
+          return undefined;
+        };
+
+        const mediatorAssignment = upstreamMediatorCode ? findAssignment(upstreamMediatorCode) : undefined;
+        const hasMediatorAssignment = mediatorAssignment !== undefined;
+        const hasAgencyAccess = upstreamAgencyCode ? allowedAgencyCodes.includes(upstreamAgencyCode) : false;
+        const campaignIsOpenToAll = (campaign as any).openToAll === true;
+
+        if (!campaignIsOpenToAll && !hasAgencyAccess && !hasMediatorAssignment) {
           throw new AppError(403, 'FORBIDDEN', 'Campaign is not available for your network');
         }
 
@@ -661,7 +723,7 @@ export function makeOrdersController(env: Env) {
           throw new AppError(409, 'SOLD_OUT', 'Sold Out Globally');
         }
 
-        const assignmentVal = upstreamMediatorCode ? assignmentsRaw[upstreamMediatorCode] : undefined;
+        const assignmentVal = mediatorAssignment;
         const assigned = upstreamMediatorCode
           ? typeof assignmentVal === 'number'
             ? assignmentVal
@@ -676,7 +738,8 @@ export function makeOrdersController(env: Env) {
 
         // [PERF] Parallel fetch: mediatorSales + maybeDeal are independent
         const [mediatorSales, maybeDeal] = await Promise.all([
-          (upstreamMediatorCode && assigned > 0)
+          // For "Open to All" campaigns, skip per-mediator limit check — only global slot limit applies
+          (!campaignIsOpenToAll && upstreamMediatorCode && assigned > 0)
             ? db().order.count({
                 where: {
                   managerName: upstreamMediatorCode,
@@ -689,7 +752,7 @@ export function makeOrdersController(env: Env) {
           db().deal.findFirst({ where: dealWhere as any }),
         ]);
 
-        if (upstreamMediatorCode && assigned > 0 && mediatorSales >= assigned) {
+        if (!campaignIsOpenToAll && upstreamMediatorCode && assigned > 0 && mediatorSales >= assigned) {
           throw new AppError(
             409,
             'SOLD_OUT_FOR_PARTNER',
@@ -908,7 +971,7 @@ export function makeOrdersController(env: Env) {
           // the purchase step. The hard blocks (orderIdMatch, productNameMatch, etc.)
           // already ensure proof correctness — any surviving proof is "AI-approved".
           const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
-          if (aiOrderConfidence > 0) {
+          if (aiOrderConfidence >= autoThreshold) {
             const freshOrder = await db().order.findFirst({
               where: { mongoId: orderMongoId, isDeleted: false },
               include: { items: { where: { isDeleted: false } } },
@@ -947,6 +1010,24 @@ export function makeOrdersController(env: Env) {
                   finalOrder = updated;
                 }
               }
+            }
+          }
+
+          // Mark order verification data when AI was unavailable so reviewers know
+          if (aiUnavailable) {
+            const aiUnavailableOrder = await db().order.findFirst({
+              where: { mongoId: orderMongoId, isDeleted: false },
+              select: { id: true, verification: true },
+            });
+            if (aiUnavailableOrder) {
+              const v = (aiUnavailableOrder.verification && typeof aiUnavailableOrder.verification === 'object')
+                ? { ...(aiUnavailableOrder.verification as any) } : {} as any;
+              v.aiUnavailable = true;
+              v.aiUnavailableAt = new Date().toISOString();
+              await db().order.update({
+                where: { id: aiUnavailableOrder.id },
+                data: { verification: v },
+              });
             }
           }
         }
@@ -1201,10 +1282,32 @@ export function makeOrdersController(env: Env) {
             }
           }
           updateData.reviewLink = reviewUrl;
-          // Auto-verify review links: URL validation already confirms it's from a known marketplace.
-          // Set confidence so autoVerifyStep can pick it up.
+          // Auto-verify review links: URL validation confirms it's from a known marketplace.
+          // Additionally verify the link is reachable (HEAD request with timeout) before
+          // awarding auto-verify confidence. This prevents fraudulent dead links from
+          // being auto-approved.
           if (env.NODE_ENV !== 'test') {
-            claimAiConfidence = env.AI_REVIEW_LINK_CONFIDENCE ?? 95;
+            try {
+              const headResp = await fetch(reviewUrl, {
+                method: 'HEAD',
+                redirect: 'follow',
+                signal: AbortSignal.timeout(8000),
+              });
+              if (headResp.ok || headResp.status === 405 || headResp.status === 403) {
+                // 200/405 (method not allowed but URL exists)/403 (auth-gated) — link exists
+                claimAiConfidence = env.AI_REVIEW_LINK_CONFIDENCE ?? 95;
+              } else {
+                orderLog.warn('Review link HEAD returned non-OK status', {
+                  orderId: order.mongoId, status: headResp.status, url: reviewUrl,
+                });
+                // Still accept the link but don't auto-verify — mediator will review
+                claimAiConfidence = 0;
+              }
+            } catch {
+              // Network error / timeout — accept link but skip auto-verify
+              orderLog.warn('Review link HEAD request failed', { orderId: order.mongoId, url: reviewUrl });
+              claimAiConfidence = 0;
+            }
           }
           if (order.rejectionType === 'review') {
             updateData.rejectionType = null;
@@ -1258,6 +1361,13 @@ export function makeOrdersController(env: Env) {
                   'Please upload the correct rating screenshot. ' +
                   (ratingAiResult.discrepancyNote || ''));
               }
+              // Block submission if screenshot is cropped/incomplete (fraud prevention)
+              if (ratingAiResult && ratingAiResult.screenshotCropped === true) {
+                throw new AppError(422, 'SCREENSHOT_INCOMPLETE',
+                  'Your rating screenshot appears to be cropped or incomplete. ' +
+                  'Please upload a FULL screenshot showing the complete review page including the page header and account name. ' +
+                  (ratingAiResult.discrepancyNote || ''));
+              }
             }
           }
 
@@ -1267,6 +1377,7 @@ export function makeOrdersController(env: Env) {
             updateData.ratingAiVerification = {
               accountNameMatch: ratingAiResult.accountNameMatch,
               productNameMatch: ratingAiResult.productNameMatch,
+              screenshotCropped: ratingAiResult.screenshotCropped,
               detectedAccountName: ratingAiResult.detectedAccountName,
               detectedProductName: ratingAiResult.detectedProductName,
               confidenceScore: ratingAiResult.confidenceScore,
@@ -1282,6 +1393,7 @@ export function makeOrdersController(env: Env) {
               metadata: {
                 accountNameMatch: ratingAiResult.accountNameMatch,
                 productNameMatch: ratingAiResult.productNameMatch,
+                screenshotCropped: ratingAiResult.screenshotCropped,
                 confidenceScore: ratingAiResult.confidenceScore,
                 detectedAccountName: ratingAiResult.detectedAccountName,
                 detectedProductName: ratingAiResult.detectedProductName,
@@ -1359,6 +1471,13 @@ export function makeOrdersController(env: Env) {
                   'Please upload a screenshot from the correct marketplace account. ' +
                   (returnWindowResult.discrepancyNote || ''));
               }
+              // Hard-block 5: Screenshot must not be cropped/incomplete
+              if (returnWindowResult && returnWindowResult.screenshotCropped === true) {
+                throw new AppError(422, 'SCREENSHOT_INCOMPLETE',
+                  'Your return window screenshot appears to be cropped or incomplete. ' +
+                  'Please upload a FULL screenshot showing the complete delivery/return page including the page header. ' +
+                  (returnWindowResult.discrepancyNote || ''));
+              }
               // Return window open/closed, amount — stored for mediator review, NOT blocking
             }
           }
@@ -1379,6 +1498,7 @@ export function makeOrdersController(env: Env) {
                 amountMatch: returnWindowResult.amountMatch,
                 soldByMatch: returnWindowResult.soldByMatch,
                 reviewerNameMatch: returnWindowResult.reviewerNameMatch,
+                screenshotCropped: returnWindowResult.screenshotCropped,
                 confidenceScore: returnWindowResult.confidenceScore,
               },
             });
@@ -1442,6 +1562,13 @@ export function makeOrdersController(env: Env) {
                   'Please upload a screenshot from the correct platform. ' +
                   (aiOrderVerification.discrepancyNote || ''));
               }
+              // Block re-upload if screenshot is cropped/incomplete (fraud prevention)
+              if (aiOrderVerification && aiOrderVerification.screenshotCropped === true) {
+                throw new AppError(422, 'SCREENSHOT_INCOMPLETE',
+                  'Your order screenshot appears to be cropped or incomplete. ' +
+                  'Please upload a FULL screenshot showing the complete order page including the page header. ' +
+                  (aiOrderVerification.discrepancyNote || ''));
+              }
             }
           }
 
@@ -1454,6 +1581,7 @@ export function makeOrdersController(env: Env) {
               amountMatch: aiOrderVerification.amountMatch,
               productNameMatch: aiOrderVerification.productNameMatch,
               platformMatch: aiOrderVerification.platformMatch,
+              screenshotCropped: aiOrderVerification.screenshotCropped,
               detectedOrderId: aiOrderVerification.detectedOrderId,
               detectedAmount: aiOrderVerification.detectedAmount,
               detectedProductName: aiOrderVerification.detectedProductName,
@@ -1482,6 +1610,7 @@ export function makeOrdersController(env: Env) {
                 amountMatch: aiOrderVerification.amountMatch,
                 productNameMatch: aiOrderVerification.productNameMatch,
                 platformMatch: aiOrderVerification.platformMatch,
+                screenshotCropped: aiOrderVerification.screenshotCropped,
                 confidenceScore: aiOrderVerification.confidenceScore,
                 detectedPlatform: aiOrderVerification.detectedPlatform,
                 verificationMethod: aiOrderVerification.verificationMethod,
@@ -1576,19 +1705,19 @@ export function makeOrdersController(env: Env) {
           try {
             const privilegedRoles: Role[] = ['admin', 'ops'];
             const managerCode = String(order.managerName || '').trim();
-            const mediatorUser = managerCode
-              ? await db().user.findFirst({
-                where: { roles: { has: 'mediator' as any }, mediatorCode: managerCode, isDeleted: false },
-                select: { parentCode: true },
-              })
-              : null;
-            const upstreamAgencyCode = String(mediatorUser?.parentCode || '').trim();
-            const [orderUser, brandUser] = await Promise.all([
+            const [mediatorUser, orderUser, brandUser] = await Promise.all([
+              managerCode
+                ? db().user.findFirst({
+                  where: { roles: { has: 'mediator' as any }, mediatorCode: managerCode, isDeleted: false },
+                  select: { parentCode: true },
+                })
+                : null,
               db().user.findUnique({ where: { id: order.userId }, select: { mongoId: true } }),
               order.brandUserId
                 ? db().user.findUnique({ where: { id: order.brandUserId }, select: { mongoId: true } })
                 : null,
             ]);
+            const upstreamAgencyCode = String(mediatorUser?.parentCode || '').trim();
             const audience = {
               roles: privilegedRoles,
               userIds: [orderUser?.mongoId ?? '', brandUser?.mongoId ?? ''].filter(Boolean),
@@ -1613,7 +1742,7 @@ export function makeOrdersController(env: Env) {
           // ── Auto-verify by AI confidence (submitClaim, already UNDER_REVIEW) ──
           // Any proof that passed AI hard-block validation (confidence > 0) is auto-verified.
           const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
-          if (claimAiConfidence > 0 && refreshed) {
+          if (claimAiConfidence >= autoThreshold && refreshed) {
             refreshed = await autoVerifyStep(refreshed, body.type, claimAiConfidence, autoThreshold, env);
           }
 
@@ -1623,19 +1752,19 @@ export function makeOrdersController(env: Env) {
           try {
             const privilegedRoles: Role[] = ['admin', 'ops'];
             const managerCode = String(order.managerName || '').trim();
-            const mediatorUser = managerCode
-              ? await db().user.findFirst({
-                where: { roles: { has: 'mediator' as any }, mediatorCode: managerCode, isDeleted: false },
-                select: { parentCode: true },
-              })
-              : null;
-            const upstreamAgencyCode = String(mediatorUser?.parentCode || '').trim();
-            const [orderUser, brandUser] = await Promise.all([
+            const [mediatorUser, orderUser, brandUser] = await Promise.all([
+              managerCode
+                ? db().user.findFirst({
+                  where: { roles: { has: 'mediator' as any }, mediatorCode: managerCode, isDeleted: false },
+                  select: { parentCode: true },
+                })
+                : null,
               db().user.findUnique({ where: { id: order.userId }, select: { mongoId: true } }),
               order.brandUserId
                 ? db().user.findUnique({ where: { id: order.brandUserId }, select: { mongoId: true } })
                 : null,
             ]);
+            const upstreamAgencyCode = String(mediatorUser?.parentCode || '').trim();
             const audience = {
               roles: privilegedRoles,
               userIds: [orderUser?.mongoId ?? '', brandUser?.mongoId ?? ''].filter(Boolean),
@@ -1689,21 +1818,20 @@ export function makeOrdersController(env: Env) {
         try {
         const privilegedRoles: Role[] = ['admin', 'ops'];
         const managerCode = String(order.managerName || '').trim();
-        const mediatorUser = managerCode
-          ? await db().user.findFirst({
-            where: { roles: { has: 'mediator' as any }, mediatorCode: managerCode, isDeleted: false },
-            select: { parentCode: true },
-          })
-          : null;
-        const upstreamAgencyCode = String(mediatorUser?.parentCode || '').trim();
-
-        // Resolve mongoIds for realtime audience — parallel lookups
-        const [orderUser, brandUser] = await Promise.all([
+        // Parallelize all user lookups — mediator, order owner, brand user
+        const [mediatorUser, orderUser, brandUser] = await Promise.all([
+          managerCode
+            ? db().user.findFirst({
+              where: { roles: { has: 'mediator' as any }, mediatorCode: managerCode, isDeleted: false },
+              select: { parentCode: true },
+            })
+            : null,
           db().user.findUnique({ where: { id: order.userId }, select: { mongoId: true } }),
           order.brandUserId
             ? db().user.findUnique({ where: { id: order.brandUserId }, select: { mongoId: true } })
             : null,
         ]);
+        const upstreamAgencyCode = String(mediatorUser?.parentCode || '').trim();
 
         const audience = {
           roles: privilegedRoles,

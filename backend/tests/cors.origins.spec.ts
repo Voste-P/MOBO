@@ -21,7 +21,7 @@ describe('CORS origin enforcement', () => {
       .set('Origin', 'https://evil.example');
 
     expect(res.status).toBe(403);
-    expect(res.body).toMatchObject({ error: 'origin_not_allowed' });
+    expect(res.body).toMatchObject({ error: { code: 'ORIGIN_NOT_ALLOWED' } });
   });
 
   it('allows requests with an allowed Origin header', async () => {

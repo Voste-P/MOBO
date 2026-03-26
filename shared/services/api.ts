@@ -6,6 +6,9 @@ import { isNetworkError, isTimeoutError, httpStatusToFriendlyMessage } from '../
 // Real API Base URL
 const API_URL = getApiBaseUrl();
 
+/** Tracks whether the server has responded at least once this session (skip redundant warmups). */
+let _serverWarmedUp = false;
+
 /**
  * Extract a plain array from an API response that may be a paginated envelope
  * `{ data: T[] }` or a plain `T[]`.  Always returns a safe array.
@@ -16,6 +19,37 @@ export function asArray<T = any>(response: unknown): T[] {
     return (response as any).data;
   }
   return [];
+}
+
+/** Pagination metadata extracted from a paginated envelope */
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+/**
+ * Extract pagination metadata from an API response envelope.
+ * Returns null if the response is a plain array (no pagination info).
+ */
+export function extractPaginationMeta(response: unknown): PaginationMeta | null {
+  if (
+    response &&
+    typeof response === 'object' &&
+    !Array.isArray(response) &&
+    'total' in (response as any) &&
+    'page' in (response as any)
+  ) {
+    const r = response as any;
+    return {
+      total: Number(r.total) || 0,
+      page: Number(r.page) || 1,
+      limit: Number(r.limit) || 50,
+      totalPages: Number(r.totalPages) || 1,
+    };
+  }
+  return null;
 }
 
 export const TOKEN_STORAGE_KEY = 'mobo_tokens_v1';
@@ -176,6 +210,7 @@ function toErrorFromPayload(payload: any, fallback: string): Error {
   const message =
     payload?.error?.message ||
     payload?.message ||
+    (typeof payload?.error === 'string' ? payload.error : null) ||
     (typeof payload === 'string' ? payload : null) ||
     fallback;
   const err = new Error(maybeFixMojibake(String(message)));
@@ -280,7 +315,111 @@ function wrapFetchError(err: unknown): never {
   throw err;
 }
 
+// Deduplication map: concurrent identical GET requests share one in-flight promise
+const inflightGets = new Map<string, Promise<any>>();
+
+// --- GET Response Cache with TTL + LRU eviction ---
+// Prevents redundant network calls when switching tabs or rapid navigation.
+// Default TTL: 5 seconds. Automatically invalidated on any mutation.
+// LRU eviction when capacity exceeded (promotes on read, evicts least-recently-accessed).
+interface GETCacheEntry { data: any; expiresAt: number }
+const getCache = new Map<string, GETCacheEntry>();
+const GET_CACHE_TTL_MS = 5_000;
+const GET_CACHE_MAX = 200;
+
+function getCachedResponse(path: string): any | undefined {
+  const entry = getCache.get(path);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) { getCache.delete(path); return undefined; }
+  // LRU promotion: move to end of Map iteration order
+  getCache.delete(path);
+  getCache.set(path, entry);
+  return entry.data;
+}
+
+function cacheResponse(path: string, data: any) {
+  getCache.set(path, { data, expiresAt: Date.now() + GET_CACHE_TTL_MS });
+  // Evict least-recently-used entry when over capacity
+  if (getCache.size > GET_CACHE_MAX) {
+    const first = getCache.keys().next().value;
+    if (first) getCache.delete(first);
+  }
+}
+
+// Periodic cleanup of expired entries (every 30s)
+if (typeof window !== 'undefined') {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of getCache) {
+      if (now > entry.expiresAt) getCache.delete(key);
+    }
+  }, 30_000);
+}
+
+/** Invalidate GET cache. Called automatically on mutations. */
+export function invalidateGetCache(pathPrefix?: string) {
+  if (!pathPrefix) { getCache.clear(); return; }
+  for (const key of getCache.keys()) {
+    if (key.startsWith(pathPrefix)) getCache.delete(key);
+  }
+}
+
+/**
+ * Derive which cache prefixes a mutation path affects.
+ * Returns an array of path prefixes to invalidate.
+ * This prevents a profile update from nuking the products/orders cache.
+ */
+function mutationCachePrefixes(path: string): string[] | null {
+  // Extract the first path segment: /auth/profile → 'auth'
+  const seg = path.split('/').filter(Boolean)[0];
+  if (!seg) return null; // fallback: clear all
+  // Map mutation paths to the cache prefixes they can affect
+  const scopeMap: Record<string, string[]> = {
+    auth:          ['/auth'],
+    orders:        ['/orders', '/ops', '/brand', '/admin'],
+    products:      ['/products'],
+    brand:         ['/brand', '/products'],
+    ops:           ['/ops', '/products', '/orders'],
+    admin:         ['/admin', '/auth'],
+    tickets:       ['/tickets'],
+    invites:       ['/invites'],
+    notifications: ['/notifications'],
+    ai:            ['/ai', '/orders'],
+    sheets:        [],
+    google:        [],
+    media:         [],
+  };
+  return scopeMap[seg] ?? null; // null = unknown → clear all
+}
+
 async function fetchJson(path: string, init?: RequestInit): Promise<any> {
+  const method = (init?.method || 'GET').toUpperCase();
+  if (method === 'GET') {
+    // 1. Check response cache (TTL-based, serves instant data for rapid tab switches)
+    const cached = getCachedResponse(path);
+    if (cached !== undefined) return cached;
+    // 2. Deduplicate concurrent in-flight GET requests
+    const dedup = inflightGets.get(path);
+    if (dedup) return dedup;
+    // 3. Network request → cache result on success
+    const promise = fetchJsonInner(path, init).then(data => {
+      cacheResponse(path, data);
+      return data;
+    }).finally(() => { inflightGets.delete(path); });
+    inflightGets.set(path, promise);
+    return promise;
+  }
+  // Semantic cache invalidation: only clear cache entries related to the mutated resource
+  const prefixes = mutationCachePrefixes(path);
+  if (prefixes === null) {
+    getCache.clear(); // unknown path — full clear for safety
+  } else {
+    for (const p of prefixes) invalidateGetCache(p);
+  }
+  return fetchJsonInner(path, init);
+}
+
+async function fetchJsonInner(path: string, init?: RequestInit): Promise<any> {
   assertOnlineForWrite(init);
   const res = await fetchWithRetry(`${API_URL}${path}`, withRequestId(init));
   const payload = await readPayloadSafe(res);
@@ -320,6 +459,13 @@ async function fetchJson(path: string, init?: RequestInit): Promise<any> {
 }
 
 async function fetchOk(path: string, init?: RequestInit): Promise<void> {
+  // Semantic cache invalidation: only clear cache entries related to the mutated resource
+  const prefixes = mutationCachePrefixes(path);
+  if (prefixes === null) {
+    getCache.clear();
+  } else {
+    for (const p of prefixes) invalidateGetCache(p);
+  }
   assertOnlineForWrite(init);
   const res = await fetchWithRetry(`${API_URL}${path}`, withRequestId(init));
   const payload = await readPayloadSafe(res);
@@ -520,18 +666,23 @@ export const api = {
     },
   },
   products: {
-    getAll: async (mediatorCode?: string) => {
-      const query = mediatorCode ? `?mediatorCode=${encodeURIComponent(mediatorCode)}` : '';
-      const data = await fetchJson(`/products${query}`, {
+    getAll: async (mediatorCode?: string, page = 1, limit = 50) => {
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      if (mediatorCode) params.set('mediatorCode', mediatorCode);
+      const data = await fetchJson(`/products?${params}`, {
         headers: { ...authHeaders() },
       });
-      return Array.isArray(data) ? data : [];
+      // Backend returns paginated envelope { data: [...] } when page/limit are sent.
+      // Use asArray-compatible unwrap so callers get the actual deals array.
+      if (Array.isArray(data)) return data;
+      if (data && typeof data === 'object' && Array.isArray((data as any).data)) return (data as any).data;
+      return [];
     },
   },
   orders: {
     /** [FIX] Added missing getUserOrders for Chatbot and Orders components */
-    getUserOrders: async (userId: string) => {
-      return fetchJson(`/orders/user/${encodeURIComponent(userId)}`, {
+    getUserOrders: async (userId: string, page = 1, limit = 50) => {
+      return fetchJson(`/orders/user/${encodeURIComponent(userId)}?page=${page}&limit=${limit}`, {
         headers: { ...authHeaders() },
       });
     },
@@ -577,12 +728,15 @@ export const api = {
       // Render free tier spins down after 15min idle; cold start takes 15-30s.
       // Wake the server FIRST with a lightweight health check, so extraction
       // doesn't waste its timeout budget waiting for the container to start.
-      try {
-        const warmupCtrl = new AbortController();
-        const warmupTimer = setTimeout(() => warmupCtrl.abort(), 40_000);
-        await fetch(`${API_URL}/health`, { signal: warmupCtrl.signal, method: 'GET' }).catch(() => {});
-        clearTimeout(warmupTimer);
-      } catch { /* ignore — extraction will retry anyway */ }
+      if (!_serverWarmedUp) {
+        try {
+          const warmupCtrl = new AbortController();
+          const warmupTimer = setTimeout(() => warmupCtrl.abort(), 40_000);
+          await fetch(`${API_URL}/health`, { signal: warmupCtrl.signal, method: 'GET' }).catch(() => {});
+          clearTimeout(warmupTimer);
+          _serverWarmedUp = true;
+        } catch { /* ignore — extraction will retry anyway */ }
+      }
 
       // --- EXTRACTION WITH AUTO-RETRY ---
       // Attempt extraction up to 2 times. First attempt has generous 60s timeout.
@@ -621,7 +775,7 @@ export const api = {
       }
     },
     /** Pre-validate rating screenshot: checks account name + product name match */
-    verifyRating: async (file: File, expectedBuyerName: string, expectedProductName: string, expectedReviewerName?: string, orderId?: string) => {
+    verifyRating: async (file: File, expectedBuyerName: string, expectedProductName: string, expectedReviewerName?: string, orderId?: string, signal?: AbortSignal) => {
       const rawBase64 = await readFileAsDataUrl(file);
       // Compress before sending to stay under Vercel proxy body limit.
       const compressed = await compressImage(rawBase64, { maxDimension: 1600, quality: 0.8 });
@@ -629,16 +783,18 @@ export const api = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ imageBase64: compressed, expectedBuyerName, expectedProductName, ...(expectedReviewerName ? { expectedReviewerName } : {}), ...(orderId ? { orderId } : {}) }),
+        ...(signal ? { signal } : {}),
       });
     },
     /** Pre-validate return window screenshot: checks order ID, product, amount, seller, return window closed */
-    verifyReturnWindow: async (file: File, expectedOrderId: string, expectedProductName: string, expectedAmount: number, expectedSoldBy?: string, expectedReviewerName?: string) => {
+    verifyReturnWindow: async (file: File, expectedOrderId: string, expectedProductName: string, expectedAmount: number, expectedSoldBy?: string, expectedReviewerName?: string, signal?: AbortSignal) => {
       const rawBase64 = await readFileAsDataUrl(file);
       const compressed = await compressImage(rawBase64, { maxDimension: 1600, quality: 0.8 });
       return fetchJson('/ai/verify-return-window', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ imageBase64: compressed, expectedOrderId, expectedProductName, expectedAmount, ...(expectedSoldBy ? { expectedSoldBy } : {}), ...(expectedReviewerName ? { expectedReviewerName } : {}) }),
+        ...(signal ? { signal } : {}),
       });
     },
   },
@@ -674,47 +830,46 @@ export const api = {
   },
   ops: {
     /** [FIX] Expanded ops object with all methods used by MediatorDashboard and AgencyDashboard */
-    getMediators: async (agencyCode: string, opts?: { search?: string }) => {
-      const params = new URLSearchParams({ agencyCode });
+    getMediators: async (agencyCode: string, opts?: { search?: string; page?: number; limit?: number }) => {
+      const params = new URLSearchParams({ agencyCode, page: String(opts?.page || 1), limit: String(opts?.limit || 50) });
       if (opts?.search) params.set('search', opts.search);
       return fetchJson(`/ops/mediators?${params}`, {
         headers: { ...authHeaders() },
       });
     },
-    getCampaigns: async (mediatorCode?: string) => {
-      const query = mediatorCode ? `?mediatorCode=${encodeURIComponent(mediatorCode)}` : '';
-      return fetchJson(`/ops/campaigns${query}`, {
+    getCampaigns: async (mediatorCode?: string, page = 1, limit = 50) => {
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      if (mediatorCode) params.set('mediatorCode', mediatorCode);
+      return fetchJson(`/ops/campaigns?${params}`, {
         headers: { ...authHeaders() },
       });
     },
-    getDeals: async (mediatorCode: string, role?: string) => {
-      const query = role
-        ? `?mediatorCode=${encodeURIComponent(mediatorCode)}&role=${encodeURIComponent(role)}`
-        : `?mediatorCode=${encodeURIComponent(mediatorCode)}`;
-      return fetchJson(`/ops/deals${query}`, {
+    getDeals: async (mediatorCode: string, role?: string, page = 1, limit = 50) => {
+      const params = new URLSearchParams({ mediatorCode, page: String(page), limit: String(limit) });
+      if (role) params.set('role', role);
+      return fetchJson(`/ops/deals?${params}`, {
         headers: { ...authHeaders() },
       });
     },
-    getMediatorOrders: async (mediatorCode: string, role?: string) => {
-      const query = role
-        ? `?mediatorCode=${encodeURIComponent(mediatorCode)}&role=${encodeURIComponent(role)}`
-        : `?mediatorCode=${encodeURIComponent(mediatorCode)}`;
-      return fetchJson(`/ops/orders${query}`, {
+    getMediatorOrders: async (mediatorCode: string, role?: string, page = 1, limit = 50) => {
+      const params = new URLSearchParams({ mediatorCode, page: String(page), limit: String(limit) });
+      if (role) params.set('role', role);
+      return fetchJson(`/ops/orders?${params}`, {
         headers: { ...authHeaders() },
       });
     },
-    getPendingUsers: async (code: string) => {
-      return fetchJson(`/ops/users/pending?code=${encodeURIComponent(code)}`, {
+    getPendingUsers: async (code: string, page = 1, limit = 50) => {
+      return fetchJson(`/ops/users/pending?code=${encodeURIComponent(code)}&page=${page}&limit=${limit}`, {
         headers: { ...authHeaders() },
       });
     },
-    getVerifiedUsers: async (code: string) => {
-      return fetchJson(`/ops/users/verified?code=${encodeURIComponent(code)}`, {
+    getVerifiedUsers: async (code: string, page = 1, limit = 50) => {
+      return fetchJson(`/ops/users/verified?code=${encodeURIComponent(code)}&page=${page}&limit=${limit}`, {
         headers: { ...authHeaders() },
       });
     },
-    getAgencyLedger: async () => {
-      return fetchJson('/ops/ledger', {
+    getAgencyLedger: async (page = 1, limit = 50) => {
+      return fetchJson(`/ops/ledger?page=${page}&limit=${limit}`, {
         headers: { ...authHeaders() },
       });
     },
@@ -857,12 +1012,13 @@ export const api = {
       dealType?: string,
       price?: number,
       payout?: number,
-      commission?: number
+      commission?: number,
+      openToAll?: boolean
     ) => {
       await fetchOk('/ops/campaigns/assign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ id, assignments, dealType, price, payout, commission }),
+        body: JSON.stringify({ id, assignments, dealType, price, payout, commission, openToAll }),
       });
     },
     publishDeal: async (id: string, commission: number | undefined, mediatorCode: string) => {
@@ -911,23 +1067,23 @@ export const api = {
   },
   /** [FIX] Added missing brand object used in BrandDashboard.tsx */
   brand: {
-    getConnectedAgencies: async (brandId: string) => {
-      return fetchJson(`/brand/agencies?brandId=${encodeURIComponent(brandId)}`, {
+    getConnectedAgencies: async (brandId: string, page = 1, limit = 50) => {
+      return fetchJson(`/brand/agencies?brandId=${encodeURIComponent(brandId)}&page=${page}&limit=${limit}`, {
         headers: { ...authHeaders() },
       });
     },
-    getBrandCampaigns: async (brandId: string) => {
-      return fetchJson(`/brand/campaigns?brandId=${encodeURIComponent(brandId)}`, {
+    getBrandCampaigns: async (brandId: string, page = 1, limit = 50) => {
+      return fetchJson(`/brand/campaigns?brandId=${encodeURIComponent(brandId)}&page=${page}&limit=${limit}`, {
         headers: { ...authHeaders() },
       });
     },
-    getBrandOrders: async (brandName: string) => {
-      return fetchJson(`/brand/orders?brandName=${encodeURIComponent(brandName)}&limit=500`, {
+    getBrandOrders: async (brandName: string, page = 1, limit = 50) => {
+      return fetchJson(`/brand/orders?brandName=${encodeURIComponent(brandName)}&page=${page}&limit=${limit}`, {
         headers: { ...authHeaders() },
       });
     },
-    getTransactions: async (brandId: string) => {
-      return fetchJson(`/brand/transactions?brandId=${encodeURIComponent(brandId)}`, {
+    getTransactions: async (brandId: string, page = 1, limit = 50) => {
+      return fetchJson(`/brand/transactions?brandId=${encodeURIComponent(brandId)}&page=${page}&limit=${limit}`, {
         headers: { ...authHeaders() },
       });
     },
@@ -987,8 +1143,10 @@ export const api = {
         headers: { ...authHeaders() },
       }),
     /** [FIX] Updated getUsers to accept an optional role argument for AdminPortal.tsx */
-    getUsers: async (role: string = 'all', opts?: { search?: string; status?: string }) => {
+    getUsers: async (role: string = 'all', opts?: { search?: string; status?: string; page?: number; limit?: number }) => {
       const params = new URLSearchParams({ role });
+      if (opts?.page) params.set('page', String(opts.page));
+      if (opts?.limit) params.set('limit', String(opts.limit));
       if (opts?.search) params.set('search', opts.search);
       if (opts?.status) params.set('status', opts.status);
       return fetchJson(`/admin/users?${params}`, {
@@ -996,16 +1154,20 @@ export const api = {
       });
     },
     /** [FIX] Added missing admin methods used in AdminPortal.tsx */
-    getFinancials: async (opts?: { status?: string }) => {
+    getFinancials: async (opts?: { status?: string; page?: number; limit?: number }) => {
       const params = new URLSearchParams();
+      if (opts?.page) params.set('page', String(opts.page));
+      if (opts?.limit) params.set('limit', String(opts.limit));
       if (opts?.status) params.set('status', opts.status);
       const qs = params.toString();
       return fetchJson(`/admin/financials${qs ? '?' + qs : ''}`, {
         headers: { ...authHeaders() },
       });
     },
-    getProducts: async (opts?: { search?: string; active?: string }) => {
+    getProducts: async (opts?: { search?: string; active?: string; page?: number; limit?: number }) => {
       const params = new URLSearchParams();
+      if (opts?.page) params.set('page', String(opts.page));
+      if (opts?.limit) params.set('limit', String(opts.limit));
       if (opts?.search) params.set('search', opts.search);
       if (opts?.active) params.set('active', opts.active);
       const qs = params.toString();
@@ -1023,10 +1185,15 @@ export const api = {
       fetchJson('/admin/growth', {
         headers: { ...authHeaders() },
       }),
-    getInvites: async () =>
-      fetchJson('/admin/invites', {
+    getInvites: async (opts?: { page?: number; limit?: number }) => {
+      const params = new URLSearchParams();
+      if (opts?.page) params.set('page', String(opts.page));
+      if (opts?.limit) params.set('limit', String(opts.limit));
+      const qs = params.toString();
+      return fetchJson(`/admin/invites${qs ? '?' + qs : ''}`, {
         headers: { ...authHeaders() },
-      }),
+      });
+    },
     getConfig: async () =>
       fetchJson('/admin/config', {
         headers: { ...authHeaders() },
@@ -1085,10 +1252,16 @@ export const api = {
   },
   /** [FIX] Added missing tickets object used across various dashboards */
   tickets: {
-    getAll: async () =>
-      fetchJson('/tickets', {
+    getAll: async (opts?: { page?: number; limit?: number; issueType?: string }) => {
+      const params = new URLSearchParams();
+      if (opts?.page) params.set('page', String(opts.page));
+      if (opts?.limit) params.set('limit', String(opts.limit));
+      if (opts?.issueType) params.set('issueType', opts.issueType);
+      const qs = params.toString();
+      return fetchJson(`/tickets${qs ? '?' + qs : ''}`, {
         headers: { ...authHeaders() },
-      }),
+      });
+    },
     getIssueTypes: async () =>
       fetchJson('/tickets/issue-types', {
         headers: { ...authHeaders() },

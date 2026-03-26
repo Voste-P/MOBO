@@ -60,7 +60,7 @@ export const ZoomableImage: React.FC<{
   }, []);
 
   const defaultClass =
-    'w-full h-auto rounded-xl max-h-[60vh] object-contain border border-slate-100';
+    'w-full h-auto rounded-xl max-h-[60dvh] object-contain border border-slate-100';
 
   return (
     <>

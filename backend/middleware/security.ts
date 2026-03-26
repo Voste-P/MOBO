@@ -142,9 +142,12 @@ export function securityAuditMiddleware() {
       }
     }
 
-    // Phase 2: Log suspicious-but-not-conclusive patterns for audit
-    for (const source of sources) {
-      checkObjectForSuspiciousPatterns(source.data, source.label, req, res);
+    // Phase 2: Log suspicious-but-not-conclusive patterns — only on mutating requests
+    // GET/HEAD/OPTIONS carry minimal injection risk; skip expensive traversal for them
+    if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+      for (const source of sources) {
+        checkObjectForSuspiciousPatterns(source.data, source.label, req, res);
+      }
     }
 
     next();

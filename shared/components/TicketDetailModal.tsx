@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Loader2, Send, MessageCircle, ArrowUpCircle, RotateCcw, CheckCircle2, XCircle, Trash2 } from 'lucide-react';
 import { api } from '../services/api';
+import { subscribeRealtime } from '../services/realtime';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
@@ -94,11 +95,18 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
     }
   }, [open, ticket, loadComments]);
 
-  // Auto-poll comments every 30 seconds when modal is open
+  // Realtime: refresh comments on tickets.changed (no polling — SSE handles updates)
   useEffect(() => {
     if (!open || !ticket) return;
-    const interval = setInterval(loadComments, 30000);
-    return () => clearInterval(interval);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const unsub = subscribeRealtime((msg) => {
+      if (msg.type === 'tickets.changed') {
+        // Debounce rapid SSE bursts
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => { timer = null; loadComments(); }, 600);
+      }
+    });
+    return () => { unsub(); if (timer) clearTimeout(timer); };
   }, [open, ticket, loadComments]);
 
   useEffect(() => {
@@ -188,7 +196,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
       onClick={onClose}
     >
       <div
-        className="bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[85vh] animate-slide-up"
+        className="bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[85dvh] animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

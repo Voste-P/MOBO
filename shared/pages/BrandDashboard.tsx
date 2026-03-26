@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { getDirectBackendUrl } from '../utils/apiBaseUrl';
 import { maskMobile } from '../utils/mobiles';
 import { formatErrorMessage } from '../utils/errors';
@@ -58,7 +58,7 @@ import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 import { User, Campaign, Order, Ticket } from '../types';
-import { EmptyState, Spinner } from '../components/ui';
+import { EmptyState, Spinner, Pagination } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
 import TicketDetailModal from '../components/TicketDetailModal';
@@ -178,16 +178,18 @@ const BrandProfileView = () => {
   });
   const [avatar, setAvatar] = useState(user?.avatar);
 
+  const prevUserIdRef = useRef(user?.id);
   useEffect(() => {
-    if (user) {
-      setForm({
-        name: user.name || '',
-        mobile: user.mobile || '',
-        email: user.email || '',
-      });
-      setAvatar(user.avatar);
-    }
-  }, [user]);
+    if (!user) return;
+    if (prevUserIdRef.current === user.id) return;
+    prevUserIdRef.current = user.id;
+    setForm({
+      name: user.name || '',
+      mobile: user.mobile || '',
+      email: user.email || '',
+    });
+    setAvatar(user.avatar);
+  }, [user?.id]);
 
   const handleSave = async () => {
     setLoading(true);
@@ -593,9 +595,8 @@ const DashboardView = ({
   );
 };
 
-const OrdersView = ({ user }: any) => {
+const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean }) => {
   const { toast } = useToast();
-  const [orders, setOrders] = useState<Order[]>([]);
   const [viewProofOrder, setViewProofOrder] = useState<Order | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
@@ -603,8 +604,9 @@ const OrdersView = ({ user }: any) => {
   const [mediatorFilter, setMediatorFilter] = useState<string>('All');
   const [productFilter, setProductFilter] = useState<string>('All');
   const [orderViewMode, setOrderViewMode] = useState<'orders' | 'orderSheet' | 'financeSheet'>('orders');
-  const [isLoading, setIsLoading] = useState(true);
   const [sheetsExporting, setSheetsExporting] = useState(false);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const ORDERS_PER_PAGE = 25;
 
   const getOrderStatusBadge = (o: Order) => {
     const wf = String(o.workflowStatus || '').trim();
@@ -633,50 +635,14 @@ const OrdersView = ({ user }: any) => {
     );
   };
 
-  const fetchOrders = async () => {
-    setIsLoading(true);
-    try {
-      const data = await api.brand.getBrandOrders(user.name);
-      const safeData = asArray<Order>(data);
-      setOrders(safeData);
-      // Keep proof modal in sync with refreshed data
-      setViewProofOrder((prev) => {
-        if (!prev) return prev;
-        const updated = safeData.find((o: Order) => o.id === prev.id);
-        return updated || null;
-      });
-    } catch (err) {
-      console.error('Failed to fetch orders', err);
-      toast.error('Failed to load orders');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Sync viewProofOrder when parent orders update
   useEffect(() => {
-    fetchOrders();
-  }, [user]);
-
-
-
-  // Real-time: refresh orders when any order/deal changes.
-  useEffect(() => {
-    let timer: any = null;
-    const schedule = () => {
-      if (timer) return;
-      timer = setTimeout(() => {
-        timer = null;
-        fetchOrders();
-      }, 700);
-    };
-    const unsub = subscribeRealtime((msg) => {
-      if (msg.type === 'orders.changed' || msg.type === 'deals.changed') schedule();
+    setViewProofOrder((prev) => {
+      if (!prev) return prev;
+      const updated = orders.find((o: Order) => o.id === prev.id);
+      return updated || null;
     });
-    return () => {
-      unsub();
-      if (timer) clearTimeout(timer);
-    };
-  }, [user]);
+  }, [orders]);
 
   // Unique mediators and products for filter dropdowns
   const mediatorOptions = useMemo(() => {
@@ -721,6 +687,12 @@ const OrdersView = ({ user }: any) => {
     }
     return textMatch;
   }), [orders, search, statusFilter, dealTypeFilter, mediatorFilter, productFilter]);
+
+  // Reset page when filters change
+  useEffect(() => { setOrdersPage(1); }, [search, statusFilter, dealTypeFilter, mediatorFilter, productFilter]);
+
+  const totalOrderPages = Math.max(1, Math.ceil(filtered.length / ORDERS_PER_PAGE));
+  const paginatedOrders = filtered.slice((ordersPage - 1) * ORDERS_PER_PAGE, ordersPage * ORDERS_PER_PAGE);
 
   const handleExport = async () => {
     if (filtered.length === 0) { toast.info('No orders to export'); return; }
@@ -1051,7 +1023,7 @@ const OrdersView = ({ user }: any) => {
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((o) => (
+                  paginatedOrders.map((o) => (
                     <tr key={o.id} className="hover:bg-zinc-50/50 transition-colors group">
                       <td className="p-6">
                         <div className="font-mono text-xs font-bold text-zinc-500">
@@ -1068,7 +1040,7 @@ const OrdersView = ({ user }: any) => {
                             />
                           </div>
                           <span className="text-sm font-bold text-zinc-900 line-clamp-1">
-                            {o.items[0]?.title || 'Unknown'}
+                            {o.items?.[0]?.title || 'Unknown'}
                           </span>
                         </div>
                       </td>
@@ -1133,7 +1105,7 @@ const OrdersView = ({ user }: any) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-50">
-                    {filtered.map((o) => (
+                    {paginatedOrders.map((o) => (
                       <tr key={o.id} className="hover:bg-zinc-50/50 transition-colors">
                         <td className="p-6">
                           <span className="font-mono text-xs font-bold text-zinc-500">{getPrimaryOrderId(o)}</span>
@@ -1198,9 +1170,9 @@ const OrdersView = ({ user }: any) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-50">
-                    {filtered.map((o, i) => (
+                    {paginatedOrders.map((o, i) => (
                       <tr key={o.id} className="hover:bg-zinc-50/50 transition-colors">
-                        <td className="p-6 text-xs font-mono text-zinc-400">{i + 1}</td>
+                        <td className="p-6 text-xs font-mono text-zinc-400">{(ordersPage - 1) * ORDERS_PER_PAGE + i + 1}</td>
                         <td className="p-6">
                           <span className="text-xs font-bold text-zinc-700">{o.agencyName || 'Direct'}</span>
                         </td>
@@ -1246,13 +1218,24 @@ const OrdersView = ({ user }: any) => {
         </div>
       </div>
 
+      {/* Pagination */}
+      {totalOrderPages > 1 && (
+        <Pagination
+          page={ordersPage}
+          totalPages={totalOrderPages}
+          total={filtered.length}
+          limit={ORDERS_PER_PAGE}
+          onPageChange={(p) => { setOrdersPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+        />
+      )}
+
       {viewProofOrder && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-enter"
           onClick={() => { setViewProofOrder(null); }}
         >
           <div
-            className="bg-white w-full max-w-lg rounded-[2rem] p-6 shadow-2xl relative flex flex-col max-h-[85vh] animate-enter"
+            className="bg-white w-full max-w-lg rounded-[2rem] p-6 shadow-2xl relative flex flex-col max-h-[90dvh] animate-enter"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -1472,7 +1455,7 @@ const OrdersView = ({ user }: any) => {
                       orderId={viewProofOrder.id}
                       proofType="returnWindow"
                       existingSrc={viewProofOrder.screenshots.returnWindow !== 'exists' ? viewProofOrder.screenshots.returnWindow : undefined}
-                      className="w-full h-auto max-h-[60vh] object-contain bg-zinc-50"
+                      className="w-full h-auto max-h-[60dvh] object-contain bg-zinc-50"
                       alt="Return Window proof"
                     />
                   </div>
@@ -1610,10 +1593,10 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
       setIsEditing(false);
       setEditingId(null);
       setForm(initialForm);
-      onRefresh();
+      onRefresh(['campaigns']);
     } catch (err) {
-      console.error('Failed to save campaign:', err);
-      toast.error('Failed to save campaign');
+      if (process.env.NODE_ENV !== 'production') console.error('Failed to save campaign:', err);
+      toast.error(formatErrorMessage(err, 'Failed to save campaign'));
     }
   };
 
@@ -1646,10 +1629,10 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
     try {
       await api.brand.updateCampaign(campaign.id, { status: next });
       toast.success(next === 'paused' ? 'Campaign paused' : 'Campaign resumed');
-      onRefresh();
+      onRefresh(['campaigns']);
     } catch (err) {
-      console.error('Failed to update campaign status:', err);
-      toast.error('Failed to update campaign status');
+      if (process.env.NODE_ENV !== 'production') console.error('Failed to update campaign status:', err);
+      toast.error(formatErrorMessage(err, 'Failed to update campaign status'));
     } finally {
       setStatusUpdatingId(null);
     }
@@ -1662,7 +1645,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
     try {
       await api.brand.deleteCampaign(campaign.id);
       toast.success('Campaign deleted');
-      onRefresh();
+      onRefresh(['campaigns']);
     } catch (err: any) {
       toast.error(formatErrorMessage(err, 'Failed to delete campaign'));
     } finally {
@@ -2159,7 +2142,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
                       try {
                         await api.brand.copyCampaign(c.id);
                         toast.success('Campaign copied as Draft — you can now edit it');
-                        onRefresh();
+                        onRefresh(['campaigns']);
                       } catch (err) {
                         toast.error(formatErrorMessage(err, 'Copy failed'));
                       } finally {
@@ -2211,62 +2194,126 @@ export const BrandDashboard: React.FC = () => {
   const [resolutionNote, setResolutionNote] = useState('');
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
-  const fetchData = async () => {
-    if (!user) return;
-    setIsDataLoading(true);
-    try {
-      const [camps, ags, ords, txns, tix] = await Promise.all([
-        api.brand.getBrandCampaigns(user.id),
-        api.brand.getConnectedAgencies(user.id),
-        api.brand.getBrandOrders(user.name),
-        api.brand.getTransactions(user.id),
-        api.tickets.getAll().catch(() => []),
-      ]);
-      setCampaigns(asArray(camps));
-      setAgencies(asArray(ags));
-      setOrders(asArray(ords));
-      setTransactions(asArray(txns));
-      setTickets(asArray<Ticket>(tix).filter((t: Ticket) => t.issueType !== 'Feedback'));
-    } catch (e) {
-      console.error('Dashboard data fetch failed', e);
-      toast.error('Failed to load dashboard data');
-    } finally {
-      setIsDataLoading(false);
+  const loadedRef = useRef<Set<string>>(new Set());
+  const inFlightRef = useRef<Set<string>>(new Set());
+  const lastFetchedAt = useRef<Record<string, number>>({});
+
+  const tabDataNeeds = useMemo<string[]>(() => {
+    switch (activeTab) {
+      case 'dashboard': return ['campaigns', 'agencies', 'orders'];
+      case 'campaigns': return ['campaigns'];
+      case 'orders': return ['orders'];
+      case 'agencies': return ['agencies', 'transactions'];
+      case 'requests': return ['agencies'];
+      case 'tickets': return ['tickets'];
+      case 'profile': return [];
+      default: return [];
     }
-  };
+  }, [activeTab]);
 
-  useEffect(() => {
-    fetchData();
-  }, [user]);
+  // Keep a ref so fetchData callback stays stable across tab switches
+  const tabDataNeedsRef = useRef(tabDataNeeds);
+  tabDataNeedsRef.current = tabDataNeeds;
 
-  // Realtime: refresh when orders/wallets/users change.
-  useEffect(() => {
+  const fetchData = useCallback(async (opts?: { force?: boolean; silent?: boolean; keys?: string[] }) => {
     if (!user) return;
-    let timer: any = null;
-    const schedule = () => {
-      if (timer) return;
+    const force = opts?.force ?? false;
+    const silent = opts?.silent ?? false;
+    const invalidateKeys = opts?.keys;
+
+    if (invalidateKeys) {
+      for (const k of invalidateKeys) loadedRef.current.delete(k);
+    }
+
+    const currentNeeds = tabDataNeedsRef.current;
+    if (force && !invalidateKeys) {
+      for (const k of currentNeeds) loadedRef.current.delete(k);
+    }
+    const needed = currentNeeds.filter((k) => !loadedRef.current.has(k) && !inFlightRef.current.has(k));
+    if (needed.length === 0) return;
+
+    for (const k of needed) inFlightRef.current.add(k);
+    if (!silent) setIsDataLoading(true);
+    try {
+      const promises: Promise<any>[] = [];
+      const keys: string[] = [];
+
+      if (needed.includes('campaigns')) { promises.push(api.brand.getBrandCampaigns(user.id)); keys.push('campaigns'); }
+      if (needed.includes('agencies')) { promises.push(api.brand.getConnectedAgencies(user.id)); keys.push('agencies'); }
+      if (needed.includes('orders')) { promises.push(api.brand.getBrandOrders(user.name)); keys.push('orders'); }
+      if (needed.includes('transactions')) { promises.push(api.brand.getTransactions(user.id)); keys.push('transactions'); }
+      if (needed.includes('tickets')) { promises.push(api.tickets.getAll().catch(() => [])); keys.push('tickets'); }
+
+      const results = await Promise.all(promises);
+      const now = Date.now();
+      keys.forEach((key, i) => {
+        loadedRef.current.add(key);
+        lastFetchedAt.current[key] = now;
+        switch (key) {
+          case 'campaigns': setCampaigns(asArray(results[i])); break;
+          case 'agencies': setAgencies(asArray(results[i])); break;
+          case 'orders': setOrders(asArray(results[i])); break;
+          case 'transactions': setTransactions(asArray(results[i])); break;
+          case 'tickets': setTickets(asArray<Ticket>(results[i]).filter((t: Ticket) => t.issueType !== 'Feedback')); break;
+        }
+      });
+    } catch (e) {
+      if (process.env.NODE_ENV !== 'production') console.error('Dashboard data fetch failed', e);
+      if (!silent) toast.error(formatErrorMessage(e, 'Failed to load dashboard data'));
+    } finally {
+      for (const k of needed) inFlightRef.current.delete(k);
+      if (inFlightRef.current.size === 0) setIsDataLoading(false);
+    }
+  }, [user?.id]);
+
+  // Trigger data load on tab change — only fetches keys not already cached
+  const prevTabRef = useRef(activeTab);
+  useEffect(() => {
+    const tabChanged = prevTabRef.current !== activeTab;
+    prevTabRef.current = activeTab;
+    fetchData({ silent: tabChanged });
+  }, [fetchData, activeTab]);
+
+  // Realtime: only invalidate data keys relevant to the SSE event, then refetch
+  useEffect(() => {
+    if (!user?.id) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const eventToKeys: Record<string, string[]> = {
+      'orders.changed': ['orders'],
+      'deals.changed': ['campaigns'],
+      'users.changed': ['agencies'],
+      'wallets.changed': ['transactions'],
+      'tickets.changed': ['tickets'],
+    };
+    const schedule = (keysToInvalidate: string[]) => {
+      if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        fetchData();
+        // Skip keys that were just fetched by an explicit refresh (prevents double-fetch)
+        const now = Date.now();
+        const stale = keysToInvalidate.filter(k => (now - (lastFetchedAt.current[k] || 0)) > 2000);
+        if (stale.length === 0) return;
+        // Always invalidate globally so other tabs see fresh data on next visit
+        for (const k of stale) loadedRef.current.delete(k);
+        // Only re-fetch if current tab actually needs these keys
+        const relevant = stale.filter(k => tabDataNeedsRef.current.includes(k));
+        if (relevant.length > 0) fetchData({ silent: true });
       }, 900);
     };
     const unsub = subscribeRealtime((msg) => {
-      if (
-        msg.type === 'orders.changed' ||
-        msg.type === 'users.changed' ||
-        msg.type === 'wallets.changed' ||
-        msg.type === 'deals.changed' ||
-        msg.type === 'notifications.changed' ||
-        msg.type === 'tickets.changed'
-      ) {
-        schedule();
-      }
+      const keys = eventToKeys[msg.type];
+      if (keys && keys.length > 0) schedule(keys);
     });
     return () => {
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [user]);
+  }, [user?.id, fetchData]);
+
+  const refreshData = useCallback((keys?: string[]) => {
+    if (keys) return fetchData({ keys });
+    return fetchData({ force: true });
+  }, [fetchData]);
 
   const handlePayout = async () => {
     if (!selectedAgency || !payoutAmount || !payoutRef || !user) return;
@@ -2286,7 +2333,7 @@ export const BrandDashboard: React.FC = () => {
       setPayoutAmount('');
       setPayoutRef('');
       setSelectedAgency(null);
-      fetchData();
+      fetchData({ keys: ['transactions'] });
     } catch (e) {
       toast.error(formatErrorMessage(e, 'Payment failed'));
     } finally {
@@ -2528,10 +2575,10 @@ export const BrandDashboard: React.FC = () => {
             agencies={agencies}
             user={user}
             loading={isDataLoading}
-            onRefresh={fetchData}
+            onRefresh={refreshData}
           />
         )}
-        {activeTab === 'orders' && <OrdersView user={user} />}
+        {activeTab === 'orders' && <OrdersView orders={orders} isLoading={isDataLoading} />}
         {activeTab === 'profile' && <BrandProfileView />}
         {activeTab === 'tickets' && (
           <div className="max-w-3xl mx-auto animate-enter pb-12">
@@ -2587,7 +2634,7 @@ export const BrandDashboard: React.FC = () => {
                 icon={<HelpCircle size={22} className="text-zinc-400" />}
               />
             ) : (
-              <div className="space-y-3 max-h-[65vh] overflow-y-auto scrollbar-styled">
+              <div className="space-y-3 max-h-[65dvh] overflow-y-auto scrollbar-styled">
                 {tickets.filter((t: Ticket) => {
                   if (ticketFilter !== 'All' && String(t.status) !== ticketFilter) return false;
                   if (ticketSearch.trim()) {
@@ -2650,7 +2697,7 @@ export const BrandDashboard: React.FC = () => {
                               try {
                                 await api.tickets.escalate(t.id);
                                 toast.success('Ticket escalated to admin.');
-                                fetchData();
+                                fetchData({ keys: ['tickets'] });
                               } catch (err: any) {
                                 toast.error(formatErrorMessage(err, 'Failed to escalate ticket.'));
                               }
@@ -2667,10 +2714,10 @@ export const BrandDashboard: React.FC = () => {
                             className="w-full px-2 py-1.5 text-xs rounded-lg border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
                           <div className="flex items-center gap-2">
                             <button type="button" onClick={async () => {
-                              try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData(); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
+                              try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
                             }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✓ Resolve</button>
                             <button type="button" onClick={async () => {
-                              try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData(); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
+                              try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
                             }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
                             <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
                               className="px-3 py-1 rounded-lg text-xs font-bold bg-zinc-100 text-zinc-500 hover:bg-zinc-200">Cancel</button>
@@ -2685,7 +2732,7 @@ export const BrandDashboard: React.FC = () => {
                               try {
                                 await api.tickets.update(t.id, 'Open');
                                 toast.success('Ticket reopened.');
-                                fetchData();
+                                fetchData({ keys: ['tickets'] });
                               } catch (err: any) {
                                 toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
                               }
@@ -2700,7 +2747,7 @@ export const BrandDashboard: React.FC = () => {
                               try {
                                 await api.tickets.delete(t.id);
                                 toast.success('Ticket deleted.');
-                                fetchData();
+                                fetchData({ keys: ['tickets'] });
                               } catch (err: any) {
                                 toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
                               }
@@ -2776,7 +2823,7 @@ export const BrandDashboard: React.FC = () => {
                         e.stopPropagation();
                         if (!user) return;
                         if (await confirmDialog({ message: 'Disconnect this Agency?', confirmLabel: 'Disconnect', variant: 'destructive' })) {
-                          api.brand.removeAgency(user.id, ag.mediatorCode!).then(fetchData).catch((err: any) => toast.error(formatErrorMessage(err, 'Failed to disconnect agency')));
+                          api.brand.removeAgency(user.id, ag.mediatorCode!).then(() => refreshData(['agencies'])).catch((err: any) => toast.error(formatErrorMessage(err, 'Failed to disconnect agency')));
                         }
                       }}
                       aria-label="Disconnect agency"
@@ -2939,10 +2986,10 @@ export const BrandDashboard: React.FC = () => {
                               (r: any) => r.agencyId !== req.agencyId
                             );
                             await updateUser({ pendingConnections: newPending });
-                            fetchData();
+                            fetchData({ keys: ['agencies'] });
                           } catch (e) {
-                            console.error('Failed to decline', e);
-                            toast.error('Failed to decline connection');
+                            if (process.env.NODE_ENV !== 'production') console.error('Failed to decline', e);
+                            toast.error(formatErrorMessage(e, 'Failed to decline connection'));
                           }
                         }}
                         className="flex-1 sm:flex-none px-6 py-2.5 bg-white text-zinc-600 rounded-xl font-bold text-xs border border-zinc-200 hover:bg-zinc-50 transition-colors"
@@ -2969,10 +3016,10 @@ export const BrandDashboard: React.FC = () => {
                               pendingConnections: newPending,
                               connectedAgencies: newConnected,
                             });
-                            fetchData();
+                            fetchData({ keys: ['agencies'] });
                           } catch (e) {
-                            console.error('Failed to approve', e);
-                            toast.error('Failed to approve connection');
+                            if (process.env.NODE_ENV !== 'production') console.error('Failed to approve', e);
+                            toast.error(formatErrorMessage(e, 'Failed to approve connection'));
                           }
                         }}
                         className="flex-1 sm:flex-none px-8 py-2.5 bg-zinc-900 text-white rounded-xl font-bold text-xs hover:bg-black shadow-lg transition-all active:scale-95"
@@ -2993,7 +3040,7 @@ export const BrandDashboard: React.FC = () => {
           onClick={() => setSelectedAgency(null)}
         >
           <div
-            className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl relative animate-enter flex flex-col max-h-[90vh]"
+            className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl relative animate-enter flex flex-col max-h-[90dvh]"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -3146,7 +3193,7 @@ export const BrandDashboard: React.FC = () => {
       open={!!selectedTicket}
       onClose={() => setSelectedTicket(null)}
       ticket={selectedTicket}
-      onRefresh={fetchData}
+      onRefresh={refreshData}
     />
     {BrandConfirmDialog}
     </>

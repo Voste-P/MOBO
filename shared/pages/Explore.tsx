@@ -1,32 +1,75 @@
-﻿import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { api } from '../services/api';
-import { subscribeRealtime } from '../services/realtime';
+﻿import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '../context/ToastContext';
-import { Product } from '../types';
 import { ProductCard } from '../components/ProductCard';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
+import { api, asArray, invalidateGetCache } from '../services/api';
+import { subscribeRealtime } from '../services/realtime';
 import { Search, AlertTriangle, ShoppingBag } from 'lucide-react';
 import { EmptyState, Input } from '../components/ui';
+import { Product } from '../types';
 
-export const Explore: React.FC = () => {
+export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) => {
   const { toast } = useToast();
-  const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedDealType, setSelectedDealType] = useState('All');
+  const [ticketOpen, setTicketOpen] = useState(false);
+
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
-  const silentSyncRef = useRef(false);
-  const [ticketOpen, setTicketOpen] = useState(false);
+  const loadingRef = useRef(false);
+
+  const loadProducts = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    setLoading(true);
+    setFetchError(false);
+    try {
+      const data = await api.products.getAll(undefined, 1, 200);
+      setProducts(asArray<Product>(data));
+    } catch {
+      setFetchError(true);
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+    }
+  }, []);
+
+  const loadedOnceRef = useRef(false);
+
+  useEffect(() => {
+    if (!isActive) return;
+    if (loadedOnceRef.current) return;
+    loadedOnceRef.current = true;
+    invalidateGetCache('/products');
+    loadProducts();
+  }, [loadProducts, isActive]);
+
+  // Realtime: refresh products on deals.changed (debounce 1.5s to batch rapid changes)
+  useEffect(() => {
+    let timer: any = null;
+    const unsub = subscribeRealtime((msg: any) => {
+      if (msg.type === 'deals.changed') {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => { timer = null; loadProducts(); }, 1500);
+      }
+    });
+    return () => { unsub(); if (timer) clearTimeout(timer); };
+  }, [loadProducts]);
+
+  useEffect(() => {
+    if (fetchError) toast.error('Failed to load deals. Please try again.');
+  }, [fetchError]);
 
   const handlePullRefresh = useCallback(async () => {
     setSearchTerm('');
     setSelectedCategory('All');
     setSelectedDealType('All');
-    await fetchDeals();
-  }, []);
+    await loadProducts();
+  }, [loadProducts]);
   const { handlers: pullHandlers, pullDistance, isRefreshing } = usePullToRefresh({ onRefresh: handlePullRefresh });
 
   const dealTypes = useMemo(() => {
@@ -46,52 +89,6 @@ export const Explore: React.FC = () => {
     }
     return ['All', ...Array.from(seen).sort()];
   }, [products]);
-
-  const fetchDeals = async (silent = false) => {
-    if (silent) {
-      if (silentSyncRef.current) return;
-      silentSyncRef.current = true;
-    } else {
-      setLoading(true);
-      setFetchError(false);
-    }
-    try {
-      const data = await api.products.getAll();
-      setProducts(Array.isArray(data) ? data : []);
-      setFetchError(false);
-    } catch (err) {
-      console.error(err);
-      if (!silent) {
-        toast.error('Failed to load deals. Please try again.');
-        setFetchError(true);
-      }
-    } finally {
-      setLoading(false);
-      silentSyncRef.current = false;
-    }
-  };
-
-  useEffect(() => {
-    fetchDeals();
-
-    let timer: any = null;
-    const schedule = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        timer = null;
-        fetchDeals(true);
-      }, 400);
-    };
-
-    // Realtime inventory updates (SSE)
-    const unsub = subscribeRealtime((msg) => {
-      if (msg.type === 'deals.changed') schedule();
-    });
-    return () => {
-      unsub();
-      if (timer) clearTimeout(timer);
-    };
-  }, []);
 
   // Derived filtered list — no extra state or effect needed
   const filtered = useMemo(() => {
@@ -176,7 +173,7 @@ export const Explore: React.FC = () => {
         </div>
 
         {/* Deal Type Filter */}
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1 mb-1.5">
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-styled pb-1 mb-1.5">
           {dealTypes.map((dt) => {
             const label = dt === 'Discount' ? 'Order Deal' : dt === 'All' ? 'All Types' : `${dt} Deal`;
             return (
@@ -198,7 +195,7 @@ export const Explore: React.FC = () => {
         </div>
 
         {/* Categories */}
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1">
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-styled pb-1">
           {categories.map((cat) => (
             <button
               key={cat}
@@ -244,7 +241,7 @@ export const Explore: React.FC = () => {
             <p className="text-xs text-zinc-400 max-w-[240px] text-center">Please check your internet connection and try again.</p>
             <button
               type="button"
-              onClick={() => fetchDeals()}
+              onClick={() => loadProducts()}
               className="px-6 py-2.5 bg-black text-white rounded-full text-xs font-bold hover:bg-zinc-800 transition-colors active:scale-95"
             >
               Try Again

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node ../../scripts/next.mjs dev -p 3003",
-    "build": "node ../../scripts/next.mjs build",
+    "build": "next build",
     "start": "node ../../scripts/next.mjs start -p 3003"
   },
   "dependencies": {

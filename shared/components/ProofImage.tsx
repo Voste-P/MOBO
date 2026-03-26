@@ -110,7 +110,7 @@ export const ProofImage: React.FC<{
   if (loading) {
     return (
       <div
-        className={`${className || 'w-full h-auto rounded-xl max-h-[60vh] border border-slate-100 flex items-center justify-center bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100 animate-pulse'} min-h-[120px]`}
+        className={`${className || 'w-full h-auto rounded-xl max-h-[60dvh] border border-slate-100 flex items-center justify-center bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100 animate-pulse'} min-h-[120px]`}
       >
         <ImageIcon size={32} className="text-slate-300" />
       </div>
@@ -121,7 +121,7 @@ export const ProofImage: React.FC<{
   if (error || !blobUrl) {
     return (
       <div
-        className={`${className || 'w-full h-auto rounded-xl max-h-[60vh] border border-dashed border-slate-200 flex flex-col items-center justify-center gap-2 bg-slate-50 text-slate-400 p-4'} min-h-[80px]`}
+        className={`${className || 'w-full h-auto rounded-xl max-h-[60dvh] border border-dashed border-slate-200 flex flex-col items-center justify-center gap-2 bg-slate-50 text-slate-400 p-4'} min-h-[80px]`}
       >
         <ImageIcon size={24} className="text-slate-300" />
         <span className="text-xs font-bold">Failed to load proof</span>

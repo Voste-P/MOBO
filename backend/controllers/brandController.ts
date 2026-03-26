@@ -1,4 +1,4 @@
-import type { NextFunction, Request, Response } from 'express';
+﻿import type { NextFunction, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { AppError } from '../middleware/errors.js';
 import { idWhere } from '../utils/idWhere.js';
@@ -8,7 +8,7 @@ import { logChangeEvent, logAccessEvent, logErrorEvent } from '../config/appLogs
 import { prisma } from '../database/prisma.js';
 import { rupeesToPaise } from '../utils/money.js';
 import { toUiCampaign, toUiOrderSummary, toUiOrderSummaryForBrand, toUiUser } from '../utils/uiMappers.js';
-import { orderListSelectLite, getProofFlags, userListSelect } from '../utils/querySelect.js';
+import { orderListSelectLite, getProofFlags, userListSelect, campaignListSelect, transactionListSelect } from '../utils/querySelect.js';
 import { parsePagination, paginatedResponse } from '../utils/pagination.js';
 import { pgUser, pgOrder, pgCampaign } from '../utils/pgMappers.js';
 import { getRequester, isPrivileged } from '../services/authz.js';
@@ -104,7 +104,7 @@ export function makeBrandController() {
           where.mediatorCode = { in: connected };
         }
 
-        const { page, limit, skip, isPaginated } = parsePagination(req.query as any);
+        const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
         const [agencies, total] = await Promise.all([
           db().user.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take: limit, select: userListSelect }),
           db().user.count({ where }),
@@ -141,13 +141,14 @@ export function makeBrandController() {
           brandPgId = (req.auth as any)?.pgUserId;
         }
 
-        const { page, limit, skip, isPaginated } = parsePagination(q);
+        const { page, limit, skip, isPaginated } = parsePagination(q, { limit: 50, maxLimit: 200 });
         const [campaigns, total] = await Promise.all([
           db().campaign.findMany({
             where: { brandUserId: brandPgId, isDeleted: false },
             orderBy: { createdAt: 'desc' },
             skip,
             take: limit,
+            select: campaignListSelect,
           }),
           db().campaign.count({ where: { brandUserId: brandPgId, isDeleted: false } }),
         ]);
@@ -184,7 +185,7 @@ export function makeBrandController() {
             { brandUserId: null, brandName: (user as any)?.name },
           ];
         }
-        const { page, limit, skip, isPaginated } = parsePagination(q);
+        const { page, limit, skip, isPaginated } = parsePagination(q, { limit: 50, maxLimit: 200 });
         const [orders, total] = await Promise.all([
           db().order.findMany({
             where,
@@ -280,13 +281,14 @@ export function makeBrandController() {
 
         // Brand ledger = outbound agency payouts from this brand.
         const txWhere = { isDeleted: false, fromUserId: brandPgId, type: 'agency_payout' as any };
-        const { page, limit, skip, isPaginated } = parsePagination(q);
+        const { page, limit, skip, isPaginated } = parsePagination(q, { limit: 50, maxLimit: 200 });
         const [txns, txTotal] = await Promise.all([
           db().transaction.findMany({
             where: txWhere,
             orderBy: { createdAt: 'desc' },
             skip,
             take: limit,
+            select: { ...transactionListSelect, metadata: true },
           }),
           db().transaction.count({ where: txWhere }),
         ]);
@@ -455,7 +457,7 @@ export function makeBrandController() {
           entityId: brandMongoId,
           metadata: { agencyId: agencyMongoId, agencyCode, amountPaise, ref, mode: payoutMode },
         });
-        walletLog.info('Brand→agency payout recorded', { brandId: brandMongoId, agencyId: agencyMongoId, agencyCode, amountPaise, ref, mode: payoutMode });
+        walletLog.info('Brandâ†’agency payout recorded', { brandId: brandMongoId, agencyId: agencyMongoId, agencyCode, amountPaise, ref, mode: payoutMode });
         logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Wallet', entityId: brandMongoId, action: 'AGENCY_PAYOUT', changedFields: ['balance'], before: {}, after: { amountPaise, agencyCode, ref, mode: payoutMode } });
         logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Payout', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'BRAND_AGENCY_PAYOUT', agencyCode, amountPaise, ref, mode: payoutMode } });
 
@@ -1012,6 +1014,7 @@ export function makeBrandController() {
 
         const campaign = await db().campaign.findFirst({
           where: { ...idWhere(id), isDeleted: false },
+          select: { id: true, mongoId: true, brandUserId: true, title: true, allowedAgencyCodes: true, assignments: true },
         });
         if (!campaign) throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
 

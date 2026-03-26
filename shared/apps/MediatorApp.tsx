@@ -1,4 +1,4 @@
-﻿import React, { lazy, Suspense } from 'react';
+﻿import React, { Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { NotificationProvider } from '../context/NotificationContext';
 import { ToastProvider } from '../context/ToastContext';
@@ -6,9 +6,9 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { PortalGuard } from '../components/PortalGuard';
 import { PageSkeleton } from '../components/ui/PageSkeleton';
 import { MediatorAuthScreen } from '../pages/MediatorAuth';
+import { lazyRetry } from '../utils/lazyRetry';
 
-// Lazy-load the 125KB MediatorDashboard — only fetched after auth succeeds
-const MediatorDashboard = lazy(() => import('../pages/MediatorDashboard').then(m => ({ default: m.MediatorDashboard })));
+const MediatorDashboard = lazyRetry(() => import('../pages/MediatorDashboard').then(m => ({ default: m.MediatorDashboard })));
 
 interface MediatorAppProps {
   onBack?: () => void;

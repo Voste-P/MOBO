@@ -27,7 +27,7 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClos
 
   const userRole = useMemo(() => {
     return String((user as any)?.role || (user as any)?.roles?.[0] || 'shopper');
-  }, [user]);
+  }, [user?.id]);
 
   const issueTypes = useMemo(() => {
     return ROLE_ISSUE_TYPES[userRole] || ROLE_ISSUE_TYPES.shopper;
@@ -92,7 +92,7 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClos
       onClick={handleClose}
     >
       <div
-        className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl animate-slide-up relative max-h-[90vh] overflow-y-auto scrollbar-styled"
+        className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl animate-slide-up relative max-h-[90dvh] overflow-y-auto scrollbar-styled"
         onClick={(e) => e.stopPropagation()}
       >
         <button

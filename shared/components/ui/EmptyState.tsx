@@ -22,9 +22,9 @@ export function EmptyState({
         className
       )}
     >
-      {icon ? <div className="mb-4 opacity-70">{icon}</div> : null}
+      {icon ? <div className="mb-4 opacity-70 animate-subtle-pulse">{icon}</div> : null}
       <div className="text-sm font-extrabold text-zinc-900">{title}</div>
-      {description ? <div className="mt-1 text-xs font-medium text-zinc-500 max-w-sm">{description}</div> : null}
+      {description ? <div className="mt-1.5 text-xs font-medium text-zinc-500 max-w-sm leading-relaxed">{description}</div> : null}
       {action ? <div className="mt-6">{action}</div> : null}
     </div>
   );

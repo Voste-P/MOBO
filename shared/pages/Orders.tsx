@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { api } from '../services/api';
+import { api, asArray, invalidateGetCache } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
@@ -178,7 +178,7 @@ const isValidReviewLink = (value: string) => {
   }
 };
 
-export const Orders: React.FC = () => {
+export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -189,6 +189,7 @@ export const Orders: React.FC = () => {
   const [proofToView, setProofToView] = useState<Order | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const submittingRef = useRef(false);
+  const ordersLoadingRef = useRef(false);
   const [inputValue, setInputValue] = useState('');
 
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
@@ -242,6 +243,7 @@ export const Orders: React.FC = () => {
     confidenceScore: number;
     detectedAccountName?: string;
     detectedProductName?: string;
+    screenshotCropped?: boolean;
     discrepancyNote?: string;
   } | null>(null);
   const [ratingFile, setRatingFile] = useState<File | null>(null);
@@ -259,9 +261,22 @@ export const Orders: React.FC = () => {
     confidenceScore: number;
     detectedReturnWindow?: string;
     detectedAccountName?: string;
+    screenshotCropped?: boolean;
     discrepancyNote?: string;
   } | null>(null);
   const [rwFile, setRwFile] = useState<File | null>(null);
+
+  // AbortController refs to cancel in-flight AI verification when user re-uploads
+  const ratingAbortRef = useRef<AbortController | null>(null);
+  const rwAbortRef = useRef<AbortController | null>(null);
+
+  // Cleanup abort controllers on unmount
+  useEffect(() => {
+    return () => {
+      ratingAbortRef.current?.abort();
+      rwAbortRef.current?.abort();
+    };
+  }, []);
 
   // Order list search & filter
   const [orderListSearch, setOrderListSearch] = useState('');
@@ -296,36 +311,49 @@ export const Orders: React.FC = () => {
     });
   }, [availableProducts, dealTypeFilter, formSearch]);
 
+  const loadedOnceRef = useRef(false);
+
   useEffect(() => {
+    if (!isActive) return;
+    if (loadedOnceRef.current) return;
+    loadedOnceRef.current = true;
+    invalidateGetCache('/orders');
+    invalidateGetCache('/tickets');
     if (user) {
-      loadOrders();
-      loadMyTickets();
-      api.products.getAll().then((data) => {
-        setAvailableProducts(Array.isArray(data) ? data : []);
-        setProductsLoadError(false);
-      }).catch((err) => {
-        if (process.env.NODE_ENV !== 'production') console.error('Failed to load products:', err);
-        setAvailableProducts([]);
-        setProductsLoadError(true);
-        toast.error('Failed to load available deals. Pull down to retry.');
-      });
+      Promise.all([loadOrders(), loadMyTickets()]);
     } else {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user?.id, isActive]);
+
+  // Defer product loading until the New Order modal is opened; cache for session
+  const productsLoadedRef = useRef(false);
+  useEffect(() => {
+    if (!isNewOrderModalOpen || productsLoadedRef.current) return;
+    productsLoadedRef.current = true;
+    api.products.getAll().then((data) => {
+      setAvailableProducts(asArray<Product>(data));
+      setProductsLoadError(false);
+    }).catch((err) => {
+      if (process.env.NODE_ENV !== 'production') console.error('Failed to load products:', err);
+      setAvailableProducts([]);
+      setProductsLoadError(true);
+      productsLoadedRef.current = false; // Reset only on error so next open retries
+      toast.error('Failed to load available deals. Pull down to retry.');
+    });
+  }, [isNewOrderModalOpen]);
 
   const handlePullRefresh = useCallback(async () => {
-    await loadOrders();
-  }, [user]);
+    await Promise.all([loadOrders(), loadMyTickets()]);
+  }, [user?.id]);
   const { handlers: pullHandlers, pullDistance, isRefreshing: isPullRefreshing } = usePullToRefresh({ onRefresh: handlePullRefresh });
 
   const loadMyTickets = async () => {
     if (!user?.id) return;
     try {
       const data = await api.tickets.getAll();
-      const mine = Array.isArray(data)
-        ? data.filter((t: Ticket) => t.userId === user.id && t.issueType !== 'Feedback')
-        : [];
+      const mine = asArray<Ticket>(data)
+        .filter((t: Ticket) => t.userId === user.id && t.issueType !== 'Feedback');
       setMyTickets(mine.sort((a: Ticket, b: Ticket) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     } catch { /* silently degrade — tickets are secondary */ }
   };
@@ -365,19 +393,21 @@ export const Orders: React.FC = () => {
 
   const loadOrders = async () => {
     if (!user?.id) return;
+    if (ordersLoadingRef.current) return;
+    ordersLoadingRef.current = true;
     try {
-      const data = await api.orders.getUserOrders(user.id);
+      const data = asArray<Order>(await api.orders.getUserOrders(user.id));
       setOrders(data);
       // Keep selectedOrder in sync with refreshed data
       setSelectedOrder((prev) => {
         if (!prev) return prev;
-        const refreshed = (data as Order[]).find((o: Order) => o.id === prev.id);
+        const refreshed = data.find((o: Order) => o.id === prev.id);
         return refreshed || null;
       });
       // Keep proof modal in sync with refreshed data
       setProofToView((prev) => {
         if (!prev) return prev;
-        const updated = (data as Order[]).find((o: Order) => o.id === prev.id);
+        const updated = data.find((o: Order) => o.id === prev.id);
         return updated || null;
       });
     } catch (e) {
@@ -385,40 +415,47 @@ export const Orders: React.FC = () => {
       toast.error('Failed to load orders. Please try again.');
     } finally {
       setIsLoading(false);
+      ordersLoadingRef.current = false;
     }
   };
 
-  // Realtime: refresh order list when any order changes.
+  // Realtime: refresh orders & tickets on relevant events
   useEffect(() => {
     if (!user) return;
+
     let timer: any = null;
-    const schedule = () => {
-      if (timer) return;
+    const pendingKeys = new Set<string>();
+    const schedule = (key: string) => {
+      pendingKeys.add(key);
+      if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        loadOrders();
-      }, 500);
+        const keys = new Set(pendingKeys);
+        pendingKeys.clear();
+        const tasks: Promise<any>[] = [];
+        if (keys.has('orders')) tasks.push(loadOrders());
+        if (keys.has('tickets')) tasks.push(loadMyTickets());
+        Promise.all(tasks).catch(() => {});
+      }, 800);
     };
-    const unsub = subscribeRealtime((msg) => {
-      if (msg.type === 'orders.changed' || msg.type === 'notifications.changed') schedule();
-      if (msg.type === 'tickets.changed') loadMyTickets();
+    const unsub = subscribeRealtime((msg: any) => {
+      if (msg.type === 'orders.changed') schedule('orders');
+      if (msg.type === 'tickets.changed') schedule('tickets');
       if (msg.type === 'deals.changed') {
-        // Keep filters/product titles in sync (non-critical, but avoids stale UI).
-        api.products
-          .getAll()
-          .then((data) => { setAvailableProducts(Array.isArray(data) ? data : []); setProductsLoadError(false); })
-          .catch((err) => {
-            if (process.env.NODE_ENV !== 'production') console.error('Failed to load products:', err);
-            setAvailableProducts([]);
-            setProductsLoadError(true);
-          });
+        // Refresh products only if modal was already opened
+        if (productsLoadedRef.current) {
+          api.products
+            .getAll()
+            .then((data) => { setAvailableProducts(asArray<Product>(data)); setProductsLoadError(false); })
+            .catch(() => {});
+        }
       }
     });
     return () => {
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [user]);
+  }, [user?.id]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0] || !selectedOrder || isUploading || submittingRef.current) return;
@@ -444,7 +481,6 @@ export const Orders: React.FC = () => {
       toast.success('Proof uploaded!');
       mergeSubmitResponse(resp);
       setSelectedOrder(null);
-      loadOrders();
     } catch (err: any) {
       toast.error(formatErrorMessage(err, 'Failed to upload proof'));
     } finally {
@@ -467,7 +503,6 @@ export const Orders: React.FC = () => {
       mergeSubmitResponse(resp);
       setSelectedOrder(null);
       setInputValue('');
-      loadOrders();
     } catch (e: any) {
       toast.error(formatErrorMessage(e, 'Failed to submit link'));
     } finally {
@@ -607,6 +642,11 @@ export const Orders: React.FC = () => {
       return;
     }
 
+    // Cancel any in-flight verification to prevent stale-state race
+    ratingAbortRef.current?.abort();
+    const controller = new AbortController();
+    ratingAbortRef.current = controller;
+
     // Show preview immediately
     const reader = new FileReader();
     reader.onload = () => setRatingPreview(reader.result as string);
@@ -629,10 +669,12 @@ export const Orders: React.FC = () => {
       // confusing mismatches against the buyer's app account name.
       if (!hasReviewerName) {
         if (productName) {
-          const result = await api.orders.verifyRating(file, buyerName || '', productName, undefined, selectedOrder.id);
+          const result = await api.orders.verifyRating(file, buyerName || '', productName, undefined, selectedOrder.id, controller.signal);
           // Override account name match — we can't verify without a reviewer name
           setRatingVerification({ ...result, accountNameMatch: true });
-          if (!result.productNameMatch) {
+          if (result.screenshotCropped) {
+            toast.error('Screenshot appears cropped or incomplete. Please upload a FULL screenshot showing the complete page including the account name header at the top.');
+          } else if (!result.productNameMatch) {
             toast.warning('Product name does not match this order. Please check the screenshot.');
           } else {
             toast.success('Screenshot verified! Product matches.');
@@ -645,10 +687,12 @@ export const Orders: React.FC = () => {
         if (reviewerName && productName) {
           // Pass buyer's app account name as expectedBuyerName (secondary),
           // and reviewer name as expectedReviewerName (PRIMARY match target).
-          const result = await api.orders.verifyRating(file, buyerName || '', productName, reviewerName, selectedOrder.id);
+          const result = await api.orders.verifyRating(file, buyerName || '', productName, reviewerName, selectedOrder.id, controller.signal);
           setRatingVerification(result);
 
-          if (!result.accountNameMatch && !result.productNameMatch) {
+          if (result.screenshotCropped) {
+            toast.error('Screenshot appears cropped or incomplete. Please upload a FULL screenshot showing the complete rating page including the account name header at the top.');
+          } else if (!result.accountNameMatch && !result.productNameMatch) {
             toast.error(`Reviewer name "${reviewerName}" and product do not match. Upload the correct screenshot.`);
           } else if (!result.accountNameMatch) {
             toast.error(`Reviewer name "${reviewerName}" not found in screenshot. ${result.detectedAccountName ? `Found "${result.detectedAccountName}" instead.` : ''}`);
@@ -663,6 +707,7 @@ export const Orders: React.FC = () => {
         }
       }
     } catch (err: any) {
+      if (err?.name === 'AbortError') return; // Cancelled by re-upload — ignore silently
       if (process.env.NODE_ENV !== 'production') console.error('Rating pre-validation failed:', err);
       // Keep verification null — submit button stays disabled until user retries
       setRatingVerification(null);
@@ -680,6 +725,12 @@ export const Orders: React.FC = () => {
     // Block if AI verification hasn't completed yet (file uploaded but not verified)
     if (!ratingVerification) {
       toast.error('Please wait for AI verification to complete before submitting.');
+      return;
+    }
+
+    // Block submission when screenshot is cropped/incomplete
+    if (ratingVerification.screenshotCropped) {
+      toast.error('Screenshot appears cropped or incomplete. Please upload a FULL screenshot showing the complete rating page including the account name header at the top.');
       return;
     }
 
@@ -714,7 +765,6 @@ export const Orders: React.FC = () => {
       setRatingPreview(null);
       setRatingFile(null);
       setRatingVerification(null);
-      loadOrders();
     } catch (err: any) {
       toast.error(formatErrorMessage(err, 'Failed to upload proof'));
     } finally {
@@ -732,6 +782,11 @@ export const Orders: React.FC = () => {
       toast.error(err === 'too_large' ? 'Image too large (max 10 MB).' : 'Please upload a PNG, JPG, or WebP image.');
       return;
     }
+
+    // Cancel any in-flight verification to prevent stale-state race
+    rwAbortRef.current?.abort();
+    const controller = new AbortController();
+    rwAbortRef.current = controller;
 
     // Show preview immediately
     const reader = new FileReader();
@@ -762,21 +817,27 @@ export const Orders: React.FC = () => {
         file, orderId, productName, amount,
         soldBy || undefined,
         reviewerName || undefined,
+        controller.signal,
       );
       setRwVerification(result);
 
-      // Hard-block fields: order ID, product name, seller/sold by
-      const hardFails: string[] = [];
-      if (!result.orderIdMatch) hardFails.push('Order ID');
-      if (!result.productNameMatch) hardFails.push('Product name');
-      if (!result.soldByMatch && soldBy) hardFails.push('Seller name');
-
-      if (hardFails.length > 0) {
-        toast.error(`Mismatch: ${hardFails.join(', ')}. Please upload the correct return window screenshot.`);
+      if (result.screenshotCropped) {
+        toast.error('Screenshot appears cropped or incomplete. Please upload a FULL screenshot showing the complete order page including the page header.');
       } else {
-        toast.success(`Return window verified! Return window: ${result.returnWindowClosed ? 'Closed' : 'Open'}. You can submit.`);
+        // Hard-block fields: order ID, product name, seller/sold by
+        const hardFails: string[] = [];
+        if (!result.orderIdMatch) hardFails.push('Order ID');
+        if (!result.productNameMatch) hardFails.push('Product name');
+        if (!result.soldByMatch && soldBy) hardFails.push('Seller name');
+
+        if (hardFails.length > 0) {
+          toast.error(`Mismatch: ${hardFails.join(', ')}. Please upload the correct return window screenshot.`);
+        } else {
+          toast.success(`Return window verified! Return window: ${result.returnWindowClosed ? 'Closed' : 'Open'}. You can submit.`);
+        }
       }
     } catch (err: any) {
+      if (err?.name === 'AbortError') return; // Cancelled by re-upload — ignore silently
       if (process.env.NODE_ENV !== 'production') console.error('Return window pre-validation failed:', err);
       // Keep verification null — submit button stays disabled until user retries
       setRwVerification(null);
@@ -794,6 +855,12 @@ export const Orders: React.FC = () => {
     // Block if AI verification hasn't completed yet (file uploaded but not verified)
     if (!rwVerification) {
       toast.error('Please wait for AI verification to complete before submitting.');
+      return;
+    }
+
+    // Block submission when screenshot is cropped/incomplete
+    if (rwVerification.screenshotCropped) {
+      toast.error('Screenshot appears cropped or incomplete. Please upload a FULL screenshot showing the complete order page including the page header.');
       return;
     }
 
@@ -828,7 +895,6 @@ export const Orders: React.FC = () => {
       setRwPreview(null);
       setRwFile(null);
       setRwVerification(null);
-      loadOrders();
     } catch (err: any) {
       toast.error(formatErrorMessage(err, 'Failed to upload proof'));
     } finally {
@@ -916,6 +982,7 @@ export const Orders: React.FC = () => {
       setExtractedDetails({ orderId: '', amount: '' });
       setMatchStatus({ id: 'none', amount: 'none', productName: 'none', reviewerName: 'none' });
       setOrderIdLocked(false);
+      // Realtime will sync the order list; do a background refresh to ensure consistency
       loadOrders();
       toast.success('Order submitted successfully!');
     } catch (e: any) {
@@ -1565,7 +1632,7 @@ export const Orders: React.FC = () => {
                   </p>
                 );
                 return (
-                <div className="max-h-[50vh] overflow-y-auto scrollbar-styled space-y-2">
+                <div className="max-h-[50dvh] overflow-y-auto scrollbar-styled space-y-2">
                 {filtered.map((t) => (
                   <div key={t.id} className="bg-white rounded-xl border border-zinc-200 p-3 space-y-1.5 cursor-pointer hover:border-zinc-400 transition-colors" onClick={() => setSelectedTicket(t)}>
                     <div className="flex items-center justify-between">
@@ -1655,9 +1722,21 @@ export const Orders: React.FC = () => {
             setReviewLinkInput('');
             setFormSearch('');
           }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setIsNewOrderModalOpen(false);
+              setFormScreenshot(null);
+              setExtractedDetails({ orderId: '', amount: '' });
+              setMatchStatus({ id: 'none', amount: 'none', productName: 'none', reviewerName: 'none' });
+              setOrderIdLocked(false);
+              setSelectedProduct(null);
+              setReviewLinkInput('');
+              setFormSearch('');
+            }
+          }}
         >
           <div
-            className="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl animate-slide-up flex flex-col max-h-[85vh] relative"
+            className="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl animate-slide-up flex flex-col max-h-[90dvh] relative"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -1725,7 +1804,7 @@ export const Orders: React.FC = () => {
                           onClick={() => {
                             setProductsLoadError(false);
                             api.products.getAll().then((data) => {
-                              setAvailableProducts(Array.isArray(data) ? data : []);
+                              setAvailableProducts(asArray<Product>(data));
                               setProductsLoadError(false);
                             }).catch(() => {
                               setProductsLoadError(true);
@@ -2121,7 +2200,7 @@ export const Orders: React.FC = () => {
           onClick={() => setProofToView(null)}
         >
           <div
-            className="max-w-lg w-full bg-white p-4 rounded-2xl relative shadow-2xl"
+            className="max-w-lg w-full bg-white p-4 rounded-2xl relative shadow-2xl max-h-[90dvh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -2142,7 +2221,7 @@ export const Orders: React.FC = () => {
                 </p>
               )}
             </div>
-            <div className="space-y-4 max-h-[75vh] overflow-y-auto scrollbar-styled pr-1">
+            <div className="space-y-4 max-h-[75dvh] overflow-y-auto scrollbar-styled pr-1">
               <div className="space-y-2">
                 <div className="text-[10px] font-bold uppercase text-slate-400">Order Proof</div>
                 {proofToView.screenshots?.order ? (
@@ -2245,7 +2324,7 @@ export const Orders: React.FC = () => {
           }}
         >
           <div
-            className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-slide-up relative max-h-[85vh] overflow-y-auto scrollbar-styled"
+            className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-slide-up relative max-h-[90dvh] overflow-y-auto scrollbar-styled"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -2384,7 +2463,13 @@ export const Orders: React.FC = () => {
                       </div>
                     </div>
 
-                    {ratingVerification.accountNameMatch && ratingVerification.productNameMatch && (
+                    {ratingVerification.screenshotCropped && (
+                      <p className="text-[10px] text-red-600 font-bold bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
+                        <AlertTriangle size={12} />
+                        Screenshot appears cropped or incomplete. Please upload a FULL screenshot showing the complete rating page including the account name header at the top.
+                      </p>
+                    )}
+                    {ratingVerification.accountNameMatch && ratingVerification.productNameMatch && !ratingVerification.screenshotCropped && (
                       <p className="text-[10px] text-green-600 font-bold bg-green-50 p-2 rounded-lg flex items-center gap-1.5">
                         <CheckCircle2 size={12} /> Rating screenshot verified. Ready to submit.
                       </p>
@@ -2434,6 +2519,8 @@ export const Orders: React.FC = () => {
                     !ratingFile ||
                     // Block submit until AI verification succeeds
                     !ratingVerification ||
+                    // Block submit when screenshot is cropped/incomplete
+                    !!(ratingVerification && ratingVerification.screenshotCropped) ||
                     // Block submit when reviewer name doesn't match or product name doesn't match
                     !!(ratingVerification && !ratingVerification.accountNameMatch && selectedOrder?.reviewerName) ||
                     !!(ratingVerification && !ratingVerification.productNameMatch)
@@ -2542,7 +2629,13 @@ export const Orders: React.FC = () => {
                       )}
                     </div>
 
-                    {rwVerification.orderIdMatch && rwVerification.productNameMatch && rwVerification.returnWindowClosed && rwVerification.amountMatch && (!selectedOrder?.soldBy || rwVerification.soldByMatch) && (!selectedOrder?.reviewerName || rwVerification.reviewerNameMatch) && (
+                    {rwVerification.screenshotCropped && (
+                      <p className="text-[10px] text-red-600 font-bold bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
+                        <AlertTriangle size={12} />
+                        Screenshot appears cropped or incomplete. Please upload a FULL screenshot showing the complete order page including the page header.
+                      </p>
+                    )}
+                    {rwVerification.orderIdMatch && rwVerification.productNameMatch && rwVerification.returnWindowClosed && rwVerification.amountMatch && !rwVerification.screenshotCropped && (!selectedOrder?.soldBy || rwVerification.soldByMatch) && (!selectedOrder?.reviewerName || rwVerification.reviewerNameMatch) && (
                       <p className="text-[10px] text-green-600 font-bold bg-green-50 p-2 rounded-lg flex items-center gap-1.5">
                         <CheckCircle2 size={12} /> Return window screenshot verified. Ready to submit.
                       </p>
@@ -2607,6 +2700,8 @@ export const Orders: React.FC = () => {
                     !rwFile ||
                     // Block submit until AI verification succeeds
                     !rwVerification ||
+                    // Block submit when screenshot is cropped/incomplete
+                    !!rwVerification.screenshotCropped ||
                     // Block submit when critical checks fail
                     !rwVerification.orderIdMatch ||
                     !rwVerification.productNameMatch ||
