@@ -1,16 +1,16 @@
 -- Performance composite indexes for high-traffic query patterns
 
 -- User: ops dashboard mediator-scoped queries
-CREATE INDEX IF NOT EXISTS "users_mediatorCode_isDeleted_status_idx" ON "users"("mediatorCode", "isDeleted", "status");
+CREATE INDEX IF NOT EXISTS "users_mediator_code_is_deleted_status_idx" ON "users"("mediator_code", "is_deleted", "status");
 
 -- User: agency team listing
-CREATE INDEX IF NOT EXISTS "users_parentCode_isDeleted_status_idx" ON "users"("parentCode", "isDeleted", "status");
+CREATE INDEX IF NOT EXISTS "users_parent_code_is_deleted_status_idx" ON "users"("parent_code", "is_deleted", "status");
 
 -- Transaction: ledger queries with type filter
-CREATE INDEX IF NOT EXISTS "transactions_walletId_type_createdAt_idx" ON "transactions"("walletId", "type", "createdAt" DESC);
+CREATE INDEX IF NOT EXISTS "transactions_wallet_id_type_created_at_idx" ON "transactions"("wallet_id", "type", "created_at" DESC);
 
 -- Ticket: permission checks
-CREATE INDEX IF NOT EXISTS "tickets_userId_orderId_isDeleted_idx" ON "tickets"("userId", "orderId", "isDeleted");
+CREATE INDEX IF NOT EXISTS "tickets_user_id_order_id_is_deleted_idx" ON "tickets"("user_id", "order_id", "is_deleted");
 
 -- Ticket: role-scoped ticket queries
-CREATE INDEX IF NOT EXISTS "tickets_role_status_isDeleted_idx" ON "tickets"("role", "status", "isDeleted");
+CREATE INDEX IF NOT EXISTS "tickets_role_status_is_deleted_idx" ON "tickets"("role", "status", "is_deleted");
