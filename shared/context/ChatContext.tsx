@@ -68,10 +68,16 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
   }, [userId]);
 
-  // Persist messages whenever they change (debounced via effect)
+  // Persist messages whenever they change (debounced to avoid blocking UI on rapid messages)
+  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!initialized.current) return;
-    persistMessages(currentUserId.current, messages);
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    persistTimerRef.current = setTimeout(() => {
+      persistTimerRef.current = null;
+      persistMessages(currentUserId.current, messages);
+    }, 1_000);
+    return () => { if (persistTimerRef.current) clearTimeout(persistTimerRef.current); };
   }, [messages]);
 
   const addMessage = useCallback((message: ChatMessage) => {

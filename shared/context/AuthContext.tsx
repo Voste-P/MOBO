@@ -70,7 +70,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } finally {
           inFlight = false;
         }
-      }, 600);
+      }, 2_000);
     };
 
     const unsub = subscribeRealtime((msg) => {
