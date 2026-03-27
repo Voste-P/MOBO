@@ -1520,6 +1520,13 @@ const DashboardView = ({ stats, revenueTrendData, brandPerfData, onRangeChange }
             </select>
           </div>
           <div className="flex-1 w-full min-h-0">
+            {data.length === 0 || data.every((d: any) => !d.val) ? (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <div className="p-4 rounded-full bg-slate-50 mb-4"><IndianRupee size={32} className="text-slate-300" /></div>
+                <p className="text-sm font-semibold text-slate-400">No revenue data yet</p>
+                <p className="text-xs text-slate-300 mt-1">Revenue will appear here as orders are completed</p>
+              </div>
+            ) : (
             <ChartSuspense>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data}>
@@ -1564,6 +1571,7 @@ const DashboardView = ({ stats, revenueTrendData, brandPerfData, onRangeChange }
               </AreaChart>
             </ResponsiveContainer>
             </ChartSuspense>
+            )}
           </div>
         </div>
 
@@ -1572,6 +1580,13 @@ const DashboardView = ({ stats, revenueTrendData, brandPerfData, onRangeChange }
           <h3 className="text-lg font-bold text-slate-900 mb-1">Brand Performance</h3>
           <p className="text-xs text-slate-400 font-medium mb-6">Top performing brands by volume</p>
           <div className="flex-1 min-h-0">
+            {!brandData || brandData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <div className="p-4 rounded-full bg-slate-50 mb-4"><Layers size={32} className="text-slate-300" /></div>
+                <p className="text-sm font-semibold text-slate-400">No brand data yet</p>
+                <p className="text-xs text-slate-300 mt-1">Brand performance will show as orders come in</p>
+              </div>
+            ) : (
             <ChartSuspense>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={brandData} layout="vertical" barSize={24}>
@@ -1596,6 +1611,7 @@ const DashboardView = ({ stats, revenueTrendData, brandPerfData, onRangeChange }
               </BarChart>
             </ResponsiveContainer>
             </ChartSuspense>
+            )}
           </div>
         </div>
       </div>

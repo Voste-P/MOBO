@@ -52,6 +52,7 @@ import {
   FileSpreadsheet,
   Sparkles,
   HelpCircle,
+  BarChart3,
 } from 'lucide-react';
 import { api, asArray } from '../services/api';
 import { exportToGoogleSheet } from '../utils/exportToSheets';
@@ -439,6 +440,13 @@ const DashboardView = ({
             </div>
           </div>
           <div className="absolute inset-x-0 bottom-0 top-20 px-4 pb-4">
+            {revenueData.length === 0 || revenueData.every((d: any) => !d.revenue) ? (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <div className="p-4 rounded-full bg-zinc-50 mb-4"><TrendingUp size={32} className="text-zinc-300" /></div>
+                <p className="text-sm font-semibold text-zinc-400">No revenue data yet</p>
+                <p className="text-xs text-zinc-300 mt-1">Revenue will appear here as orders are completed</p>
+              </div>
+            ) : (
             <ChartSuspense>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={revenueData}>
@@ -486,6 +494,7 @@ const DashboardView = ({
               </AreaChart>
             </ResponsiveContainer>
             </ChartSuspense>
+            )}
           </div>
         </div>
 
@@ -503,6 +512,13 @@ const DashboardView = ({
             </div>
           </div>
           <div className="flex-1 min-h-0">
+            {!campaignPerformance || campaignPerformance.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <div className="p-4 rounded-full bg-zinc-50 mb-4"><BarChart3 size={32} className="text-zinc-300" /></div>
+                <p className="text-sm font-semibold text-zinc-400">No campaigns yet</p>
+                <p className="text-xs text-zinc-300 mt-1">Create campaigns to track inventory fill rates</p>
+              </div>
+            ) : (
             <ChartSuspense>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
@@ -542,6 +558,7 @@ const DashboardView = ({
               </BarChart>
             </ResponsiveContainer>
             </ChartSuspense>
+            )}
           </div>
         </div>
       </div>
