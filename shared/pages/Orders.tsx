@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { api, asArray, invalidateGetCache } from '../services/api';
+import { api, asArray } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
@@ -317,10 +317,8 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
     if (!isActive) return;
     if (loadedOnceRef.current) return;
     loadedOnceRef.current = true;
-    invalidateGetCache('/orders');
-    invalidateGetCache('/tickets');
     if (user) {
-      Promise.all([loadOrders(), loadMyTickets()]);
+      Promise.allSettled([loadOrders(), loadMyTickets()]);
     } else {
       setIsLoading(false);
     }
@@ -344,7 +342,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
   }, [isNewOrderModalOpen]);
 
   const handlePullRefresh = useCallback(async () => {
-    await Promise.all([loadOrders(), loadMyTickets()]);
+    await Promise.allSettled([loadOrders(), loadMyTickets()]);
   }, [user?.id]);
   const { handlers: pullHandlers, pullDistance, isRefreshing: isPullRefreshing } = usePullToRefresh({ onRefresh: handlePullRefresh });
 
@@ -435,7 +433,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
         const tasks: Promise<any>[] = [];
         if (keys.has('orders')) tasks.push(loadOrders());
         if (keys.has('tickets')) tasks.push(loadMyTickets());
-        Promise.all(tasks).catch(() => {});
+        Promise.allSettled(tasks).catch(() => {});
       }, 800);
     };
     const unsub = subscribeRealtime((msg: any) => {

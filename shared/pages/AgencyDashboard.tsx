@@ -1455,70 +1455,22 @@ const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
   );
 };
 
-const DashboardView = ({ stats, allOrders }: any) => {
+const DashboardView = ({ stats, revenueTrendData, brandPerfData, onRangeChange }: {
+  stats: { revenue: number; totalMediators: number; activeCampaigns: number; ordersToday: number };
+  revenueTrendData: Array<{ name: string; val: number }>;
+  brandPerfData: Array<{ name: string; count: number }>;
+  onRangeChange: (range: string) => void;
+}) => {
   const [range, setRange] = useState<'last30' | 'yesterday' | 'last7' | 'thisMonth'>('last30');
 
-  const data = useMemo(() => {
-    const now = new Date();
-    const end = new Date(now);
-    end.setHours(23, 59, 59, 999);
+  const handleRangeChange = (newRange: 'last30' | 'yesterday' | 'last7' | 'thisMonth') => {
+    setRange(newRange);
+    onRangeChange(newRange);
+  };
 
-    let start = new Date(now);
-    if (range === 'last7') {
-      start.setDate(start.getDate() - 6);
-    } else if (range === 'yesterday') {
-      start.setDate(start.getDate() - 1);
-      start.setHours(0, 0, 0, 0);
-      end.setTime(start.getTime());
-      end.setHours(23, 59, 59, 999);
-    } else if (range === 'thisMonth') {
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
-    } else {
-      start.setDate(start.getDate() - 29);
-    }
-    start.setHours(0, 0, 0, 0);
-
-    const localKey = (d: Date) => {
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      return `${yyyy}-${mm}-${dd}`;
-    };
-
-    const buckets = new Map<string, number>();
-    const cursor = new Date(start);
-    while (cursor <= end) {
-      buckets.set(localKey(cursor), 0);
-      cursor.setDate(cursor.getDate() + 1);
-    }
-
-    (allOrders || []).forEach((o: any) => {
-      const createdAt = new Date(o.createdAt);
-      if (Number.isNaN(createdAt.getTime())) return;
-      if (createdAt < start || createdAt > end) return;
-      const key = localKey(createdAt);
-      if (!buckets.has(key)) return;
-      buckets.set(key, (buckets.get(key) || 0) + Number(o.total || 0));
-    });
-
-    return Array.from(buckets.entries()).map(([iso, total]) => ({
-      name: new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }),
-      val: Math.round(total),
-    }));
-  }, [allOrders, range]);
-
-  // Calculate Brand Performance
-  const brandData = useMemo(() => {
-    const brandCounts: Record<string, number> = {};
-    allOrders.forEach((o: Order) => {
-      const brand = o.brandName || 'Unknown';
-      brandCounts[brand] = (brandCounts[brand] || 0) + 1;
-    });
-    return Object.keys(brandCounts)
-      .map((b) => ({ name: b, count: brandCounts[b] }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-  }, [allOrders]);
+  // Use pre-fetched server-side data directly
+  const data = revenueTrendData;
+  const brandData = brandPerfData;
 
   return (
     <div className="space-y-6 animate-enter pb-12">
@@ -1533,11 +1485,7 @@ const DashboardView = ({ stats, allOrders }: any) => {
         <StatCard label="Live Campaigns" value={stats.activeCampaigns} icon={Layers} />
         <StatCard
           label="Orders Today"
-          value={
-            allOrders.filter(
-              (o: any) => new Date(o.createdAt).toDateString() === new Date().toDateString()
-            ).length
-          }
+          value={stats.ordersToday}
           icon={Box}
         />
       </div>
@@ -1561,7 +1509,7 @@ const DashboardView = ({ stats, allOrders }: any) => {
             </div>
             <select
               value={range}
-              onChange={(e) => setRange(e.target.value as any)}
+              onChange={(e) => handleRangeChange(e.target.value as any)}
               aria-label="Date range"
               className="bg-slate-50 border border-slate-200 text-xs font-bold text-slate-600 rounded-lg px-3 py-2 outline-none hover:bg-slate-100 transition-colors cursor-pointer"
             >
@@ -1572,6 +1520,13 @@ const DashboardView = ({ stats, allOrders }: any) => {
             </select>
           </div>
           <div className="flex-1 w-full min-h-0">
+            {data.length === 0 || data.every((d: any) => !d.val) ? (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <div className="p-4 rounded-full bg-slate-50 mb-4"><IndianRupee size={32} className="text-slate-300" /></div>
+                <p className="text-sm font-semibold text-slate-400">No revenue data yet</p>
+                <p className="text-xs text-slate-300 mt-1">Revenue will appear here as orders are completed</p>
+              </div>
+            ) : (
             <ChartSuspense>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data}>
@@ -1616,6 +1571,7 @@ const DashboardView = ({ stats, allOrders }: any) => {
               </AreaChart>
             </ResponsiveContainer>
             </ChartSuspense>
+            )}
           </div>
         </div>
 
@@ -1624,6 +1580,13 @@ const DashboardView = ({ stats, allOrders }: any) => {
           <h3 className="text-lg font-bold text-slate-900 mb-1">Brand Performance</h3>
           <p className="text-xs text-slate-400 font-medium mb-6">Top performing brands by volume</p>
           <div className="flex-1 min-h-0">
+            {!brandData || brandData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <div className="p-4 rounded-full bg-slate-50 mb-4"><Layers size={32} className="text-slate-300" /></div>
+                <p className="text-sm font-semibold text-slate-400">No brand data yet</p>
+                <p className="text-xs text-slate-300 mt-1">Brand performance will show as orders come in</p>
+              </div>
+            ) : (
             <ChartSuspense>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={brandData} layout="vertical" barSize={24}>
@@ -1648,6 +1611,7 @@ const DashboardView = ({ stats, allOrders }: any) => {
               </BarChart>
             </ResponsiveContainer>
             </ChartSuspense>
+            )}
           </div>
         </div>
       </div>
@@ -4340,11 +4304,13 @@ export const AgencyDashboard: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Data state
-  const [stats, setStats] = useState({ revenue: 0, totalMediators: 0, activeCampaigns: 0 });
+  const [stats, setStats] = useState({ revenue: 0, totalMediators: 0, activeCampaigns: 0, ordersToday: 0 });
   const [orders, setOrders] = useState<Order[]>([]);
   const [mediators, setMediators] = useState<User[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
+  const [revenueTrendData, setRevenueTrendData] = useState<Array<{ name: string; val: number }>>([]);
+  const [brandPerfData, setBrandPerfData] = useState<Array<{ name: string; count: number }>>([]);
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [ticketOpen, setTicketOpen] = useState(false);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -4358,6 +4324,8 @@ export const AgencyDashboard: React.FC = () => {
   const loadedRef = useRef<Set<string>>(new Set());
   const inFlightRef = useRef<Set<string>>(new Set());
   const lastFetchedAt = useRef<Record<string, number>>({});
+  const fetchSeqRef = useRef(0);
+  const fetchAbortRef = useRef<AbortController | null>(null);
   // Ref to always read current state for stats computation (avoids stale closures)
   const dataRef = useRef({ mediators, campaigns, orders });
   dataRef.current = { mediators, campaigns, orders };
@@ -4365,7 +4333,7 @@ export const AgencyDashboard: React.FC = () => {
   // Compute which data sets the active tab needs
   const tabDataNeeds = useMemo<string[]>(() => {
     switch (activeTab) {
-      case 'dashboard': return ['mediators', 'campaigns', 'orders'];
+      case 'dashboard': return ['dashboardStats', 'revenueTrend', 'brandPerformance'];
       case 'team': return ['mediators', 'orders'];
       case 'inventory': return ['campaigns', 'mediators', 'orders'];
       case 'orders': return ['orders', 'campaigns', 'mediators'];
@@ -4397,22 +4365,38 @@ export const AgencyDashboard: React.FC = () => {
     if (force && !invalidateKeys) {
       for (const k of currentNeeds) loadedRef.current.delete(k);
     }
-    const needed = currentNeeds.filter((k) => !loadedRef.current.has(k) && !inFlightRef.current.has(k));
+    const now = Date.now();
+    const needed = currentNeeds.filter((k) => {
+      if (inFlightRef.current.has(k)) return false;
+      if (!loadedRef.current.has(k)) return true;
+      return (now - (lastFetchedAt.current[k] || 0)) > 30_000;
+    });
     if (needed.length === 0) return;
 
-    for (const k of needed) inFlightRef.current.add(k);
+    for (const k of needed) { loadedRef.current.delete(k); inFlightRef.current.add(k); }
     if (!silent) setIsDataLoading(true);
+    // Abort any previous in-flight batch and start fresh
+    fetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
+    const seq = ++fetchSeqRef.current;
     try {
       const promises: Promise<any>[] = [];
       const keys: string[] = [];
 
+      if (needed.includes('dashboardStats')) { promises.push(api.ops.getDashboardStats(user.mediatorCode)); keys.push('dashboardStats'); }
+      if (needed.includes('revenueTrend')) { promises.push(api.ops.getRevenueTrend(user.mediatorCode)); keys.push('revenueTrend'); }
+      if (needed.includes('brandPerformance')) { promises.push(api.ops.getBrandPerformance(user.mediatorCode)); keys.push('brandPerformance'); }
       if (needed.includes('mediators')) { promises.push(api.ops.getMediators(user.mediatorCode)); keys.push('mediators'); }
       if (needed.includes('campaigns')) { promises.push(api.ops.getCampaigns(user.mediatorCode)); keys.push('campaigns'); }
       if (needed.includes('orders')) { promises.push(api.ops.getMediatorOrders(user.mediatorCode, 'agency')); keys.push('orders'); }
       if (needed.includes('ledger')) { promises.push(api.ops.getAgencyLedger()); keys.push('ledger'); }
       if (needed.includes('tickets')) { promises.push(api.tickets.getAll().catch(() => [])); keys.push('tickets'); }
 
-      const results = await Promise.all(promises);
+      const settled = await Promise.allSettled(promises);
+
+      // Discard stale results if a newer fetch was started (rapid tab switch) or if aborted
+      if (fetchSeqRef.current !== seq || controller.signal.aborted) return;
 
       // Map results back to state — read current values from ref to avoid stale closures
       let safeMeds = dataRef.current.mediators;
@@ -4421,35 +4405,28 @@ export const AgencyDashboard: React.FC = () => {
 
       const now = Date.now();
       keys.forEach((key, i) => {
+        const result = settled[i];
+        if (result.status !== 'fulfilled') {
+          if (process.env.NODE_ENV !== 'production') console.warn(`[AgencyDashboard] fetch '${key}' failed`, result.reason);
+          return;
+        }
         loadedRef.current.add(key);
         lastFetchedAt.current[key] = now;
         switch (key) {
-          case 'mediators': safeMeds = asArray<User>(results[i]); setMediators(safeMeds); break;
-          case 'campaigns': safeCamps = asArray<Campaign>(results[i]); setCampaigns(safeCamps); break;
-          case 'orders': safeOrds = asArray<Order>(results[i]); setOrders(safeOrds); break;
-          case 'ledger': setPayouts(asArray(results[i])); break;
-          case 'tickets': setTickets(asArray<Ticket>(results[i]).filter((t: Ticket) => t.issueType !== 'Feedback')); break;
+          case 'dashboardStats': {
+            const s = result.value as any;
+            setStats({ revenue: s.revenue ?? 0, totalMediators: s.totalMediators ?? 0, activeCampaigns: s.activeCampaigns ?? 0, ordersToday: s.ordersToday ?? 0 });
+            break;
+          }
+          case 'revenueTrend': setRevenueTrendData(asArray(result.value)); break;
+          case 'brandPerformance': setBrandPerfData(asArray(result.value)); break;
+          case 'mediators': safeMeds = asArray<User>(result.value); setMediators(safeMeds); break;
+          case 'campaigns': safeCamps = asArray<Campaign>(result.value); setCampaigns(safeCamps); break;
+          case 'orders': safeOrds = asArray<Order>(result.value); setOrders(safeOrds); break;
+          case 'ledger': setPayouts(asArray(result.value)); break;
+          case 'tickets': setTickets(asArray<Ticket>(result.value).filter((t: Ticket) => t.issueType !== 'Feedback')); break;
         }
       });
-
-      // Recompute stats when relevant data loaded
-      if (keys.includes('orders') || keys.includes('mediators') || keys.includes('campaigns')) {
-        const revenue = safeOrds.reduce((sum: number, o: Order) => sum + (o.total || 0), 0);
-        const myMediatorCodes: string[] = safeMeds
-          .map((m: User) => (m.mediatorCode || '').toLowerCase())
-          .filter((code: string): code is string => Boolean(code));
-        const activeCount = safeCamps.filter(
-          (c: Campaign) =>
-            c.status === 'Active' &&
-            c.allowedAgencies.includes(user.mediatorCode!) &&
-            (
-              String(c.brandId || '') === String(user.id || '') ||
-              c.openToAll ||
-              Object.keys(c.assignments || {}).some((code: string) => myMediatorCodes.includes(code.toLowerCase()))
-            )
-        ).length;
-        setStats({ revenue, totalMediators: safeMeds.length, activeCampaigns: activeCount });
-      }
     } catch (e) {
       if (process.env.NODE_ENV !== 'production') console.error('Dashboard data fetch failed', e);
       if (!silent) toast.error(formatErrorMessage(e, 'Failed to load dashboard data'));
@@ -4465,6 +4442,7 @@ export const AgencyDashboard: React.FC = () => {
     const tabChanged = prevTabRef.current !== activeTab;
     prevTabRef.current = activeTab;
     fetchData({ silent: tabChanged });
+    return () => { fetchAbortRef.current?.abort(); };
   }, [fetchData, activeTab]);
 
   // Realtime: only invalidate data keys relevant to the SSE event, then refetch
@@ -4472,9 +4450,9 @@ export const AgencyDashboard: React.FC = () => {
     if (!user?.id) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const eventToKeys: Record<string, string[]> = {
-      'orders.changed': ['orders'],
-      'deals.changed': ['campaigns'],
-      'users.changed': ['mediators'],
+      'orders.changed': ['orders', 'dashboardStats', 'revenueTrend', 'brandPerformance'],
+      'deals.changed': ['campaigns', 'dashboardStats'],
+      'users.changed': ['mediators', 'dashboardStats'],
       'wallets.changed': ['ledger'],
       'tickets.changed': ['tickets'],
     };
@@ -4508,6 +4486,16 @@ export const AgencyDashboard: React.FC = () => {
     if (keys) return fetchData({ keys });
     return fetchData({ force: true });
   }, [fetchData]);
+
+  const handleRevenueTrendRange = useCallback((range: string) => {
+    if (!user?.mediatorCode) return;
+    // Invalidate and re-fetch with the new range
+    loadedRef.current.delete('revenueTrend');
+    api.ops.getRevenueTrend(user.mediatorCode, range).then((data) => {
+      setRevenueTrendData(asArray(data));
+      loadedRef.current.add('revenueTrend');
+    }).catch(() => {});
+  }, [user?.mediatorCode]);
 
   return (
     <DesktopShell
@@ -4659,7 +4647,7 @@ export const AgencyDashboard: React.FC = () => {
         </>
       }
     >
-      {activeTab === 'dashboard' && <DashboardView stats={stats} allOrders={orders} />}
+      {activeTab === 'dashboard' && <DashboardView stats={stats} revenueTrendData={revenueTrendData} brandPerfData={brandPerfData} onRangeChange={handleRevenueTrendRange} />}
       {activeTab === 'team' && (
         <TeamView
           mediators={mediators}

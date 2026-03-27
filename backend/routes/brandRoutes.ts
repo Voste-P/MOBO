@@ -34,6 +34,9 @@ export function brandRoutes(env: Env): Router {
     next();
   };
 
+  router.get('/dashboard-stats', dashboardCache, brand.getDashboardStats);
+  router.get('/revenue-trend', dashboardCache, brand.getRevenueTrend);
+  router.get('/inventory-fill', dashboardCache, brand.getInventoryFill);
   router.get('/agencies', dashboardCache, brand.getAgencies);
   router.get('/campaigns', dashboardCache, brand.getCampaigns);
   router.get('/orders', dashboardCache, brand.getOrders);

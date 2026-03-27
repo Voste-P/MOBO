@@ -36,6 +36,9 @@ export function opsRoutes(env: Env): Router {
     next();
   };
 
+  router.get('/dashboard-stats', dashboardCache, ops.getDashboardStats);
+  router.get('/revenue-trend', dashboardCache, ops.getRevenueTrend);
+  router.get('/brand-performance', dashboardCache, ops.getBrandPerformance);
   router.get('/mediators', dashboardCache, ops.getMediators);
   router.get('/campaigns', dashboardCache, ops.getCampaigns);
   router.get('/deals', dashboardCache, ops.getDeals);

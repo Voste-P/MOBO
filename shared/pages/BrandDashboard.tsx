@@ -52,6 +52,7 @@ import {
   FileSpreadsheet,
   Sparkles,
   HelpCircle,
+  BarChart3,
 } from 'lucide-react';
 import { api, asArray } from '../services/api';
 import { exportToGoogleSheet } from '../utils/exportToSheets';
@@ -376,66 +377,20 @@ const BrandProfileView = () => {
 };
 
 const DashboardView = ({
-  campaigns,
-  agencies,
-  orders,
+  stats,
+  revenueData,
+  campaignPerformance,
 }: {
-  campaigns: Campaign[];
-  agencies: User[];
-  orders: Order[];
+  stats: { totalRevenue: number; activeCampaigns: number; partnerAgencies: number; inventoryReach: number };
+  revenueData: Array<{ name: string; revenue: number; dateKey: string }>;
+  campaignPerformance: Array<{ name: string; sold: number; remaining: number; total: number }>;
 }) => {
-  const { totalRevenue, activeCampaigns, totalReach } = useMemo(() => ({
-    totalRevenue: orders.reduce((acc, o) => acc + o.total, 0),
-    activeCampaigns: campaigns.filter((c) => c.status === 'Active').length,
-    totalReach: campaigns.reduce((acc, c) => acc + c.totalSlots, 0),
-  }), [orders, campaigns]);
+  const { totalRevenue, activeCampaigns, partnerAgencies, inventoryReach } = stats;
 
   const formatRupees = (value: number) => {
     const n = Number(value || 0);
     return `${Math.round(n).toLocaleString('en-IN')}`;
   };
-
-  const revenueData = useMemo(() => {
-    const days = 7;
-    const now = new Date();
-    const start = new Date(now);
-    start.setDate(now.getDate() - (days - 1));
-    start.setHours(0, 0, 0, 0);
-
-    const localDayKey = (d: Date) => {
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      return `${yyyy}-${mm}-${dd}`;
-    };
-
-    const totalsByDay = new Map<string, number>();
-    for (const o of orders) {
-      const d = new Date(o.createdAt);
-      if (Number.isNaN(d.getTime())) continue;
-      if (d < start || d > now) continue;
-      const key = localDayKey(d);
-      totalsByDay.set(key, (totalsByDay.get(key) ?? 0) + (Number(o.total) || 0));
-    }
-
-    const points: Array<{ name: string; revenue: number; dateKey: string }> = [];
-    for (let i = 0; i < days; i++) {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
-      const dateKey = localDayKey(d);
-      const name = d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
-      points.push({ name, revenue: totalsByDay.get(dateKey) ?? 0, dateKey });
-    }
-
-    return points;
-  }, [orders]);
-
-  const campaignPerformance = useMemo(() => campaigns.slice(0, 5).map((c) => ({
-    name: c.title.split(' ')[0],
-    sold: c.usedSlots,
-    remaining: Math.max(0, c.totalSlots - c.usedSlots),
-    total: c.totalSlots,
-  })), [campaigns]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-enter">
@@ -462,12 +417,12 @@ const DashboardView = ({
         <StatCard label="Active Campaigns" value={activeCampaigns} icon={<Briefcase size={24} />} />
         <StatCard
           label="Partner Agencies"
-          value={agencies.length}
+          value={partnerAgencies}
           icon={<Users size={24} />}
         />
         <StatCard
           label="Inventory Reach"
-          value={`${(totalReach / 1000).toFixed(1)}k`}
+          value={`${(inventoryReach / 1000).toFixed(1)}k`}
           icon={<Globe size={24} />}
           dark
         />
@@ -485,6 +440,13 @@ const DashboardView = ({
             </div>
           </div>
           <div className="absolute inset-x-0 bottom-0 top-20 px-4 pb-4">
+            {revenueData.length === 0 || revenueData.every((d: any) => !d.revenue) ? (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <div className="p-4 rounded-full bg-zinc-50 mb-4"><TrendingUp size={32} className="text-zinc-300" /></div>
+                <p className="text-sm font-semibold text-zinc-400">No revenue data yet</p>
+                <p className="text-xs text-zinc-300 mt-1">Revenue will appear here as orders are completed</p>
+              </div>
+            ) : (
             <ChartSuspense>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={revenueData}>
@@ -532,6 +494,7 @@ const DashboardView = ({
               </AreaChart>
             </ResponsiveContainer>
             </ChartSuspense>
+            )}
           </div>
         </div>
 
@@ -549,6 +512,13 @@ const DashboardView = ({
             </div>
           </div>
           <div className="flex-1 min-h-0">
+            {!campaignPerformance || campaignPerformance.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <div className="p-4 rounded-full bg-zinc-50 mb-4"><BarChart3 size={32} className="text-zinc-300" /></div>
+                <p className="text-sm font-semibold text-zinc-400">No campaigns yet</p>
+                <p className="text-xs text-zinc-300 mt-1">Create campaigns to track inventory fill rates</p>
+              </div>
+            ) : (
             <ChartSuspense>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
@@ -588,6 +558,7 @@ const DashboardView = ({
               </BarChart>
             </ResponsiveContainer>
             </ChartSuspense>
+            )}
           </div>
         </div>
       </div>
@@ -2178,6 +2149,9 @@ export const BrandDashboard: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(true);
+  const [dashboardStats, setDashboardStats] = useState<{ totalRevenue: number; activeCampaigns: number; partnerAgencies: number; inventoryReach: number }>({ totalRevenue: 0, activeCampaigns: 0, partnerAgencies: 0, inventoryReach: 0 });
+  const [revenueChartData, setRevenueChartData] = useState<Array<{ name: string; revenue: number; dateKey: string }>>([]);
+  const [inventoryFillData, setInventoryFillData] = useState<Array<{ name: string; sold: number; remaining: number; total: number }>>([]);
 
   // NEW: Agency Detail Modal State
   const [selectedAgency, setSelectedAgency] = useState<User | null>(null);
@@ -2197,10 +2171,12 @@ export const BrandDashboard: React.FC = () => {
   const loadedRef = useRef<Set<string>>(new Set());
   const inFlightRef = useRef<Set<string>>(new Set());
   const lastFetchedAt = useRef<Record<string, number>>({});
+  const fetchSeqRef = useRef(0);
+  const fetchAbortRef = useRef<AbortController | null>(null);
 
   const tabDataNeeds = useMemo<string[]>(() => {
     switch (activeTab) {
-      case 'dashboard': return ['campaigns', 'agencies', 'orders'];
+      case 'dashboard': return ['dashboardStats', 'revenueChart', 'inventoryFill'];
       case 'campaigns': return ['campaigns'];
       case 'orders': return ['orders'];
       case 'agencies': return ['agencies', 'transactions'];
@@ -2229,32 +2205,57 @@ export const BrandDashboard: React.FC = () => {
     if (force && !invalidateKeys) {
       for (const k of currentNeeds) loadedRef.current.delete(k);
     }
-    const needed = currentNeeds.filter((k) => !loadedRef.current.has(k) && !inFlightRef.current.has(k));
+    const now = Date.now();
+    const needed = currentNeeds.filter((k) => {
+      if (inFlightRef.current.has(k)) return false;
+      if (!loadedRef.current.has(k)) return true;
+      return (now - (lastFetchedAt.current[k] || 0)) > 30_000;
+    });
     if (needed.length === 0) return;
 
-    for (const k of needed) inFlightRef.current.add(k);
+    for (const k of needed) { loadedRef.current.delete(k); inFlightRef.current.add(k); }
     if (!silent) setIsDataLoading(true);
+    // Abort any previous in-flight batch and start fresh
+    fetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
+    const seq = ++fetchSeqRef.current;
     try {
       const promises: Promise<any>[] = [];
       const keys: string[] = [];
 
+      if (needed.includes('dashboardStats')) { promises.push(api.brand.getDashboardStats(user.id)); keys.push('dashboardStats'); }
+      if (needed.includes('revenueChart')) { promises.push(api.brand.getRevenueTrend(user.id)); keys.push('revenueChart'); }
+      if (needed.includes('inventoryFill')) { promises.push(api.brand.getInventoryFill(user.id)); keys.push('inventoryFill'); }
       if (needed.includes('campaigns')) { promises.push(api.brand.getBrandCampaigns(user.id)); keys.push('campaigns'); }
       if (needed.includes('agencies')) { promises.push(api.brand.getConnectedAgencies(user.id)); keys.push('agencies'); }
       if (needed.includes('orders')) { promises.push(api.brand.getBrandOrders(user.name)); keys.push('orders'); }
       if (needed.includes('transactions')) { promises.push(api.brand.getTransactions(user.id)); keys.push('transactions'); }
       if (needed.includes('tickets')) { promises.push(api.tickets.getAll().catch(() => [])); keys.push('tickets'); }
 
-      const results = await Promise.all(promises);
+      const settled = await Promise.allSettled(promises);
+
+      // Discard stale results if a newer fetch was started (rapid tab switch) or if aborted
+      if (fetchSeqRef.current !== seq || controller.signal.aborted) return;
+
       const now = Date.now();
       keys.forEach((key, i) => {
+        const result = settled[i];
+        if (result.status !== 'fulfilled') {
+          if (process.env.NODE_ENV !== 'production') console.warn(`[BrandDashboard] fetch '${key}' failed`, result.reason);
+          return;
+        }
         loadedRef.current.add(key);
         lastFetchedAt.current[key] = now;
         switch (key) {
-          case 'campaigns': setCampaigns(asArray(results[i])); break;
-          case 'agencies': setAgencies(asArray(results[i])); break;
-          case 'orders': setOrders(asArray(results[i])); break;
-          case 'transactions': setTransactions(asArray(results[i])); break;
-          case 'tickets': setTickets(asArray<Ticket>(results[i]).filter((t: Ticket) => t.issueType !== 'Feedback')); break;
+          case 'dashboardStats': setDashboardStats(result.value as any); break;
+          case 'revenueChart': setRevenueChartData(asArray(result.value)); break;
+          case 'inventoryFill': setInventoryFillData(asArray(result.value)); break;
+          case 'campaigns': setCampaigns(asArray(result.value)); break;
+          case 'agencies': setAgencies(asArray(result.value)); break;
+          case 'orders': setOrders(asArray(result.value)); break;
+          case 'transactions': setTransactions(asArray(result.value)); break;
+          case 'tickets': setTickets(asArray<Ticket>(result.value).filter((t: Ticket) => t.issueType !== 'Feedback')); break;
         }
       });
     } catch (e) {
@@ -2272,6 +2273,7 @@ export const BrandDashboard: React.FC = () => {
     const tabChanged = prevTabRef.current !== activeTab;
     prevTabRef.current = activeTab;
     fetchData({ silent: tabChanged });
+    return () => { fetchAbortRef.current?.abort(); };
   }, [fetchData, activeTab]);
 
   // Realtime: only invalidate data keys relevant to the SSE event, then refetch
@@ -2279,9 +2281,9 @@ export const BrandDashboard: React.FC = () => {
     if (!user?.id) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const eventToKeys: Record<string, string[]> = {
-      'orders.changed': ['orders'],
-      'deals.changed': ['campaigns'],
-      'users.changed': ['agencies'],
+      'orders.changed': ['orders', 'dashboardStats', 'revenueChart'],
+      'deals.changed': ['campaigns', 'dashboardStats', 'inventoryFill'],
+      'users.changed': ['agencies', 'dashboardStats'],
       'wallets.changed': ['transactions'],
       'tickets.changed': ['tickets'],
     };
@@ -2567,7 +2569,7 @@ export const BrandDashboard: React.FC = () => {
     >
 
         {activeTab === 'dashboard' && (
-          <DashboardView campaigns={campaigns} agencies={agencies} orders={orders} />
+          <DashboardView stats={dashboardStats} revenueData={revenueChartData} campaignPerformance={inventoryFillData} />
         )}
         {activeTab === 'campaigns' && (
           <CampaignsView

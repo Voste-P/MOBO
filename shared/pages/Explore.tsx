@@ -4,7 +4,7 @@ import { ProductCard } from '../components/ProductCard';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
-import { api, asArray, invalidateGetCache } from '../services/api';
+import { api, asArray } from '../services/api';
 import { subscribeRealtime } from '../services/realtime';
 import { Search, AlertTriangle, ShoppingBag } from 'lucide-react';
 import { EmptyState, Input } from '../components/ui';
@@ -44,7 +44,6 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
     if (!isActive) return;
     if (loadedOnceRef.current) return;
     loadedOnceRef.current = true;
-    invalidateGetCache('/products');
     loadProducts();
   }, [loadProducts, isActive]);
 

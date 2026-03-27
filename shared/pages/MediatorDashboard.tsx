@@ -1905,10 +1905,12 @@ export const MediatorDashboard: React.FC = () => {
   const loadedRef = useRef<Set<string>>(new Set());
   const inFlightRef = useRef<Set<string>>(new Set());
   const lastFetchedAt = useRef<Record<string, number>>({});
+  const fetchSeqRef = useRef(0);
+  const fetchAbortRef = useRef<AbortController | null>(null);
 
   const tabDataNeeds = useMemo<string[]>(() => {
     switch (activeTab) {
-      case 'inbox': return ['orders', 'campaigns', 'deals', 'pending', 'verified', 'tickets'];
+      case 'inbox': return ['orders', 'campaigns', 'deals', 'pending', 'tickets'];
       case 'market': return ['campaigns', 'deals'];
       case 'squad': return ['pending', 'verified'];
       case 'profile': return [];
@@ -1934,11 +1936,21 @@ export const MediatorDashboard: React.FC = () => {
     if (force && !invalidateKeys) {
       for (const k of currentNeeds) loadedRef.current.delete(k);
     }
-    const needed = currentNeeds.filter((k) => !loadedRef.current.has(k) && !inFlightRef.current.has(k));
+    const now = Date.now();
+    const needed = currentNeeds.filter((k) => {
+      if (inFlightRef.current.has(k)) return false;
+      if (!loadedRef.current.has(k)) return true;
+      return (now - (lastFetchedAt.current[k] || 0)) > 30_000;
+    });
     if (needed.length === 0) return;
 
-    for (const k of needed) inFlightRef.current.add(k);
+    for (const k of needed) { loadedRef.current.delete(k); inFlightRef.current.add(k); }
     setLoading(true);
+    // Abort any previous in-flight batch and start fresh
+    fetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
+    const seq = ++fetchSeqRef.current;
     try {
       const promises: Promise<any>[] = [];
       const keys: string[] = [];
@@ -1950,15 +1962,23 @@ export const MediatorDashboard: React.FC = () => {
       if (needed.includes('verified')) { promises.push(api.ops.getVerifiedUsers(user.mediatorCode || '')); keys.push('verified'); }
       if (needed.includes('tickets')) { promises.push(api.tickets.getAll()); keys.push('tickets'); }
 
-      const results = await Promise.all(promises);
+      const settled = await Promise.allSettled(promises);
+
+      // Discard stale results if a newer fetch was started (rapid tab switch) or if aborted
+      if (fetchSeqRef.current !== seq || controller.signal.aborted) return;
 
       const now = Date.now();
       keys.forEach((key, i) => {
+        const result = settled[i];
+        if (result.status !== 'fulfilled') {
+          if (process.env.NODE_ENV !== 'production') console.warn(`[MediatorDashboard] fetch '${key}' failed`, result.reason);
+          return;
+        }
         loadedRef.current.add(key);
         lastFetchedAt.current[key] = now;
         switch (key) {
           case 'orders': {
-            const safeOrds = asArray<Order>(results[i]);
+            const safeOrds = asArray<Order>(result.value);
             setOrders(safeOrds);
             setProofModal((prev) => {
               if (!prev) return prev;
@@ -1967,10 +1987,10 @@ export const MediatorDashboard: React.FC = () => {
             });
             break;
           }
-          case 'campaigns': setCampaigns(asArray<Campaign>(results[i])); break;
-          case 'deals': setDeals(asArray(results[i])); break;
+          case 'campaigns': setCampaigns(asArray<Campaign>(result.value)); break;
+          case 'deals': setDeals(asArray(result.value)); break;
           case 'pending': {
-            const safePend = asArray<User>(results[i]);
+            const safePend = asArray<User>(result.value);
             setPendingUsers(safePend);
             setSelectedBuyer((prev) => {
               if (!prev) return prev;
@@ -1981,7 +2001,7 @@ export const MediatorDashboard: React.FC = () => {
             break;
           }
           case 'verified': {
-            const safeVer = asArray<User>(results[i]);
+            const safeVer = asArray<User>(result.value);
             setVerifiedUsers(safeVer);
             setSelectedBuyer((prev) => {
               if (!prev) return prev;
@@ -1991,7 +2011,7 @@ export const MediatorDashboard: React.FC = () => {
             });
             break;
           }
-          case 'tickets': setTickets(asArray<Ticket>(results[i]).filter((t: Ticket) => t.issueType !== 'Feedback')); break;
+          case 'tickets': setTickets(asArray<Ticket>(result.value).filter((t: Ticket) => t.issueType !== 'Feedback')); break;
         }
       });
     } catch (e) {
@@ -2012,6 +2032,7 @@ export const MediatorDashboard: React.FC = () => {
     const tabChanged = prevTabRef.current !== activeTab;
     prevTabRef.current = activeTab;
     loadData({ silent: tabChanged });
+    return () => { fetchAbortRef.current?.abort(); };
   }, [loadData, activeTab]);
 
   useEffect(() => {
