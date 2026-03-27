@@ -2028,16 +2028,13 @@ export const MediatorDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load on tab change — force-refetch so every switch shows network activity
+  // Trigger data load on tab change — only fetches keys not already cached
   const prevTabRef = useRef(activeTab);
   useEffect(() => {
     const tabChanged = prevTabRef.current !== activeTab;
     prevTabRef.current = activeTab;
-    if (tabChanged) {
-      loadData({ force: true, silent: true });
-    } else {
-      loadData();
-    }
+    // silent: true on tab switch suppresses spinner; no force so shared keys stay cached
+    loadData(tabChanged ? { silent: true } : undefined);
     return () => { fetchAbortRef.current?.abort(); };
   }, [loadData, activeTab]);
 

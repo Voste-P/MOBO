@@ -4442,11 +4442,8 @@ export const AgencyDashboard: React.FC = () => {
   useEffect(() => {
     const tabChanged = prevTabRef.current !== activeTab;
     prevTabRef.current = activeTab;
-    if (tabChanged) {
-      fetchData({ force: true, silent: true });
-    } else {
-      fetchData();
-    }
+    // silent: true on tab switch suppresses spinner; no force so shared keys stay cached
+    fetchData(tabChanged ? { silent: true } : undefined);
     return () => { fetchAbortRef.current?.abort(); };
   }, [fetchData, activeTab]);
 
