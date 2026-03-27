@@ -1097,6 +1097,7 @@ export function makeBrandController() {
       try {
         const { roles, user } = getRequester(req);
         const pgUserId = (req.auth as any)?.pgUserId as string;
+        if (!pgUserId) throw new AppError(401, 'UNAUTHENTICATED', 'Missing authenticated user');
 
         let brandPgId: string;
         let brandName: string = (user as any)?.name || '';
@@ -1121,7 +1122,7 @@ export function makeBrandController() {
             where: orderWhere,
             _sum: { totalPaise: true },
           }),
-          db().campaign.count({ where: { brandUserId: brandPgId, isDeleted: false, status: 'Active' as any } }),
+          db().campaign.count({ where: { brandUserId: brandPgId, isDeleted: false, status: 'active' as any } }),
           (async () => {
             if (isPrivileged(roles)) return db().user.count({ where: { roles: { has: 'agency' as any }, isDeleted: false } });
             const brandUser = await db().user.findFirst({ where: { id: brandPgId, isDeleted: false }, select: { connectedAgencies: true } });
@@ -1151,6 +1152,7 @@ export function makeBrandController() {
       try {
         const { roles, user } = getRequester(req);
         const pgUserId = (req.auth as any)?.pgUserId as string;
+        if (!pgUserId) throw new AppError(401, 'UNAUTHENTICATED', 'Missing authenticated user');
 
         let brandPgId: string;
         let brandName: string = (user as any)?.name || '';
@@ -1219,6 +1221,7 @@ export function makeBrandController() {
       try {
         const { roles } = getRequester(req);
         const pgUserId = (req.auth as any)?.pgUserId as string;
+        if (!pgUserId) throw new AppError(401, 'UNAUTHENTICATED', 'Missing authenticated user');
 
         let brandPgId: string;
         const requested = String(req.query.brandId || '');

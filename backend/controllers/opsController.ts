@@ -3305,20 +3305,21 @@ export function makeOpsController(env: Env) {
         todayStart.setHours(0, 0, 0, 0);
 
         // All 4 stats in parallel with pure COUNT/SUM (no row transfer)
-        const [totalMediators, totalRevRow, ordersToday, activeCampaignIds] = await Promise.all([
+        const [totalMediators, totalRevRow, ordersToday, activeCampaignCount] = await Promise.all([
           db().user.count({ where: { roles: { has: 'mediator' as any }, parentCode: agencyCode, isDeleted: false } }),
           db().order.aggregate({ where: { managerName: { in: allCodes }, isDeleted: false }, _sum: { totalPaise: true } }),
           db().order.count({ where: { managerName: { in: allCodes }, isDeleted: false, createdAt: { gte: todayStart } } }),
           db().$queryRaw<{ cnt: bigint }[]>`
-            SELECT COUNT(DISTINCT id)::bigint AS cnt FROM "campaigns" WHERE "is_deleted" = false AND status = 'Active'
+            SELECT COUNT(DISTINCT id)::bigint AS cnt FROM "campaigns"
+            WHERE "is_deleted" = false AND status = 'active'
             AND (${agencyCode} = ANY("allowed_agency_codes")
                  OR "open_to_all" = true
-                 OR EXISTS (SELECT 1 FROM unnest(${allCodes}::text[]) AS mc WHERE jsonb_exists(assignments, mc)))
+                 OR EXISTS (SELECT 1 FROM unnest(${allCodes}::text[]) AS mc WHERE assignments ? mc))
           `,
         ]);
 
         const revenue = Math.round(Number(totalRevRow._sum.totalPaise ?? 0) / 100);
-        const activeCampaigns = Number(activeCampaignIds[0]?.cnt ?? 0);
+        const activeCampaigns = Number(activeCampaignCount[0]?.cnt ?? 0);
 
         res.json({ revenue, totalMediators, activeCampaigns, ordersToday });
       } catch (err) {
