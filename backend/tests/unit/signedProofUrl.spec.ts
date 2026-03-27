@@ -77,11 +77,11 @@ describe('signedProofUrl', () => {
       expect(verifyProofToken('not.valid.token', env)).toBeNull();
     });
 
-    it('rejects token with missing fields', () => {
+    it('rejects token with missing fields', async () => {
       // Create a manually signed token with missing fields
-      const crypto = require('node:crypto');
+      const { createHmac } = await import('node:crypto');
       const payload = Buffer.from(JSON.stringify({ oid: 'test' })).toString('base64url'); // missing pt and exp
-      const sig = crypto.createHmac('sha256', env.JWT_ACCESS_SECRET).update(payload).digest('base64url');
+      const sig = createHmac('sha256', env.JWT_ACCESS_SECRET).update(payload).digest('base64url');
       expect(verifyProofToken(`${payload}.${sig}`, env)).toBeNull();
     });
   });

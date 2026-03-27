@@ -24,13 +24,37 @@ test.describe('Agency inventory & connections API', () => {
     expect(body.user.roles).toContain('agency');
   });
 
-  test('agency can create a support ticket', async ({ request }) => {
-    const res = await request.post('/api/tickets', {
+  test('agency can view ops dashboard stats', async ({ request }) => {
+    const res = await request.get('/api/ops/dashboard-stats', {
       headers: authHeaders(agencyToken),
-      data: {
-        issueType: 'Technical Issue',
-        description: `E2E test ticket from agency ${Date.now()}`,
-      },
+    });
+    expect(res.ok()).toBeTruthy();
+  });
+
+  test('agency can list ops campaigns', async ({ request }) => {
+    const res = await request.get('/api/ops/campaigns', {
+      headers: authHeaders(agencyToken),
+    });
+    expect(res.ok()).toBeTruthy();
+  });
+
+  test('agency can list ops deals', async ({ request }) => {
+    const res = await request.get('/api/ops/deals', {
+      headers: authHeaders(agencyToken),
+    });
+    expect(res.ok()).toBeTruthy();
+  });
+
+  test('agency can list ops orders', async ({ request }) => {
+    const res = await request.get('/api/ops/orders', {
+      headers: authHeaders(agencyToken),
+    });
+    expect(res.ok()).toBeTruthy();
+  });
+
+  test('agency can view ops ledger', async ({ request }) => {
+    const res = await request.get('/api/ops/ledger', {
+      headers: authHeaders(agencyToken),
     });
     expect(res.ok()).toBeTruthy();
   });
