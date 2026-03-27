@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
-import { E2E_ACCOUNTS } from './_seedAccounts';
-import { loginAndGetAccessToken } from './_apiAuth';
+import { E2E_ACCOUNTS } from '../helpers/accounts';
+import { loginAndGetAccessToken } from '../helpers/auth';
 
 test('agency can request brand connection (idempotent)', async ({ request }) => {
   const { accessToken } = await loginAndGetAccessToken(request, E2E_ACCOUNTS.agency);

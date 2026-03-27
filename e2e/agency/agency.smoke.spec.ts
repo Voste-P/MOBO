@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { E2E_ACCOUNTS } from './_seedAccounts';
+import { E2E_ACCOUNTS } from '../helpers/accounts';
 
 test('agency can login and view Team', async ({ page }) => {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
