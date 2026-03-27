@@ -366,7 +366,8 @@ export function makeOpsController(env: Env) {
           let matchingIds: string[];
           if (!isPrivileged(roles) && roles.includes('agency')) {
             const mediatorCodes = await listMediatorCodesForAgency(code);
-            const allCodes = [code, ...mediatorCodes].filter(Boolean);
+            // Lowercase all codes to match assignment keys stored by assignSlots
+            const allCodes = [code, ...mediatorCodes].filter(Boolean).map((c) => c.toLowerCase());
             const rows = statusFilter
               ? await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false AND status = ${statusFilter}
@@ -382,14 +383,25 @@ export function makeOpsController(env: Env) {
                 `;
             matchingIds = rows.map((r) => r.id);
           } else {
+            // Lowercase code to match assignment keys (assignSlots lowercases them)
+            const codeLower = code.toLowerCase();
+            // Also check parent agency — campaigns targeted to an agency should be visible to its mediators
+            const parentAgency = roles.includes('mediator')
+              ? await getAgencyCodeForMediatorCode(code)
+              : null;
+            const agencyCodes = [code, ...(parentAgency ? [parentAgency] : [])].filter(Boolean);
             const rows = statusFilter
               ? await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false AND status = ${statusFilter}
-                  AND (${code} = ANY("allowed_agency_codes") OR jsonb_exists(assignments, ${code}) OR "open_to_all" = true)
+                  AND (EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))
+                       OR jsonb_exists(assignments, ${codeLower})
+                       OR "open_to_all" = true)
                 `
               : await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false
-                  AND (${code} = ANY("allowed_agency_codes") OR jsonb_exists(assignments, ${code}) OR "open_to_all" = true)
+                  AND (EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))
+                       OR jsonb_exists(assignments, ${codeLower})
+                       OR "open_to_all" = true)
                 `;
             matchingIds = rows.map((r) => r.id);
           }

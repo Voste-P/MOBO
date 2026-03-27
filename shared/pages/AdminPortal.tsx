@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../components/ui/ConfirmDialog';
-import { api, asArray, extractPaginationMeta, invalidateGetCache } from '../services/api';
+import { api, asArray, extractPaginationMeta } from '../services/api';
 import type { PaginationMeta } from '../services/api';
 import { getDirectBackendUrl } from '../utils/apiBaseUrl';
 import { maskMobile } from '../utils/mobiles';
@@ -296,14 +296,12 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     }
   }, [user?.role]);
 
-  // On view change, clear fingerprint + API cache so the per-view useEffect refetches from network
+  // On view change, clear fingerprint so the per-view useEffect refetches from network
   const prevViewRef = useRef(view);
   useEffect(() => {
     if (prevViewRef.current !== view) {
       prevViewRef.current = view;
       loadedViewsRef.current.delete(view);
-      invalidateGetCache('/admin');
-      invalidateGetCache('/tickets');
     }
   }, [view]);
 

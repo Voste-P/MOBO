@@ -2177,7 +2177,7 @@ export const BrandDashboard: React.FC = () => {
   const tabDataNeeds = useMemo<string[]>(() => {
     switch (activeTab) {
       case 'dashboard': return ['dashboardStats', 'revenueChart', 'inventoryFill'];
-      case 'campaigns': return ['campaigns'];
+      case 'campaigns': return ['campaigns', 'agencies'];
       case 'orders': return ['orders'];
       case 'agencies': return ['agencies', 'transactions'];
       case 'requests': return ['agencies'];
@@ -2269,16 +2269,13 @@ export const BrandDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load on tab change — force-refetch so every switch shows network activity
+  // Trigger data load on tab change — only fetches keys not already cached
   const prevTabRef = useRef(activeTab);
   useEffect(() => {
     const tabChanged = prevTabRef.current !== activeTab;
     prevTabRef.current = activeTab;
-    if (tabChanged) {
-      fetchData({ force: true, silent: true });
-    } else {
-      fetchData();
-    }
+    // silent: true on tab switch suppresses spinner; no force so shared keys stay cached
+    fetchData(tabChanged ? { silent: true } : undefined);
     return () => { fetchAbortRef.current?.abort(); };
   }, [fetchData, activeTab]);
 
