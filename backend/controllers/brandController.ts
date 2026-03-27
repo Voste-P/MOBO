@@ -1095,23 +1095,30 @@ export function makeBrandController() {
     /** GET /brand/dashboard-stats — pre-computed KPI numbers for brand dashboard */
     getDashboardStats: async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const { roles } = getRequester(req);
+        const { roles, user } = getRequester(req);
         const pgUserId = (req.auth as any)?.pgUserId as string;
 
         let brandPgId: string;
+        let brandName: string = (user as any)?.name || '';
         const requested = String(req.query.brandId || '');
         if (isPrivileged(roles) && requested) {
           const brandUser = await db().user.findFirst({ where: { ...idWhere(requested), isDeleted: false }, select: { id: true, name: true } });
           if (!brandUser) throw new AppError(404, 'BRAND_NOT_FOUND', 'Brand not found');
           brandPgId = brandUser.id;
+          brandName = brandUser.name;
         } else {
           brandPgId = pgUserId;
         }
 
+        // Order ownership: direct brandUserId match OR legacy name-based match
+        const orderWhere = brandName
+          ? { OR: [{ brandUserId: brandPgId }, { brandUserId: null, brandName }], isDeleted: false }
+          : { brandUserId: brandPgId, isDeleted: false };
+
         // All 4 stats in parallel — pure aggregates, no row transfer
         const [revenueRow, activeCampaigns, partnerCount, reachRow] = await Promise.all([
           db().order.aggregate({
-            where: { OR: [{ brandUserId: brandPgId }, { brandUserId: null }], isDeleted: false },
+            where: orderWhere,
             _sum: { totalPaise: true },
           }),
           db().campaign.count({ where: { brandUserId: brandPgId, isDeleted: false, status: 'Active' as any } }),
@@ -1142,15 +1149,17 @@ export function makeBrandController() {
     /** GET /brand/revenue-trend — daily revenue for chart (brand dashboard) */
     getRevenueTrend: async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const { roles } = getRequester(req);
+        const { roles, user } = getRequester(req);
         const pgUserId = (req.auth as any)?.pgUserId as string;
 
         let brandPgId: string;
+        let brandName: string = (user as any)?.name || '';
         const requested = String(req.query.brandId || '');
         if (isPrivileged(roles) && requested) {
-          const brandUser = await db().user.findFirst({ where: { ...idWhere(requested), isDeleted: false }, select: { id: true } });
+          const brandUser = await db().user.findFirst({ where: { ...idWhere(requested), isDeleted: false }, select: { id: true, name: true } });
           if (!brandUser) throw new AppError(404, 'BRAND_NOT_FOUND', 'Brand not found');
           brandPgId = brandUser.id;
+          brandName = brandUser.name;
         } else {
           brandPgId = pgUserId;
         }
@@ -1161,16 +1170,29 @@ export function makeBrandController() {
         start.setDate(now.getDate() - (days - 1));
         start.setHours(0, 0, 0, 0);
 
-        const rows = await db().$queryRaw<{ day: string; total: bigint }[]>`
-          SELECT TO_CHAR("created_at", 'YYYY-MM-DD') AS day,
-                 COALESCE(SUM("total_paise"), 0)::bigint AS total
-          FROM "orders"
-          WHERE ("brand_user_id" = ${brandPgId}::uuid OR "brand_user_id" IS NULL)
-            AND "is_deleted" = false
-            AND "created_at" >= ${start}
-          GROUP BY TO_CHAR("created_at", 'YYYY-MM-DD')
-          ORDER BY day
-        `;
+        // Match orders by brandUserId OR legacy name-based assignment
+        const rows = brandName
+          ? await db().$queryRaw<{ day: string; total: bigint }[]>`
+              SELECT TO_CHAR("created_at", 'YYYY-MM-DD') AS day,
+                     COALESCE(SUM("total_paise"), 0)::bigint AS total
+              FROM "orders"
+              WHERE ("brand_user_id" = ${brandPgId}::uuid
+                     OR ("brand_user_id" IS NULL AND "brand_name" = ${brandName}))
+                AND "is_deleted" = false
+                AND "created_at" >= ${start}
+              GROUP BY TO_CHAR("created_at", 'YYYY-MM-DD')
+              ORDER BY day
+            `
+          : await db().$queryRaw<{ day: string; total: bigint }[]>`
+              SELECT TO_CHAR("created_at", 'YYYY-MM-DD') AS day,
+                     COALESCE(SUM("total_paise"), 0)::bigint AS total
+              FROM "orders"
+              WHERE "brand_user_id" = ${brandPgId}::uuid
+                AND "is_deleted" = false
+                AND "created_at" >= ${start}
+              GROUP BY TO_CHAR("created_at", 'YYYY-MM-DD')
+              ORDER BY day
+            `;
 
         const revenueByDay = new Map(rows.map(r => [r.day, Math.round(Number(r.total) / 100)]));
         const points: Array<{ name: string; revenue: number; dateKey: string }> = [];
