@@ -4359,6 +4359,7 @@ export const AgencyDashboard: React.FC = () => {
   const inFlightRef = useRef<Set<string>>(new Set());
   const lastFetchedAt = useRef<Record<string, number>>({});
   const fetchSeqRef = useRef(0);
+  const fetchAbortRef = useRef<AbortController | null>(null);
   // Ref to always read current state for stats computation (avoids stale closures)
   const dataRef = useRef({ mediators, campaigns, orders });
   dataRef.current = { mediators, campaigns, orders };
@@ -4403,6 +4404,10 @@ export const AgencyDashboard: React.FC = () => {
 
     for (const k of needed) inFlightRef.current.add(k);
     if (!silent) setIsDataLoading(true);
+    // Abort any previous in-flight batch and start fresh
+    fetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
     const seq = ++fetchSeqRef.current;
     try {
       const promises: Promise<any>[] = [];
@@ -4416,8 +4421,8 @@ export const AgencyDashboard: React.FC = () => {
 
       const settled = await Promise.allSettled(promises);
 
-      // Discard stale results if a newer fetch was started (rapid tab switch)
-      if (fetchSeqRef.current !== seq) return;
+      // Discard stale results if a newer fetch was started (rapid tab switch) or if aborted
+      if (fetchSeqRef.current !== seq || controller.signal.aborted) return;
 
       // Map results back to state — read current values from ref to avoid stale closures
       let safeMeds = dataRef.current.mediators;
@@ -4475,6 +4480,7 @@ export const AgencyDashboard: React.FC = () => {
     const tabChanged = prevTabRef.current !== activeTab;
     prevTabRef.current = activeTab;
     fetchData({ silent: tabChanged });
+    return () => { fetchAbortRef.current?.abort(); };
   }, [fetchData, activeTab]);
 
   // Realtime: only invalidate data keys relevant to the SSE event, then refetch

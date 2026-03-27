@@ -2198,6 +2198,7 @@ export const BrandDashboard: React.FC = () => {
   const inFlightRef = useRef<Set<string>>(new Set());
   const lastFetchedAt = useRef<Record<string, number>>({});
   const fetchSeqRef = useRef(0);
+  const fetchAbortRef = useRef<AbortController | null>(null);
 
   const tabDataNeeds = useMemo<string[]>(() => {
     switch (activeTab) {
@@ -2235,6 +2236,10 @@ export const BrandDashboard: React.FC = () => {
 
     for (const k of needed) inFlightRef.current.add(k);
     if (!silent) setIsDataLoading(true);
+    // Abort any previous in-flight batch and start fresh
+    fetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
     const seq = ++fetchSeqRef.current;
     try {
       const promises: Promise<any>[] = [];
@@ -2248,8 +2253,8 @@ export const BrandDashboard: React.FC = () => {
 
       const settled = await Promise.allSettled(promises);
 
-      // Discard stale results if a newer fetch was started (rapid tab switch)
-      if (fetchSeqRef.current !== seq) return;
+      // Discard stale results if a newer fetch was started (rapid tab switch) or if aborted
+      if (fetchSeqRef.current !== seq || controller.signal.aborted) return;
 
       const now = Date.now();
       keys.forEach((key, i) => {
@@ -2283,6 +2288,7 @@ export const BrandDashboard: React.FC = () => {
     const tabChanged = prevTabRef.current !== activeTab;
     prevTabRef.current = activeTab;
     fetchData({ silent: tabChanged });
+    return () => { fetchAbortRef.current?.abort(); };
   }, [fetchData, activeTab]);
 
   // Realtime: only invalidate data keys relevant to the SSE event, then refetch

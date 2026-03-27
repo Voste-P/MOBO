@@ -273,6 +273,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   const initialLoadRef = useRef(false);
   // Sequence counter to discard stale fetch responses on rapid view switches
   const viewSeqRef = useRef(0);
+  // Abort controller for cancelling in-flight view fetches on view switch / unmount
+  const viewAbortRef = useRef<AbortController | null>(null);
   // Track which views have been loaded (with param fingerprint) to avoid re-fetching on revisit
   const loadedViewsRef = useRef<Map<string, string>>(new Map());
 
@@ -301,13 +303,17 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     if (!dashboardMountedRef.current) { dashboardMountedRef.current = true; return; } // skip first mount
     const fp = 'dashboard';
     if (loadedViewsRef.current.get('dashboard') === fp) return;
+    viewAbortRef.current?.abort();
+    const controller = new AbortController();
+    viewAbortRef.current = controller;
     const seq = ++viewSeqRef.current;
     Promise.allSettled([api.admin.getStats(), api.admin.getGrowthAnalytics()]).then(([s, g]) => {
-      if (viewSeqRef.current !== seq) return;
+      if (viewSeqRef.current !== seq || controller.signal.aborted) return;
       loadedViewsRef.current.set('dashboard', fp);
       if (s.status === 'fulfilled') setStats(s.value);
       if (g.status === 'fulfilled') setChartData(asArray(g.value));
     });
+    return () => { controller.abort(); };
   }, [user?.id, view]);
 
   // Realtime: only refresh when the event is relevant to the current view
@@ -361,6 +367,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     const fp = `audit:${auditPage}:${auditActionFilter}:${auditDateFrom}:${auditDateTo}`;
     if (loadedViewsRef.current.get('audit-logs') === fp) return;
     setAuditLoading(true);
+    viewAbortRef.current?.abort();
+    const controller = new AbortController();
+    viewAbortRef.current = controller;
     const seq = ++viewSeqRef.current;
     const params: any = { limit: PAGE_SIZE, page: auditPage };
     if (auditActionFilter) params.action = auditActionFilter;
@@ -369,13 +378,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     api.admin
       .getAuditLogs(params)
       .then((res) => {
-        if (viewSeqRef.current !== seq) return;
+        if (viewSeqRef.current !== seq || controller.signal.aborted) return;
         loadedViewsRef.current.set('audit-logs', fp);
         setAuditLogs(asArray(res));
         setAuditPagination(extractPaginationMeta(res));
       })
-      .catch((e) => { if (viewSeqRef.current === seq) { if (process.env.NODE_ENV !== 'production') console.error('Audit Logs Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to load audit logs.')); } })
-      .finally(() => { if (viewSeqRef.current === seq) setAuditLoading(false); });
+      .catch((e) => { if (viewSeqRef.current === seq && !controller.signal.aborted) { if (process.env.NODE_ENV !== 'production') console.error('Audit Logs Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to load audit logs.')); } })
+      .finally(() => { if (viewSeqRef.current === seq && !controller.signal.aborted) setAuditLoading(false); });
+    return () => { controller.abort(); };
   }, [user?.id, view, auditActionFilter, auditDateFrom, auditDateTo, auditPage]);
 
   useEffect(() => {
@@ -385,16 +395,20 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     const search = debouncedUserSearch.trim() || undefined;
     const fp = `users:${usersPage}:${role}:${search || ''}`;
     if (loadedViewsRef.current.get('users') === fp) return;
+    viewAbortRef.current?.abort();
+    const controller = new AbortController();
+    viewAbortRef.current = controller;
     const seq = ++userSearchSeqRef.current;
     api.admin
       .getUsers(role, { page: usersPage, limit: PAGE_SIZE, search })
       .then((res) => {
-        if (seq !== userSearchSeqRef.current) return;
+        if (seq !== userSearchSeqRef.current || controller.signal.aborted) return;
         loadedViewsRef.current.set('users', fp);
         setUsers(asArray(res));
         setUsersPagination(extractPaginationMeta(res));
       })
-      .catch((e) => { if (seq === userSearchSeqRef.current) { if (process.env.NODE_ENV !== 'production') console.error('Admin Users Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh users list.')); } });
+      .catch((e) => { if (seq === userSearchSeqRef.current && !controller.signal.aborted) { if (process.env.NODE_ENV !== 'production') console.error('Admin Users Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh users list.')); } });
+    return () => { controller.abort(); };
   }, [user?.id, view, usersPage, userRoleFilter, debouncedUserSearch]);
 
   useEffect(() => {
@@ -402,16 +416,20 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     if (view !== 'invites') return;
     const fp = `invites:${invitesPage}`;
     if (loadedViewsRef.current.get('invites') === fp) return;
+    viewAbortRef.current?.abort();
+    const controller = new AbortController();
+    viewAbortRef.current = controller;
     const seq = ++viewSeqRef.current;
     api.admin
       .getInvites({ page: invitesPage, limit: PAGE_SIZE })
       .then((res) => {
-        if (viewSeqRef.current !== seq) return;
+        if (viewSeqRef.current !== seq || controller.signal.aborted) return;
         loadedViewsRef.current.set('invites', fp);
         setInvites(asArray(res));
         setInvitesPagination(extractPaginationMeta(res));
       })
-      .catch((e) => { if (viewSeqRef.current === seq) { if (process.env.NODE_ENV !== 'production') console.error('Admin Invites Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh invites.')); } });
+      .catch((e) => { if (viewSeqRef.current === seq && !controller.signal.aborted) { if (process.env.NODE_ENV !== 'production') console.error('Admin Invites Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh invites.')); } });
+    return () => { controller.abort(); };
   }, [user?.id, view, invitesPage]);
 
   // Fetch orders when switching to orders/finance view or when page changes
@@ -420,9 +438,12 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     if (view !== 'orders' && view !== 'finance') return;
     const fp = `orders:${ordersPage}`;
     if (loadedViewsRef.current.get('orders') === fp) return;
+    viewAbortRef.current?.abort();
+    const controller = new AbortController();
+    viewAbortRef.current = controller;
     const seq = ++viewSeqRef.current;
     api.admin.getFinancials({ page: ordersPage, limit: PAGE_SIZE }).then((res) => {
-      if (viewSeqRef.current !== seq) return;
+      if (viewSeqRef.current !== seq || controller.signal.aborted) return;
       loadedViewsRef.current.set('orders', fp);
       const safeOrders = asArray<Order>(res);
       setOrders(safeOrders);
@@ -432,7 +453,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         const updated = safeOrders.find((ord: Order) => ord.id === prev.id);
         return updated || prev;
       });
-    }).catch((e) => { if (viewSeqRef.current === seq) { if (process.env.NODE_ENV !== 'production') console.error('Admin Orders Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh orders.')); } });
+    }).catch((e) => { if (viewSeqRef.current === seq && !controller.signal.aborted) { if (process.env.NODE_ENV !== 'production') console.error('Admin Orders Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh orders.')); } });
+    return () => { controller.abort(); };
   }, [user?.id, view, ordersPage]);
 
   // Fetch products when switching to inventory view or when page changes
@@ -441,13 +463,17 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     if (view !== 'inventory') return;
     const fp = `inventory:${productsPage}`;
     if (loadedViewsRef.current.get('inventory') === fp) return;
+    viewAbortRef.current?.abort();
+    const controller = new AbortController();
+    viewAbortRef.current = controller;
     const seq = ++viewSeqRef.current;
     api.admin.getProducts({ page: productsPage, limit: PAGE_SIZE }).then((res) => {
-      if (viewSeqRef.current !== seq) return;
+      if (viewSeqRef.current !== seq || controller.signal.aborted) return;
       loadedViewsRef.current.set('inventory', fp);
       setProducts(asArray(res));
       setProductsPagination(extractPaginationMeta(res));
-    }).catch((e) => { if (viewSeqRef.current === seq) { if (process.env.NODE_ENV !== 'production') console.error('Admin Products Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh products.')); } });
+    }).catch((e) => { if (viewSeqRef.current === seq && !controller.signal.aborted) { if (process.env.NODE_ENV !== 'production') console.error('Admin Products Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh products.')); } });
+    return () => { controller.abort(); };
   }, [user?.id, view, productsPage]);
 
   useEffect(() => {
@@ -464,10 +490,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     if (view !== 'support' && view !== 'feedback') return;
     const fp = `tickets:${view}`;
     if (loadedViewsRef.current.get('tickets') === fp) return;
+    viewAbortRef.current?.abort();
+    const controller = new AbortController();
+    viewAbortRef.current = controller;
     const seq = ++viewSeqRef.current;
     api.tickets.getAll({ issueType: view === 'feedback' ? 'Feedback' : 'Support' })
-      .then((res) => { if (viewSeqRef.current === seq) { loadedViewsRef.current.set('tickets', fp); setTickets(asArray(res)); } })
-      .catch((e) => { if (viewSeqRef.current === seq) { if (process.env.NODE_ENV !== 'production') console.error('Admin Tickets Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to load tickets.')); } });
+      .then((res) => { if (viewSeqRef.current === seq && !controller.signal.aborted) { loadedViewsRef.current.set('tickets', fp); setTickets(asArray(res)); } })
+      .catch((e) => { if (viewSeqRef.current === seq && !controller.signal.aborted) { if (process.env.NODE_ENV !== 'production') console.error('Admin Tickets Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to load tickets.')); } });
+    return () => { controller.abort(); };
   }, [user?.id, view]);
 
   /** Refresh only the data needed for the active tab/view (instead of ALL endpoints). */
