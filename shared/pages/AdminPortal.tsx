@@ -277,6 +277,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   const viewAbortRef = useRef<AbortController | null>(null);
   // Track which views have been loaded (with param fingerprint) to avoid re-fetching on revisit
   const loadedViewsRef = useRef<Map<string, string>>(new Map());
+  const viewFetchedAt = useRef<Record<string, number>>({});
 
   const fetchSystemConfig = async () => {
     try {
@@ -302,14 +303,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     if (view !== 'dashboard') { dashboardMountedRef.current = true; return; }
     if (!dashboardMountedRef.current) { dashboardMountedRef.current = true; return; } // skip first mount
     const fp = 'dashboard';
-    if (loadedViewsRef.current.get('dashboard') === fp) return;
+    if (loadedViewsRef.current.get('dashboard') === fp && (Date.now() - (viewFetchedAt.current['dashboard'] || 0)) < 30_000) return;
     viewAbortRef.current?.abort();
     const controller = new AbortController();
     viewAbortRef.current = controller;
     const seq = ++viewSeqRef.current;
     Promise.allSettled([api.admin.getStats(), api.admin.getGrowthAnalytics()]).then(([s, g]) => {
       if (viewSeqRef.current !== seq || controller.signal.aborted) return;
-      loadedViewsRef.current.set('dashboard', fp);
+      loadedViewsRef.current.set('dashboard', fp); viewFetchedAt.current['dashboard'] = Date.now();
       if (s.status === 'fulfilled') setStats(s.value);
       if (g.status === 'fulfilled') setChartData(asArray(g.value));
     });
@@ -365,7 +366,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     if (!user?.id || user.role !== 'admin') return;
     if (view !== 'audit-logs') return;
     const fp = `audit:${auditPage}:${auditActionFilter}:${auditDateFrom}:${auditDateTo}`;
-    if (loadedViewsRef.current.get('audit-logs') === fp) return;
+    if (loadedViewsRef.current.get('audit-logs') === fp && (Date.now() - (viewFetchedAt.current['audit-logs'] || 0)) < 30_000) return;
     setAuditLoading(true);
     viewAbortRef.current?.abort();
     const controller = new AbortController();
@@ -379,7 +380,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       .getAuditLogs(params)
       .then((res) => {
         if (viewSeqRef.current !== seq || controller.signal.aborted) return;
-        loadedViewsRef.current.set('audit-logs', fp);
+        loadedViewsRef.current.set('audit-logs', fp); viewFetchedAt.current['audit-logs'] = Date.now();
         setAuditLogs(asArray(res));
         setAuditPagination(extractPaginationMeta(res));
       })
@@ -394,7 +395,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     const role = userRoleFilter === 'All' ? 'all' : userRoleFilter.toLowerCase();
     const search = debouncedUserSearch.trim() || undefined;
     const fp = `users:${usersPage}:${role}:${search || ''}`;
-    if (loadedViewsRef.current.get('users') === fp) return;
+    if (loadedViewsRef.current.get('users') === fp && (Date.now() - (viewFetchedAt.current['users'] || 0)) < 30_000) return;
     viewAbortRef.current?.abort();
     const controller = new AbortController();
     viewAbortRef.current = controller;
@@ -403,7 +404,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       .getUsers(role, { page: usersPage, limit: PAGE_SIZE, search })
       .then((res) => {
         if (seq !== userSearchSeqRef.current || controller.signal.aborted) return;
-        loadedViewsRef.current.set('users', fp);
+        loadedViewsRef.current.set('users', fp); viewFetchedAt.current['users'] = Date.now();
         setUsers(asArray(res));
         setUsersPagination(extractPaginationMeta(res));
       })
@@ -415,7 +416,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     if (!user?.id || user.role !== 'admin') return;
     if (view !== 'invites') return;
     const fp = `invites:${invitesPage}`;
-    if (loadedViewsRef.current.get('invites') === fp) return;
+    if (loadedViewsRef.current.get('invites') === fp && (Date.now() - (viewFetchedAt.current['invites'] || 0)) < 30_000) return;
     viewAbortRef.current?.abort();
     const controller = new AbortController();
     viewAbortRef.current = controller;
@@ -424,7 +425,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       .getInvites({ page: invitesPage, limit: PAGE_SIZE })
       .then((res) => {
         if (viewSeqRef.current !== seq || controller.signal.aborted) return;
-        loadedViewsRef.current.set('invites', fp);
+        loadedViewsRef.current.set('invites', fp); viewFetchedAt.current['invites'] = Date.now();
         setInvites(asArray(res));
         setInvitesPagination(extractPaginationMeta(res));
       })
@@ -437,14 +438,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     if (!user?.id || user.role !== 'admin') return;
     if (view !== 'orders' && view !== 'finance') return;
     const fp = `orders:${ordersPage}`;
-    if (loadedViewsRef.current.get('orders') === fp) return;
+    if (loadedViewsRef.current.get('orders') === fp && (Date.now() - (viewFetchedAt.current['orders'] || 0)) < 30_000) return;
     viewAbortRef.current?.abort();
     const controller = new AbortController();
     viewAbortRef.current = controller;
     const seq = ++viewSeqRef.current;
     api.admin.getFinancials({ page: ordersPage, limit: PAGE_SIZE }).then((res) => {
       if (viewSeqRef.current !== seq || controller.signal.aborted) return;
-      loadedViewsRef.current.set('orders', fp);
+      loadedViewsRef.current.set('orders', fp); viewFetchedAt.current['orders'] = Date.now();
       const safeOrders = asArray<Order>(res);
       setOrders(safeOrders);
       setOrdersPagination(extractPaginationMeta(res));
@@ -462,14 +463,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     if (!user?.id || user.role !== 'admin') return;
     if (view !== 'inventory') return;
     const fp = `inventory:${productsPage}`;
-    if (loadedViewsRef.current.get('inventory') === fp) return;
+    if (loadedViewsRef.current.get('inventory') === fp && (Date.now() - (viewFetchedAt.current['inventory'] || 0)) < 30_000) return;
     viewAbortRef.current?.abort();
     const controller = new AbortController();
     viewAbortRef.current = controller;
     const seq = ++viewSeqRef.current;
     api.admin.getProducts({ page: productsPage, limit: PAGE_SIZE }).then((res) => {
       if (viewSeqRef.current !== seq || controller.signal.aborted) return;
-      loadedViewsRef.current.set('inventory', fp);
+      loadedViewsRef.current.set('inventory', fp); viewFetchedAt.current['inventory'] = Date.now();
       setProducts(asArray(res));
       setProductsPagination(extractPaginationMeta(res));
     }).catch((e) => { if (viewSeqRef.current === seq && !controller.signal.aborted) { if (process.env.NODE_ENV !== 'production') console.error('Admin Products Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh products.')); } });
@@ -479,8 +480,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   useEffect(() => {
     if (!user?.id || user.role !== 'admin') return;
     if (view !== 'settings') return;
-    if (loadedViewsRef.current.has('settings')) return;
-    loadedViewsRef.current.set('settings', 'loaded');
+    if (loadedViewsRef.current.has('settings') && (Date.now() - (viewFetchedAt.current['settings'] || 0)) < 30_000) return;
+    loadedViewsRef.current.set('settings', 'loaded'); viewFetchedAt.current['settings'] = Date.now();
     fetchSystemConfig();
   }, [user?.id, view]);
 
@@ -489,13 +490,13 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     if (!user?.id || user.role !== 'admin') return;
     if (view !== 'support' && view !== 'feedback') return;
     const fp = `tickets:${view}`;
-    if (loadedViewsRef.current.get('tickets') === fp) return;
+    if (loadedViewsRef.current.get('tickets') === fp && (Date.now() - (viewFetchedAt.current['tickets'] || 0)) < 30_000) return;
     viewAbortRef.current?.abort();
     const controller = new AbortController();
     viewAbortRef.current = controller;
     const seq = ++viewSeqRef.current;
     api.tickets.getAll({ issueType: view === 'feedback' ? 'Feedback' : 'Support' })
-      .then((res) => { if (viewSeqRef.current === seq && !controller.signal.aborted) { loadedViewsRef.current.set('tickets', fp); setTickets(asArray(res)); } })
+      .then((res) => { if (viewSeqRef.current === seq && !controller.signal.aborted) { loadedViewsRef.current.set('tickets', fp); viewFetchedAt.current['tickets'] = Date.now(); setTickets(asArray(res)); } })
       .catch((e) => { if (viewSeqRef.current === seq && !controller.signal.aborted) { if (process.env.NODE_ENV !== 'production') console.error('Admin Tickets Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to load tickets.')); } });
     return () => { controller.abort(); };
   }, [user?.id, view]);

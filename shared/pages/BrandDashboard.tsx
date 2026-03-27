@@ -2205,10 +2205,15 @@ export const BrandDashboard: React.FC = () => {
     if (force && !invalidateKeys) {
       for (const k of currentNeeds) loadedRef.current.delete(k);
     }
-    const needed = currentNeeds.filter((k) => !loadedRef.current.has(k) && !inFlightRef.current.has(k));
+    const now = Date.now();
+    const needed = currentNeeds.filter((k) => {
+      if (inFlightRef.current.has(k)) return false;
+      if (!loadedRef.current.has(k)) return true;
+      return (now - (lastFetchedAt.current[k] || 0)) > 30_000;
+    });
     if (needed.length === 0) return;
 
-    for (const k of needed) inFlightRef.current.add(k);
+    for (const k of needed) { loadedRef.current.delete(k); inFlightRef.current.add(k); }
     if (!silent) setIsDataLoading(true);
     // Abort any previous in-flight batch and start fresh
     fetchAbortRef.current?.abort();
