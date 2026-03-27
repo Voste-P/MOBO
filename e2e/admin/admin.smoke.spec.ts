@@ -1,5 +1,5 @@
-﻿import { test, expect } from '@playwright/test';
-import { E2E_ACCOUNTS } from './_seedAccounts';
+import { test, expect } from '@playwright/test';
+import { E2E_ACCOUNTS } from '../helpers/accounts';
 
 test('admin can authenticate and see sidebar', async ({ page }) => {
   await page.goto('/');

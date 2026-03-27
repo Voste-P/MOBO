@@ -72,6 +72,14 @@ erDiagram
 │   └── admin-web/   Admin portal (dev port 3005)
 ├── shared/          Shared components, hooks, utils, types
 ├── e2e/             Playwright end-to-end tests
+│   ├── helpers/     Shared auth & seed account utilities
+│   ├── fixtures/    Test images and mock data
+│   ├── admin/       Admin portal tests
+│   ├── agency/      Agency portal tests
+│   ├── brand/       Brand portal tests
+│   ├── buyer/       Buyer app tests
+│   ├── mediator/    Mediator app tests
+│   └── lifecycle/   Full order lifecycle API tests
 ├── scripts/         Dev tooling (stack launcher, cleanup, health checks)
 └── docs/
     ├── operations/  Deployment and production checklists
@@ -206,6 +214,7 @@ npm run test:backend
 
 Notes:
 
+- Playwright E2E tests are organized by role: `e2e/{admin,agency,brand,buyer,mediator,lifecycle}/`.
 - Playwright starts a safe E2E backend + all portals automatically.
 - E2E uses deterministic seeding via Prisma (PG-only).
 

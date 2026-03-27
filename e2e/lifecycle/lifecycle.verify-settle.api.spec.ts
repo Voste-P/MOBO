@@ -1,6 +1,6 @@
-ï»¿import { test, expect } from '@playwright/test';
-import { loginAndGetAccessToken } from './_apiAuth';
-import { E2E_ACCOUNTS } from './_seedAccounts';
+import { test, expect } from '@playwright/test';
+import { loginAndGetAccessToken } from '../helpers/auth';
+import { E2E_ACCOUNTS } from '../helpers/accounts';
 
 // Helper: assert response ok and return parsed JSON, or throw with useful diagnostics.
 async function expectOk(res: { ok(): boolean; status(): number; text(): Promise<string>; json(): Promise<any> }, label: string) {
@@ -219,10 +219,10 @@ test('order lifecycle: buyer create -> ops verify -> ops settle -> wallets credi
   const buyerWalletAfter = Number(meAfter?.user?.wallet?.balancePaise ?? meAfter?.user?.walletBalance ?? 0);
 
   if (didSettle) {
-    // Settlement just happened â€” wallet balance must have increased.
+    // Settlement just happened — wallet balance must have increased.
     expect(buyerWalletAfter).toBeGreaterThan(buyerWalletBefore);
   } else {
-    // Order was already settled in a prior run â€” wallet shouldn't have decreased.
+    // Order was already settled in a prior run — wallet shouldn't have decreased.
     expect(buyerWalletAfter).toBeGreaterThanOrEqual(buyerWalletBefore);
   }
 });

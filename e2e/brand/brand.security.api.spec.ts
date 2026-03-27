@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
-import { E2E_ACCOUNTS } from './_seedAccounts';
-import { loginAndGetAccessToken } from './_apiAuth';
+import { E2E_ACCOUNTS } from '../helpers/accounts';
+import { loginAndGetAccessToken } from '../helpers/auth';
 
 test('brand can read its own transactions', async ({ request }) => {
   const { accessToken, user } = await loginAndGetAccessToken(request, E2E_ACCOUNTS.brand);

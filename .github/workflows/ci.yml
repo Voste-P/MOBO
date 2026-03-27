@@ -303,22 +303,21 @@ jobs:
           retention-days: 14
 
   # ═══════════════════════════════════════════════════════════════════
-  #  5. Deploy — migrate production database + trigger server deploy
+  #  5. Deploy — trigger server deploy
   #     Only on push to main or develop (never on PRs)
   # ═══════════════════════════════════════════════════════════════════
+  #
+  #  NOTE: Production database migrations are managed separately
+  #  outside of CI/CD. This job only triggers the server deployment.
   #
   #  SAFETY:
   #   - Separate concurrency group prevents parallel deploys
   #   - cancel-in-progress: false — NEVER cancel a running deploy
-  #   - DATABASE_URL is only available in this job (secret isolation)
-  #   - Migration safety re-checked before touching production
-  #   - Uses deploy-migrate.js (direct SQL) — bypasses Prisma CLI
-  #     to avoid 'permission denied for schema public' issues
   # ═══════════════════════════════════════════════════════════════════
   deploy:
     name: '🚀 Deploy'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     needs: [test-e2e]
     if: >-
       github.event_name == 'push' &&
@@ -340,335 +339,15 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Node ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Pin npm version
-        run: npm i -g npm@${{ env.NPM_VERSION }}
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Generate Prisma client
-        run: npm -w @mobo/backend run pg:generate
-
-      - name: Check migration safety (production)
-        run: cd backend && bash scripts/check-migration-safety.sh
-
-      # Fail-fast if DATABASE_URL secret is not configured
-      - name: Validate DATABASE_URL is set
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: |
-          if [ -z "$DATABASE_URL" ]; then
-            echo "::error::DATABASE_URL secret is not configured — skipping deploy"
-            exit 1
-          fi
-          echo "✅ DATABASE_URL is configured"
-          # Debug: show URL structure (masked credentials)
-          echo "URL params: $(echo "$DATABASE_URL" | grep -oP '\?.*' | sed 's/=[^&]*/=***/g' || echo '(none)')"
-
-      - name: Verify database connectivity & permissions
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          NODE_TLS_REJECT_UNAUTHORIZED: '0'
-        run: |
-          cd backend
-          # Determine schema based on branch
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            SCHEMA="buzzma_production"
-          else
-            SCHEMA="buzzma_test"
-          fi
-          echo "DB_SCHEMA=$SCHEMA" >> "$GITHUB_ENV"
-          echo "Using schema: $SCHEMA"
-
-          # Build the correctly-fixed DATABASE_URL (Node.js handles URL params safely)
-          # Adds search_path + sslaccept for Prisma Rust engine compatibility
-          FIXED_URL=$(node -e '
-            var schema = process.argv[1];
-            var u = process.env.DATABASE_URL || "";
-            var i = u.indexOf("?");
-            var base = i >= 0 ? u.substring(0, i) : u;
-            var qs = i >= 0 ? u.substring(i + 1) : "";
-            var params = qs ? qs.split("&").filter(function(p) {
-              return !p.startsWith("search_path=") && !p.startsWith("sslaccept=");
-            }) : [];
-            params.push("search_path=" + schema);
-            params.push("sslaccept=accept_invalid_certs");
-            process.stdout.write(base + "?" + params.join("&"));
-          ' "$SCHEMA")
-          # Save for all subsequent deploy steps
-          echo "DEPLOY_DATABASE_URL=$FIXED_URL" >> "$GITHUB_ENV"
-          echo "::add-mask::$FIXED_URL"
-
-          # Show masked URL structure for debugging
-          echo "$FIXED_URL" | sed 's/:\/\/[^:]*:[^@]*@/:\/\/***:***@/'
-
-          DEPLOY_URL="$FIXED_URL" node -e '
-            const { Client } = require("pg");
-            const c = new Client({
-              connectionString: process.env.DEPLOY_URL,
-              ssl: { rejectUnauthorized: false }
-            });
-            const schema = process.argv[1];
-            (async () => {
-              await c.connect();
-              const sp = await c.query("SHOW search_path");
-              console.log("search_path:", sp.rows[0].search_path);
-              const cs = await c.query("SELECT current_schema()");
-              console.log("current_schema:", cs.rows[0].current_schema);
-
-              // Check if schema exists
-              const res = await c.query(
-                "SELECT 1 FROM information_schema.schemata WHERE schema_name = $1",
-                [schema]
-              );
-              if (res.rows.length === 0) {
-                console.log("⚠️  Schema " + schema + " does not exist — deploy-migrate.js will handle creation");
-              } else {
-                console.log("✅ Schema " + schema + " exists");
-              }
-
-              // Verify CREATE privilege (non-fatal — deploy-migrate.js has its own error handling)
-              await c.query("SET search_path TO " + schema);
-              try {
-                await c.query("CREATE TABLE IF NOT EXISTS _ci_privilege_test (id int)");
-                await c.query("DROP TABLE IF EXISTS _ci_privilege_test");
-                console.log("✅ CREATE privilege verified on " + schema);
-              } catch (privErr) {
-                console.log("⚠️  CREATE privilege test failed: " + privErr.message);
-                console.log("   deploy-migrate.js will attempt migration anyway");
-              }
-
-              console.log("✅ Connectivity OK");
-              await c.end();
-            })().catch(e => { console.error("::error::DB check failed: " + e.message); process.exit(1); });
-          ' "$SCHEMA"
-
-      - name: Prepare migration state
-        id: prepare-migration
-        continue-on-error: true
-        env:
-          NODE_TLS_REJECT_UNAUTHORIZED: '0'
-        run: |
-          export DATABASE_URL="${DEPLOY_DATABASE_URL}"
-          echo "DATABASE_URL is ${#DATABASE_URL} chars (empty=${DATABASE_URL:+no}${DATABASE_URL:-YES})"
-          cd backend
-
-          # Pre-create _prisma_migrations + clean incomplete entries (all via direct pg)
-          node -e '
-            const fs = require("fs");
-            const crypto = require("crypto");
-            const path = require("path");
-            const { Client } = require("pg");
-            const c = new Client({
-              connectionString: process.env.DATABASE_URL,
-              ssl: { rejectUnauthorized: false }
-            });
-            const schema = process.argv[1];
-            (async () => {
-              await c.connect();
-              console.log("Connected. Preparing migration state for schema:", schema);
-
-              // pg library does not apply search_path from URL — set explicitly
-              await c.query("SET search_path TO " + schema);
-              const sp = await c.query("SHOW search_path");
-              console.log("search_path:", sp.rows[0].search_path);
-
-              await c.query(
-                "CREATE TABLE IF NOT EXISTS \"_prisma_migrations\" (" +
-                "id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text, " +
-                "checksum VARCHAR(64) NOT NULL, " +
-                "finished_at TIMESTAMPTZ, " +
-                "migration_name VARCHAR(255) NOT NULL UNIQUE, " +
-                "logs TEXT, " +
-                "rolled_back_at TIMESTAMPTZ, " +
-                "started_at TIMESTAMPTZ DEFAULT now(), " +
-                "applied_steps_count INTEGER DEFAULT 0)"
-              );
-              console.log("_prisma_migrations table ready");
-
-              const del = await c.query(
-                "DELETE FROM \"_prisma_migrations\" WHERE finished_at IS NULL"
-              );
-              if (del.rowCount > 0) console.log("Cleaned", del.rowCount, "incomplete entries");
-
-              // Check for existing tables
-              const r = await c.query(
-                "SELECT table_name FROM information_schema.tables " +
-                "WHERE table_schema = $1 AND table_type = " + String.fromCharCode(39) + "BASE TABLE" + String.fromCharCode(39) +
-                " AND table_name != " + String.fromCharCode(39) + "_prisma_migrations" + String.fromCharCode(39) +
-                " ORDER BY table_name",
-                [schema]
-              );
-
-              const hasTables = r.rows.length > 0;
-              const existingTables = new Set(r.rows.map(x => x.table_name));
-              if (hasTables) {
-                console.log("Found", r.rows.length, "tables:", r.rows.map(x => x.table_name).join(", "));
-
-                // Resolve migrations as applied ONLY if the tables they create already exist.
-                // This prevents marking NEW migrations as applied when their tables do not exist yet.
-                const migrations = fs.readdirSync("prisma/migrations")
-                  .filter(d => fs.existsSync(path.join("prisma/migrations", d, "migration.sql")))
-                  .sort();
-                for (const m of migrations) {
-                  const sqlFile = path.join("prisma/migrations", m, "migration.sql");
-                  if (!fs.existsSync(sqlFile)) { console.log("  Skip", m, "(no file)"); continue; }
-                  const sql = fs.readFileSync(sqlFile, "utf8");
-                  const checksum = crypto.createHash("sha256").update(sql).digest("hex");
-                  const exists = await c.query("SELECT 1 FROM \"_prisma_migrations\" WHERE migration_name = $1 AND finished_at IS NOT NULL", [m]);
-                  if (exists.rows.length > 0) { console.log("  Already resolved:", m); continue; }
-
-                  // Check if any CREATE TABLE in this migration references tables that do not exist yet
-                  const createMatches = sql.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+"?(\w+)"?/gi) || [];
-                  const tablesInMigration = createMatches.map(s => {
-                    const match = s.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+"?(\w+)"?/i);
-                    return match ? match[1] : null;
-                  }).filter(Boolean);
-                  if (tablesInMigration.length > 0) {
-                    const missingTables = tablesInMigration.filter(t => !existingTables.has(t));
-                    if (missingTables.length > 0) {
-                      console.log("  Skip resolve (tables missing:", missingTables.join(", ") + "):", m);
-                      continue;
-                    }
-                  }
-
-                  await c.query("DELETE FROM \"_prisma_migrations\" WHERE migration_name = $1", [m]);
-                  await c.query("INSERT INTO \"_prisma_migrations\" (checksum, migration_name, finished_at, applied_steps_count) VALUES ($1, $2, now(), 1)", [checksum, m]);
-                  console.log("  Resolved:", m);
-                }
-                console.log("✅ Existing migrations resolved (new table migrations left pending)");
-              } else {
-                console.log("✅ Schema is empty — migrations will run fresh from baseline");
-              }
-
-              await c.end();
-              console.log("Done.");
-            })().catch(e => {
-              if (e.message && e.message.includes("permission denied")) {
-                console.log("⚠️  Cannot manage _prisma_migrations table (permission denied)");
-                console.log("   Table may be owned by a different database role.");
-                console.log("   Fix: GRANT ALL ON TABLE " + schema + "._prisma_migrations TO <deploy_user>;");
-                console.log("   Continuing — Apply Migrations step will attempt migration directly.");
-                process.exit(0);
-              } else {
-                console.error("::error::Prepare migration state failed:", e.message);
-                process.exit(1);
-              }
-            });
-          ' "${DB_SCHEMA}"
-
-      - name: Apply migrations to production database
-        env:
-          NODE_TLS_REJECT_UNAUTHORIZED: '0'
-        run: |
-          export DATABASE_URL="${DEPLOY_DATABASE_URL}"
-          echo "Migrating schema: ${DB_SCHEMA}"
-          echo "Prepare step outcome: ${{ steps.prepare-migration.outcome }}"
-          cd backend
-
-          LOGFILE="/tmp/deploy-migrations.log"
-          > "$LOGFILE"
-
-          # Direct SQL migration via deploy-migrate.js (primary method)
-          # Bypasses Prisma Rust engine which has SSL + public schema issues
-          echo "=== Direct SQL migration (deploy-migrate.js) ===" | tee -a "$LOGFILE"
-          set +e
-          node scripts/deploy-migrate.cjs 2>&1 | tee -a "$LOGFILE"
-          MIGRATE_EXIT=${PIPESTATUS[0]}
-          set -e
-
-          if [ $MIGRATE_EXIT -eq 0 ]; then
-            echo "✅ Migration succeeded" | tee -a "$LOGFILE"
-            exit 0
-          fi
-
-          # Capture full error output in Summary
-          echo "## Deploy Migration Log" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          cat "$LOGFILE" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-
-          ERROR_DETAIL=$(cat "$LOGFILE" | tail -80 | head -c 2000)
-          ERROR_DETAIL="${ERROR_DETAIL//'%'/%25}"
-          ERROR_DETAIL="${ERROR_DETAIL//$'\n'/%0A}"
-          ERROR_DETAIL="${ERROR_DETAIL//$'\r'/%0D}"
-          echo "::error::Migration failed. Output:%0A${ERROR_DETAIL}"
-          exit 1
-
-      - name: Upload deploy log
-        if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-        with:
-          name: deploy-migration-log
-          path: /tmp/deploy-migrations.log
-          retention-days: 7
-
-      - name: Verify production migration state
-        env:
-          NODE_TLS_REJECT_UNAUTHORIZED: '0'
-        run: |
-          export DATABASE_URL="${DEPLOY_DATABASE_URL}"
-          cd backend
-          echo "--- Verifying schema tables ---"
-          node -e '
-            const { Client } = require("pg");
-            const c = new Client({
-              connectionString: process.env.DATABASE_URL,
-              ssl: { rejectUnauthorized: false }
-            });
-            c.on("error", () => {}); // Prevent unhandled error crash
-            const schema = process.argv[1];
-            (async () => {
-              await c.connect();
-
-              // pg library does not apply search_path from URL — set explicitly
-              await c.query("SET search_path TO " + schema);
-
-              // List applied migrations (may fail with permission denied)
-              try {
-                const migs = await c.query(
-                  "SELECT migration_name, finished_at FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL ORDER BY migration_name"
-                );
-                console.log("Applied migrations:");
-                migs.rows.forEach(r => console.log("  ✅", r.migration_name, "—", r.finished_at));
-              } catch (e) {
-                if (e.message && e.message.includes("permission denied")) {
-                  console.log("⚠️  Cannot read _prisma_migrations (permission denied) — skipping verification");
-                } else {
-                  throw e;
-                }
-              }
-
-              // List tables
-              const r = await c.query(
-                "SELECT table_name FROM information_schema.tables WHERE table_schema = $1 AND table_type = \x27BASE TABLE\x27 ORDER BY table_name",
-                [schema]
-              );
-              console.log("\nTables in " + schema + ": " + r.rows.map(x => x.table_name).join(", "));
-              console.log("Total: " + r.rows.length + " tables");
-
-              if (r.rows.length < 10) {
-                console.error("::warning::Expected at least 10 tables but found " + r.rows.length);
-              }
-              await c.end();
-            })().catch(e => { console.error(e.message); process.exit(0); });
-          ' "${DB_SCHEMA}"
-
-      # Deploy to self-hosted server (SSH/webhook) — placeholder
+      # Deploy to self-hosted server (SSH/webhook)
       # Configure SERVER_DEPLOY_HOOK secret when your server is ready
       - name: Trigger server deploy
-        if: success()
         env:
           SERVER_DEPLOY_HOOK: ${{ secrets.SERVER_DEPLOY_HOOK }}
         run: |
+          echo "🚀 Deploying commit $GIT_SHA ($BUILD_TIME)"
           if [ -z "$SERVER_DEPLOY_HOOK" ]; then
-            echo "::notice::SERVER_DEPLOY_HOOK not set — migrations applied, manual deploy needed"
+            echo "::notice::SERVER_DEPLOY_HOOK not set — CI passed, manual deploy needed"
             exit 0
           fi
           echo "Triggering server deploy for SHA $GIT_SHA…"

@@ -1,13 +1,13 @@
-﻿import { test, expect } from '@playwright/test';
-import { E2E_ACCOUNTS } from './_seedAccounts';
+import { test, expect } from '@playwright/test';
+import { E2E_ACCOUNTS } from '../helpers/accounts';
 
 test.describe.configure({ retries: 2 });
 
-test('admin can view seeded users', async ({ page, request }) => {
+test('brand can open Order Intelligence', async ({ page, request }) => {
   test.setTimeout(360_000);
 
   const loginRes = await request.post('/api/auth/login', {
-    data: { username: E2E_ACCOUNTS.admin.username, password: E2E_ACCOUNTS.admin.password },
+    data: { mobile: E2E_ACCOUNTS.brand.mobile, password: E2E_ACCOUNTS.brand.password },
   });
   expect(loginRes.ok()).toBeTruthy();
   const payload = await loginRes.json();
@@ -22,11 +22,9 @@ test('admin can view seeded users', async ({ page, request }) => {
   }, { user, tokens });
 
   await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 180_000 });
-  await page.getByRole('button', { name: 'Users' }).waitFor({ timeout: 120_000 });
+  await page.getByRole('button', { name: 'Order Intelligence' }).waitFor({ timeout: 120_000 });
 
-  await page.getByRole('button', { name: 'Users' }).click({ timeout: 60_000 });
-
-  // Assert seeded shopper exists
-  await expect(page.getByText('E2E Shopper', { exact: true })).toBeVisible();
-  await expect(page.getByText('9000000004', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Order Intelligence' }).click();
+  await expect(page.getByRole('heading', { name: 'Order Intelligence' })).toBeVisible();
+  await expect(page.getByPlaceholder('Search Orders...')).toBeVisible();
 });

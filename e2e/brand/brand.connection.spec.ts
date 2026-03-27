@@ -1,6 +1,6 @@
-﻿import { test, expect, type APIRequestContext } from '@playwright/test';
-import { loginAndGetAccessToken } from './_apiAuth';
-import { E2E_ACCOUNTS } from './_seedAccounts';
+import { test, expect, type APIRequestContext } from '@playwright/test';
+import { loginAndGetAccessToken } from '../helpers/auth';
+import { E2E_ACCOUNTS } from '../helpers/accounts';
 
 const BRAND_CODE = 'BRD_TEST';
 const AGENCY_CODE = 'AG_TEST';
@@ -73,7 +73,7 @@ test('brand can see and approve an agency connection request', async ({ page, re
   await page.getByRole('button', { name: 'Requests' }).click();
 
   // Wait for the pending connection card from E2E Agency.
-  // Use h4 heading locator — avoids matching ancestor wrapper divs that cascade `hasText`.
+  // Use h4 heading locator � avoids matching ancestor wrapper divs that cascade `hasText`.
   const agencyHeading = page.locator('h4').filter({ hasText: 'E2E Agency' });
   await expect(agencyHeading.first()).toBeVisible({ timeout: 15000 });
 

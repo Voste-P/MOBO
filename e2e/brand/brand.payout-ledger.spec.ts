@@ -1,5 +1,5 @@
-﻿import { test, expect, type APIRequestContext } from '@playwright/test';
-import { E2E_ACCOUNTS } from './_seedAccounts';
+import { test, expect, type APIRequestContext } from '@playwright/test';
+import { E2E_ACCOUNTS } from '../helpers/accounts';
 
 const BRAND_CODE = 'BRD_TEST';
 const AGENCY_CODE = 'AG_TEST';

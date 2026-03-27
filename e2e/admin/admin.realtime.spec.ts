@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { loginAndGetAccessToken } from './_apiAuth';
-import { E2E_ACCOUNTS } from './_seedAccounts';
+import { loginAndGetAccessToken } from '../helpers/auth';
+import { E2E_ACCOUNTS } from '../helpers/accounts';
 
 test('admin realtime stream is ready', async ({ page, request }) => {
   const { accessToken } = await loginAndGetAccessToken(request, {

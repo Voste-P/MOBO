@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from '@playwright/test';
-import { E2E_ACCOUNTS } from './_seedAccounts';
+import { E2E_ACCOUNTS } from '../helpers/accounts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -40,7 +40,7 @@ test('buyer can submit a cashback claim (creates an order)', async ({ page }) =>
   await claimModal.getByText('E2E', { exact: false }).first().click();
 
   // Upload proof
-  const proofPath = path.resolve(__dirname, 'fixtures', 'proof.png');
+  const proofPath = path.resolve(__dirname, '..', 'fixtures', 'proof.png');
   const fileInput = page.locator('input[type="file"][accept="image/*"]');
   await expect(fileInput).toHaveCount(1);
   await fileInput.setInputFiles(proofPath);
