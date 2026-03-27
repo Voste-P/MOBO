@@ -38,12 +38,12 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
     }
   }, []);
 
-  const loadedOnceRef = useRef(false);
+  const lastLoadedAt = useRef(0);
 
   useEffect(() => {
     if (!isActive) return;
-    if (loadedOnceRef.current) return;
-    loadedOnceRef.current = true;
+    if (lastLoadedAt.current && (Date.now() - lastLoadedAt.current) < 30_000) return;
+    lastLoadedAt.current = Date.now();
     loadProducts();
   }, [loadProducts, isActive]);
 

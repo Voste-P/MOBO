@@ -54,7 +54,7 @@ import {
   HelpCircle,
   BarChart3,
 } from 'lucide-react';
-import { api, asArray } from '../services/api';
+import { api, asArray, invalidateGetCache } from '../services/api';
 import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
@@ -2204,6 +2204,8 @@ export const BrandDashboard: React.FC = () => {
     const currentNeeds = tabDataNeedsRef.current;
     if (force && !invalidateKeys) {
       for (const k of currentNeeds) loadedRef.current.delete(k);
+      invalidateGetCache('/brand');
+      invalidateGetCache('/tickets');
     }
     const now = Date.now();
     const needed = currentNeeds.filter((k) => {
@@ -2267,12 +2269,16 @@ export const BrandDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load on tab change — only fetches keys not already cached
+  // Trigger data load on tab change — force-refetch so every switch shows network activity
   const prevTabRef = useRef(activeTab);
   useEffect(() => {
     const tabChanged = prevTabRef.current !== activeTab;
     prevTabRef.current = activeTab;
-    fetchData({ silent: tabChanged });
+    if (tabChanged) {
+      fetchData({ force: true, silent: true });
+    } else {
+      fetchData();
+    }
     return () => { fetchAbortRef.current?.abort(); };
   }, [fetchData, activeTab]);
 

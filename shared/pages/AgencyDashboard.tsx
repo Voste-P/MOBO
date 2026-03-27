@@ -7,7 +7,7 @@ import { ProxiedImage } from '../components/ProxiedImage';
 import { RaiseTicketModal } from '../components/RaiseTicketModal';
 import TicketDetailModal from '../components/TicketDetailModal';
 import { FeedbackCard } from '../components/FeedbackCard';
-import { api, asArray } from '../services/api';
+import { api, asArray, invalidateGetCache } from '../services/api';
 import { getDirectBackendUrl } from '../utils/apiBaseUrl';
 import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
@@ -4360,10 +4360,11 @@ export const AgencyDashboard: React.FC = () => {
       for (const k of invalidateKeys) loadedRef.current.delete(k);
     }
 
-    // Determine which data sets are actually needed but not yet loaded
     const currentNeeds = tabDataNeedsRef.current;
     if (force && !invalidateKeys) {
       for (const k of currentNeeds) loadedRef.current.delete(k);
+      invalidateGetCache('/ops');
+      invalidateGetCache('/tickets');
     }
     const now = Date.now();
     const needed = currentNeeds.filter((k) => {
@@ -4441,7 +4442,11 @@ export const AgencyDashboard: React.FC = () => {
   useEffect(() => {
     const tabChanged = prevTabRef.current !== activeTab;
     prevTabRef.current = activeTab;
-    fetchData({ silent: tabChanged });
+    if (tabChanged) {
+      fetchData({ force: true, silent: true });
+    } else {
+      fetchData();
+    }
     return () => { fetchAbortRef.current?.abort(); };
   }, [fetchData, activeTab]);
 

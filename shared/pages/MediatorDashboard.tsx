@@ -6,7 +6,7 @@ import { useConfirm } from '../components/ui/ConfirmDialog';
 import { useSwipeTabs } from '../hooks/useSwipeTabs';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
-import { api, asArray } from '../services/api';
+import { api, asArray, invalidateGetCache } from '../services/api';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 import { normalizeMobileTo10Digits, maskMobile } from '../utils/mobiles';
@@ -1935,6 +1935,8 @@ export const MediatorDashboard: React.FC = () => {
     const currentNeeds = tabDataNeedsRef.current;
     if (force && !invalidateKeys) {
       for (const k of currentNeeds) loadedRef.current.delete(k);
+      invalidateGetCache('/ops');
+      invalidateGetCache('/tickets');
     }
     const now = Date.now();
     const needed = currentNeeds.filter((k) => {
@@ -2026,12 +2028,16 @@ export const MediatorDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load on tab change — only fetches keys not already cached
+  // Trigger data load on tab change — force-refetch so every switch shows network activity
   const prevTabRef = useRef(activeTab);
   useEffect(() => {
     const tabChanged = prevTabRef.current !== activeTab;
     prevTabRef.current = activeTab;
-    loadData({ silent: tabChanged });
+    if (tabChanged) {
+      loadData({ force: true, silent: true });
+    } else {
+      loadData();
+    }
     return () => { fetchAbortRef.current?.abort(); };
   }, [loadData, activeTab]);
 
