@@ -58,7 +58,7 @@ test.describe('Admin API security', () => {
   });
 
   test('admin can view audit logs', async ({ request }) => {
-    const res = await request.get('/api/admin/audit-log', {
+    const res = await request.get('/api/admin/audit-logs', {
       headers: authHeaders(adminToken),
     });
     expect(res.ok()).toBeTruthy();

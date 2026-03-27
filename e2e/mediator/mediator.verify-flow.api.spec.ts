@@ -22,8 +22,24 @@ test.describe('Mediator verification flow', () => {
     adminToken = admin.accessToken;
   });
 
-  test('mediator can list their team orders', async ({ request }) => {
-    const res = await request.get('/api/auth/me', {
+  test('mediator can list their team orders via ops', async ({ request }) => {
+    const res = await request.get('/api/ops/orders', {
+      headers: authHeaders(mediatorToken),
+    });
+    expect(res.ok()).toBeTruthy();
+    const body = await res.json();
+    expect(body).toHaveProperty('orders');
+  });
+
+  test('mediator can view ops dashboard stats', async ({ request }) => {
+    const res = await request.get('/api/ops/dashboard-stats', {
+      headers: authHeaders(mediatorToken),
+    });
+    expect(res.ok()).toBeTruthy();
+  });
+
+  test('mediator can view ops mediators list', async ({ request }) => {
+    const res = await request.get('/api/ops/mediators', {
       headers: authHeaders(mediatorToken),
     });
     expect(res.ok()).toBeTruthy();
@@ -36,6 +52,13 @@ test.describe('Mediator verification flow', () => {
         issueType: 'Commission Delay',
         description: `E2E test ticket from mediator ${Date.now()}`,
       },
+    });
+    expect(res.ok()).toBeTruthy();
+  });
+
+  test('admin can list ops orders', async ({ request }) => {
+    const res = await request.get('/api/ops/orders', {
+      headers: authHeaders(adminToken),
     });
     expect(res.ok()).toBeTruthy();
   });
