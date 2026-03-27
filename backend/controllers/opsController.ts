@@ -3285,5 +3285,136 @@ export function makeOpsController(env: Env) {
         next(err);
       }
     },
+
+    /* ─── Lightweight dashboard-specific endpoints ──────────────────── */
+
+    /** GET /ops/dashboard-stats — pre-computed KPI numbers for agency dashboard */
+    getDashboardStats: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { roles, user } = getRequester(req);
+        const agencyCode = isPrivileged(roles)
+          ? String(req.query.agencyCode || '')
+          : String((user as any)?.mediatorCode || '');
+        if (!agencyCode) throw new AppError(400, 'INVALID_AGENCY_CODE', 'agencyCode required');
+        if (!isPrivileged(roles)) requireAnyRole(roles, 'agency');
+
+        const mediatorCodes = await listMediatorCodesForAgency(agencyCode);
+        const allCodes = [agencyCode, ...mediatorCodes].filter(Boolean);
+
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
+        // All 4 stats in parallel with pure COUNT/SUM (no row transfer)
+        const [totalMediators, totalRevRow, ordersToday, activeCampaignIds] = await Promise.all([
+          db().user.count({ where: { roles: { has: 'mediator' as any }, parentCode: agencyCode, isDeleted: false } }),
+          db().order.aggregate({ where: { managerName: { in: allCodes }, isDeleted: false }, _sum: { totalPaise: true } }),
+          db().order.count({ where: { managerName: { in: allCodes }, isDeleted: false, createdAt: { gte: todayStart } } }),
+          db().$queryRaw<{ cnt: bigint }[]>`
+            SELECT COUNT(DISTINCT id)::bigint AS cnt FROM "campaigns" WHERE "is_deleted" = false AND status = 'Active'
+            AND (${agencyCode} = ANY("allowed_agency_codes")
+                 OR "open_to_all" = true
+                 OR EXISTS (SELECT 1 FROM unnest(${allCodes}::text[]) AS mc WHERE jsonb_exists(assignments, mc)))
+          `,
+        ]);
+
+        const revenue = Math.round(Number(totalRevRow._sum.totalPaise ?? 0) / 100);
+        const activeCampaigns = Number(activeCampaignIds[0]?.cnt ?? 0);
+
+        res.json({ revenue, totalMediators, activeCampaigns, ordersToday });
+      } catch (err) {
+        logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'BUSINESS_LOGIC', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'ops/getDashboardStats' } });
+        next(err);
+      }
+    },
+
+    /** GET /ops/revenue-trend — daily revenue for charts (agency dashboard) */
+    getRevenueTrend: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { roles, user } = getRequester(req);
+        const agencyCode = isPrivileged(roles)
+          ? String(req.query.agencyCode || '')
+          : String((user as any)?.mediatorCode || '');
+        if (!agencyCode) throw new AppError(400, 'INVALID_AGENCY_CODE', 'agencyCode required');
+        if (!isPrivileged(roles)) requireAnyRole(roles, 'agency');
+
+        const rangeParam = String(req.query.range || 'last30');
+        const now = new Date();
+        const end = new Date(now);
+        end.setHours(23, 59, 59, 999);
+        let start = new Date(now);
+        if (rangeParam === 'last7') start.setDate(start.getDate() - 6);
+        else if (rangeParam === 'yesterday') { start.setDate(start.getDate() - 1); start.setHours(0, 0, 0, 0); end.setTime(start.getTime()); end.setHours(23, 59, 59, 999); }
+        else if (rangeParam === 'thisMonth') start = new Date(now.getFullYear(), now.getMonth(), 1);
+        else start.setDate(start.getDate() - 29);
+        start.setHours(0, 0, 0, 0);
+
+        const mediatorCodes = await listMediatorCodesForAgency(agencyCode);
+        const allCodes = [agencyCode, ...mediatorCodes].filter(Boolean);
+
+        // Aggregate revenue per day with a single SQL query
+        const rows = await db().$queryRaw<{ day: string; total: bigint }[]>`
+          SELECT TO_CHAR("created_at", 'YYYY-MM-DD') AS day,
+                 COALESCE(SUM("total_paise"), 0)::bigint AS total
+          FROM "orders"
+          WHERE "manager_name" = ANY(${allCodes}::text[])
+            AND "is_deleted" = false
+            AND "created_at" >= ${start}
+            AND "created_at" <= ${end}
+          GROUP BY TO_CHAR("created_at", 'YYYY-MM-DD')
+          ORDER BY day
+        `;
+
+        // Build full date range with zero-fills
+        const revenueByDay = new Map(rows.map(r => [r.day, Math.round(Number(r.total) / 100)]));
+        const points: Array<{ name: string; val: number }> = [];
+        const cursor = new Date(start);
+        while (cursor <= end) {
+          const yyyy = cursor.getFullYear();
+          const mm = String(cursor.getMonth() + 1).padStart(2, '0');
+          const dd = String(cursor.getDate()).padStart(2, '0');
+          const key = `${yyyy}-${mm}-${dd}`;
+          const label = cursor.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
+          points.push({ name: label, val: revenueByDay.get(key) ?? 0 });
+          cursor.setDate(cursor.getDate() + 1);
+        }
+
+        res.json(points);
+      } catch (err) {
+        logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'BUSINESS_LOGIC', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'ops/getRevenueTrend' } });
+        next(err);
+      }
+    },
+
+    /** GET /ops/brand-performance — top brands by order count (agency dashboard) */
+    getBrandPerformance: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { roles, user } = getRequester(req);
+        const agencyCode = isPrivileged(roles)
+          ? String(req.query.agencyCode || '')
+          : String((user as any)?.mediatorCode || '');
+        if (!agencyCode) throw new AppError(400, 'INVALID_AGENCY_CODE', 'agencyCode required');
+        if (!isPrivileged(roles)) requireAnyRole(roles, 'agency');
+
+        const mediatorCodes = await listMediatorCodesForAgency(agencyCode);
+        const allCodes = [agencyCode, ...mediatorCodes].filter(Boolean);
+
+        // Top 5 brands by order count — pure aggregate, no row data
+        const rows = await db().$queryRaw<{ name: string; count: bigint }[]>`
+          SELECT COALESCE("brand_name", 'Unknown') AS name,
+                 COUNT(*)::bigint AS count
+          FROM "orders"
+          WHERE "manager_name" = ANY(${allCodes}::text[])
+            AND "is_deleted" = false
+          GROUP BY COALESCE("brand_name", 'Unknown')
+          ORDER BY count DESC
+          LIMIT 5
+        `;
+
+        res.json(rows.map(r => ({ name: r.name, count: Number(r.count) })));
+      } catch (err) {
+        logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'BUSINESS_LOGIC', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'ops/getBrandPerformance' } });
+        next(err);
+      }
+    },
   };
 }

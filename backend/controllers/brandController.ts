@@ -1089,5 +1089,143 @@ export function makeBrandController() {
         next(err);
       }
     },
+
+    /* ─── Lightweight dashboard-specific endpoints ──────────────────── */
+
+    /** GET /brand/dashboard-stats — pre-computed KPI numbers for brand dashboard */
+    getDashboardStats: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { roles } = getRequester(req);
+        const pgUserId = (req.auth as any)?.pgUserId as string;
+
+        let brandPgId: string;
+        const requested = String(req.query.brandId || '');
+        if (isPrivileged(roles) && requested) {
+          const brandUser = await db().user.findFirst({ where: { ...idWhere(requested), isDeleted: false }, select: { id: true, name: true } });
+          if (!brandUser) throw new AppError(404, 'BRAND_NOT_FOUND', 'Brand not found');
+          brandPgId = brandUser.id;
+        } else {
+          brandPgId = pgUserId;
+        }
+
+        // All 4 stats in parallel — pure aggregates, no row transfer
+        const [revenueRow, activeCampaigns, partnerCount, reachRow] = await Promise.all([
+          db().order.aggregate({
+            where: { OR: [{ brandUserId: brandPgId }, { brandUserId: null }], isDeleted: false },
+            _sum: { totalPaise: true },
+          }),
+          db().campaign.count({ where: { brandUserId: brandPgId, isDeleted: false, status: 'Active' as any } }),
+          (async () => {
+            if (isPrivileged(roles)) return db().user.count({ where: { roles: { has: 'agency' as any }, isDeleted: false } });
+            const brandUser = await db().user.findFirst({ where: { id: brandPgId, isDeleted: false }, select: { connectedAgencies: true } });
+            const connected = Array.isArray((brandUser as any)?.connectedAgencies) ? (brandUser as any).connectedAgencies as string[] : [];
+            return connected.length;
+          })(),
+          db().campaign.aggregate({
+            where: { brandUserId: brandPgId, isDeleted: false },
+            _sum: { totalSlots: true },
+          }),
+        ]);
+
+        res.json({
+          totalRevenue: Math.round(Number(revenueRow._sum.totalPaise ?? 0) / 100),
+          activeCampaigns,
+          partnerAgencies: partnerCount,
+          inventoryReach: Number(reachRow._sum.totalSlots ?? 0),
+        });
+      } catch (err) {
+        logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'DATABASE', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'brand/getDashboardStats' } });
+        next(err);
+      }
+    },
+
+    /** GET /brand/revenue-trend — daily revenue for chart (brand dashboard) */
+    getRevenueTrend: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { roles } = getRequester(req);
+        const pgUserId = (req.auth as any)?.pgUserId as string;
+
+        let brandPgId: string;
+        const requested = String(req.query.brandId || '');
+        if (isPrivileged(roles) && requested) {
+          const brandUser = await db().user.findFirst({ where: { ...idWhere(requested), isDeleted: false }, select: { id: true } });
+          if (!brandUser) throw new AppError(404, 'BRAND_NOT_FOUND', 'Brand not found');
+          brandPgId = brandUser.id;
+        } else {
+          brandPgId = pgUserId;
+        }
+
+        const days = Math.min(Math.max(Number(req.query.days) || 7, 1), 90);
+        const now = new Date();
+        const start = new Date(now);
+        start.setDate(now.getDate() - (days - 1));
+        start.setHours(0, 0, 0, 0);
+
+        const rows = await db().$queryRaw<{ day: string; total: bigint }[]>`
+          SELECT TO_CHAR("created_at", 'YYYY-MM-DD') AS day,
+                 COALESCE(SUM("total_paise"), 0)::bigint AS total
+          FROM "orders"
+          WHERE ("brand_user_id" = ${brandPgId}::uuid OR "brand_user_id" IS NULL)
+            AND "is_deleted" = false
+            AND "created_at" >= ${start}
+          GROUP BY TO_CHAR("created_at", 'YYYY-MM-DD')
+          ORDER BY day
+        `;
+
+        const revenueByDay = new Map(rows.map(r => [r.day, Math.round(Number(r.total) / 100)]));
+        const points: Array<{ name: string; revenue: number; dateKey: string }> = [];
+        for (let i = 0; i < days; i++) {
+          const d = new Date(start);
+          d.setDate(start.getDate() + i);
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          const dateKey = `${yyyy}-${mm}-${dd}`;
+          const name = d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
+          points.push({ name, revenue: revenueByDay.get(dateKey) ?? 0, dateKey });
+        }
+
+        res.json(points);
+      } catch (err) {
+        logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'DATABASE', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'brand/getRevenueTrend' } });
+        next(err);
+      }
+    },
+
+    /** GET /brand/inventory-fill — top campaigns fill rate (brand dashboard) */
+    getInventoryFill: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { roles } = getRequester(req);
+        const pgUserId = (req.auth as any)?.pgUserId as string;
+
+        let brandPgId: string;
+        const requested = String(req.query.brandId || '');
+        if (isPrivileged(roles) && requested) {
+          const brandUser = await db().user.findFirst({ where: { ...idWhere(requested), isDeleted: false }, select: { id: true } });
+          if (!brandUser) throw new AppError(404, 'BRAND_NOT_FOUND', 'Brand not found');
+          brandPgId = brandUser.id;
+        } else {
+          brandPgId = pgUserId;
+        }
+
+        // Top 5 campaigns by slot usage — minimal select
+        const campaigns = await db().campaign.findMany({
+          where: { brandUserId: brandPgId, isDeleted: false },
+          orderBy: { usedSlots: 'desc' },
+          take: 5,
+          select: { title: true, usedSlots: true, totalSlots: true },
+        });
+
+        res.json(campaigns.map(c => ({
+          name: c.title.split(' ')[0],
+          sold: c.usedSlots ?? 0,
+          remaining: Math.max(0, (c.totalSlots ?? 0) - (c.usedSlots ?? 0)),
+          total: c.totalSlots ?? 0,
+        })));
+      } catch (err) {
+        logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'DATABASE', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'brand/getInventoryFill' } });
+        next(err);
+      }
+    },
   };
 }

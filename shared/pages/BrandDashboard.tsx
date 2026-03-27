@@ -376,66 +376,20 @@ const BrandProfileView = () => {
 };
 
 const DashboardView = ({
-  campaigns,
-  agencies,
-  orders,
+  stats,
+  revenueData,
+  campaignPerformance,
 }: {
-  campaigns: Campaign[];
-  agencies: User[];
-  orders: Order[];
+  stats: { totalRevenue: number; activeCampaigns: number; partnerAgencies: number; inventoryReach: number };
+  revenueData: Array<{ name: string; revenue: number; dateKey: string }>;
+  campaignPerformance: Array<{ name: string; sold: number; remaining: number; total: number }>;
 }) => {
-  const { totalRevenue, activeCampaigns, totalReach } = useMemo(() => ({
-    totalRevenue: orders.reduce((acc, o) => acc + o.total, 0),
-    activeCampaigns: campaigns.filter((c) => c.status === 'Active').length,
-    totalReach: campaigns.reduce((acc, c) => acc + c.totalSlots, 0),
-  }), [orders, campaigns]);
+  const { totalRevenue, activeCampaigns, partnerAgencies, inventoryReach } = stats;
 
   const formatRupees = (value: number) => {
     const n = Number(value || 0);
     return `${Math.round(n).toLocaleString('en-IN')}`;
   };
-
-  const revenueData = useMemo(() => {
-    const days = 7;
-    const now = new Date();
-    const start = new Date(now);
-    start.setDate(now.getDate() - (days - 1));
-    start.setHours(0, 0, 0, 0);
-
-    const localDayKey = (d: Date) => {
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      return `${yyyy}-${mm}-${dd}`;
-    };
-
-    const totalsByDay = new Map<string, number>();
-    for (const o of orders) {
-      const d = new Date(o.createdAt);
-      if (Number.isNaN(d.getTime())) continue;
-      if (d < start || d > now) continue;
-      const key = localDayKey(d);
-      totalsByDay.set(key, (totalsByDay.get(key) ?? 0) + (Number(o.total) || 0));
-    }
-
-    const points: Array<{ name: string; revenue: number; dateKey: string }> = [];
-    for (let i = 0; i < days; i++) {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
-      const dateKey = localDayKey(d);
-      const name = d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
-      points.push({ name, revenue: totalsByDay.get(dateKey) ?? 0, dateKey });
-    }
-
-    return points;
-  }, [orders]);
-
-  const campaignPerformance = useMemo(() => campaigns.slice(0, 5).map((c) => ({
-    name: c.title.split(' ')[0],
-    sold: c.usedSlots,
-    remaining: Math.max(0, c.totalSlots - c.usedSlots),
-    total: c.totalSlots,
-  })), [campaigns]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-enter">
@@ -462,12 +416,12 @@ const DashboardView = ({
         <StatCard label="Active Campaigns" value={activeCampaigns} icon={<Briefcase size={24} />} />
         <StatCard
           label="Partner Agencies"
-          value={agencies.length}
+          value={partnerAgencies}
           icon={<Users size={24} />}
         />
         <StatCard
           label="Inventory Reach"
-          value={`${(totalReach / 1000).toFixed(1)}k`}
+          value={`${(inventoryReach / 1000).toFixed(1)}k`}
           icon={<Globe size={24} />}
           dark
         />
@@ -2178,6 +2132,9 @@ export const BrandDashboard: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(true);
+  const [dashboardStats, setDashboardStats] = useState<{ totalRevenue: number; activeCampaigns: number; partnerAgencies: number; inventoryReach: number }>({ totalRevenue: 0, activeCampaigns: 0, partnerAgencies: 0, inventoryReach: 0 });
+  const [revenueChartData, setRevenueChartData] = useState<Array<{ name: string; revenue: number; dateKey: string }>>([]);
+  const [inventoryFillData, setInventoryFillData] = useState<Array<{ name: string; sold: number; remaining: number; total: number }>>([]);
 
   // NEW: Agency Detail Modal State
   const [selectedAgency, setSelectedAgency] = useState<User | null>(null);
@@ -2202,7 +2159,7 @@ export const BrandDashboard: React.FC = () => {
 
   const tabDataNeeds = useMemo<string[]>(() => {
     switch (activeTab) {
-      case 'dashboard': return ['campaigns', 'agencies', 'orders'];
+      case 'dashboard': return ['dashboardStats', 'revenueChart', 'inventoryFill'];
       case 'campaigns': return ['campaigns'];
       case 'orders': return ['orders'];
       case 'agencies': return ['agencies', 'transactions'];
@@ -2245,6 +2202,9 @@ export const BrandDashboard: React.FC = () => {
       const promises: Promise<any>[] = [];
       const keys: string[] = [];
 
+      if (needed.includes('dashboardStats')) { promises.push(api.brand.getDashboardStats(user.id)); keys.push('dashboardStats'); }
+      if (needed.includes('revenueChart')) { promises.push(api.brand.getRevenueTrend(user.id)); keys.push('revenueChart'); }
+      if (needed.includes('inventoryFill')) { promises.push(api.brand.getInventoryFill(user.id)); keys.push('inventoryFill'); }
       if (needed.includes('campaigns')) { promises.push(api.brand.getBrandCampaigns(user.id)); keys.push('campaigns'); }
       if (needed.includes('agencies')) { promises.push(api.brand.getConnectedAgencies(user.id)); keys.push('agencies'); }
       if (needed.includes('orders')) { promises.push(api.brand.getBrandOrders(user.name)); keys.push('orders'); }
@@ -2266,6 +2226,9 @@ export const BrandDashboard: React.FC = () => {
         loadedRef.current.add(key);
         lastFetchedAt.current[key] = now;
         switch (key) {
+          case 'dashboardStats': setDashboardStats(result.value as any); break;
+          case 'revenueChart': setRevenueChartData(asArray(result.value)); break;
+          case 'inventoryFill': setInventoryFillData(asArray(result.value)); break;
           case 'campaigns': setCampaigns(asArray(result.value)); break;
           case 'agencies': setAgencies(asArray(result.value)); break;
           case 'orders': setOrders(asArray(result.value)); break;
@@ -2296,9 +2259,9 @@ export const BrandDashboard: React.FC = () => {
     if (!user?.id) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const eventToKeys: Record<string, string[]> = {
-      'orders.changed': ['orders'],
-      'deals.changed': ['campaigns'],
-      'users.changed': ['agencies'],
+      'orders.changed': ['orders', 'dashboardStats', 'revenueChart'],
+      'deals.changed': ['campaigns', 'dashboardStats', 'inventoryFill'],
+      'users.changed': ['agencies', 'dashboardStats'],
       'wallets.changed': ['transactions'],
       'tickets.changed': ['tickets'],
     };
@@ -2584,7 +2547,7 @@ export const BrandDashboard: React.FC = () => {
     >
 
         {activeTab === 'dashboard' && (
-          <DashboardView campaigns={campaigns} agencies={agencies} orders={orders} />
+          <DashboardView stats={dashboardStats} revenueData={revenueChartData} campaignPerformance={inventoryFillData} />
         )}
         {activeTab === 'campaigns' && (
           <CampaignsView

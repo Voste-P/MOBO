@@ -1064,11 +1064,41 @@ export const api = {
         body: JSON.stringify({ brandCode }),
       });
     },
+    getDashboardStats: async (agencyCode: string) => {
+      return fetchJson(`/ops/dashboard-stats?agencyCode=${encodeURIComponent(agencyCode)}`, {
+        headers: { ...authHeaders() },
+      });
+    },
+    getRevenueTrend: async (agencyCode: string, range: string = 'last30') => {
+      return fetchJson(`/ops/revenue-trend?agencyCode=${encodeURIComponent(agencyCode)}&range=${encodeURIComponent(range)}`, {
+        headers: { ...authHeaders() },
+      });
+    },
+    getBrandPerformance: async (agencyCode: string) => {
+      return fetchJson(`/ops/brand-performance?agencyCode=${encodeURIComponent(agencyCode)}`, {
+        headers: { ...authHeaders() },
+      });
+    },
   },
   /** [FIX] Added missing brand object used in BrandDashboard.tsx */
   brand: {
     getConnectedAgencies: async (brandId: string, page = 1, limit = 50) => {
       return fetchJson(`/brand/agencies?brandId=${encodeURIComponent(brandId)}&page=${page}&limit=${limit}`, {
+        headers: { ...authHeaders() },
+      });
+    },
+    getDashboardStats: async (brandId: string) => {
+      return fetchJson(`/brand/dashboard-stats?brandId=${encodeURIComponent(brandId)}`, {
+        headers: { ...authHeaders() },
+      });
+    },
+    getRevenueTrend: async (brandId: string, days: number = 7) => {
+      return fetchJson(`/brand/revenue-trend?brandId=${encodeURIComponent(brandId)}&days=${days}`, {
+        headers: { ...authHeaders() },
+      });
+    },
+    getInventoryFill: async (brandId: string) => {
+      return fetchJson(`/brand/inventory-fill?brandId=${encodeURIComponent(brandId)}`, {
         headers: { ...authHeaders() },
       });
     },
