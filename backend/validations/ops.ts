@@ -106,9 +106,9 @@ export const createCampaignSchema = z.object({
   title: z.string().min(1).max(200),
   platform: z.string().min(1).max(80),
   dealType: z.enum(['Discount', 'Review', 'Rating']).optional(),
-  price: z.number().nonnegative(),
-  originalPrice: z.number().nonnegative(),
-  payout: z.number().nonnegative(),
+  price: z.number().nonnegative().max(10_00_000),
+  originalPrice: z.number().nonnegative().max(10_00_000),
+  payout: z.number().nonnegative().max(10_00_000),
   image: z.string().min(1),
   productUrl: z.string().min(1),
   totalSlots: z.number().int().min(0),
@@ -121,18 +121,18 @@ export const assignSlotsSchema = z.object({
   assignments: z.record(
     z.string(),
     z.union([
-      z.number().int().min(0),
+      z.number().int().min(0).max(10_000),
       z.object({
-        limit: z.number().int().min(0),
-        payout: z.number().nonnegative().optional(),
+        limit: z.number().int().min(0).max(10_000),
+        payout: z.number().nonnegative().max(10_00_000).optional(),
       }),
     ])
   ).optional().default({}),
   openToAll: z.boolean().optional(),
   dealType: z.enum(['Discount', 'Review', 'Rating']).optional(),
-  price: z.number().nonnegative().optional(),
-  payout: z.number().nonnegative().optional(),
-  commission: z.number().nonnegative().optional(),
+  price: z.number().nonnegative().max(10_00_000).optional(),
+  payout: z.number().nonnegative().max(10_00_000).optional(),
+  commission: z.number().nonnegative().max(10_00_000).optional(),
 });
 
 export const updateCampaignStatusSchema = z.object({
@@ -148,7 +148,7 @@ export const publishDealSchema = z.object({
 
 export const payoutMediatorSchema = z.object({
   mediatorId: z.string().min(1),
-  amount: z.number().positive(),
+  amount: z.number().positive().max(1_00_00_000),
   ref: z.string().trim().min(1).max(128),
 });
 

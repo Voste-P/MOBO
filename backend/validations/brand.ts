@@ -4,7 +4,7 @@ export const payoutAgencySchema = z.object({
   // UI sends these fields; backend uses auth user by default.
   brandId: z.string().min(1).optional(),
   agencyId: z.string().min(1),
-  amount: z.coerce.number().positive(), // INR
+  amount: z.coerce.number().positive().max(1_00_00_000, 'Amount cannot exceed ₹1 crore'), // INR
   ref: z.string().trim().min(1).max(128),
 });
 
@@ -14,9 +14,9 @@ export const createBrandCampaignSchema = z.object({
   brand: z.string().max(200).optional(),
   platform: z.string().min(1).max(80),
   dealType: z.enum(['Discount', 'Review', 'Rating']).optional(),
-  price: z.number().nonnegative(),
-  originalPrice: z.number().nonnegative(),
-  payout: z.number().nonnegative(),
+  price: z.number().nonnegative().max(10_00_000),
+  originalPrice: z.number().nonnegative().max(10_00_000),
+  payout: z.number().nonnegative().max(10_00_000),
   image: z.string().min(1),
   productUrl: z.string().min(1),
   totalSlots: z.number().int().min(0),
@@ -28,9 +28,9 @@ export const updateBrandCampaignSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   platform: z.string().min(1).max(80).optional(),
   dealType: z.enum(['Discount', 'Review', 'Rating']).optional(),
-  price: z.number().nonnegative().optional(),
-  originalPrice: z.number().nonnegative().optional(),
-  payout: z.number().nonnegative().optional(),
+  price: z.number().nonnegative().max(10_00_000).optional(),
+  originalPrice: z.number().nonnegative().max(10_00_000).optional(),
+  payout: z.number().nonnegative().max(10_00_000).optional(),
   image: z.string().min(1).optional(),
   productUrl: z.string().min(1).optional(),
   totalSlots: z.number().int().min(0).optional(),

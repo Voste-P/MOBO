@@ -210,10 +210,11 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
           user?.id ? api.orders.getUserOrders(user.id).catch(() => []) : Promise.resolve([]),
           api.tickets.getAll().catch(() => []),
         ]);
+        // Cap cached arrays to prevent memory bloat in long sessions
         contextCacheRef.current = {
-          products: allProducts,
-          orders: userOrders,
-          tickets: allTickets,
+          products: Array.isArray(allProducts) ? allProducts.slice(0, 200) : [],
+          orders: Array.isArray(userOrders) ? userOrders.slice(0, 100) : [],
+          tickets: Array.isArray(allTickets) ? allTickets.slice(0, 100) : [],
           fetchedAt: now,
         };
       }

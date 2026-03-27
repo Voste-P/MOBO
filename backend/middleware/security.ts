@@ -21,10 +21,12 @@ const SUSPICIOUS_PATTERNS = [
   /(union\s+select|insert\s+into|drop\s+table|delete\s+from)/i,      // SQL injection
   /(\x00|\x1a|\x7f)/,                                                 // Null bytes
   /exec(\s|\+)+(s|x)p/i,                                              // MSSQL xp_ calls
-  /0x[0-9a-f]{8,}/i,                                                  // Hex-encoded payloads
+  /0x[0-9a-f]{8,64}/i,                                                 // Hex-encoded payloads (bounded to prevent long-input overhead)
 ];
 
 function containsSuspiciousPattern(value: string): string | null {
+  // Skip extremely long values — they won't match meaningful patterns and would waste CPU
+  if (value.length > 8_000) return null;
   for (const pattern of SUSPICIOUS_PATTERNS) {
     if (pattern.test(value)) return pattern.source;
   }

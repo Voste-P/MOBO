@@ -95,7 +95,9 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     try {
       const raw = localStorage.getItem(`${STORAGE_DISMISSED}${storageScope}`);
       const arr = raw ? (JSON.parse(raw) as string[]) : [];
-      setDismissedIds(new Set(Array.isArray(arr) ? arr : []));
+      // Cap dismissed IDs loaded from storage to prevent unbounded growth
+      const capped = Array.isArray(arr) ? arr.slice(-200) : [];
+      setDismissedIds(new Set(capped));
     } catch {
       setDismissedIds(new Set());
     }
