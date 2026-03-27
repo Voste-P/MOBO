@@ -1,22 +1,60 @@
-import { expect, test } from '@playwright/test';
-import { E2E_ACCOUNTS } from '../helpers/accounts';
+import { test, expect } from '@playwright/test';
 import { loginAndGetAccessToken } from '../helpers/auth';
+import { E2E_ACCOUNTS } from '../helpers/accounts';
 
-test('agency can request brand connection (idempotent)', async ({ request }) => {
-  const { accessToken } = await loginAndGetAccessToken(request, E2E_ACCOUNTS.agency);
+const authHeaders = (token: string) => ({ Authorization: `Bearer ${token}` });
 
-  const res = await request.post('/api/ops/brands/connect', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    data: { brandCode: 'BRD_TEST' },
+test.describe('Agency API security', () => {
+  let agencyToken: string;
+  let buyerToken: string;
+
+  test.beforeAll(async ({ request }) => {
+    const agency = await loginAndGetAccessToken(request, {
+      mobile: E2E_ACCOUNTS.agency.mobile,
+      password: E2E_ACCOUNTS.agency.password,
+    });
+    agencyToken = agency.accessToken;
+
+    const buyer = await loginAndGetAccessToken(request, {
+      mobile: E2E_ACCOUNTS.shopper.mobile,
+      password: E2E_ACCOUNTS.shopper.password,
+    });
+    buyerToken = buyer.accessToken;
   });
 
-  if (res.ok()) {
-    const payload = await res.json().catch(() => null);
-    expect(payload).toBeTruthy();
-    return;
-  }
+  test('agency can view their profile', async ({ request }) => {
+    const res = await request.get('/api/auth/me', {
+      headers: authHeaders(agencyToken),
+    });
+    expect(res.ok()).toBeTruthy();
+    const body = await res.json();
+    expect(body.user.roles).toContain('agency');
+  });
 
-  // If already connected/pending, backend may return a structured error; treat as success.
-  const payload = await res.json().catch(() => null);
-  expect(payload?.error?.code).toBe('ALREADY_REQUESTED');
+  test('agency can list notifications', async ({ request }) => {
+    const res = await request.get('/api/notifications', {
+      headers: authHeaders(agencyToken),
+    });
+    expect(res.ok()).toBeTruthy();
+  });
+
+  test('agency cannot access admin endpoints', async ({ request }) => {
+    const res = await request.get('/api/admin/financials', {
+      headers: authHeaders(agencyToken),
+    });
+    expect(res.status()).toBe(403);
+  });
+
+  test('buyer cannot impersonate agency role', async ({ request }) => {
+    // Agency inventory page should reject buyer
+    const res = await request.get('/api/brand/agencies', {
+      headers: authHeaders(buyerToken),
+    });
+    expect(res.status()).toBe(403);
+  });
+
+  test('unauthenticated request is rejected', async ({ request }) => {
+    const res = await request.get('/api/auth/me');
+    expect(res.status()).toBe(401);
+  });
 });

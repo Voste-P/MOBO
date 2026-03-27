@@ -9,7 +9,7 @@
  *
  * Design:
  * - Per-userId keying (not per-token) — so a user switching devices is still fast.
- * - 30s TTL by default (configurable via AUTH_CACHE_TTL_MS env var).
+ * - 15s TTL by default (configurable via AUTH_CACHE_TTL_MS env var).
  * - LRU eviction when MAX_ENTRIES is exceeded (promotes on read, evicts least-recently-accessed).
  * - Call `authCacheInvalidate(userId)` after role/suspension changes.
  */
@@ -19,7 +19,7 @@ interface CacheEntry {
   expiresAt: number;
 }
 
-const TTL_MS = parseInt(process.env.AUTH_CACHE_TTL_MS || '30000', 10);
+const TTL_MS = parseInt(process.env.AUTH_CACHE_TTL_MS || '15000', 10);
 const MAX_ENTRIES = 5000;
 
 const cache = new Map<string, CacheEntry>();

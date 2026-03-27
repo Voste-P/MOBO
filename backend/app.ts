@@ -253,22 +253,24 @@ export function createApp(env: Env) {
   app.use((req, res, next) => {
     // Skip SSE streams — they're intentionally long-lived.
     if (req.path.startsWith('/api/realtime/')) return next();
-    // Skip extraction routes — they manage their own internal deadline (25s)
-    // and need extra headroom for image upload + Gemini Vision API calls.
-    if (req.path === '/api/ai/extract-order') return next();
+    // Extraction routes manage their own internal deadline (25s) but still
+    // need an outer safety-net timeout to prevent hung connections.
+    const effectiveTimeout = req.path === '/api/ai/extract-order'
+      ? 35_000 // 35s > 25s internal deadline — gives Gemini Vision API time
+      : REQUEST_TIMEOUT_MS;
     const timer = setTimeout(() => {
       if (!res.headersSent) {
         httpLog.warn('Request timeout', {
           method: req.method,
           path: req.originalUrl,
-          timeoutMs: REQUEST_TIMEOUT_MS,
+          timeoutMs: effectiveTimeout,
           ip: req.ip,
         });
         res.status(504).json({
           error: { code: 'GATEWAY_TIMEOUT', message: 'The request took too long. Please try again.' },
         });
       }
-    }, REQUEST_TIMEOUT_MS);
+    }, effectiveTimeout);
     // Don't prevent process exit.
     timer.unref();
     res.on('finish', () => clearTimeout(timer));
