@@ -200,16 +200,37 @@ Examples:
 
 ## Testing
 
-Run everything:
-
-```bash
-npm test
-```
-
-Or backend only:
+### Backend tests (Vitest)
 
 ```bash
 npm run test:backend
+```
+
+Backend tests are organized into:
+
+- **Unit tests** (`backend/tests/unit/`): Pure function tests for money, pagination, mediatorCode, signedProofUrl, authCache, idWhere, env config, AppError.
+- **Integration tests** (`backend/tests/`): API tests against a real database — health, auth, RBAC, orders, tickets, notifications, wallet, push notifications, security middleware, audit logs.
+
+### E2E tests (Playwright)
+
+```bash
+npx playwright test -c playwright.api.config.ts   # API-only (no portals needed)
+npx playwright test                                 # Full stack (all portals)
+```
+
+E2E tests are organized by role:
+
+- `e2e/admin/` — Admin security API, users management, portal smoke
+- `e2e/agency/` — Agency security API, inventory, portal smoke
+- `e2e/brand/` — Brand security API, orders/campaigns, portal smoke
+- `e2e/buyer/` — Buyer security API, order creation, portal smoke
+- `e2e/mediator/` — Mediator security API, verification flow, portal smoke
+- `e2e/lifecycle/` — Full order lifecycle: create → verify → settle → wallet
+
+### Run everything
+
+```bash
+npm test
 ```
 
 Notes:
