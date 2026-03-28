@@ -3445,15 +3445,35 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
   const [teamPage, setTeamPage] = useState(1);
   const TEAM_PER_PAGE = 25;
 
+  // Lazy-load orders on demand when a mediator is selected (orders not fetched with team tab)
+  const [lazyOrders, setLazyOrders] = useState<Order[] | null>(null);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const effectiveOrders: Order[] = allOrders.length > 0 ? allOrders : (lazyOrders ?? []);
+  const ordersAvailable = allOrders.length > 0 || lazyOrders !== null;
 
-  // Keep proof modal in sync when allOrders updates from real-time
+  useEffect(() => {
+    if (!selectedMediator || !user?.mediatorCode) return;
+    // Skip if parent already has orders loaded
+    if (allOrders.length > 0) return;
+    // Skip if already fetched this session
+    if (lazyOrders !== null) return;
+    let cancelled = false;
+    setLoadingOrders(true);
+    api.ops.getMediatorOrders(user.mediatorCode, 'agency')
+      .then((data: any) => { if (!cancelled) setLazyOrders(asArray<Order>(data)); })
+      .catch(() => { if (!cancelled) setLazyOrders([]); })
+      .finally(() => { if (!cancelled) setLoadingOrders(false); });
+    return () => { cancelled = true; };
+  }, [selectedMediator, user?.mediatorCode, allOrders.length, lazyOrders]);
+
+  // Keep proof modal in sync when orders update from real-time or lazy load
   useEffect(() => {
     setProofOrder((prev) => {
       if (!prev) return prev;
-      const updated = allOrders.find((o: Order) => o.id === prev.id);
+      const updated = effectiveOrders.find((o: Order) => o.id === prev.id);
       return updated || null;
     });
-  }, [allOrders]);
+  }, [effectiveOrders]);
 
   // [PERF] Memoize mediator list filtering
   const { activeMediators, pendingMediators } = useMemo(() => ({
@@ -3473,11 +3493,11 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
   const totalTeamPages = Math.max(1, Math.ceil(filtered.length / TEAM_PER_PAGE));
   const paginatedTeam = filtered.slice((teamPage - 1) * TEAM_PER_PAGE, teamPage * TEAM_PER_PAGE);
 
-  // Filter orders for selected mediator (Sanitized for Privacy)
+  // Filter orders for selected mediator — uses orders from parent or lazy-loaded
   const mediatorOrders = useMemo(() => {
     if (!selectedMediator) return [];
-    return allOrders.filter((o: Order) => (o.mediatorCode || o.managerName) === selectedMediator.mediatorCode);
-  }, [selectedMediator, allOrders]);
+    return effectiveOrders.filter((o: Order) => (o.mediatorCode || o.managerName) === selectedMediator.mediatorCode);
+  }, [selectedMediator, effectiveOrders]);
 
   const generateInvite = async () => {
     try {
@@ -3699,8 +3719,11 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                     </td>
                     <td className="p-5 text-center">
                       <div className="text-xs font-bold text-slate-600">
-                        {allOrders.filter((o: Order) => (o.mediatorCode || o.managerName) === m.mediatorCode).length}{' '}
-                        Orders
+                        {loadingOrders
+                          ? '…'
+                          : ordersAvailable
+                            ? `${effectiveOrders.filter((o: Order) => (o.mediatorCode || o.managerName) === m.mediatorCode).length} Orders`
+                            : '–'}
                       </div>
                     </td>
                     <td className="p-5 text-right">
@@ -4334,7 +4357,7 @@ export const AgencyDashboard: React.FC = () => {
   const tabDataNeeds = useMemo<string[]>(() => {
     switch (activeTab) {
       case 'dashboard': return ['dashboardStats', 'revenueTrend', 'brandPerformance'];
-      case 'team': return ['mediators', 'orders'];
+      case 'team': return ['mediators'];
       case 'inventory': return ['campaigns', 'mediators', 'orders'];
       case 'orders': return ['orders', 'campaigns', 'mediators'];
       case 'finance': return ['orders', 'mediators'];
