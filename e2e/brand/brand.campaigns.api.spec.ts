@@ -23,7 +23,7 @@ test.describe('Brand campaigns & dashboard API', () => {
     shopperToken = shopper.accessToken;
   });
 
-  // ── Dashboard read endpoints ───────────────────────────────────
+  // ── Dashboard read endpoints ───────────────────────────────────────
   test('brand can view dashboard stats', async ({ request }) => {
     const res = await request.get('/api/brand/dashboard-stats', {
       headers: authHeaders(brandToken),
@@ -73,7 +73,7 @@ test.describe('Brand campaigns & dashboard API', () => {
     expect(res.ok()).toBeTruthy();
   });
 
-  // ── Campaign CRUD ──────────────────────────────────────────────
+  // ── Campaign CRUD ──────────────────────────────────────────────────
   let createdCampaignId: string | undefined;
 
   test('brand can create a campaign', async ({ request }) => {
@@ -102,6 +102,10 @@ test.describe('Brand campaigns & dashboard API', () => {
       headers: authHeaders(brandToken),
       data: { title: `Updated E2E Campaign ${Date.now()}` },
     });
+    if (!res.ok()) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(`PATCH /api/brand/campaigns/${createdCampaignId} failed with ${res.status()}: ${JSON.stringify(body)}`);
+    }
     expect(res.ok()).toBeTruthy();
   });
 
@@ -110,6 +114,10 @@ test.describe('Brand campaigns & dashboard API', () => {
     const res = await request.delete(`/api/brand/campaigns/${createdCampaignId}`, {
       headers: authHeaders(brandToken),
     });
+    if (!res.ok()) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(`DELETE /api/brand/campaigns/${createdCampaignId} failed with ${res.status()}: ${JSON.stringify(body)}`);
+    }
     expect(res.ok()).toBeTruthy();
   });
 
