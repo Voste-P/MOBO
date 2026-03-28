@@ -81,17 +81,19 @@ test.describe('Brand campaigns & dashboard API', () => {
       headers: authHeaders(brandToken),
       data: {
         title: `E2E Campaign ${Date.now()}`,
-        budgetPaise: 100000,
-        rewardPaise: 5000,
-        slots: 10,
+        platform: 'Amazon',
+        price: 999,
+        originalPrice: 1200,
+        payout: 100,
+        image: 'https://placehold.co/600x400',
+        productUrl: 'https://example.com/product',
+        totalSlots: 10,
+        allowedAgencies: ['AG_TEST'],
       },
     });
-    // Campaign creation may require additional fields depending on schema
-    if (res.ok()) {
-      const body = await res.json();
-      createdCampaignId = body.campaign?.id ?? body.id;
-    }
-    expect([200, 201, 400]).toContain(res.status());
+    expect([200, 201]).toContain(res.status());
+    const body = await res.json();
+    createdCampaignId = body.campaign?.id ?? body.id ?? body._id;
   });
 
   test('brand can update a campaign', async ({ request }) => {

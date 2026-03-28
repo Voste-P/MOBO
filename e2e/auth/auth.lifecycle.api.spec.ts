@@ -83,6 +83,7 @@ test.describe('Auth lifecycle API', () => {
         mobile: E2E_ACCOUNTS.shopper.mobile,
         password: 'SomePassword_123!',
         name: 'Duplicate Test',
+        mediatorCode: 'AG_TEST',
       },
     });
     // Should reject because the mobile already exists

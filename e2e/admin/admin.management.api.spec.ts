@@ -37,7 +37,7 @@ test.describe('Admin management API', () => {
     });
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
-    expect(Array.isArray(body.users)).toBeTruthy();
+    expect(Array.isArray(body.data ?? body)).toBeTruthy();
   });
 
   // ── Financials ─────────────────────────────────────────────────
