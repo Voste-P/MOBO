@@ -28,7 +28,9 @@ test.describe('Mediator verification flow', () => {
     });
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
-    expect(body).toHaveProperty('orders');
+    // Without pagination params, response is a plain array;
+    // with ?page=, it's { data: [...] }
+    expect(Array.isArray(body) || Array.isArray(body.data)).toBeTruthy();
   });
 
   test('mediator can view ops dashboard stats', async ({ request }) => {
