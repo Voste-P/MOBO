@@ -39,7 +39,7 @@ test.describe('Ticket lifecycle API', () => {
     const res = await request.post('/api/tickets', {
       headers: authHeaders(shopperToken),
       data: {
-        issueType: 'Payment Issue',
+        issueType: 'Order Issue',
         description: `E2E ticket lifecycle test ${Date.now()}`,
       },
     });
@@ -56,7 +56,7 @@ test.describe('Ticket lifecycle API', () => {
     });
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
-    expect(Array.isArray(body.tickets ?? body)).toBeTruthy();
+    expect(Array.isArray(body.data ?? body)).toBeTruthy();
   });
 
   // ── Read single ────────────────────────────────────────────────
@@ -76,7 +76,7 @@ test.describe('Ticket lifecycle API', () => {
     test.skip(!createdTicketId, 'No ticket was created');
     const res = await request.patch(`/api/tickets/${createdTicketId}`, {
       headers: authHeaders(shopperToken),
-      data: { description: `Updated at ${Date.now()}` },
+      data: { status: 'Resolved' },
     });
     expect(res.ok()).toBeTruthy();
   });
@@ -86,7 +86,7 @@ test.describe('Ticket lifecycle API', () => {
     test.skip(!createdTicketId, 'No ticket was created');
     const res = await request.post(`/api/tickets/${createdTicketId}/comments`, {
       headers: authHeaders(shopperToken),
-      data: { text: `E2E comment ${Date.now()}` },
+      data: { message: `E2E comment ${Date.now()}` },
     });
     expect(res.ok()).toBeTruthy();
   });
