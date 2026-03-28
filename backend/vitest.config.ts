@@ -22,5 +22,9 @@ export default defineConfig({
     isolate: false,
     hookTimeout: 120_000,
     testTimeout: 120_000,
+    coverage: {
+      provider: 'v8',
+      reportsDirectory: './coverage',
+    },
   },
 });
