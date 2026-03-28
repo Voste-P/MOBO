@@ -38,7 +38,7 @@ test.describe('Auth lifecycle API', () => {
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
     expect(body.user).toBeTruthy();
-    expect(body.user.roles).toContain('shopper');
+    expect(body.user.role).toBe('user');
   });
 
   // ── Token refresh ──────────────────────────────────────────────
@@ -117,7 +117,7 @@ test.describe('Auth lifecycle API', () => {
     });
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
-    expect(body.user.roles).toContain('admin');
+    expect(body.user.role).toBe('admin');
   });
 
   // ── Brand registration flow ────────────────────────────────────

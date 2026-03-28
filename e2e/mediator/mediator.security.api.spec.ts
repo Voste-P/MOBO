@@ -28,7 +28,7 @@ test.describe('Mediator API security', () => {
     });
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
-    expect(body.user.roles).toContain('mediator');
+    expect(body.user.role).toBe('mediator');
   });
 
   test('mediator can list their notifications', async ({ request }) => {

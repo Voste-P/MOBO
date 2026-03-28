@@ -28,7 +28,7 @@ test.describe('Agency API security', () => {
     });
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
-    expect(body.user.roles).toContain('agency');
+    expect(body.user.role).toBe('agency');
   });
 
   test('agency can list notifications', async ({ request }) => {

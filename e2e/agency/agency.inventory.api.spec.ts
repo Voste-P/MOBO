@@ -21,7 +21,7 @@ test.describe('Agency inventory & connections API', () => {
     });
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
-    expect(body.user.roles).toContain('agency');
+    expect(body.user.role).toBe('agency');
   });
 
   test('agency can view ops dashboard stats', async ({ request }) => {

@@ -303,7 +303,7 @@ export function makeOpsController(env: Env) {
 
         const agencyCode = isPrivileged(roles) ? requested : String((user as any)?.mediatorCode || '');
         if (!agencyCode) throw new AppError(400, 'INVALID_AGENCY_CODE', 'agencyCode required');
-        if (!isPrivileged(roles)) requireAnyRole(roles, 'agency');
+        if (!isPrivileged(roles)) requireAnyRole(roles, 'agency', 'mediator');
 
         const where: any = {
           roles: { has: 'mediator' as any },
@@ -3308,7 +3308,7 @@ export function makeOpsController(env: Env) {
           ? String(req.query.agencyCode || '')
           : String((user as any)?.mediatorCode || '');
         if (!agencyCode) throw new AppError(400, 'INVALID_AGENCY_CODE', 'agencyCode required');
-        if (!isPrivileged(roles)) requireAnyRole(roles, 'agency');
+        if (!isPrivileged(roles)) requireAnyRole(roles, 'agency', 'mediator');
 
         const mediatorCodes = await listMediatorCodesForAgency(agencyCode);
         const allCodes = [agencyCode, ...mediatorCodes].filter(Boolean);
@@ -3348,7 +3348,7 @@ export function makeOpsController(env: Env) {
           ? String(req.query.agencyCode || '')
           : String((user as any)?.mediatorCode || '');
         if (!agencyCode) throw new AppError(400, 'INVALID_AGENCY_CODE', 'agencyCode required');
-        if (!isPrivileged(roles)) requireAnyRole(roles, 'agency');
+        if (!isPrivileged(roles)) requireAnyRole(roles, 'agency', 'mediator');
 
         const rangeParam = String(req.query.range || 'last30');
         const now = new Date();

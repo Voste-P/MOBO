@@ -47,8 +47,8 @@ test.describe('Notifications API', () => {
         },
       },
     });
-    // May return 200/201 on success, or 400 if VAPID is not configured
-    expect([200, 201, 400]).toContain(res.status());
+    // May return 200/201 on success, 204 if already subscribed, or 400 if VAPID is not configured
+    expect([200, 201, 204, 400]).toContain(res.status());
   });
 
   // ── Push unsubscribe ───────────────────────────────────────────

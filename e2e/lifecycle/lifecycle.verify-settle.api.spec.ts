@@ -44,7 +44,10 @@ test.describe('Order lifecycle: create → verify → settle → wallet', () => 
       test.skip(true, 'No deals available in test DB');
       return;
     }
-    const deal = deals[0];
+    // Pick the E2E Deal (has valid payout) instead of whatever comes first
+    const deal = deals.find((d: any) => d.title === 'E2E Deal' && d.commission > 0)
+      ?? deals.find((d: any) => d.commission > 0)
+      ?? deals[0];
 
     // 2. Record wallet before
     const meBefore = await expectOk(
@@ -123,14 +126,17 @@ test.describe('Order lifecycle: create → verify → settle → wallet', () => 
         currentWorkflow = 'APPROVED';
       } else {
         // Submit returnWindow proof
-        await request.post('/api/orders/claim', {
-          headers: authHeaders(buyer.accessToken),
-          data: {
-            orderId,
-            type: 'returnWindow',
-            data: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMTAwIj48dGV4dCB4PSIxMCIgeT0iNTAiPkUyRSBSZXR1cm4gV2luZG93PC90ZXh0Pjwvc3ZnPg==',
-          },
-        });
+        await expectOk(
+          await request.post('/api/orders/claim', {
+            headers: authHeaders(buyer.accessToken),
+            data: {
+              orderId,
+              type: 'returnWindow',
+              data: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMTAwIj48dGV4dCB4PSIxMCIgeT0iNTAiPkUyRSBSZXR1cm4gV2luZG93PC90ZXh0Pjwvc3ZnPg==',
+            },
+          }),
+          'Submit returnWindow proof',
+        );
         // Verify returnWindow proof
         const rwRes = await expectOk(
           await request.post('/api/ops/orders/verify-requirement', {

@@ -59,7 +59,7 @@ test.describe('Mediator verification flow', () => {
   });
 
   test('admin can list ops orders', async ({ request }) => {
-    const res = await request.get('/api/ops/orders', {
+    const res = await request.get('/api/ops/orders?mediatorCode=AG_TEST', {
       headers: authHeaders(adminToken),
     });
     expect(res.ok()).toBeTruthy();
