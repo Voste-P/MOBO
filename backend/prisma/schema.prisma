@@ -321,6 +321,7 @@ model User {
   // 100k-scale indexes for login + listing queries
   @@index([mobile, isDeleted])               // fast login lookup
   @@index([username, isDeleted])             // fast username login lookup
+  @@index([email, isDeleted])                // fast email lookup (admin search, profile)
   @@index([isDeleted, createdAt(sort: Desc)]) // admin user listing
   @@index([mediatorCode, isDeleted, status]) // ops dashboard mediator-scoped queries
   @@index([parentCode, isDeleted, status])   // agency team listing  

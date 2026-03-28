@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../components/ui/ConfirmDialog';
@@ -9,12 +9,14 @@ import { maskMobile } from '../utils/mobiles';
 import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage } from '../components/ProxiedImage';
 
-import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
 import { Button, EmptyState, IconButton, Input, Spinner, Pagination } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { RatingVerificationBadge, ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
 import { DesktopShell } from '../components/DesktopShell';
+import { lazyRetry } from '../utils/lazyRetry';
+
+const TicketDetailModal = lazyRetry(() => import('../components/TicketDetailModal'));
 import {
   LayoutGrid,
   Users,
@@ -62,7 +64,6 @@ import {
 import { User, Order, Product, Invite, Ticket } from '../types';
 import { formatCurrency as formatCurrencyBase } from '../utils/formatCurrency';
 import { csvSafe, downloadCsv } from '../utils/csvHelpers';
-import TicketDetailModal from '../components/TicketDetailModal';
 
 // --- TYPES & CONSTANTS ---
 type ViewMode =
@@ -950,7 +951,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         order.settlementMode || '',
       ] as (string | number)[];
     });
-    exportToGoogleSheet({
+    import('../utils/exportToSheets').then(({ exportToGoogleSheet }) => exportToGoogleSheet({
       title: `Buzzma Admin ${reportType} Report - ${new Date().toISOString().slice(0, 10)}`,
       headers: sheetHeaders,
       rows: sheetRows,
@@ -959,7 +960,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       onEnd: () => setSheetsExporting(false),
       onSuccess: () => toast.success('Exported to Google Sheets!'),
       onError: (msg) => toast.error(typeof msg === 'string' ? msg : 'Google Sheets export failed. Please try again.'),
-    });
+    }));
   };
 
   const filteredUsers = useMemo(() => {
@@ -2575,12 +2576,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         </div>
       )}
     </DesktopShell>
-    <TicketDetailModal
-      open={!!selectedTicket}
-      onClose={() => setSelectedTicket(null)}
-      ticket={selectedTicket}
-      onRefresh={fetchAllData}
-    />
+    <Suspense fallback={null}>
+      <TicketDetailModal
+        open={!!selectedTicket}
+        onClose={() => setSelectedTicket(null)}
+        ticket={selectedTicket}
+        onRefresh={fetchAllData}
+      />
+    </Suspense>
     </>
   );
 };

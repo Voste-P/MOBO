@@ -1,15 +1,12 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../components/ui/ConfirmDialog';
 import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage } from '../components/ProxiedImage';
-import { RaiseTicketModal } from '../components/RaiseTicketModal';
-import TicketDetailModal from '../components/TicketDetailModal';
 import { FeedbackCard } from '../components/FeedbackCard';
 import { api, asArray, invalidateGetCache } from '../services/api';
 import { getDirectBackendUrl } from '../utils/apiBaseUrl';
-import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 import { User, Campaign, Order, Ticket } from '../types';
@@ -18,6 +15,13 @@ import { ProofImage } from '../components/ProofImage';
 import { DesktopShell } from '../components/DesktopShell';
 import { formatCurrency } from '../utils/formatCurrency';
 import { getPrimaryOrderId } from '../utils/orderHelpers';
+import { lazyRetry } from '../utils/lazyRetry';
+
+// Lazy-load modals & heavy utilities (only needed on user interaction)
+const RaiseTicketModal = lazyRetry(() =>
+  import('../components/RaiseTicketModal').then(m => ({ default: m.RaiseTicketModal }))
+);
+const TicketDetailModal = lazyRetry(() => import('../components/TicketDetailModal'));
 import { csvSafe, downloadCsv } from '../utils/csvHelpers';
 import { maskMobile } from '../utils/mobiles';
 import { BetaLock } from '../components/BetaLock';
@@ -693,7 +697,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
       ] as (string | number)[];
     });
 
-    exportToGoogleSheet({
+    import('../utils/exportToSheets').then(({ exportToGoogleSheet }) => exportToGoogleSheet({
       title: `Agency Orders Report - ${new Date().toISOString().slice(0, 10)}`,
       headers: ['Order ID','Date','Time','Product','Brand','Platform','Deal Type','Unit Price','Quantity','Total Value','Commission (₹)','Settlement Date','Agency Name','Mediator Name','Mediator Code','Buyer Name','Buyer Mobile','Reviewer Name','Workflow Status','Payment Status','Verification Status','Internal Ref','Sold By','Order Date','Extracted Product','UTR/Reference','Payment Mode'],
       rows: orderRows,
@@ -702,7 +706,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
       onEnd: () => setSheetsExporting(false),
       onSuccess: () => toast.success('Exported to Google Sheets!'),
       onError: (msg) => toast.error(msg),
-    });
+    }));
   };
 
   return (
@@ -1293,7 +1297,7 @@ const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
         p.status || '',
       ] as (string | number)[];
     });
-    exportToGoogleSheet({
+    import('../utils/exportToSheets').then(({ exportToGoogleSheet }) => exportToGoogleSheet({
       title: `Agency Payout Ledger - ${new Date().toISOString().slice(0, 10)}`,
       headers: payoutHeaders,
       rows: payoutRows,
@@ -1302,7 +1306,7 @@ const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
       onEnd: () => setSheetsExporting(false),
       onSuccess: () => toast.success('Exported to Google Sheets!'),
       onError: (msg) => toast.error(msg),
-    });
+    }));
   };
 
   return (
@@ -3445,15 +3449,35 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
   const [teamPage, setTeamPage] = useState(1);
   const TEAM_PER_PAGE = 25;
 
+  // Lazy-load orders on demand when a mediator is selected (orders not fetched with team tab)
+  const [lazyOrders, setLazyOrders] = useState<Order[] | null>(null);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const effectiveOrders: Order[] = allOrders.length > 0 ? allOrders : (lazyOrders ?? []);
+  const ordersAvailable = allOrders.length > 0 || lazyOrders !== null;
 
-  // Keep proof modal in sync when allOrders updates from real-time
+  useEffect(() => {
+    if (!selectedMediator || !user?.mediatorCode) return;
+    // Skip if parent already has orders loaded
+    if (allOrders.length > 0) return;
+    // Skip if already fetched this session
+    if (lazyOrders !== null) return;
+    let cancelled = false;
+    setLoadingOrders(true);
+    api.ops.getMediatorOrders(user.mediatorCode, 'agency')
+      .then((data: any) => { if (!cancelled) setLazyOrders(asArray<Order>(data)); })
+      .catch(() => { if (!cancelled) setLazyOrders([]); })
+      .finally(() => { if (!cancelled) setLoadingOrders(false); });
+    return () => { cancelled = true; };
+  }, [selectedMediator, user?.mediatorCode, allOrders.length, lazyOrders]);
+
+  // Keep proof modal in sync when orders update from real-time or lazy load
   useEffect(() => {
     setProofOrder((prev) => {
       if (!prev) return prev;
-      const updated = allOrders.find((o: Order) => o.id === prev.id);
+      const updated = effectiveOrders.find((o: Order) => o.id === prev.id);
       return updated || null;
     });
-  }, [allOrders]);
+  }, [effectiveOrders]);
 
   // [PERF] Memoize mediator list filtering
   const { activeMediators, pendingMediators } = useMemo(() => ({
@@ -3473,11 +3497,11 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
   const totalTeamPages = Math.max(1, Math.ceil(filtered.length / TEAM_PER_PAGE));
   const paginatedTeam = filtered.slice((teamPage - 1) * TEAM_PER_PAGE, teamPage * TEAM_PER_PAGE);
 
-  // Filter orders for selected mediator (Sanitized for Privacy)
+  // Filter orders for selected mediator — uses orders from parent or lazy-loaded
   const mediatorOrders = useMemo(() => {
     if (!selectedMediator) return [];
-    return allOrders.filter((o: Order) => (o.mediatorCode || o.managerName) === selectedMediator.mediatorCode);
-  }, [selectedMediator, allOrders]);
+    return effectiveOrders.filter((o: Order) => (o.mediatorCode || o.managerName) === selectedMediator.mediatorCode);
+  }, [selectedMediator, effectiveOrders]);
 
   const generateInvite = async () => {
     try {
@@ -3699,8 +3723,11 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                     </td>
                     <td className="p-5 text-center">
                       <div className="text-xs font-bold text-slate-600">
-                        {allOrders.filter((o: Order) => (o.mediatorCode || o.managerName) === m.mediatorCode).length}{' '}
-                        Orders
+                        {loadingOrders
+                          ? '…'
+                          : ordersAvailable
+                            ? `${effectiveOrders.filter((o: Order) => (o.mediatorCode || o.managerName) === m.mediatorCode).length} Orders`
+                            : '–'}
                       </div>
                     </td>
                     <td className="p-5 text-right">
@@ -4334,7 +4361,7 @@ export const AgencyDashboard: React.FC = () => {
   const tabDataNeeds = useMemo<string[]>(() => {
     switch (activeTab) {
       case 'dashboard': return ['dashboardStats', 'revenueTrend', 'brandPerformance'];
-      case 'team': return ['mediators', 'orders'];
+      case 'team': return ['mediators'];
       case 'inventory': return ['campaigns', 'mediators', 'orders'];
       case 'orders': return ['orders', 'campaigns', 'mediators'];
       case 'finance': return ['orders', 'mediators'];
@@ -4864,13 +4891,15 @@ export const AgencyDashboard: React.FC = () => {
         </div>
       )}
       {activeTab === 'profile' && <AgencyProfile user={user} />}
-      <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />
-      <TicketDetailModal
-        open={!!selectedTicket}
-        onClose={() => setSelectedTicket(null)}
-        ticket={selectedTicket}
-        onRefresh={refreshData}
-      />
+      <Suspense fallback={null}>
+        <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />
+        <TicketDetailModal
+          open={!!selectedTicket}
+          onClose={() => setSelectedTicket(null)}
+          ticket={selectedTicket}
+          onRefresh={refreshData}
+        />
+      </Suspense>
     </DesktopShell>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import { api, asArray } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -15,9 +15,14 @@ import { Order, Product, Ticket } from '../types';
 import { Button, EmptyState, Spinner } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { ProxiedImage } from '../components/ProxiedImage';
-import { RaiseTicketModal } from '../components/RaiseTicketModal';
-import TicketDetailModal from '../components/TicketDetailModal';
 import { ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
+import { lazyRetry } from '../utils/lazyRetry';
+
+// Lazy-load modals (only needed on user interaction)
+const RaiseTicketModal = lazyRetry(() =>
+  import('../components/RaiseTicketModal').then(m => ({ default: m.RaiseTicketModal }))
+);
+const TicketDetailModal = lazyRetry(() => import('../components/TicketDetailModal'));
 import {
   Clock,
   CheckCircle2,
@@ -1694,17 +1699,19 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       </div>
 
       {/* Raise Ticket Modal for buyer */}
-      <RaiseTicketModal
-        open={ticketModalOpen}
-        onClose={() => { setTicketModalOpen(false); loadMyTickets(); }}
-        orderId={ticketOrderId}
-      />
-      <TicketDetailModal
-        open={!!selectedTicket}
-        onClose={() => { setSelectedTicket(null); loadMyTickets(); }}
-        ticket={selectedTicket}
-        onRefresh={loadMyTickets}
-      />
+      <Suspense fallback={null}>
+        <RaiseTicketModal
+          open={ticketModalOpen}
+          onClose={() => { setTicketModalOpen(false); loadMyTickets(); }}
+          orderId={ticketOrderId}
+        />
+        <TicketDetailModal
+          open={!!selectedTicket}
+          onClose={() => { setSelectedTicket(null); loadMyTickets(); }}
+          ticket={selectedTicket}
+          onRefresh={loadMyTickets}
+        />
+      </Suspense>
 
       {/* SUBMIT PURCHASE MODAL (SMART UI) */}
       {isNewOrderModalOpen && (

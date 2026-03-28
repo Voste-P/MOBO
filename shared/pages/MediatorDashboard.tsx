@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { useToast } from '../context/ToastContext';
@@ -55,9 +55,14 @@ import { EmptyState, Spinner, Pagination } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { RatingVerificationBadge, ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
 import { MobileTabBar } from '../components/MobileTabBar';
-import { RaiseTicketModal } from '../components/RaiseTicketModal';
-import TicketDetailModal from '../components/TicketDetailModal';
 import { FeedbackCard } from '../components/FeedbackCard';
+import { lazyRetry } from '../utils/lazyRetry';
+
+// Lazy-load modals (only needed on user interaction)
+const RaiseTicketModal = lazyRetry(() =>
+  import('../components/RaiseTicketModal').then(m => ({ default: m.RaiseTicketModal }))
+);
+const TicketDetailModal = lazyRetry(() => import('../components/TicketDetailModal'));
 
 // --- UTILS ---
 // formatCurrency, getPrimaryOrderId, csvSafe, downloadCsv, urlToBase64 imported from shared/utils
@@ -741,12 +746,14 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
         )}
       </section>
 
-      <TicketDetailModal
-        open={!!selectedTicket}
-        onClose={() => setSelectedTicket(null)}
-        ticket={selectedTicket}
-        onRefresh={onRefresh}
-      />
+      <Suspense fallback={null}>
+        <TicketDetailModal
+          open={!!selectedTicket}
+          onClose={() => setSelectedTicket(null)}
+          ticket={selectedTicket}
+          onRefresh={onRefresh}
+        />
+      </Suspense>
     </div>
   );
 };
@@ -3162,7 +3169,9 @@ export const MediatorDashboard: React.FC = () => {
           onRefresh={refreshData}
         />
       )}
-      <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />
+      <Suspense fallback={null}>
+        <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />
+      </Suspense>
     </div>
   );
 };
