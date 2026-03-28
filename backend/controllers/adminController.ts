@@ -20,6 +20,10 @@ import { authCacheInvalidate } from '../utils/authCache.js';
 
 function db() { return prisma(); }
 
+// In-memory cache for expensive admin stats (full-table aggregations)
+let _statsCache: { data: any; at: number } | null = null;
+const STATS_CACHE_TTL_MS = 30_000; // 30 seconds
+
 function roleToDb(role: string): string | null {
   const r = role.toLowerCase();
   if (r === 'all') return null;
@@ -202,6 +206,12 @@ export function makeAdminController() {
 
     getStats: async (req: Request, res: Response, next: NextFunction) => {
       try {
+        // Serve from cache if fresh (avoids expensive full-table scans)
+        if (_statsCache && Date.now() - _statsCache.at < STATS_CACHE_TTL_MS) {
+          res.json(_statsCache.data);
+          return;
+        }
+
         const [roleCounts, orderStats] = await Promise.all([
           db().$queryRaw<Array<{ role: string; count: number }>>`
             SELECT r AS role, COUNT(*)::int AS count
@@ -227,13 +237,15 @@ export function makeAdminController() {
 
         const os = orderStats[0] || { total_orders: 0, total_revenue_paise: 0, pending_revenue_paise: 0, risk_orders: 0 };
 
-        res.json({
+        const statsResult = {
           totalRevenue: Math.round(Number(os.total_revenue_paise) / 100),
           pendingRevenue: Math.round(Number(os.pending_revenue_paise) / 100),
           totalOrders: Number(os.total_orders),
           riskOrders: Number(os.risk_orders),
           counts,
-        });
+        };
+        _statsCache = { data: statsResult, at: Date.now() };
+        res.json(statsResult);
         businessLog.info('Platform stats viewed', { userId: req.auth?.userId, totalOrders: Number(os.total_orders), riskOrders: Number(os.risk_orders), ip: req.ip });
         logAccessEvent('ADMIN_ACTION', {
           userId: req.auth?.userId,

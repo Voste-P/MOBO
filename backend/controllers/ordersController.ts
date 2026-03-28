@@ -1296,17 +1296,20 @@ export function makeOrdersController(env: Env) {
               if (headResp.ok || headResp.status === 405 || headResp.status === 403) {
                 // 200/405 (method not allowed but URL exists)/403 (auth-gated) — link exists
                 claimAiConfidence = env.AI_REVIEW_LINK_CONFIDENCE ?? 95;
+              } else if ([301, 302, 303, 307, 308, 429].includes(headResp.status)) {
+                // Redirects or rate-limited — URL exists but server didn't cooperate with HEAD
+                claimAiConfidence = Math.max(80, (env.AI_REVIEW_LINK_CONFIDENCE ?? 95) - 10);
               } else {
                 orderLog.warn('Review link HEAD returned non-OK status', {
                   orderId: order.mongoId, status: headResp.status, url: reviewUrl,
                 });
-                // Still accept the link but don't auto-verify — mediator will review
-                claimAiConfidence = 0;
+                // Domain-validated link from known platform — moderate confidence
+                claimAiConfidence = 70;
               }
             } catch {
-              // Network error / timeout — accept link but skip auto-verify
+              // Network error / timeout — domain was validated, assign moderate confidence
               orderLog.warn('Review link HEAD request failed', { orderId: order.mongoId, url: reviewUrl });
-              claimAiConfidence = 0;
+              claimAiConfidence = 70;
             }
           }
           if (order.rejectionType === 'review') {
@@ -1799,10 +1802,9 @@ export function makeOrdersController(env: Env) {
         });
 
         // ── Auto-verify by AI confidence (submitClaim, new UNDER_REVIEW) ──
-        // Any proof that passed AI hard-block validation (confidence > 0) is auto-verified.
         let claimFinalOrder: any = afterReview;
         const autoThreshold2 = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
-        if (claimAiConfidence > 0 && afterReview) {
+        if (claimAiConfidence >= autoThreshold2 && afterReview) {
           const freshOrder = await db().order.findFirst({
             where: { id: order.id, isDeleted: false },
             include: { items: { where: { isDeleted: false } } },

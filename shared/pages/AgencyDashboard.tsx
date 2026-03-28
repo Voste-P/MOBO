@@ -1,15 +1,12 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../components/ui/ConfirmDialog';
 import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage } from '../components/ProxiedImage';
-import { RaiseTicketModal } from '../components/RaiseTicketModal';
-import TicketDetailModal from '../components/TicketDetailModal';
 import { FeedbackCard } from '../components/FeedbackCard';
 import { api, asArray, invalidateGetCache } from '../services/api';
 import { getDirectBackendUrl } from '../utils/apiBaseUrl';
-import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 import { User, Campaign, Order, Ticket } from '../types';
@@ -18,6 +15,13 @@ import { ProofImage } from '../components/ProofImage';
 import { DesktopShell } from '../components/DesktopShell';
 import { formatCurrency } from '../utils/formatCurrency';
 import { getPrimaryOrderId } from '../utils/orderHelpers';
+import { lazyRetry } from '../utils/lazyRetry';
+
+// Lazy-load modals & heavy utilities (only needed on user interaction)
+const RaiseTicketModal = lazyRetry(() =>
+  import('../components/RaiseTicketModal').then(m => ({ default: m.RaiseTicketModal }))
+);
+const TicketDetailModal = lazyRetry(() => import('../components/TicketDetailModal'));
 import { csvSafe, downloadCsv } from '../utils/csvHelpers';
 import { maskMobile } from '../utils/mobiles';
 import { BetaLock } from '../components/BetaLock';
@@ -693,7 +697,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
       ] as (string | number)[];
     });
 
-    exportToGoogleSheet({
+    import('../utils/exportToSheets').then(({ exportToGoogleSheet }) => exportToGoogleSheet({
       title: `Agency Orders Report - ${new Date().toISOString().slice(0, 10)}`,
       headers: ['Order ID','Date','Time','Product','Brand','Platform','Deal Type','Unit Price','Quantity','Total Value','Commission (₹)','Settlement Date','Agency Name','Mediator Name','Mediator Code','Buyer Name','Buyer Mobile','Reviewer Name','Workflow Status','Payment Status','Verification Status','Internal Ref','Sold By','Order Date','Extracted Product','UTR/Reference','Payment Mode'],
       rows: orderRows,
@@ -702,7 +706,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
       onEnd: () => setSheetsExporting(false),
       onSuccess: () => toast.success('Exported to Google Sheets!'),
       onError: (msg) => toast.error(msg),
-    });
+    }));
   };
 
   return (
@@ -1293,7 +1297,7 @@ const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
         p.status || '',
       ] as (string | number)[];
     });
-    exportToGoogleSheet({
+    import('../utils/exportToSheets').then(({ exportToGoogleSheet }) => exportToGoogleSheet({
       title: `Agency Payout Ledger - ${new Date().toISOString().slice(0, 10)}`,
       headers: payoutHeaders,
       rows: payoutRows,
@@ -1302,7 +1306,7 @@ const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
       onEnd: () => setSheetsExporting(false),
       onSuccess: () => toast.success('Exported to Google Sheets!'),
       onError: (msg) => toast.error(msg),
-    });
+    }));
   };
 
   return (
@@ -4887,13 +4891,15 @@ export const AgencyDashboard: React.FC = () => {
         </div>
       )}
       {activeTab === 'profile' && <AgencyProfile user={user} />}
-      <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />
-      <TicketDetailModal
-        open={!!selectedTicket}
-        onClose={() => setSelectedTicket(null)}
-        ticket={selectedTicket}
-        onRefresh={refreshData}
-      />
+      <Suspense fallback={null}>
+        <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />
+        <TicketDetailModal
+          open={!!selectedTicket}
+          onClose={() => setSelectedTicket(null)}
+          ticket={selectedTicket}
+          onRefresh={refreshData}
+        />
+      </Suspense>
     </DesktopShell>
   );
 };

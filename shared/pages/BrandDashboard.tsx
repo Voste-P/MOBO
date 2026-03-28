@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import { getDirectBackendUrl } from '../utils/apiBaseUrl';
 import { maskMobile } from '../utils/mobiles';
 import { formatErrorMessage } from '../utils/errors';
@@ -55,19 +55,23 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { api, asArray, invalidateGetCache } from '../services/api';
-import { exportToGoogleSheet } from '../utils/exportToSheets';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 import { User, Campaign, Order, Ticket } from '../types';
 import { EmptyState, Spinner, Pagination } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
-import { RaiseTicketModal } from '../components/RaiseTicketModal';
-import TicketDetailModal from '../components/TicketDetailModal';
 import { FeedbackCard } from '../components/FeedbackCard';
 import { RatingVerificationBadge, ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
 import { formatCurrency } from '../utils/formatCurrency';
 import { getPrimaryOrderId } from '../utils/orderHelpers';
 import { csvSafe, downloadCsv } from '../utils/csvHelpers';
+import { lazyRetry } from '../utils/lazyRetry';
+
+// Lazy-load modals & heavy utilities (only needed on user interaction)
+const RaiseTicketModal = lazyRetry(() =>
+  import('../components/RaiseTicketModal').then(m => ({ default: m.RaiseTicketModal }))
+);
+const TicketDetailModal = lazyRetry(() => import('../components/TicketDetailModal'));
 import { DesktopShell } from '../components/DesktopShell';
 import { BetaLock } from '../components/BetaLock';
 import {
@@ -833,7 +837,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
         o.settlementMode || '',
       ] as (string | number)[];
     });
-    exportToGoogleSheet({
+    import('../utils/exportToSheets').then(({ exportToGoogleSheet }) => exportToGoogleSheet({
       title: `Brand Orders Report - ${new Date().toISOString().slice(0, 10)}`,
       headers: sheetHeaders,
       rows: sheetRows,
@@ -842,7 +846,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
       onEnd: () => setSheetsExporting(false),
       onSuccess: () => toast.success('Exported to Google Sheets!'),
       onError: (msg) => toast.error(typeof msg === 'string' ? msg : 'Google Sheets export failed. Please try again.'),
-    });
+    }));
   };
 
   return (
@@ -2396,7 +2400,7 @@ export const BrandDashboard: React.FC = () => {
         tx.status || '',
       ] as (string | number)[];
     });
-    exportToGoogleSheet({
+    import('../utils/exportToSheets').then(({ exportToGoogleSheet }) => exportToGoogleSheet({
       title: `Brand Payout Ledger - ${new Date().toISOString().slice(0, 10)}`,
       headers: payoutHeaders,
       rows: payoutRows,
@@ -2405,7 +2409,7 @@ export const BrandDashboard: React.FC = () => {
       onEnd: () => setSheetsExporting(false),
       onSuccess: () => toast.success('Exported to Google Sheets!'),
       onError: (msg) => toast.error(typeof msg === 'string' ? msg : 'Google Sheets export failed. Please try again.'),
-    });
+    }));
   };
 
   const pendingRequests = user?.pendingConnections?.length || 0;
@@ -3193,13 +3197,15 @@ export const BrandDashboard: React.FC = () => {
         </div>
       )}
     </DesktopShell>
-    <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />
-    <TicketDetailModal
-      open={!!selectedTicket}
-      onClose={() => setSelectedTicket(null)}
-      ticket={selectedTicket}
-      onRefresh={refreshData}
-    />
+    <Suspense fallback={null}>
+      <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />
+      <TicketDetailModal
+        open={!!selectedTicket}
+        onClose={() => setSelectedTicket(null)}
+        ticket={selectedTicket}
+        onRefresh={refreshData}
+      />
+    </Suspense>
     {BrandConfirmDialog}
     </>
   );

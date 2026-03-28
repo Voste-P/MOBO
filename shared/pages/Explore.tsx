@@ -1,13 +1,17 @@
-﻿import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useMemo, useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useToast } from '../context/ToastContext';
 import { ProductCard } from '../components/ProductCard';
-import { RaiseTicketModal } from '../components/RaiseTicketModal';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { api, asArray } from '../services/api';
 import { subscribeRealtime } from '../services/realtime';
 import { Search, AlertTriangle, ShoppingBag } from 'lucide-react';
 import { EmptyState, Input } from '../components/ui';
+import { lazyRetry } from '../utils/lazyRetry';
+
+const RaiseTicketModal = lazyRetry(() =>
+  import('../components/RaiseTicketModal').then(m => ({ default: m.RaiseTicketModal }))
+);
 import { Product } from '../types';
 
 export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) => {
@@ -262,7 +266,9 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
           </div>
         )}
       </div>
-      <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />
+      <Suspense fallback={null}>
+        <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />
+      </Suspense>
     </div>
   );
 };

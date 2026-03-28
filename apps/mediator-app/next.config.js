@@ -25,7 +25,7 @@ const nextConfig = {
   },
   experimental: {
     externalDir: true,
-    optimizePackageImports: ['lucide-react'],
+    optimizePackageImports: ['lucide-react', 'recharts'],
   },
   async headers() {
     return [
