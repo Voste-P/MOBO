@@ -1,4 +1,4 @@
-﻿import type { NextFunction, Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { AppError } from '../middleware/errors.js';
 import { idWhere } from '../utils/idWhere.js';
@@ -457,7 +457,7 @@ export function makeBrandController() {
           entityId: brandMongoId,
           metadata: { agencyId: agencyMongoId, agencyCode, amountPaise, ref, mode: payoutMode },
         });
-        walletLog.info('Brandâ†’agency payout recorded', { brandId: brandMongoId, agencyId: agencyMongoId, agencyCode, amountPaise, ref, mode: payoutMode });
+        walletLog.info('Brand\u2192agency payout recorded', { brandId: brandMongoId, agencyId: agencyMongoId, agencyCode, amountPaise, ref, mode: payoutMode });
         logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Wallet', entityId: brandMongoId, action: 'AGENCY_PAYOUT', changedFields: ['balance'], before: {}, after: { amountPaise, agencyCode, ref, mode: payoutMode } });
         logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Payout', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'BRAND_AGENCY_PAYOUT', agencyCode, amountPaise, ref, mode: payoutMode } });
 
@@ -781,10 +781,8 @@ export function makeBrandController() {
         const body = updateBrandCampaignSchema.parse(req.body);
 
         if (!isPrivileged(roles)) {
-          // Resolve brand user mongoId from PG UUID for ownership check
-          const brandOwner = await db().user.findFirst({ where: { id: existing.brandUserId, isDeleted: false }, select: { mongoId: true } });
-          const ownerMongoId = brandOwner?.mongoId || existing.brandUserId;
-          if (ownerMongoId !== userId) throw new AppError(403, 'FORBIDDEN', 'Cannot modify campaigns outside your brand');
+          // Ownership check: compare PG UUIDs directly (brandUserId stored in campaign vs pgUserId from JWT)
+          if (existing.brandUserId !== pgUserId) throw new AppError(403, 'FORBIDDEN', 'Cannot modify campaigns outside your brand');
 
           if (typeof body.allowedAgencies !== 'undefined') {
             const allowed = body.allowedAgencies ?? [];
@@ -883,18 +881,15 @@ export function makeBrandController() {
           : [];
 
         const allowedUnion = Array.from(new Set([...(previousAllowed || []), ...(nextAllowed || [])])).filter(Boolean);
-        // Resolve brand user mongoId for realtime audience
-        const brandOwner = await db().user.findFirst({ where: { id: campaign.brandUserId, isDeleted: false }, select: { mongoId: true } });
-        const brandUserIdForAudience = brandOwner?.mongoId || campaign.brandUserId || userId;
-
         const campaignMongoId = campaign.mongoId || campaign.id;
+        const brandAudienceId = campaign.brandUserId || userId;
         const ts = new Date().toISOString();
         publishRealtime({
           type: 'deals.changed',
           ts,
           payload: { campaignId: campaignMongoId },
           audience: {
-            userIds: [brandUserIdForAudience],
+            userIds: [brandAudienceId],
             agencyCodes: allowedUnion,
             roles: ['admin', 'ops'],
           },
@@ -904,7 +899,7 @@ export function makeBrandController() {
           ts,
           payload: { source: 'campaign.updated', campaignId: campaignMongoId },
           audience: {
-            userIds: [brandUserIdForAudience],
+            userIds: [brandAudienceId],
             agencyCodes: allowedUnion,
             roles: ['admin', 'ops'],
           },
@@ -939,10 +934,8 @@ export function makeBrandController() {
           throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
         }
 
-        // Only brand owner or privileged can copy
-        const brandOwner = await db().user.findFirst({ where: { id: campaign.brandUserId, isDeleted: false }, select: { mongoId: true } });
-        const ownerMongoId = brandOwner?.mongoId || campaign.brandUserId;
-        if (!isPrivileged(roles) && ownerMongoId !== userId) {
+        // Ownership check: compare PG UUIDs directly
+        if (!isPrivileged(roles) && campaign.brandUserId !== pgUserId) {
           throw new AppError(403, 'FORBIDDEN', 'Not authorized to copy this campaign');
         }
 
@@ -989,9 +982,9 @@ export function makeBrandController() {
         publishRealtime({
           type: 'deals.changed',
           ts,
-          payload: { campaignId: newId, brandId: ownerMongoId },
+          payload: { campaignId: newId, brandId: campaign.brandUserId },
           audience: {
-            userIds: [ownerMongoId],
+            userIds: [campaign.brandUserId || userId],
             agencyCodes: allowed,
             roles: ['admin', 'ops'],
           },
@@ -1018,9 +1011,8 @@ export function makeBrandController() {
         });
         if (!campaign) throw new AppError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign not found');
 
-        const brandOwner = await db().user.findFirst({ where: { id: campaign.brandUserId, isDeleted: false }, select: { mongoId: true } });
-        const ownerMongoId = brandOwner?.mongoId || campaign.brandUserId;
-        if (!isPrivileged(roles) && ownerMongoId !== userId) {
+        // Ownership check: compare PG UUIDs directly
+        if (!isPrivileged(roles) && campaign.brandUserId !== pgUserId) {
           throw new AppError(403, 'FORBIDDEN', 'Cannot delete campaigns outside your ownership');
         }
 
@@ -1065,7 +1057,7 @@ export function makeBrandController() {
           ts,
           payload: { campaignId: campaignMongoId },
           audience: {
-            userIds: [ownerMongoId].filter(Boolean),
+            userIds: [campaign.brandUserId || userId].filter(Boolean),
             agencyCodes: allowed,
             mediatorCodes: assignmentCodes,
             roles: ['admin', 'ops'],
@@ -1076,7 +1068,7 @@ export function makeBrandController() {
           ts,
           payload: { source: 'campaign.deleted', campaignId: campaignMongoId },
           audience: {
-            userIds: [ownerMongoId].filter(Boolean),
+            userIds: [campaign.brandUserId || userId].filter(Boolean),
             agencyCodes: allowed,
             mediatorCodes: assignmentCodes,
             roles: ['admin', 'ops'],
@@ -1090,7 +1082,7 @@ export function makeBrandController() {
       }
     },
 
-    /* ─── Lightweight dashboard-specific endpoints ──────────────────── */
+    /* ─── Lightweight dashboard-specific endpoints ────────────────── */
 
     /** GET /brand/dashboard-stats — pre-computed KPI numbers for brand dashboard */
     getDashboardStats: async (req: Request, res: Response, next: NextFunction) => {

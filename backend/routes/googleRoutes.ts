@@ -23,7 +23,7 @@ import { prisma, isPrismaAvailable } from '../database/prisma.js';
 import { idWhere } from '../utils/idWhere.js';
 import { authLog, businessLog } from '../config/logger.js';
 
-// ─── Helpers ───────────────────────────────────────────────────
+// ─── Helpers ───────────────────────────────────────────────────────
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -38,9 +38,21 @@ const SCOPES = [
 function isGoogleOAuthConfigured(env: Env): boolean {
   return !!(
     (env as any).GOOGLE_CLIENT_ID &&
-    (env as any).GOOGLE_CLIENT_SECRET &&
-    (env as any).GOOGLE_REDIRECT_URI
+    (env as any).GOOGLE_CLIENT_SECRET
   );
+}
+
+/**
+ * Resolve the Google OAuth redirect URI.
+ * Uses the explicit env var if set, otherwise derives it from the incoming request.
+ * The derived URI MUST match what is registered in the Google Cloud Console.
+ */
+function resolveRedirectUri(env: Env, req: import('express').Request): string {
+  if ((env as any).GOOGLE_REDIRECT_URI) return (env as any).GOOGLE_REDIRECT_URI;
+  // Auto-derive from request origin (works for both local dev and production)
+  const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+  const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:8080';
+  return `${proto}://${host}/api/google/callback`;
 }
 
 // ─── Signed-state helpers (survives server restarts) ───────────
@@ -95,7 +107,7 @@ function verifySignedState(state: string, env: Env): { userId: string; createdAt
   }
 }
 
-// ─── Routes ────────────────────────────────────────────────────
+// ─── Routes ────────────────────────────────────────────────────────
 
 export function googleRoutes(env: Env): Router {
   const router = Router();
@@ -133,9 +145,10 @@ export function googleRoutes(env: Env): Router {
     // Use 'consent' prompt to ensure we get a refresh_token.
     // Google only returns refresh_token on the very first consent or when prompt=consent.
     // We also include 'include_granted_scopes' for incremental authorization.
+    const redirectUri = resolveRedirectUri(env, req);
     const params = new URLSearchParams({
       client_id: (env as any).GOOGLE_CLIENT_ID,
-      redirect_uri: (env as any).GOOGLE_REDIRECT_URI,
+      redirect_uri: redirectUri,
       response_type: 'code',
       scope: SCOPES,
       access_type: 'offline',
@@ -176,6 +189,7 @@ export function googleRoutes(env: Env): Router {
 
     try {
       // Exchange authorization code for tokens
+      const redirectUri = resolveRedirectUri(env, req);
       const tokenRes = await fetch(GOOGLE_TOKEN_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -183,7 +197,7 @@ export function googleRoutes(env: Env): Router {
           code,
           client_id: (env as any).GOOGLE_CLIENT_ID,
           client_secret: (env as any).GOOGLE_CLIENT_SECRET,
-          redirect_uri: (env as any).GOOGLE_REDIRECT_URI,
+          redirect_uri: redirectUri,
           grant_type: 'authorization_code',
         }).toString(),
       });
@@ -377,7 +391,7 @@ export function googleRoutes(env: Env): Router {
   return router;
 }
 
-// ─── HTML template for OAuth popup callback ────────────────────
+// ─── HTML template for OAuth popup callback ────────────────
 
 function makeCallbackHtml(success: boolean, message: string): string {
   return `<!DOCTYPE html>
