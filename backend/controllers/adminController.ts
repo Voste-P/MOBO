@@ -588,7 +588,10 @@ export function makeAdminController() {
         const body = updateUserStatusSchema.parse(req.body);
 
         // Guard: prevent admin from suspending themselves (could cause unrecoverable lockout).
-        if (String(body.userId) === String(req.auth?.userId) && body.status === 'suspended') {
+        // body.userId may be a mongoId while auth.userId is PG UUID — check both.
+        const selfCheck = String(body.userId);
+        const isSelfSuspend = (selfCheck === String(req.auth?.userId) || selfCheck === String(req.auth?.pgUserId) || selfCheck === String((req.auth as any)?.mongoId ?? ''));
+        if (isSelfSuspend && body.status === 'suspended') {
           throw new AppError(400, 'CANNOT_SELF_SUSPEND', 'Cannot suspend your own account');
         }
 

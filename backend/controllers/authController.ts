@@ -871,7 +871,10 @@ export function makeAuthController(env: Env) {
         const requester = await db().user.findFirst({ where: { ...idWhere(requesterId), isDeleted: false } });
         if (!requester) throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
 
-        const isSelf = String(targetMongoId) === String(requesterId);
+        // targetMongoId may be a mongoId while requesterId is PG UUID — check both.
+        const isSelf = String(targetMongoId) === String(requesterId)
+          || String(targetMongoId) === String(requester.id)
+          || String(targetMongoId) === String(requester.mongoId ?? '');
         const isAdmin = requester.roles?.includes('admin' as any) || requester.roles?.includes('ops' as any);
         if (!isSelf && !isAdmin) {
           throw new AppError(403, 'FORBIDDEN', 'Cannot update other user profile');

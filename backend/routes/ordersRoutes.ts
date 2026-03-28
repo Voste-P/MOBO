@@ -27,7 +27,11 @@ export function ordersRoutes(env: Env): Router {
     const auth = req.auth;
     const roles: string[] = auth?.roles ?? [];
     const isPrivileged = roles.some((r: string) => ['admin', 'ops'].includes(r));
-    if (!isPrivileged && auth?.userId !== requestedUserId) {
+    // requestedUserId may be a mongoId (public API id) while auth.userId is the PG UUID.
+    const isOwner = auth?.userId === requestedUserId
+      || auth?.pgUserId === requestedUserId
+      || (auth?.mongoId && auth.mongoId === requestedUserId);
+    if (!isPrivileged && !isOwner) {
       return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Access denied' } });
     }
     next();

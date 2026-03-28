@@ -433,7 +433,9 @@ export function makeOrdersController(env: Env) {
         const requesterId = req.auth?.userId;
         const requesterRoles = req.auth?.roles ?? [];
         const privileged = requesterRoles.includes('admin') || requesterRoles.includes('ops');
-        if (!privileged && requesterId !== userId) {
+        // userId may be a mongoId (public API id) while auth.userId is the PG UUID.
+        const requesterMongoId = (req.auth as any)?.mongoId ?? '';
+        if (!privileged && requesterId !== userId && (req.auth?.pgUserId ?? '') !== userId && requesterMongoId !== userId) {
           throw new AppError(403, 'FORBIDDEN', 'Cannot access other user orders');
         }
 
@@ -515,7 +517,12 @@ export function makeOrdersController(env: Env) {
           throw new AppError(403, 'FORBIDDEN', 'Only buyers can create orders');
         }
 
-        if (String(body.userId) !== String(requesterId)) {
+        // Ownership check: body.userId may be a mongoId (public API id) while
+        // req.auth.userId is always the PG UUID.  Compare against both to avoid
+        // a false-positive 403 when the client sends the mongoId.
+        const bodyUserId = String(body.userId);
+        const requesterMongoId = (req.auth as any)?.mongoId ?? '';
+        if (bodyUserId !== String(requesterId) && bodyUserId !== String(_pgUserId) && bodyUserId !== requesterMongoId) {
           throw new AppError(403, 'FORBIDDEN', 'Cannot create orders for another user');
         }
 
@@ -1914,8 +1921,11 @@ export function makeOrdersController(env: Env) {
         });
         if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
 
-        // Only the order owner can set the reviewer name
-        if (String(order.userId) !== String(requesterId)) {
+        // Only the order owner can set the reviewer name.
+        // order.userId is the PG UUID; requesterId may be either PG UUID or mongoId.
+        const ownerPgId = String(order.userId);
+        const requesterPgId = String(req.auth?.pgUserId ?? requesterId);
+        if (ownerPgId !== requesterPgId && ownerPgId !== String(requesterId)) {
           throw new AppError(403, 'FORBIDDEN', 'You can only update your own orders');
         }
 

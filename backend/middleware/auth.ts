@@ -27,6 +27,8 @@ export type AuthContext = {
   userId: string;
   /** PG UUID – use for foreign-key references in Prisma queries. */
   pgUserId: string;
+  /** Mongo-era ID surfaced as the public user ID in API responses. */
+  mongoId?: string;
   roles: Role[];
   user?: AuthUser;
 };
@@ -162,7 +164,7 @@ async function resolveAuthFromToken(token: string, env: Env): Promise<AuthContex
     name: user.name,
   };
 
-  const result: AuthContext = { userId, pgUserId: user.id, roles, user: authUser };
+  const result: AuthContext = { userId, pgUserId: user.id, mongoId: user.mongoId ?? undefined, roles, user: authUser };
   authCacheSet(userId, result);
   return result;
 }

@@ -31,7 +31,7 @@ test.describe('Admin users management API', () => {
   });
 
   test('admin can access realtime health', async ({ request }) => {
-    const res = await request.get('/api/health/realtime', {
+    const res = await request.get('/api/realtime/health', {
       headers: authHeaders(adminToken),
     });
     // Realtime health may not be available in all environments
