@@ -2414,7 +2414,7 @@ export async function extractOrderDetailsWithAi(
     const ORDER_LABEL_PATTERN = 'order\\s*(?:id|no\\.?|number|#)\\s*[:\\-#]?\\s*([A-Z0-9\\-_/]{4,40})';
 
     // ── Platform-specific order ID patterns ──
-    const AMAZON_ORDER_PATTERN     = '\\b\\d{3}[\\-\\s]?\\d{7}[\\-\\s]?\\d{7}\\b';
+    const AMAZON_ORDER_PATTERN     = '\\b\\d{3}[\\-\\s]\\d{7}[\\-\\s]\\d{7}\\b';
     const FLIPKART_ORDER_PATTERN   = '\\b[Oo0][Dd]\\d{10,}\\b';
     const MYNTRA_ORDER_PATTERN     = '\\b(?:MYN|MNT|ORD|PP)[\\-\\s]?\\d{6,}\\b';
     const MEESHO_ORDER_PATTERN     = '\\b(?:MSH|MEESH[O0])[\\-\\s]?\\d{6,}\\b';
@@ -2495,6 +2495,9 @@ export async function extractOrderDetailsWithAi(
       }
       if (/^[a-f0-9]{24}$/i.test(raw)) return null; // legacy hex ID
       if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) return null; // UUID
+      // Strip OCR 'U' artifacts from Flipkart-style prefixes before normalization
+      // e.g. "0DU426..." → "0D426...", "0ODuU367..." → "0OD367..."
+      raw = raw.replace(/^([0Oo]{0,2}[Dd])[Uu]+/, '$1');
       // Normalize Flipkart OD prefix: OCR often produces "0OD..." or "00D..." instead of "OD..."
       if (/^[0o][Oo0][Dd]\d{10,}$/i.test(raw)) raw = 'OD' + raw.slice(3);
       else if (/^[0o][Dd]\d{10,}$/i.test(raw)) raw = 'OD' + raw.slice(2);
@@ -2553,6 +2556,8 @@ export async function extractOrderDetailsWithAi(
       // Platform-specific bonus scoring
       if (new RegExp(`^${AMAZON_ORDER_PATTERN}$`).test(upper)) score += 10;
       if (/^OD\d{10,}$/.test(upper)) score += 8;
+      // OCR frequently reads 'O' as '0' — give bonus to garbled Flipkart prefix (0D + digits)
+      else if (/^0D\d{10,}$/.test(upper)) score += 7;
       if (new RegExp(`^${MYNTRA_ORDER_PATTERN}$`).test(upper)) score += 8;
       if (new RegExp(`^${MEESHO_ORDER_PATTERN}$`).test(upper)) score += 8;
       if (new RegExp(`^${AJIO_ORDER_PATTERN}$`).test(upper)) score += 8;
@@ -2571,6 +2576,7 @@ export async function extractOrderDetailsWithAi(
         .replace(/S/g, '5')
         .replace(/B/g, '8')
         .replace(/Z/g, '2')
+        .replace(/[Uu]/g, '')     // Tesseract commonly inserts U in digit positions
         .replace(/[—–]/g, '-')    // em-dash / en-dash → hyphen
         .replace(/\./g, '-');     // period sometimes confused with dash
 
@@ -3101,7 +3107,7 @@ export async function extractOrderDetailsWithAi(
     };
 
     // ── Platform detection from OCR text for context-aware extraction ──
-    const detectPlatform = (text: string): string => {
+    const detectPlatform = (text: string): string | null => {
       const lower = text.toLowerCase();
       // Direct domain / branding matches
       if (/amazon\.(in|com)|amzn|a]mazon/i.test(text)) return 'amazon';
@@ -3122,16 +3128,18 @@ export async function extractOrderDetailsWithAi(
       if (/\bswiggy\b/i.test(text)) return 'swiggy';
       if (/\bpurplle\b/i.test(text)) return 'purplle';
       if (/\bshopsy\b/i.test(text)) return 'shopsy';
-      // Order ID pattern detection
+      // Order ID pattern detection (includes OCR-garbled variants)
       if (/\b\d{3}-\d{7}-\d{7}\b/.test(text)) return 'amazon';
-      if (/\bOD\d{10,}\b/i.test(text)) return 'flipkart';
+      if (/\b[Oo0][Dd]\d{10,}\b/.test(text)) return 'flipkart';
       if (/\bMYN\d{6,}\b/i.test(text)) return 'myntra';
       if (/\bMSH\d{6,}\b|MEESHO\d+/i.test(text)) return 'meesho';
       if (/\bNYK\d{6,}\b/i.test(text)) return 'nykaa';
       if (/\bFN\d{6,}\b/i.test(text)) return 'ajio';
       if (/\bBLK\d{6,}\b|BLINKIT\d+/i.test(text)) return 'blinkit';
       if (lower.includes('prime') && lower.includes('order')) return 'amazon';
-      return 'unknown';
+      // Return null when platform cannot be identified — 'unknown' was incorrectly
+      // treated as a non-Amazon platform, which disabled Amazon order ID coercion.
+      return null;
     };
 
     /** Extract product name from OCR text. */
@@ -3600,6 +3608,8 @@ export async function extractOrderDetailsWithAi(
       line
         // Flipkart: 0D / 0d → OD (zero mistaken for O, any case)
         .replace(/\b0[Dd](\d{10,})\b/g, 'OD$1')
+        // Flipkart: 0DU / 0ODU → OD (U is a common Tesseract artifact between D and digits)
+        .replace(/\b[0Oo]{1,2}[Dd][Uu](\d{10,})\b/g, 'OD$1')
         // Myntra: 0RD → ORD
         .replace(/\b0RD(\d{6,})\b/gi, 'ORD$1')
         // Meesho: MEESH0 → MEESHO
@@ -3643,7 +3653,11 @@ export async function extractOrderDetailsWithAi(
           if (labeled?.[1]) {
             // Don't coerce to Amazon format if line has Flipkart OD or non-Amazon platform detected
             if (!skipLineAmazon) {
-              const coerced = coerceAmazonOrderId(labeled[1]);
+              // Only coerce to Amazon when the labeled value already contains separators
+              // (dashes/spaces). Real Amazon IDs always have dashes; bare 17-digit strings
+              // are likely garbled Flipkart OD-prefix IDs where OCR converted D to a digit.
+              const hasSeparator = /[\-\s]/.test(labeled[1]);
+              const coerced = hasSeparator ? coerceAmazonOrderId(labeled[1]) : null;
               pushCandidate(coerced ?? labeled[1], true);
             } else {
               pushCandidate(labeled[1], true);
@@ -3652,7 +3666,7 @@ export async function extractOrderDetailsWithAi(
 
           if (!skipLineAmazon) {
             const spaced = line.match(new RegExp(AMAZON_SPACED_PATTERN));
-            if (spaced?.[0]) {
+            if (spaced?.[0] && /[\s\-.]/.test(spaced[0])) {
               const coerced = coerceAmazonOrderId(spaced[0]);
               if (coerced) pushCandidate(coerced, true);
             }
@@ -3668,7 +3682,7 @@ export async function extractOrderDetailsWithAi(
                 pushCandidate(coerced ?? amazonNext[0], true);
               }
               const spacedNext = nextLine.match(new RegExp(AMAZON_SPACED_PATTERN));
-              if (spacedNext?.[0]) {
+              if (spacedNext?.[0] && /[\s\-.]/.test(spacedNext[0])) {
                 const coerced = coerceAmazonOrderId(spacedNext[0]);
                 if (coerced) pushCandidate(coerced, true);
               }
@@ -3761,10 +3775,16 @@ export async function extractOrderDetailsWithAi(
           if (coerced) pushCandidate(coerced, false);
         }
 
-        const globalDigits = normalizeDigits(text).match(/\d{17}/g) || [];
-        for (const digits of globalDigits) {
-          if (digits.length === 17) {
-            pushCandidate(`${digits.slice(0, 3)}-${digits.slice(3, 10)}-${digits.slice(10)}`, false);
+        // Global 17-digit scan: ONLY when platform is CONFIRMED Amazon — this is aggressive
+        // extraction that can create false Amazon IDs from non-Amazon digit sequences
+        // (e.g. Flipkart OD123... with OCR-garbled prefix becoming 17 digit numbers).
+        // When platform is unknown (null), skip this to avoid false positives.
+        if (detectedPlatformFromText === 'amazon') {
+          const globalDigits = normalizeDigits(text).match(/\d{17}/g) || [];
+          for (const digits of globalDigits) {
+            if (digits.length === 17) {
+              pushCandidate(`${digits.slice(0, 3)}-${digits.slice(3, 10)}-${digits.slice(10)}`, false);
+            }
           }
         }
       }
@@ -4947,7 +4967,7 @@ export async function extractOrderDetailsWithAi(
     // Detect platform from OCR text so the frontend can flag platform mismatches
     // Use FAST PATH Gemini-detected platform as fallback when OCR text is unavailable
     const ocrDetectedPlatform = detectPlatform(ocrText);
-    const detectedPlatform = (ocrDetectedPlatform && ocrDetectedPlatform !== 'unknown' ? ocrDetectedPlatform : null)
+    const detectedPlatform = ocrDetectedPlatform
       || fastPathDetectedPlatform
       || null;
 
@@ -5735,7 +5755,7 @@ export async function extractOrderDetailsWithAi(
       soldBy: finalSoldBy,
       productName: finalProductName,
       accountName: finalAccountName,
-      platform: detectedPlatform === 'unknown' ? null : detectedPlatform,
+      platform: detectedPlatform,
       confidenceScore,
       notes: notes.join(' '),
     };

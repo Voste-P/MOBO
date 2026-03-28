@@ -1807,9 +1807,15 @@ export function makeOpsController(env: Env) {
           }
 
           // Atomic settlement using Prisma transaction â€” wallet + order status in one commit
+          // Cycle counter: count past SETTLED events to generate unique idempotency keys
+          // for settle→unsettle→re-settle flows. Without this, re-settlement silently
+          // no-ops because the wallet service sees a duplicate idempotency key.
+          const settleEvents = Array.isArray(order.events) ? order.events as any[] : [];
+          const settleCycle = settleEvents.filter((e: any) => e?.type === 'SETTLED').length;
+
           await db().$transaction(async (tx: any) => {
             await applyWalletDebit({
-              idempotencyKey: `order-settlement-debit-${order.mongoId}`,
+              idempotencyKey: `order-settlement-debit-${order.mongoId}-c${settleCycle}`,
               type: 'order_settlement_debit',
               ownerUserId: brandId,
               fromUserId: brandId,
@@ -1823,7 +1829,7 @@ export function makeOpsController(env: Env) {
 
             if (buyerCommissionPaise > 0) {
               await applyWalletCredit({
-                idempotencyKey: `order-commission-${order.mongoId}`,
+                idempotencyKey: `order-commission-${order.mongoId}-c${settleCycle}`,
                 type: 'commission_settle',
                 ownerUserId: buyerUserId,
                 amountPaise: buyerCommissionPaise,
@@ -1836,7 +1842,7 @@ export function makeOpsController(env: Env) {
 
             if (mediatorUserId && mediatorMarginPaise > 0) {
               await applyWalletCredit({
-                idempotencyKey: `order-margin-${order.mongoId}`,
+                idempotencyKey: `order-margin-${order.mongoId}-c${settleCycle}`,
                 type: 'commission_settle',
                 ownerUserId: mediatorUserId,
                 amountPaise: mediatorMarginPaise,
@@ -2040,10 +2046,14 @@ export function makeOpsController(env: Env) {
             }
           }
 
+          // Cycle counter for unsettle: count past UNSETTLED events
+          const unsettleEvents = Array.isArray(order.events) ? order.events as any[] : [];
+          const unsettleCycle = unsettleEvents.filter((e: any) => e?.type === 'UNSETTLED').length;
+
           // Atomic unsettlement using Prisma transaction
           await db().$transaction(async (tx: any) => {
             await applyWalletCredit({
-              idempotencyKey: `order-unsettle-credit-brand-${order.mongoId}`,
+              idempotencyKey: `order-unsettle-credit-brand-${order.mongoId}-c${unsettleCycle}`,
               type: 'refund',
               ownerUserId: brandId,
               fromUserId: buyerUserId,
@@ -2057,7 +2067,7 @@ export function makeOpsController(env: Env) {
 
             if (buyerCommissionPaise > 0) {
               await applyWalletDebit({
-                idempotencyKey: `order-unsettle-debit-buyer-${order.mongoId}`,
+                idempotencyKey: `order-unsettle-debit-buyer-${order.mongoId}-c${unsettleCycle}`,
                 type: 'commission_reversal',
                 ownerUserId: buyerUserId,
                 fromUserId: buyerUserId,
@@ -2072,7 +2082,7 @@ export function makeOpsController(env: Env) {
 
             if (unsettleMediatorUserId && mediatorMarginPaise > 0) {
               await applyWalletDebit({
-                idempotencyKey: `order-unsettle-debit-mediator-${order.mongoId}`,
+                idempotencyKey: `order-unsettle-debit-mediator-${order.mongoId}-c${unsettleCycle}`,
                 type: 'margin_reversal',
                 ownerUserId: unsettleMediatorUserId,
                 fromUserId: unsettleMediatorUserId,
