@@ -2576,7 +2576,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         </div>
       )}
     </DesktopShell>
-    <Suspense fallback={null}>
+    <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20"><Spinner /></div>}>
       <TicketDetailModal
         open={!!selectedTicket}
         onClose={() => setSelectedTicket(null)}

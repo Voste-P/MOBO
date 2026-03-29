@@ -134,28 +134,34 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
             <NotificationProvider>
             <div className="flex flex-col h-full bg-[#F2F2F7] relative overflow-hidden font-sans">
               <div className="flex-1 overflow-hidden overscroll-none" {...swipeHandlers}>
-                <Suspense fallback={<TabSkeleton />}>
                   {visitedTabs.has('explore') && (
                     <div className={`h-full ${activeTab === 'explore' ? '' : 'hidden'}`}>
+                      <Suspense fallback={<TabSkeleton />}>
                       <div className="h-full overflow-y-auto scrollbar-styled"><Explore isActive={activeTab === 'explore'} /></div>
+                      </Suspense>
                     </div>
                   )}
                   {visitedTabs.has('home') && (
                     <div className={`h-full ${activeTab === 'home' ? '' : 'hidden'}`}>
+                      <Suspense fallback={<TabSkeleton />}>
                       <div className="h-full overflow-y-auto scrollbar-styled"><Home onVoiceNavigate={handleTabChangeWrapped} isActive={activeTab === 'home'} /></div>
+                      </Suspense>
                     </div>
                   )}
                   {visitedTabs.has('orders') && (
                     <div className={`h-full ${activeTab === 'orders' ? '' : 'hidden'}`}>
+                      <Suspense fallback={<TabSkeleton />}>
                       <div className="h-full overflow-y-auto scrollbar-styled"><Orders isActive={activeTab === 'orders'} /></div>
+                      </Suspense>
                     </div>
                   )}
                   {visitedTabs.has('profile') && (
                     <div className={`h-full ${activeTab === 'profile' ? '' : 'hidden'}`}>
+                      <Suspense fallback={<TabSkeleton />}>
                       <div className="h-full overflow-y-auto scrollbar-styled"><Profile isActive={activeTab === 'profile'} /></div>
+                      </Suspense>
                     </div>
                   )}
-                </Suspense>
               </div>
 
               <div className="absolute bottom-[calc(0.75rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 w-[92vw] max-w-[360px]">
