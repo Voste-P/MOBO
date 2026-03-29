@@ -60,7 +60,7 @@ async function buildOrderAudience(order: any, agencyCode?: string) {
   if (!buyerMongoId || !brandMongoId) {
     const ids = [!buyerMongoId && order?.userId, !brandMongoId && order?.brandUserId].filter(Boolean) as string[];
     if (ids.length) {
-      const users = await db().user.findMany({ where: { id: { in: ids } }, select: { id: true, mongoId: true } });
+      const users = await db().user.findMany({ where: { id: { in: ids }, isDeleted: false }, select: { id: true, mongoId: true } });
       for (const u of users) {
         if (u.id === order?.userId) buyerMongoId = u.mongoId ?? '';
         if (u.id === order?.brandUserId) brandMongoId = u.mongoId ?? '';
@@ -3338,7 +3338,6 @@ export function makeOpsController(env: Env) {
             SELECT COUNT(DISTINCT id)::bigint AS cnt FROM "campaigns"
             WHERE "is_deleted" = false AND status = 'active'
             AND (${agencyCode} = ANY("allowed_agency_codes")
-                 OR "open_to_all" = true
                  OR EXISTS (SELECT 1 FROM unnest(${allCodes}::text[]) AS mc WHERE assignments ? mc))
           `,
         ]);

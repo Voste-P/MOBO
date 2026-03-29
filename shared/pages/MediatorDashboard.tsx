@@ -1063,7 +1063,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className={`grid gap-2 ${String(c.brandId || '') === String(user.id || '') ? 'grid-cols-2' : 'grid-cols-1'}`}>
                     <button
                       type="button"
                       onClick={() => onPublish(c)}
@@ -1071,6 +1071,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
                     >
                       <ArrowUpRight size={14} strokeWidth={2.5} /> Configure & Publish
                     </button>
+                    {String(c.brandId || '') === String(user.id || '') && (
                     <button
                       type="button"
                       onClick={async () => {
@@ -1087,6 +1088,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
                     >
                       Delete
                     </button>
+                    )}
                   </div>
                 </div>
               ))

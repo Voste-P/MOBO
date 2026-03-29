@@ -17,7 +17,7 @@ import type { Role } from '../middleware/auth.js';
 import { publishRealtime } from '../services/realtimeHub.js';
 import { getRequester, isPrivileged } from '../services/authz.js';
 import { isGeminiConfigured, verifyProofWithAi, verifyRatingScreenshotWithAi, verifyReturnWindowWithAi } from '../services/aiService.js';
-import { finalizeApprovalIfReady } from './opsController.js';
+import { finalizeApprovalIfReady, getRequiredStepsForOrder, hasProofForRequirement } from './opsController.js';
 import { createProofToken, verifyProofToken } from '../utils/signedProofUrl.js';
 
 // UUID v4 regex — 8-4-4-4-12 hex with dashes.
@@ -102,6 +102,11 @@ export function makeOrdersController(env: Env) {
    * Auto-verify a proof step when AI confidence meets the auto-verify threshold.
    * Sets verification.{step}.verifiedAt, pushes AUTO_VERIFIED event, and calls
    * finalizeApprovalIfReady to potentially approve the entire order.
+   *
+   * Enhanced: After verifying the current step, checks if ALL required proofs
+   * are present with AI confidence >= AI_PROOF_CONFIDENCE_THRESHOLD. If so,
+   * bulk-verifies ALL remaining unverified steps and goes directly to cooling
+   * period — no mediator manual check needed.
    */
   const autoVerifyStep = async (
     freshOrder: any,
@@ -111,7 +116,12 @@ export function makeOrdersController(env: Env) {
     envRef: Env,
   ): Promise<any> => {
     if (String(freshOrder.workflowStatus) !== 'UNDER_REVIEW') return freshOrder;
-    if (aiConfidence < threshold) return freshOrder; // Below auto-verify threshold
+    if (aiConfidence < threshold) {
+      // Even below auto-verify threshold, attempt bulk auto-verify:
+      // If ALL proofs are uploaded and ALL have AI confidence >= the baseline
+      // confidence threshold, auto-verify everything and go to cooling period.
+      return attemptBulkAutoVerify(freshOrder, envRef);
+    }
 
     const v = (freshOrder.verification && typeof freshOrder.verification === 'object')
       ? { ...(freshOrder.verification as any) } : {} as any;
@@ -159,6 +169,111 @@ export function makeOrdersController(env: Env) {
     if ((finalize as any).approved) {
       return await db().order.findFirst({
         where: { id: freshOrder.id, isDeleted: false },
+        include: { items: { where: { isDeleted: false } } },
+      });
+    }
+
+    // Even after individual step verify, attempt bulk verify for remaining steps
+    return attemptBulkAutoVerify(updated, envRef);
+  };
+
+  /**
+   * Bulk auto-verify: When ALL required proofs are present and each has AI
+   * confidence >= AI_PROOF_CONFIDENCE_THRESHOLD (75%), auto-verify ALL
+   * unverified steps at once and go directly to cooling period.
+   * This bypasses mediator manual review when AI is confident in all proofs.
+   */
+  const attemptBulkAutoVerify = async (order: any, envRef: Env): Promise<any> => {
+    if (String(order.workflowStatus) !== 'UNDER_REVIEW') return order;
+
+    const required = getRequiredStepsForOrder(order);
+    const v = (order.verification && typeof order.verification === 'object')
+      ? { ...(order.verification as any) } : {} as any;
+
+    // Purchase proof must be verified (either by AI or mediator)
+    if (!v.order?.verifiedAt) {
+      // Check if purchase proof has AI confidence data
+      const orderAi = order.orderAiVerification as any;
+      const orderConfidence = orderAi?.confidenceScore ?? 0;
+      const baselineThreshold = envRef.AI_PROOF_CONFIDENCE_THRESHOLD ?? 75;
+      if (orderConfidence < baselineThreshold) return order;
+    }
+
+    // Check all required steps have proofs uploaded with sufficient AI confidence
+    const baselineThreshold = envRef.AI_PROOF_CONFIDENCE_THRESHOLD ?? 75;
+    const stepsToVerify: Array<{ key: string; confidence: number }> = [];
+
+    for (const step of required) {
+      if (v[step]?.verifiedAt) continue; // already verified
+      if (!hasProofForRequirement(order, step)) return order; // proof not uploaded yet
+
+      // Get AI confidence for this step
+      let confidence = 0;
+      if (step === 'rating') {
+        confidence = (order.ratingAiVerification as any)?.confidenceScore ?? 0;
+      } else if (step === 'returnWindow') {
+        confidence = (order.returnWindowAiVerification as any)?.confidenceScore ?? 0;
+      } else if (step === 'review') {
+        // Review links get confidence from the review link validation
+        confidence = (v.review?.aiConfidenceScore) ?? (envRef.AI_REVIEW_LINK_CONFIDENCE ?? 95);
+        if (!order.reviewLink && !order.screenshotReview) confidence = 0;
+      }
+
+      if (confidence < baselineThreshold) return order; // insufficient confidence
+      stepsToVerify.push({ key: step, confidence });
+    }
+
+    // Also check purchase proof if not yet verified
+    if (!v.order?.verifiedAt) {
+      const orderConfidence = (order.orderAiVerification as any)?.confidenceScore ?? 0;
+      if (orderConfidence < baselineThreshold) return order;
+      stepsToVerify.push({ key: 'order', confidence: orderConfidence });
+    }
+
+    if (stepsToVerify.length === 0) return order; // nothing to bulk-verify
+
+    // All proofs present, all AI confidence above threshold — bulk verify!
+    const now = new Date().toISOString();
+    let events = Array.isArray(order.events) ? [...(order.events as any[])] : [];
+
+    for (const { key, confidence } of stepsToVerify) {
+      v[key] = v[key] ?? {};
+      v[key].verifiedAt = now;
+      v[key].verifiedBy = 'SYSTEM_AI_BULK';
+      v[key].autoVerified = true;
+      v[key].aiConfidenceScore = confidence;
+
+      events = pushOrderEvent(events, {
+        type: 'VERIFIED',
+        at: new Date(),
+        actorUserId: 'SYSTEM_AI',
+        metadata: { step: key, autoVerified: true, bulkVerify: true, aiConfidenceScore: confidence },
+      });
+    }
+
+    const guardResult = await db().order.updateMany({
+      where: { id: order.id, workflowStatus: 'UNDER_REVIEW' },
+      data: { verification: v, events: events as any },
+    });
+    if (guardResult.count === 0) return order;
+
+    const updated = await db().order.findFirst({
+      where: { id: order.id, isDeleted: false },
+      include: { items: { where: { isDeleted: false } } },
+    });
+    if (!updated) return order;
+
+    const finalize = await finalizeApprovalIfReady(updated, 'SYSTEM_AI', envRef);
+    orderLog.info('Bulk auto-verified all steps — direct to cooling period', {
+      orderId: order.mongoId,
+      steps: stepsToVerify.map(s => s.key),
+      confidences: stepsToVerify.map(s => s.confidence),
+      approved: (finalize as any).approved,
+    });
+
+    if ((finalize as any).approved) {
+      return await db().order.findFirst({
+        where: { id: order.id, isDeleted: false },
         include: { items: { where: { isDeleted: false } } },
       });
     }
