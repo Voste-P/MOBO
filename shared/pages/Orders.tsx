@@ -1699,7 +1699,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       </div>
 
       {/* Raise Ticket Modal for buyer */}
-      <Suspense fallback={null}>
+      <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20"><Spinner /></div>}>
         <RaiseTicketModal
           open={ticketModalOpen}
           onClose={() => { setTicketModalOpen(false); loadMyTickets(); }}

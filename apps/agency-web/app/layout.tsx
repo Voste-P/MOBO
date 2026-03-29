@@ -21,6 +21,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" className={`${HTML_CLASSNAME} ${plusJakartaSans.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <head>
         <MoboHead />
+        <meta name="theme-color" content="#A3E635" />
+        <meta name="application-name" content="BUZZMA Agency" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="BUZZMA Agency" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body className={BODY_CLASSNAME} suppressHydrationWarning>
         <BetaBanner />

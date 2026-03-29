@@ -319,21 +319,24 @@ export function makeOpsController(env: Env) {
           ];
         }
 
-        const { limit, skip } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
+        const { limit, skip, page, isPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
 
-        const mediators = await db().user.findMany({
-          where,
-          orderBy: { createdAt: 'desc' },
-          skip,
-          take: limit,
-          select: { ...userListSelect, wallets: { where: { isDeleted: false }, take: 1, select: { id: true, availablePaise: true, pendingPaise: true } } },
-        });
+        const [mediators, total] = await Promise.all([
+          db().user.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take: limit,
+            select: { ...userListSelect, wallets: { where: { isDeleted: false }, take: 1, select: { id: true, availablePaise: true, pendingPaise: true } } },
+          }),
+          db().user.count({ where }),
+        ]);
 
         const mediatorList = mediators.map((m: any) => {
           const wallet = m.wallets?.[0];
           return toUiUser(pgUser(m), wallet ? pgWallet(wallet) : undefined);
         });
-        res.json(mediatorList);
+        res.json(paginatedResponse(mediatorList, total, page, limit, isPaginated));
 
         businessLog.info('Mediators listed', { userId: req.auth?.userId, resultCount: mediatorList.length, ip: req.ip });
         logAccessEvent('RESOURCE_ACCESS', {
@@ -357,10 +360,11 @@ export function makeOpsController(env: Env) {
         const requested = queryParams.mediatorCode || undefined;
         const code = isPrivileged(roles) ? requested : String((user as any)?.mediatorCode || '');
 
-        const { limit: cLimit, skip: cSkip } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
+        const { limit: cLimit, skip: cSkip, page: cPage, isPaginated: cIsPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
         const statusFilter = queryParams.status && queryParams.status !== 'all' ? queryParams.status : null;
 
         let campaigns: any[];
+        let campaignTotal: number;
         if (code) {
           // Use raw SQL for JSONB key-exists check (assignments ? code)
           let matchingIds: string[];
@@ -372,13 +376,11 @@ export function makeOpsController(env: Env) {
               ? await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false AND status = ${statusFilter}
                   AND (${code} = ANY("allowed_agency_codes")
-                       OR "open_to_all" = true
                        OR EXISTS (SELECT 1 FROM unnest(${allCodes}::text[]) AS mc WHERE jsonb_exists(assignments, mc)))
                 `
               : await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false
                   AND (${code} = ANY("allowed_agency_codes")
-                       OR "open_to_all" = true
                        OR EXISTS (SELECT 1 FROM unnest(${allCodes}::text[]) AS mc WHERE jsonb_exists(assignments, mc)))
                 `;
             matchingIds = rows.map((r) => r.id);
@@ -394,14 +396,12 @@ export function makeOpsController(env: Env) {
               ? await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false AND status = ${statusFilter}
                   AND (EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))
-                       OR jsonb_exists(assignments, ${codeLower})
-                       OR "open_to_all" = true)
+                       OR jsonb_exists(assignments, ${codeLower}))
                 `
               : await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false
                   AND (EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))
-                       OR jsonb_exists(assignments, ${codeLower})
-                       OR "open_to_all" = true)
+                       OR jsonb_exists(assignments, ${codeLower}))
                 `;
             matchingIds = rows.map((r) => r.id);
           }
@@ -415,17 +415,21 @@ export function makeOpsController(env: Env) {
               select: campaignListSelect,
             })
             : [];
+          campaignTotal = matchingIds.length;
         } else {
-          campaigns = await db().campaign.findMany({
-            where: {
-              isDeleted: false,
-              ...(statusFilter ? { status: statusFilter as any } : {}),
-            },
-            orderBy: { createdAt: 'desc' },
-            skip: cSkip,
-            take: cLimit,
-            select: campaignListSelect,
-          });
+          const cWhere = { isDeleted: false as const, ...(statusFilter ? { status: statusFilter as any } : {}) };
+          const [fetchedCampaigns, fetchedTotal] = await Promise.all([
+            db().campaign.findMany({
+              where: cWhere,
+              orderBy: { createdAt: 'desc' },
+              skip: cSkip,
+              take: cLimit,
+              select: campaignListSelect,
+            }),
+            db().campaign.count({ where: cWhere }),
+          ]);
+          campaigns = fetchedCampaigns;
+          campaignTotal = fetchedTotal;
         }
 
         const requesterMediatorCode = roles.includes('mediator') ? String((user as any)?.mediatorCode || '').trim() : '';
@@ -454,7 +458,7 @@ export function makeOpsController(env: Env) {
           }
           return mapped;
         });
-        res.json(ui);
+        res.json(paginatedResponse(ui, campaignTotal, cPage, cLimit, cIsPaginated));
 
         businessLog.info('Campaigns listed', { userId: req.auth?.userId, resultCount: ui.length, ip: req.ip });
         logAccessEvent('RESOURCE_ACCESS', {
@@ -500,20 +504,21 @@ export function makeOpsController(env: Env) {
           return;
         }
 
-        const { limit: dLimit, skip: dSkip } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
-        const deals = await db().deal.findMany({
-          where: {
-            mediatorCode: { in: mediatorCodes },
-            isDeleted: false,
-          },
-          orderBy: { createdAt: 'desc' },
-          skip: dSkip,
-          take: dLimit,
-          select: dealListSelect,
-        });
+        const { limit: dLimit, skip: dSkip, page: dPage, isPaginated: dIsPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
+        const dealWhere = { mediatorCode: { in: mediatorCodes }, isDeleted: false as const };
+        const [deals, dealTotal] = await Promise.all([
+          db().deal.findMany({
+            where: dealWhere,
+            orderBy: { createdAt: 'desc' },
+            skip: dSkip,
+            take: dLimit,
+            select: dealListSelect,
+          }),
+          db().deal.count({ where: dealWhere }),
+        ]);
 
         const dealList = deals.map((d: any) => toUiDeal(pgDeal(d)));
-        res.json(dealList);
+        res.json(paginatedResponse(dealList, dealTotal, dPage, dLimit, dIsPaginated));
 
         businessLog.info('Deals listed', { userId: req.auth?.userId, resultCount: dealList.length, ip: req.ip });
         logAccessEvent('RESOURCE_ACCESS', {
@@ -1693,16 +1698,22 @@ export function makeOpsController(env: Env) {
         const agencyCode = await assertOrderAccess(order, roles, user);
 
         // Buyer must also be active â€” order.userId is PG UUID
-        const buyer = await db().user.findUnique({ where: { id: order.userId }, select: { id: true, status: true, isDeleted: true } });
+        const orderDisplayId = order.mongoId ?? order.id;
+        const campaignId = order.items?.[0]?.campaignId;
+        const productId = String(order.items?.[0]?.productId || '').trim();
+        const mediatorCode = String(order.managerName || '').trim();
+
+        // Parallel: buyer check, dispute check, campaign fetch
+        const [buyer, hasOpenDispute, campaign] = await Promise.all([
+          db().user.findUnique({ where: { id: order.userId }, select: { id: true, status: true, isDeleted: true } }),
+          db().ticket.findFirst({ where: { orderId: orderDisplayId, status: 'Open', isDeleted: false }, select: { id: true } }),
+          campaignId ? db().campaign.findFirst({ where: { id: campaignId, isDeleted: false }, select: { id: true, assignments: true, brandUserId: true } }) : Promise.resolve(null),
+        ]);
+
         if (!buyer || buyer.isDeleted || buyer.status !== 'active') {
           throw new AppError(409, 'FROZEN_SUSPENSION', 'Buyer is not active; settlement is blocked');
         }
 
-        const orderDisplayId = order.mongoId ?? order.id;
-        const hasOpenDispute = await db().ticket.findFirst({
-          where: { orderId: orderDisplayId, status: 'Open', isDeleted: false },
-          select: { id: true },
-        });
         if (hasOpenDispute) {
           const newEvents = pushOrderEvent(order.events as any, {
             type: 'FROZEN_DISPUTED',
@@ -1728,12 +1739,6 @@ export function makeOpsController(env: Env) {
         if (wf !== 'APPROVED') {
           throw new AppError(409, 'INVALID_WORKFLOW_STATE', `Cannot settle in state ${wf}`);
         }
-
-        const campaignId = order.items?.[0]?.campaignId;
-        const productId = String(order.items?.[0]?.productId || '').trim();
-        const mediatorCode = String(order.managerName || '').trim();
-
-        const campaign = campaignId ? await db().campaign.findFirst({ where: { id: campaignId, isDeleted: false }, select: { id: true, assignments: true, brandUserId: true } }) : null;
 
         let isOverLimit = false;
         if (campaignId && mediatorCode) {
@@ -2666,10 +2671,8 @@ export function makeOpsController(env: Env) {
           const slotAssignment = findAssignmentForMediator(campaign.assignments, requestedCode);
           const hasAssignment = !!slotAssignment && Number((slotAssignment as any)?.limit ?? 0) > 0;
 
-          // "Open to All" campaigns: allow any mediator whose agency is in allowedAgencyCodes
-          const campaignIsOpenToAll = (campaign as any).openToAll === true;
-
-          const isAllowed = campaignIsOpenToAll || (agencyCode && allowedCodes.has(agencyCode.toLowerCase())) || allowedCodes.has(selfCode.toLowerCase()) || hasAssignment;
+          // "Open to All" campaigns still require agency membership — they just skip per-mediator slot assignment
+          const isAllowed = (agencyCode && allowedCodes.has(agencyCode.toLowerCase())) || allowedCodes.has(selfCode.toLowerCase()) || hasAssignment;
           if (!isAllowed) {
             throw new AppError(403, 'FORBIDDEN', 'Campaign not assigned to your network');
           }

@@ -3197,7 +3197,7 @@ export const BrandDashboard: React.FC = () => {
         </div>
       )}
     </DesktopShell>
-    <Suspense fallback={null}>
+    <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20"><Spinner /></div>}>
       <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />
       <TicketDetailModal
         open={!!selectedTicket}

@@ -721,7 +721,8 @@ export function makeOrdersController(env: Env) {
         const hasAgencyAccess = upstreamAgencyCode ? allowedAgencyCodes.includes(upstreamAgencyCode) : false;
         const campaignIsOpenToAll = (campaign as any).openToAll === true;
 
-        if (!campaignIsOpenToAll && !hasAgencyAccess && !hasMediatorAssignment) {
+        // openToAll skips per-mediator slot limits but still requires agency membership
+        if (!hasAgencyAccess && !hasMediatorAssignment) {
           throw new AppError(403, 'FORBIDDEN', 'Campaign is not available for your network');
         }
 
@@ -974,49 +975,15 @@ export function makeOrdersController(env: Env) {
           });
 
           // ── Auto-verify by AI confidence ──────────────────────────────
-          // When AI has verified the proof (passed all hard-block checks), auto-verify
-          // the purchase step. The hard blocks (orderIdMatch, productNameMatch, etc.)
-          // already ensure proof correctness — any surviving proof is "AI-approved".
+          // Uses guarded autoVerifyStep which prevents race conditions via updateMany
           const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
           if (aiOrderConfidence >= autoThreshold) {
             const freshOrder = await db().order.findFirst({
               where: { mongoId: orderMongoId, isDeleted: false },
               include: { items: { where: { isDeleted: false } } },
             });
-            if (freshOrder && String(freshOrder.workflowStatus) === 'UNDER_REVIEW') {
-              const v = (freshOrder.verification && typeof freshOrder.verification === 'object')
-                ? { ...(freshOrder.verification as any) } : {} as any;
-              if (!v.order?.verifiedAt) {
-                v.order = v.order ?? {};
-                v.order.verifiedAt = new Date().toISOString();
-                v.order.verifiedBy = 'SYSTEM_AI';
-                v.order.autoVerified = true;
-                v.order.aiConfidenceScore = aiOrderConfidence;
-                const evts = pushOrderEvent(
-                  Array.isArray(freshOrder.events) ? (freshOrder.events as any[]) : [],
-                  { type: 'VERIFIED', at: new Date(), actorUserId: 'SYSTEM_AI', metadata: { step: 'order', autoVerified: true, aiConfidenceScore: aiOrderConfidence } },
-                );
-                const updated = await db().order.update({
-                  where: { id: freshOrder.id },
-                  data: { verification: v, events: evts as any },
-                  include: { items: { where: { isDeleted: false } } },
-                });
-                const finalize = await finalizeApprovalIfReady(updated!, 'SYSTEM_AI', env);
-                orderLog.info('Auto-verified purchase by AI confidence', {
-                  orderId: orderMongoId,
-                  aiConfidenceScore: aiOrderConfidence,
-                  autoThreshold,
-                  approved: (finalize as any).approved,
-                });
-                if ((finalize as any).approved) {
-                  finalOrder = await db().order.findFirst({
-                    where: { id: freshOrder.id, isDeleted: false },
-                    include: { items: { where: { isDeleted: false } } },
-                  });
-                } else {
-                  finalOrder = updated;
-                }
-              }
+            if (freshOrder) {
+              finalOrder = await autoVerifyStep(freshOrder, 'order', aiOrderConfidence, autoThreshold, env);
             }
           }
 

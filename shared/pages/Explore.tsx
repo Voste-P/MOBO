@@ -6,7 +6,7 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { api, asArray } from '../services/api';
 import { subscribeRealtime } from '../services/realtime';
 import { Search, AlertTriangle, ShoppingBag } from 'lucide-react';
-import { EmptyState, Input } from '../components/ui';
+import { EmptyState, Input, Spinner } from '../components/ui';
 import { lazyRetry } from '../utils/lazyRetry';
 
 const RaiseTicketModal = lazyRetry(() =>
@@ -266,7 +266,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
           </div>
         )}
       </div>
-      <Suspense fallback={null}>
+      <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20"><Spinner /></div>}>
         <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />
       </Suspense>
     </div>
