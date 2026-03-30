@@ -347,8 +347,11 @@ function cacheResponse(path: string, data: any) {
 }
 
 // Periodic cleanup of expired entries (every 30s)
+// Guard against HMR creating duplicate intervals in development
+let _cacheCleanupTimer: ReturnType<typeof setInterval> | undefined;
 if (typeof window !== 'undefined') {
-  setInterval(() => {
+  if (_cacheCleanupTimer) clearInterval(_cacheCleanupTimer);
+  _cacheCleanupTimer = setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of getCache) {
       if (now > entry.expiresAt) getCache.delete(key);

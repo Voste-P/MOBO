@@ -675,6 +675,8 @@ model Wallet {
   transactions Transaction[]
   payouts      Payout[]
 
+  @@index([isDeleted])                         // wallet listing with soft-delete filter
+  @@index([ownerUserId, isDeleted])            // fast wallet lookups by owner
   @@map("wallets")
 }
 
