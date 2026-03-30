@@ -473,7 +473,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
     }
     if (financeMediatorFilter !== 'All') {
       result = result.filter((o: Order) => {
-        const label = (o as any).managerName || (o as any).mediatorCode || '';
+        const label = o.managerName || o.mediatorCode || '';
         return label === financeMediatorFilter;
       });
     }
@@ -624,10 +624,10 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
         item?.quantity || 1,
         o.total,
         item?.commission || 0,
-        (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString('en-GB') : '',
+        o.expectedSettlementDate ? new Date(o.expectedSettlementDate).toLocaleDateString('en-GB') : '',
         csvSafe(o.agencyName || user?.name || 'Agency'),
         csvSafe(o.managerName || ''),
-        csvSafe(o.mediatorCode || (o as any).managerCode || ''),
+        csvSafe(o.mediatorCode || o.managerCode || ''),
         csvSafe(o.buyerName || ''),
         csvSafe(o.buyerMobile || ''),
         csvSafe(o.reviewerName || ''),
@@ -678,13 +678,13 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
         item?.quantity || 1,
         o.total,
         item?.commission || 0,
-        (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString('en-GB') : '',
+        o.expectedSettlementDate ? new Date(o.expectedSettlementDate).toLocaleDateString('en-GB') : '',
         o.agencyName || user?.name || 'Agency',
         o.managerName || '',
-        o.mediatorCode || (o as any).managerCode || '',
+        o.mediatorCode || o.managerCode || '',
         o.buyerName || '',
         o.buyerMobile || '',
-        (o as any).reviewerName || '',
+        o.reviewerName || '',
         o.workflowStatus || o.status || '',
         o.paymentStatus,
         o.affiliateStatus || '',
@@ -1515,7 +1515,7 @@ const DashboardView = ({ stats, revenueTrendData, brandPerfData, onRangeChange }
             </div>
             <select
               value={range}
-              onChange={(e) => handleRangeChange(e.target.value as any)}
+              onChange={(e) => handleRangeChange(e.target.value as typeof range)}
               aria-label="Date range"
               className="bg-slate-50 border border-slate-200 text-xs font-bold text-slate-600 rounded-lg px-3 py-2 outline-none hover:bg-slate-100 transition-colors cursor-pointer"
             >
@@ -1656,7 +1656,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     const raw = assignModal.assignments || {};
     const normalized: Record<string, number> = {};
     for (const [code, val] of Object.entries(raw)) {
-      normalized[code] = typeof val === 'number' ? val : Number((val as any)?.limit ?? 0);
+      normalized[code] = typeof val === 'number' ? val : Number((val as Record<string, unknown>)?.limit ?? 0);
     }
     setAssignments(normalized);
     setAssignSearch('');
@@ -1864,7 +1864,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
         payout,
         totalSlots,
         originalPrice,
-        dealType: newCampaign.dealType as any,
+        dealType: newCampaign.dealType as Campaign['dealType'],
         allowedAgencies: [user.mediatorCode],
         brandName: newCampaign.brandName.trim() || undefined,
       });
@@ -1920,7 +1920,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     setCustomPrice(c.price.toString());
     setCustomPayout(c.payout.toString());
     // Pre-fill commission & payout from previously saved assignment values.
-    const details = (c as any).assignmentDetails || {};
+    const details = c.assignmentDetails || {};
     const detailValues = Object.values(details) as Array<{ limit: number; payout: number; commission: number }>;
     const savedComm = detailValues.find((d) => typeof d?.commission === 'number' && d.commission > 0);
     setCommissionOnDeal(savedComm ? String(savedComm.commission) : '0');
@@ -2210,7 +2210,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                               setCustomPrice(c.price.toString());
                               setCustomPayout(c.payout.toString());
                               // Pre-fill commission & payout from previously saved assignment values.
-                              const details = (c as any).assignmentDetails || {};
+                              const details = c.assignmentDetails || {};
                               const detailValues = Object.values(details) as Array<{ limit: number; payout: number; commission: number }>;
                               const savedComm = detailValues.find((d) => typeof d?.commission === 'number' && d.commission > 0);
                               setCommissionOnDeal(savedComm ? String(savedComm.commission) : '0');
@@ -2219,8 +2219,8 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                               // Pre-fill per-mediator commission overrides from saved assignments
                               const perMediatorOverrides: Record<string, string> = {};
                               for (const [code, detail] of Object.entries(details)) {
-                                if (detail && typeof (detail as any).payout === 'number') {
-                                  perMediatorOverrides[code] = String((detail as any).payout);
+                                if (detail && typeof detail.payout === 'number') {
+                                  perMediatorOverrides[code] = String(detail.payout);
                                 }
                               }
                               setMediatorPayouts(perMediatorOverrides);
@@ -2277,7 +2277,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                                   }
                                   setSubTab('inventory');
                                 } else {
-                                  toast.error((res as any).error || 'Copy failed');
+                                  toast.error(res?.error || 'Copy failed');
                                 }
                               } catch (err) {
                                 toast.error(formatErrorMessage(err, 'Copy failed'));
@@ -3029,7 +3029,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
   }, [allOrders]);
 
   const getApprovalMethod = (o: Order): 'ai' | 'manual' | 'pending' => {
-    const v = (o as any).verification;
+    const v = o.verification;
     if (!v?.order?.verifiedAt) return 'pending';
     return v.order.autoVerified ? 'ai' : 'manual';
   };
@@ -3138,13 +3138,13 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
           <option value="all">All Mediators</option>
           {uniqueMediators.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
-        <select value={approvalFilter} onChange={(e) => setApprovalFilter(e.target.value as any)} className="text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:ring-2 focus:ring-purple-200">
+        <select value={approvalFilter} onChange={(e) => setApprovalFilter(e.target.value as typeof approvalFilter)} className="text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:ring-2 focus:ring-purple-200">
           <option value="all">All Approval</option>
           <option value="manual">Manual Only</option>
           <option value="ai">AI Auto</option>
           <option value="pending">Pending</option>
         </select>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:ring-2 focus:ring-purple-200">
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)} className="text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:ring-2 focus:ring-purple-200">
           <option value="all">All Statuses</option>
           <option value="UNDER_REVIEW">Under Review</option>
           <option value="APPROVED">Approved</option>
@@ -3238,7 +3238,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
                               </button>
                               <button
                                 onClick={() => {
-                                  const v = (o as any).verification;
+                                  const v = o.verification;
                                   const proofType = !v?.order?.verifiedAt ? 'order'
                                     : o.items?.[0]?.dealType === 'Review' && !v?.review?.verifiedAt ? 'review'
                                     : o.items?.[0]?.dealType === 'Rating' && !v?.rating?.verifiedAt ? 'rating'
@@ -4444,7 +4444,7 @@ export const AgencyDashboard: React.FC = () => {
         lastFetchedAt.current[key] = now;
         switch (key) {
           case 'dashboardStats': {
-            const s = result.value as any;
+            const s = result.value as Record<string, number>;
             setStats({ revenue: s.revenue ?? 0, totalMediators: s.totalMediators ?? 0, activeCampaigns: s.activeCampaigns ?? 0, ordersToday: s.ordersToday ?? 0 });
             break;
           }
@@ -4735,10 +4735,10 @@ export const AgencyDashboard: React.FC = () => {
               const header = ['Ticket ID','Status','Issue Type','Description','User','Role','Target Role','Order ID','Resolution Note','Resolved By','Resolved At','Created At'].map(csvSafe).join(',');
               const rows = supportTickets.map(t => [
                 csvSafe(t.id.slice(-8)), csvSafe(String(t.status)),
-                csvSafe(String(t.issueType)), csvSafe(String(t.description || '')), csvSafe(String((t as any).userName || '')),
-                csvSafe(String((t as any).role || '')), csvSafe(String((t as any).targetRole || '')), csvSafe(String(t.externalOrderId || t.orderId || '')),
-                csvSafe(String((t as any).resolutionNote || '')), csvSafe(String((t as any).resolvedByName || '')),
-                csvSafe((t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString('en-GB') : ''),
+                csvSafe(String(t.issueType)), csvSafe(String(t.description || '')), csvSafe(String(t.userName || '')),
+                csvSafe(String(t.role || '')), csvSafe(String(t.targetRole || '')), csvSafe(String(t.externalOrderId || t.orderId || '')),
+                csvSafe(String(t.resolutionNote || '')), csvSafe(String(t.resolvedByName || '')),
+                csvSafe(t.resolvedAt ? new Date(t.resolvedAt).toLocaleDateString('en-GB') : ''),
                 csvSafe(t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''),
               ].join(','));
               downloadCsv(`agency-tickets-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...rows].join('\n'));
@@ -4785,7 +4785,7 @@ export const AgencyDashboard: React.FC = () => {
                   const q = ticketSearch.trim().toLowerCase();
                   return (String(t.issueType || '').toLowerCase().includes(q) ||
                     String(t.description || '').toLowerCase().includes(q) ||
-                    String((t as any).userName || '').toLowerCase().includes(q) ||
+                    String(t.userName || '').toLowerCase().includes(q) ||
                     String(t.externalOrderId || t.orderId || '').toLowerCase().includes(q) ||
                     t.id.toLowerCase().includes(q));
                 }
@@ -4810,22 +4810,22 @@ export const AgencyDashboard: React.FC = () => {
                       &ldquo;{String(t.description)}&rdquo;
                     </div>
                   )}
-                  {(t as any).userName && (
-                    <div className="text-[10px] text-slate-400">From: {String((t as any).userName)} ({String((t as any).userRole || '')})</div>
+                  {t.userName && (
+                    <div className="text-[10px] text-slate-400">From: {String(t.userName)} ({String(t.userRole || '')})</div>
                   )}
                   {(t.externalOrderId || t.orderId) && (
                     <div className="text-[10px] text-slate-400"><span className="font-bold">Order:</span> {String(t.externalOrderId || t.orderId)}</div>
                   )}
-                  {(t as any).resolutionNote && (
+                  {t.resolutionNote && (
                     <div className="text-[10px] text-green-700 bg-green-50 rounded-lg px-2 py-1.5">
-                      <span className="font-bold">Resolution:</span> {String((t as any).resolutionNote)}
+                      <span className="font-bold">Resolution:</span> {String(t.resolutionNote)}
                     </div>
                   )}
-                  {(String(t.status) === 'Resolved' || String(t.status) === 'Rejected') && ((t as any).resolvedByName || (t as any).resolvedAt) && (
+                  {(String(t.status) === 'Resolved' || String(t.status) === 'Rejected') && (t.resolvedByName || t.resolvedAt) && (
                     <div className="text-[10px] text-slate-400">
                       {String(t.status) === 'Resolved' ? 'Resolved' : 'Rejected'}
-                      {(t as any).resolvedByName ? ` by ${String((t as any).resolvedByName)}` : ''}
-                      {(t as any).resolvedAt ? ` on ${new Date(String((t as any).resolvedAt)).toLocaleDateString('en-GB')}` : ''}
+                      {t.resolvedByName ? ` by ${String(t.resolvedByName)}` : ''}
+                      {t.resolvedAt ? ` on ${new Date(String(t.resolvedAt)).toLocaleDateString('en-GB')}` : ''}
                     </div>
                   )}
                   <div className="flex items-center gap-2 justify-end flex-wrap">

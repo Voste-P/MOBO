@@ -96,7 +96,18 @@ const formatRelativeTime = (iso?: string) => {
 
 // --- VIEWS ---
 
-const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewProof, onGoToUnpublished, unpublishedCount }: any) => {
+interface InboxViewProps {
+  orders: Order[];
+  pendingUsers: User[];
+  tickets: Ticket[];
+  loading: boolean;
+  onRefresh: (keys?: string[]) => void;
+  onViewProof: (order: Order) => void;
+  onGoToUnpublished: () => void;
+  unpublishedCount: number;
+}
+
+const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewProof, onGoToUnpublished, unpublishedCount }: InboxViewProps) => {
   // Verification queue is workflow-driven.
   // Orders can remain UNDER_REVIEW even after purchase verification if review/rating is still pending.
   const { toast } = useToast();
@@ -552,9 +563,9 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                 const headers = ['Ticket ID', 'Status', 'Issue Type', 'Description', 'User', 'Role', 'Target Role', 'Order ID', 'Resolution Note', 'Resolved By', 'Resolved At', 'Created At'];
                 const rows = supportTickets.map((t: Ticket) => [
                   t.id.slice(-8), String(t.status), String(t.issueType), String(t.description || ''),
-                  String((t as any).userName || ''), String((t as any).role || ''), String((t as any).targetRole || ''), String(t.orderId || ''),
-                  String((t as any).resolutionNote || ''), String((t as any).resolvedByName || ''),
-                  (t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString('en-GB') : '',
+                  String(t.userName || ''), String(t.role || ''), String(t.targetRole || ''), String(t.orderId || ''),
+                  String(t.resolutionNote || ''), String(t.resolvedByName || ''),
+                  t.resolvedAt ? new Date(t.resolvedAt).toLocaleDateString('en-GB') : '',
                   t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : '',
                 ]);
                 downloadCsv(`mediator-tickets-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
@@ -607,7 +618,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                 const q = ticketSearch.trim().toLowerCase();
                 return (String(t.issueType || '').toLowerCase().includes(q) ||
                   String(t.description || '').toLowerCase().includes(q) ||
-                  String((t as any).userName || '').toLowerCase().includes(q) ||
+                  String(t.userName || '').toLowerCase().includes(q) ||
                   String(t.orderId || '').toLowerCase().includes(q) ||
                   t.id.toLowerCase().includes(q));
               }
@@ -636,22 +647,22 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                     &ldquo;{String(t.description)}&rdquo;
                   </div>
                 )}
-                {(t as any).userName && (
-                  <div className="text-[9px] text-zinc-400">From: {String((t as any).userName)} ({String((t as any).userRole || '')})</div>
+                {t.userName && (
+                  <div className="text-[9px] text-zinc-400">From: {String(t.userName)} ({String(t.userRole || '')})</div>
                 )}
                 {(t.externalOrderId || t.orderId) && (
                   <div className="text-[9px] text-zinc-400"><span className="font-bold">Order:</span> {String(t.externalOrderId || t.orderId)}</div>
                 )}
-                {(t as any).resolutionNote && (
+                {t.resolutionNote && (
                   <div className="text-[10px] text-green-700 bg-green-50 rounded-lg px-2 py-1.5">
-                    <span className="font-bold">Resolution:</span> {String((t as any).resolutionNote)}
+                    <span className="font-bold">Resolution:</span> {String(t.resolutionNote)}
                   </div>
                 )}
-                {(String(t.status) === 'Resolved' || String(t.status) === 'Rejected') && ((t as any).resolvedByName || (t as any).resolvedAt) && (
+                {(String(t.status) === 'Resolved' || String(t.status) === 'Rejected') && (t.resolvedByName || t.resolvedAt) && (
                   <div className="text-[9px] text-zinc-400">
                     {String(t.status) === 'Resolved' ? 'Resolved' : 'Rejected'}
-                    {(t as any).resolvedByName ? ` by ${String((t as any).resolvedByName)}` : ''}
-                    {(t as any).resolvedAt ? ` on ${new Date(String((t as any).resolvedAt)).toLocaleDateString('en-GB')}` : ''}
+                    {t.resolvedByName ? ` by ${String(t.resolvedByName)}` : ''}
+                    {t.resolvedAt ? ` on ${new Date(String(t.resolvedAt)).toLocaleDateString('en-GB')}` : ''}
                   </div>
                 )}
                 <div className="flex items-center gap-1.5 justify-end">
@@ -674,7 +685,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                                 toast.success('Ticket resolved.');
                                 setResolvingTicketId(null); setResolutionNote('');
                                 onRefresh(['tickets']);
-                              } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
+                              } catch (err) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
                             }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
                               ✓ Resolve
                             </button>
@@ -684,7 +695,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                                 toast.success('Ticket rejected.');
                                 setResolvingTicketId(null); setResolutionNote('');
                                 onRefresh(['tickets']);
-                              } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
+                              } catch (err) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
                             }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-50 border border-red-200 text-red-600 hover:bg-red-100">
                               ✗ Reject
                             </button>
@@ -714,7 +725,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                             await api.tickets.update(t.id, 'Open');
                             toast.success('Ticket reopened.');
                             onRefresh(['tickets']);
-                          } catch (err: any) {
+                          } catch (err) {
                             toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
                           }
                         }}
@@ -729,7 +740,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                             await api.tickets.delete(t.id);
                             toast.success('Ticket deleted.');
                             onRefresh(['tickets']);
-                          } catch (err: any) {
+                          } catch (err) {
                             toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
                           }
                         }}
@@ -1110,7 +1121,17 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
   );
 };
 
-const SquadView = ({ user, pendingUsers, verifiedUsers, loading, orders: _orders, onRefresh: _onRefresh, onSelectUser }: any) => {
+interface SquadViewProps {
+  user: User;
+  pendingUsers: User[];
+  verifiedUsers: User[];
+  loading: boolean;
+  orders: Order[];
+  onRefresh: (keys?: string[]) => void;
+  onSelectUser: (u: User) => void;
+}
+
+const SquadView = ({ user, pendingUsers, verifiedUsers, loading, orders: _orders, onRefresh: _onRefresh, onSelectUser }: SquadViewProps) => {
   const { toast } = useToast();
   const [squadSearch, setSquadSearch] = useState('');
   const [squadPage, setSquadPage] = useState(1);
@@ -2005,9 +2026,9 @@ export const MediatorDashboard: React.FC = () => {
             setPendingUsers(safePend);
             setSelectedBuyer((prev) => {
               if (!prev) return prev;
-              const updated = safePend.find((u: any) => u?.id === (prev as any).id);
+              const updated = safePend.find((u) => u?.id === prev.id);
               if (!updated) return prev;
-              return updated.name !== (prev as any).name || updated.mobile !== (prev as any).mobile || updated.upiId !== (prev as any).upiId || updated.qrCode !== (prev as any).qrCode ? updated : prev;
+              return updated.name !== prev.name || updated.mobile !== prev.mobile || updated.upiId !== prev.upiId || updated.qrCode !== prev.qrCode ? updated : prev;
             });
             break;
           }
@@ -2016,9 +2037,9 @@ export const MediatorDashboard: React.FC = () => {
             setVerifiedUsers(safeVer);
             setSelectedBuyer((prev) => {
               if (!prev) return prev;
-              const updated = safeVer.find((u: any) => u?.id === (prev as any).id);
+              const updated = safeVer.find((u) => u?.id === prev.id);
               if (!updated) return prev;
-              return updated.name !== (prev as any).name || updated.mobile !== (prev as any).mobile || updated.upiId !== (prev as any).upiId || updated.qrCode !== (prev as any).qrCode ? updated : prev;
+              return updated.name !== prev.name || updated.mobile !== prev.mobile || updated.upiId !== prev.upiId || updated.qrCode !== prev.qrCode ? updated : prev;
             });
             break;
           }
@@ -2028,7 +2049,7 @@ export const MediatorDashboard: React.FC = () => {
     } catch (e) {
       if (process.env.NODE_ENV !== 'production') console.error(e);
       if (!silent) {
-        const msg = (e as any)?.message ? String((e as any).message) : 'Failed to refresh dashboard.';
+        const msg = (e as Error)?.message ? String((e as Error).message) : 'Failed to refresh dashboard.';
         toast.error(msg.includes('fetch') || msg.includes('network') ? 'Network error. Please check your connection.' : msg);
       }
     } finally {
@@ -2112,7 +2133,7 @@ export const MediatorDashboard: React.FC = () => {
       loadData({ keys: ['campaigns', 'deals'] });
     } catch (e) {
       if (process.env.NODE_ENV !== 'production') console.error(e);
-      const msg = (e as any)?.message ? String((e as any).message) : 'Failed to publish deal.';
+      const msg = (e as Error)?.message ? String((e as Error).message) : 'Failed to publish deal.';
       toast.error(msg);
     }
   };
@@ -2316,7 +2337,7 @@ export const MediatorDashboard: React.FC = () => {
           items={mediatorTabItems}
           activeId={activeTab}
           onChange={(id) => {
-            handleTabChange(id as any);
+            handleTabChange(id as typeof activeTab);
             setShowNotifications(false);
           }}
           variant="darkGlass"
@@ -2786,9 +2807,9 @@ export const MediatorDashboard: React.FC = () => {
                   try {
                     const resp = await api.ops.verifyOrderClaim(proofModal.id);
                     const missingProofs: Array<'review' | 'rating' | 'returnWindow'> =
-                      (resp?.missingProofs as any) || [];
+                      resp?.missingProofs || [];
                     const missingVerifications: Array<'review' | 'rating' | 'returnWindow'> =
-                      (resp?.missingVerifications as any) || [];
+                      resp?.missingVerifications || [];
 
                     if (resp?.approved) {
                       toast.success('Order approved! Cashback is now in cooling period. ✓');
@@ -3076,7 +3097,7 @@ export const MediatorDashboard: React.FC = () => {
               {/* Agency commission badge — visible at top-right of deal card */}
               <div className="flex-shrink-0 bg-blue-50 border-2 border-blue-300 rounded-[1rem] px-3 py-2 flex flex-col items-center justify-center shadow-sm">
                 <p className="text-[8px] font-bold text-blue-500 uppercase tracking-wider">Agency Commission</p>
-                <p className="text-lg font-black text-blue-700">₹{(dealBuilder as any).assignmentPayout ?? dealBuilder.payout ?? 0}</p>
+                <p className="text-lg font-black text-blue-700">₹{dealBuilder.assignmentPayout ?? dealBuilder.payout ?? 0}</p>
                 <p className="text-[7px] text-blue-400 font-semibold">from agency</p>
               </div>
             </div>
@@ -3108,7 +3129,7 @@ export const MediatorDashboard: React.FC = () => {
             {/* Net earnings breakdown */}
             {(() => {
               // Agency commission = what agency pays mediator per deal
-              const agencyComm = (dealBuilder as any).assignmentPayout ?? dealBuilder.payout ?? 0;
+              const agencyComm = dealBuilder.assignmentPayout ?? dealBuilder.payout ?? 0;
               // Your commission = what mediator adds to the deal price (can be negative)
               const buyerComm = parseInt(commission) || 0;
               // Net earnings = agency commission + your commission

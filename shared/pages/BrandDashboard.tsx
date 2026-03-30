@@ -623,7 +623,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
   const mediatorOptions = useMemo(() => {
     const codes = new Set<string>();
     orders.forEach((o) => {
-      const label = o.managerName || (o as any).mediatorCode || '';
+      const label = o.managerName || o.mediatorCode || '';
       if (label) codes.add(label);
     });
     return Array.from(codes).sort();
@@ -653,7 +653,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
       if (dt !== dealTypeFilter) return false;
     }
     if (mediatorFilter !== 'All') {
-      const label = o.managerName || (o as any).mediatorCode || '';
+      const label = o.managerName || o.mediatorCode || '';
       if (label !== mediatorFilter) return false;
     }
     if (productFilter !== 'All') {
@@ -764,10 +764,10 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
         item?.quantity || 1,
         o.total,
         item?.commission || 0,
-        (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString('en-GB') : '',
+        o.expectedSettlementDate ? new Date(o.expectedSettlementDate).toLocaleDateString('en-GB') : '',
         csvSafe(o.agencyName || 'Direct'),
         csvSafe(o.managerName || ''),
-        csvSafe(o.mediatorCode || (o as any).managerCode || ''),
+        csvSafe(o.mediatorCode || o.managerCode || ''),
         csvSafe(o.buyerName || ''),
         csvSafe(o.buyerMobile || ''),
         csvSafe(o.reviewerName || ''),
@@ -819,10 +819,10 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
         item?.quantity || 1,
         o.total,
         item?.commission || 0,
-        (o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString('en-GB') : '',
+        o.expectedSettlementDate ? new Date(o.expectedSettlementDate).toLocaleDateString('en-GB') : '',
         o.agencyName || 'Direct',
         o.managerName || '',
-        o.mediatorCode || (o as any).managerCode || '',
+        o.mediatorCode || o.managerCode || '',
         o.buyerName || '',
         o.buyerMobile || '',
         o.reviewerName || '',
@@ -2254,7 +2254,7 @@ export const BrandDashboard: React.FC = () => {
         loadedRef.current.add(key);
         lastFetchedAt.current[key] = now;
         switch (key) {
-          case 'dashboardStats': setDashboardStats(result.value as any); break;
+          case 'dashboardStats': setDashboardStats(result.value as typeof dashboardStats); break;
           case 'revenueChart': setRevenueChartData(asArray(result.value)); break;
           case 'inventoryFill': setInventoryFillData(asArray(result.value)); break;
           case 'campaigns': setCampaigns(asArray(result.value)); break;
@@ -2600,10 +2600,10 @@ export const BrandDashboard: React.FC = () => {
                 const header = ['Ticket ID','Status','Issue Type','Description','User','Role','Target Role','Order ID','Resolution Note','Resolved By','Resolved At','Created At'].map(csvSafe).join(',');
                 const rows = supportTickets.map(t => [
                   csvSafe(t.id.slice(-8)), csvSafe(String(t.status)),
-                  csvSafe(String(t.issueType)), csvSafe(String(t.description || '')), csvSafe(String((t as any).userName || '')),
-                  csvSafe(String((t as any).role || '')), csvSafe(String((t as any).targetRole || '')), csvSafe(String(t.externalOrderId || t.orderId || '')),
-                  csvSafe(String((t as any).resolutionNote || '')), csvSafe(String((t as any).resolvedByName || '')),
-                  csvSafe((t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString('en-GB') : ''),
+                  csvSafe(String(t.issueType)), csvSafe(String(t.description || '')), csvSafe(String(t.userName || '')),
+                  csvSafe(String(t.role || '')), csvSafe(String(t.targetRole || '')), csvSafe(String(t.externalOrderId || t.orderId || '')),
+                  csvSafe(String(t.resolutionNote || '')), csvSafe(String(t.resolvedByName || '')),
+                  csvSafe(t.resolvedAt ? new Date(t.resolvedAt).toLocaleDateString('en-GB') : ''),
                   csvSafe(t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''),
                 ].join(','));
                 downloadCsv(`brand-tickets-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...rows].join('\n'));
@@ -2650,7 +2650,7 @@ export const BrandDashboard: React.FC = () => {
                     const q = ticketSearch.trim().toLowerCase();
                     return (String(t.issueType || '').toLowerCase().includes(q) ||
                       String(t.description || '').toLowerCase().includes(q) ||
-                      String((t as any).userName || '').toLowerCase().includes(q) ||
+                      String(t.userName || '').toLowerCase().includes(q) ||
                       String(t.externalOrderId || t.orderId || '').toLowerCase().includes(q) ||
                       t.id.toLowerCase().includes(q));
                   }
@@ -2675,22 +2675,22 @@ export const BrandDashboard: React.FC = () => {
                         &ldquo;{String(t.description)}&rdquo;
                       </div>
                     )}
-                    {(t as any).userName && (
-                      <div className="text-[10px] text-zinc-400">From: {String((t as any).userName)} ({String((t as any).userRole || '')})</div>
+                    {t.userName && (
+                      <div className="text-[10px] text-zinc-400">From: {String(t.userName)} ({String(t.userRole || '')})</div>
                     )}
                     {(t.externalOrderId || t.orderId) && (
                       <div className="text-[10px] text-zinc-400"><span className="font-bold">Order:</span> {String(t.externalOrderId || t.orderId)}</div>
                     )}
-                    {(t as any).resolutionNote && (
+                    {t.resolutionNote && (
                       <div className="text-[10px] text-green-700 bg-green-50 rounded-lg px-2 py-1.5">
-                        <span className="font-bold">Resolution:</span> {String((t as any).resolutionNote)}
+                        <span className="font-bold">Resolution:</span> {String(t.resolutionNote)}
                       </div>
                     )}
-                    {(String(t.status) === 'Resolved' || String(t.status) === 'Rejected') && ((t as any).resolvedByName || (t as any).resolvedAt) && (
+                    {(String(t.status) === 'Resolved' || String(t.status) === 'Rejected') && (t.resolvedByName || t.resolvedAt) && (
                       <div className="text-[10px] text-zinc-400">
                         {String(t.status) === 'Resolved' ? 'Resolved' : 'Rejected'}
-                        {(t as any).resolvedByName ? ` by ${String((t as any).resolvedByName)}` : ''}
-                        {(t as any).resolvedAt ? ` on ${new Date(String((t as any).resolvedAt)).toLocaleDateString('en-GB')}` : ''}
+                        {t.resolvedByName ? ` by ${String(t.resolvedByName)}` : ''}
+                        {t.resolvedAt ? ` on ${new Date(String(t.resolvedAt)).toLocaleDateString('en-GB')}` : ''}
                       </div>
                     )}
                     <div className="flex items-center gap-2 justify-end flex-wrap">

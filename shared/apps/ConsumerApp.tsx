@@ -57,7 +57,7 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
   }, [activeTab]);
 
   const swipeHandlers = useSwipeTabs({
-    tabs: TAB_ORDER as unknown as string[],
+    tabs: [...TAB_ORDER],
     activeTab,
     onChangeTab: (t) => handleTabChangeWrapped(t as typeof activeTab),
   });
@@ -168,7 +168,7 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
                 <MobileTabBar
                   items={tabItems}
                   activeId={activeTab}
-                  onChange={(id) => handleTabChangeWrapped(id as any)}
+                  onChange={(id) => handleTabChangeWrapped(id as typeof activeTab)}
                   variant="glass"
                   showLabels={false}
                 />

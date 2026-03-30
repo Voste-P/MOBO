@@ -364,9 +364,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
   // Merge a submitClaim response (toUiOrder) into the orders list so the UI
   // updates instantly without waiting for a full refetch. This ensures the
   // next proof upload button appears immediately after a successful upload.
-  const mergeSubmitResponse = useCallback((updated: any) => {
+  const mergeSubmitResponse = useCallback((updated: Partial<Order> & { id: string }) => {
     if (!updated || !updated.id) return;
-    setOrders((prev: any) => {
+    setOrders((prev) => {
       if (!Array.isArray(prev)) return prev;
       return prev.map((o: Order) => {
         if (o.id !== updated.id) return o;
@@ -426,7 +426,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
   useEffect(() => {
     if (!user) return;
 
-    let timer: any = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const pendingKeys = new Set<string>();
     const schedule = (key: string) => {
       pendingKeys.add(key);
@@ -435,13 +435,13 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
         timer = null;
         const keys = new Set(pendingKeys);
         pendingKeys.clear();
-        const tasks: Promise<any>[] = [];
+        const tasks: Promise<void>[] = [];
         if (keys.has('orders')) tasks.push(loadOrders());
         if (keys.has('tickets')) tasks.push(loadMyTickets());
         Promise.allSettled(tasks).catch(() => {});
       }, 800);
     };
-    const unsub = subscribeRealtime((msg: any) => {
+    const unsub = subscribeRealtime((msg) => {
       if (msg.type === 'orders.changed') schedule('orders');
       if (msg.type === 'tickets.changed') schedule('tickets');
       if (msg.type === 'deals.changed') {
@@ -484,7 +484,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       toast.success('Proof uploaded!');
       mergeSubmitResponse(resp);
       setSelectedOrder(null);
-    } catch (err: any) {
+    } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to upload proof'));
     } finally {
       setIsUploading(false);
@@ -506,7 +506,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       mergeSubmitResponse(resp);
       setSelectedOrder(null);
       setInputValue('');
-    } catch (e: any) {
+    } catch (e) {
       toast.error(formatErrorMessage(e, 'Failed to submit link'));
     } finally {
       setIsUploading(false);
@@ -618,7 +618,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
           toast.info(`Screenshot uploaded but extraction couldn't read the details${extractionNote}. Please enter Order ID and Amount manually.`);
         }
       }
-    } catch (e: any) {
+    } catch (e) {
       if (process.env.NODE_ENV !== 'production') console.error('[extraction error]', e);
       // Still allow manual entry by showing empty extraction fields
       setExtractedDetails({ orderId: '', amount: '' });
@@ -709,12 +709,12 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
           toast.info('Screenshot ready for upload.');
         }
       }
-    } catch (err: any) {
-      if (err?.name === 'AbortError') return; // Cancelled by re-upload — ignore silently
+    } catch (err) {
+      if ((err as Error)?.name === 'AbortError') return; // Cancelled by re-upload — ignore silently
       if (process.env.NODE_ENV !== 'production') console.error('Rating pre-validation failed:', err);
       // Keep verification null — submit button stays disabled until user retries
       setRatingVerification(null);
-      const msg = err?.message || 'AI verification failed. Please try uploading the screenshot again.';
+      const msg = (err as Error)?.message || 'AI verification failed. Please try uploading the screenshot again.';
       toast.error(msg);
     } finally {
       setRatingAnalyzing(false);
@@ -768,7 +768,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       setRatingPreview(null);
       setRatingFile(null);
       setRatingVerification(null);
-    } catch (err: any) {
+    } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to upload proof'));
     } finally {
       setIsUploading(false);
@@ -804,7 +804,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       const orderId = selectedOrder.externalOrderId || '';
       const productName = selectedOrder.items?.[0]?.title || '';
       const amount = (selectedOrder.items ?? []).reduce(
-        (sum: number, it: any) => sum + (Number(it.priceAtPurchase) || 0) * (Number(it.quantity) || 1), 0
+        (sum, it) => sum + (Number(it.priceAtPurchase) || 0) * (Number(it.quantity) || 1), 0
       ) || selectedOrder.total || 0;
       const soldBy = selectedOrder.soldBy || '';
       const reviewerName = selectedOrder.reviewerName || '';
@@ -839,12 +839,12 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
           toast.success(`Return window verified! Return window: ${result.returnWindowClosed ? 'Closed' : 'Open'}. You can submit.`);
         }
       }
-    } catch (err: any) {
-      if (err?.name === 'AbortError') return; // Cancelled by re-upload — ignore silently
+    } catch (err) {
+      if ((err as Error)?.name === 'AbortError') return; // Cancelled by re-upload — ignore silently
       if (process.env.NODE_ENV !== 'production') console.error('Return window pre-validation failed:', err);
       // Keep verification null — submit button stays disabled until user retries
       setRwVerification(null);
-      const msg = err?.message || 'AI verification failed. Please try uploading the screenshot again.';
+      const msg = (err as Error)?.message || 'AI verification failed. Please try uploading the screenshot again.';
       toast.error(msg);
     } finally {
       setRwAnalyzing(false);
@@ -898,7 +898,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       setRwPreview(null);
       setRwFile(null);
       setRwVerification(null);
-    } catch (err: any) {
+    } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to upload proof'));
     } finally {
       setIsUploading(false);
@@ -942,7 +942,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
     // No longer required at creation time.
     setIsUploading(true);
     try {
-      const screenshots: any = { order: formScreenshot };
+      const screenshots: Pick<NonNullable<Order['screenshots']>, 'order'> = { order: formScreenshot };
 
       await api.orders.create(
         user.id,
@@ -988,7 +988,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       // Realtime will sync the order list; do a background refresh to ensure consistency
       loadOrders();
       toast.success('Order submitted successfully!');
-    } catch (e: any) {
+    } catch (e) {
       toast.error(formatErrorMessage(e, 'Failed to submit order.'));
     } finally {
       setIsUploading(false);
@@ -1038,10 +1038,10 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                   csvSafe(o.workflowStatus || ''),
                   csvSafe(o.affiliateStatus || ''),
                   csvSafe(o.paymentStatus || ''),
-                  csvSafe((o as any).expectedSettlementDate ? new Date((o as any).expectedSettlementDate).toLocaleDateString('en-GB') : ''),
+                  csvSafe(o.expectedSettlementDate ? new Date(o.expectedSettlementDate).toLocaleDateString('en-GB') : ''),
                   csvSafe(o.managerName || ''),
                   csvSafe(o.agencyName || ''),
-                  csvSafe((o as any).reviewerName || ''),
+                  csvSafe(o.reviewerName || ''),
                   csvSafe(o.soldBy || ''),
                   csvSafe(o.orderDate ? new Date(o.orderDate).toLocaleDateString('en-GB') : ''),
                   csvSafe(o.extractedProductName || ''),
@@ -1179,7 +1179,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
             } else if (order.affiliateStatus === 'Pending_Cooling') {
               displayStatus = 'VERIFIED';
               statusClass = 'bg-blue-50 text-blue-700 border-blue-100';
-            } else if (String((order as any).workflowStatus || '') === 'UNDER_REVIEW' && !purchaseVerified) {
+            } else if (String(order.workflowStatus || '') === 'UNDER_REVIEW' && !purchaseVerified) {
               displayStatus = 'UNDER REVIEW';
               statusClass = 'bg-slate-50 text-slate-700 border-slate-200';
             } else if (purchaseVerified && missingProofs.length > 0) {
@@ -1677,7 +1677,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                                 await api.tickets.update(t.id, 'Open');
                                 toast.success('Ticket reopened.');
                                 loadMyTickets();
-                              } catch (err: any) {
+                              } catch (err) {
                                 toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
                               }
                             }}
@@ -1768,7 +1768,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                 <button
                   key={type}
                   onClick={() => {
-                    setDealTypeFilter(type as any);
+                    setDealTypeFilter(type as typeof dealTypeFilter);
                     // Reset all form state when switching deal type tab
                     setFormScreenshot(null);
                     setExtractedDetails({ orderId: '', amount: '' });
@@ -2285,11 +2285,11 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
               {(proofToView.items?.[0]?.dealType === 'Rating' || proofToView.items?.[0]?.dealType === 'Review') && (
               <div className="space-y-2">
                 <div className="text-xs font-bold uppercase text-slate-400 tracking-wide">Return Window Proof</div>
-                {(proofToView.screenshots as any)?.returnWindow ? (
+                {proofToView.screenshots?.returnWindow ? (
                   <ProofImage
                     orderId={proofToView.id}
                     proofType="returnWindow"
-                    existingSrc={(proofToView.screenshots as any).returnWindow !== 'exists' ? (proofToView.screenshots as any).returnWindow : undefined}
+                    existingSrc={proofToView.screenshots.returnWindow !== 'exists' ? proofToView.screenshots.returnWindow : undefined}
                     alt="Return window proof"
                   />
                 ) : (

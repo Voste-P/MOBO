@@ -26,8 +26,8 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = React.memo(func
   const { toast } = useToast();
 
   const userRole = useMemo(() => {
-    return String((user as any)?.role || (user as any)?.roles?.[0] || 'shopper');
-  }, [user?.id]);
+    return String(user?.role || 'shopper');
+  }, [user?.role]);
 
   const issueTypes = useMemo(() => {
     return ROLE_ISSUE_TYPES[userRole] || ROLE_ISSUE_TYPES.shopper;
