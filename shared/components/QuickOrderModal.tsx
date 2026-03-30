@@ -26,7 +26,7 @@ const readFileAsDataUrl = (file: File): Promise<string> =>
     r.readAsDataURL(file);
   });
 
-export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product, onClose, onSuccess }) => {
+export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(function QuickOrderModal({ open, product, onClose, onSuccess }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -277,9 +277,14 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
                   <X size={14} className="text-red-500" />
                 </button>
                 {extracting && (
-                  <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] flex flex-col items-center justify-center gap-2 animate-fade-in">
                     <Loader2 size={24} className="text-lime-600 animate-spin" />
-                    <span className="ml-2 text-xs font-bold text-slate-600">Analyzing...</span>
+                    <span className="text-xs font-bold text-slate-600">AI analyzing screenshot...</span>
+                    <div className="w-40 space-y-1.5 mt-1">
+                      <div className="h-2 bg-lime-200 rounded-full animate-pulse" />
+                      <div className="h-2 bg-lime-100 rounded-full animate-pulse w-3/4" />
+                      <div className="h-2 bg-lime-100 rounded-full animate-pulse w-1/2" />
+                    </div>
                   </div>
                 )}
               </div>
@@ -471,4 +476,4 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({ open, product,
       </div>
     </div>
   );
-};
+});

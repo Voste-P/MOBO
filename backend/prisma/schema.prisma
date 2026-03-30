@@ -325,6 +325,7 @@ model User {
   @@index([isDeleted, createdAt(sort: Desc)]) // admin user listing
   @@index([mediatorCode, isDeleted, status]) // ops dashboard mediator-scoped queries
   @@index([parentCode, isDeleted, status])   // agency team listing  
+  @@index([parentCode, roles, isDeleted])    // lineage: agency mediator list lookups
   @@map("users")
 }
 

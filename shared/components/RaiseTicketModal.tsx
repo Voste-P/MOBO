@@ -21,7 +21,7 @@ const ROLE_ISSUE_TYPES: Record<string, readonly string[]> = {
   brand: ['Campaign Setup', 'Agency Connection', 'Order Dispute', 'Payment Issue', 'Quality Concern', 'Other'],
 };
 
-export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClose, orderId: prefilledOrderId }) => {
+export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = React.memo(function RaiseTicketModal({ open, onClose, orderId: prefilledOrderId }) {
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -180,4 +180,4 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({ open, onClos
       </div>
     </div>
   );
-};
+});
