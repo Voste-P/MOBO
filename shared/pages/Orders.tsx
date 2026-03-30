@@ -374,11 +374,11 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
         return {
           ...o,
           screenshots: {
-            order: updated.screenshots?.order ? 'exists' : o.screenshots?.order || null,
-            payment: updated.screenshots?.payment ? 'exists' : o.screenshots?.payment || null,
-            review: updated.screenshots?.review ? 'exists' : o.screenshots?.review || null,
-            rating: updated.screenshots?.rating ? 'exists' : o.screenshots?.rating || null,
-            returnWindow: updated.screenshots?.returnWindow ? 'exists' : o.screenshots?.returnWindow || null,
+            order: updated.screenshots?.order ? 'exists' : o.screenshots?.order || undefined,
+            payment: updated.screenshots?.payment ? 'exists' : o.screenshots?.payment || undefined,
+            review: updated.screenshots?.review ? 'exists' : o.screenshots?.review || undefined,
+            rating: updated.screenshots?.rating ? 'exists' : o.screenshots?.rating || undefined,
+            returnWindow: updated.screenshots?.returnWindow ? 'exists' : o.screenshots?.returnWindow || undefined,
           },
           reviewLink: updated.reviewLink || o.reviewLink,
           reviewerName: updated.reviewerName || o.reviewerName,
