@@ -2317,7 +2317,7 @@ export const MediatorDashboard: React.FC = () => {
             onPublish={setDealBuilder}
           />
         )}
-        {activeTab === 'squad' && (
+        {activeTab === 'squad' && user && (
           <SquadView
             user={user}
             pendingUsers={pendingUsers}
