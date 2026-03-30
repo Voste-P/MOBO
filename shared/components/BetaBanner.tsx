@@ -47,6 +47,9 @@ export function BetaBanner() {
           50% { box-shadow: 0 0 8px 3px rgba(250, 204, 21, 0.45); transform: scale(1.04); }
         }
         .animate-beta-pulse { animation: beta-pulse 2.5s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) {
+          .animate-beta-pulse { animation: none; }
+        }
       `}</style>
     </div>
   );

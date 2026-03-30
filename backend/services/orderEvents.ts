@@ -3,7 +3,6 @@ export type OrderEventType =
   | 'PROOF_SUBMITTED'
   | 'VERIFIED'
   | 'REJECTED'
-  | 'FRAUD_ALERT'
   | 'SETTLED'
   | 'UNSETTLED'
   | 'CAP_EXCEEDED'

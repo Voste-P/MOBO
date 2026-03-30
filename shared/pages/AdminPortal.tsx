@@ -638,7 +638,13 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     const newStatus = target.status === 'active' ? 'suspended' : 'active';
     try {
       await api.admin.updateUserStatus(target.id, newStatus);
-      setUsers(users.map((u) => (u.id === target.id ? { ...u, status: newStatus } : u)));
+      // Re-fetch server state instead of optimistic update to stay consistent
+      const role = userRoleFilter === 'All' ? 'all' : userRoleFilter.toLowerCase();
+      const search = debouncedUserSearch.trim() || undefined;
+      loadedViewsRef.current.delete('users');
+      const updated = await api.admin.getUsers(role, { page: usersPage, limit: PAGE_SIZE, search });
+      setUsers(asArray(updated));
+      setUsersPagination(extractPaginationMeta(updated));
     } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to update user status'));
     }

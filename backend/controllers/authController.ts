@@ -43,7 +43,7 @@ export function makeAuthController(env: Env) {
         const [user, wallet] = await Promise.all([
           withDbRetry(() => db().user.findFirst({
             where: { ...idWhere(userId), isDeleted: false },
-            include: { pendingConnections: true },
+            include: { pendingConnections: { where: { isDeleted: false } } },
           })),
           ensureWallet(req.auth!.pgUserId),
         ]);
@@ -398,7 +398,7 @@ export function makeAuthController(env: Env) {
 
         const [user, wallet] = await Promise.all([
           db().user.findFirst({
-            where: { id: authUser.id },
+            where: { id: authUser.id, isDeleted: false },
             select: {
               id: true, mongoId: true, name: true, mobile: true, email: true,
               avatar: true, role: true, roles: true, status: true,
@@ -406,7 +406,8 @@ export function makeAuthController(env: Env) {
               isVerifiedByMediator: true, username: true,
               upiId: true, qrCode: true, bankAccountNumber: true,
               bankIfsc: true, bankName: true, bankHolderName: true,
-              kycStatus: true, connectedAgencies: true, pendingConnections: true,
+              kycStatus: true, connectedAgencies: true,
+              pendingConnections: { where: { isDeleted: false } },
               generatedCodes: true, walletBalancePaise: true, walletPendingPaise: true,
               createdAt: true, updatedAt: true,
             },
@@ -922,6 +923,7 @@ export function makeAuthController(env: Env) {
         const user = await db().user.update({
           where: { id: targetUser.id },
           data: update,
+          include: { pendingConnections: { where: { isDeleted: false } } },
         });
 
         // Keep role-specific collections consistent with the canonical User record.

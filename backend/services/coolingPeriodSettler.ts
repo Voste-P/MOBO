@@ -431,7 +431,7 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
 
 /** Start the cooling period settlement loop. Call once at server startup. */
-export function startCoolingPeriodSettler(env: Env, intervalMs = 60 * 60 * 1000): void {
+export function startCoolingPeriodSettler(env: Env, intervalMs = 15 * 60 * 1000): void {
   if (intervalHandle) return; // already started
 
   // Run once immediately after a short delay (let server fully start)
@@ -440,7 +440,7 @@ export function startCoolingPeriodSettler(env: Env, intervalMs = 60 * 60 * 1000)
   }, 30_000);
   startupDelay.unref();
 
-  // Then run periodically (default: every hour)
+  // Then run periodically (default: every 15 minutes for faster settlements)
   intervalHandle = setInterval(() => {
     void processCoolingPeriodSettlements(env);
   }, intervalMs);

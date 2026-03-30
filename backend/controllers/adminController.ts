@@ -22,7 +22,8 @@ function db() { return prisma(); }
 
 // In-memory cache for expensive admin stats (full-table aggregations)
 let _statsCache: { data: any; at: number } | null = null;
-const STATS_CACHE_TTL_MS = 30_000; // 30 seconds
+let _statsPending: Promise<any> | null = null;
+const STATS_CACHE_TTL_MS = 5 * 60_000; // 5 minutes
 
 function roleToDb(role: string): string | null {
   const r = role.toLowerCase();
@@ -212,6 +213,14 @@ export function makeAdminController() {
           return;
         }
 
+        // Coalesce concurrent requests to prevent thundering herd
+        if (_statsPending) {
+          const data = await _statsPending;
+          res.json(data);
+          return;
+        }
+
+        const fetchStats = async () => {
         const [roleCounts, orderStats] = await Promise.all([
           db().$queryRaw<Array<{ role: string; count: number }>>`
             SELECT r AS role, COUNT(*)::int AS count
@@ -223,7 +232,7 @@ export function makeAdminController() {
               COUNT(*)::int AS total_orders,
               COALESCE(SUM("total_paise"), 0)::int AS total_revenue_paise,
               COALESCE(SUM(CASE WHEN "affiliate_status"::text = 'Pending_Cooling' THEN "total_paise" ELSE 0 END), 0)::int AS pending_revenue_paise,
-              COALESCE(SUM(CASE WHEN "affiliate_status"::text IN ('Fraud_Alert', 'Unchecked') THEN 1 ELSE 0 END), 0)::int AS risk_orders
+              COALESCE(SUM(CASE WHEN "affiliate_status"::text = 'Unchecked' THEN 1 ELSE 0 END), 0)::int AS risk_orders
             FROM "orders"
             WHERE "is_deleted" = false`,
         ]);
@@ -245,8 +254,19 @@ export function makeAdminController() {
           counts,
         };
         _statsCache = { data: statsResult, at: Date.now() };
+        return statsResult;
+        };
+
+        _statsPending = fetchStats();
+        let statsResult: any;
+        try {
+          statsResult = await _statsPending;
+        } finally {
+          _statsPending = null;
+        }
+
         res.json(statsResult);
-        businessLog.info('Platform stats viewed', { userId: req.auth?.userId, totalOrders: Number(os.total_orders), riskOrders: Number(os.risk_orders), ip: req.ip });
+        businessLog.info('Platform stats viewed', { userId: req.auth?.userId, totalOrders: statsResult.totalOrders, riskOrders: statsResult.riskOrders, ip: req.ip });
         logAccessEvent('ADMIN_ACTION', {
           userId: req.auth?.userId,
           roles: req.auth?.roles,

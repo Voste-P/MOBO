@@ -147,11 +147,14 @@ function isProductNameMatch(expected: string, detected: string): boolean {
     )
   ).length;
 
-  // 100% match policy: ALL significant tokens from expected name must be found
-  // in the detected name. This prevents different products from the same brand
-  // matching (e.g. "Avimee Herbal Keshpallav Hair Oil" vs "Avimee Herbal Scalptone Hair Growth Serum").
+  // Adaptive match policy: For names with few tokens (≤3), require 100% match
+  // to prevent collisions (e.g. brand names only). For names with 4+ tokens,
+  // require 85% match to handle OCR partial reads while still blocking different
+  // products from the same brand (e.g. "Avimee Herbal Keshpallav Hair Oil" vs
+  // "Avimee Herbal Scalptone Hair Growth Serum" still fails because only 3/5 match = 60%).
   // Fuzzy matching (edit distance ≤1) handles minor OCR errors like "Keshpallav" → "Keshpalav".
-  return matchedCount >= eTokens.length;
+  const threshold = eTokens.length <= 3 ? eTokens.length : Math.ceil(eTokens.length * 0.85);
+  return matchedCount >= threshold;
 }
 
 // ── Confidence Score Constants ──

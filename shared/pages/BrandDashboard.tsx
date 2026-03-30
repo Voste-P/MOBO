@@ -2143,7 +2143,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
 };
 
 export const BrandDashboard: React.FC = () => {
-  const { user, logout, updateUser } = useAuth();
+  const { user, logout, refreshSession } = useAuth();
   const { toast } = useToast();
   const { confirm: confirmDialog, ConfirmDialogElement: BrandConfirmDialog } = useConfirm();
   useRealtimeConnection();
@@ -2821,8 +2821,8 @@ export const BrandDashboard: React.FC = () => {
                       </p>
 
                       <div className="flex gap-2">
-                        <span className="px-3 py-1 bg-green-50 text-green-700 text-[10px] font-bold rounded-full border border-green-100 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> Active
+                        <span className={`px-3 py-1 text-[10px] font-bold rounded-full border flex items-center gap-1 ${ag.status === 'suspended' ? 'bg-red-50 text-red-700 border-red-100' : ag.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-green-50 text-green-700 border-green-100'}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${ag.status === 'suspended' ? 'bg-red-500' : ag.status === 'pending' ? 'bg-amber-500' : 'bg-green-500'}`}></span> {ag.status === 'suspended' ? 'Suspended' : ag.status === 'pending' ? 'Pending' : 'Active'}
                         </span>
                       </div>
                     </div>
@@ -2832,7 +2832,7 @@ export const BrandDashboard: React.FC = () => {
                         e.stopPropagation();
                         if (!user) return;
                         if (await confirmDialog({ message: 'Disconnect this Agency?', confirmLabel: 'Disconnect', variant: 'destructive' })) {
-                          api.brand.removeAgency(user.id, ag.mediatorCode!).then(() => refreshData(['agencies'])).catch((err: any) => toast.error(formatErrorMessage(err, 'Failed to disconnect agency')));
+                          api.brand.removeAgency(user.id, ag.mediatorCode!).then(async () => { await refreshSession(); refreshData(['agencies']); }).catch((err: any) => toast.error(formatErrorMessage(err, 'Failed to disconnect agency')));
                         }
                       }}
                       aria-label="Disconnect agency"
@@ -2990,11 +2990,7 @@ export const BrandDashboard: React.FC = () => {
                               req.agencyId,
                               'reject'
                             );
-                            const currentPending = user.pendingConnections || [];
-                            const newPending = currentPending.filter(
-                              (r: any) => r.agencyId !== req.agencyId
-                            );
-                            await updateUser({ pendingConnections: newPending });
+                            await refreshSession();
                             fetchData({ keys: ['agencies'] });
                           } catch (e) {
                             if (process.env.NODE_ENV !== 'production') console.error('Failed to decline', e);
@@ -3013,18 +3009,7 @@ export const BrandDashboard: React.FC = () => {
                               req.agencyId,
                               'approve'
                             );
-                            const currentPending = user.pendingConnections || [];
-                            const newPending = currentPending.filter(
-                              (r: any) => r.agencyId !== req.agencyId
-                            );
-                            const newConnected = [
-                              ...(user.connectedAgencies || []),
-                              req.agencyCode,
-                            ];
-                            await updateUser({
-                              pendingConnections: newPending,
-                              connectedAgencies: newConnected,
-                            });
+                            await refreshSession();
                             fetchData({ keys: ['agencies'] });
                           } catch (e) {
                             if (process.env.NODE_ENV !== 'production') console.error('Failed to approve', e);

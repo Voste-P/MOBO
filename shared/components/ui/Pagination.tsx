@@ -7,6 +7,7 @@ export interface PaginationProps {
   limit: number;
   onPageChange: (page: number) => void;
   className?: string;
+  loading?: boolean;
 }
 
 /**
@@ -20,6 +21,7 @@ export const Pagination: React.FC<PaginationProps> = ({
   limit,
   onPageChange,
   className = '',
+  loading = false,
 }) => {
   if (totalPages <= 1) return null;
 
@@ -48,7 +50,7 @@ export const Pagination: React.FC<PaginationProps> = ({
       <div className="flex items-center gap-1">
         <button
           type="button"
-          disabled={page <= 1}
+          disabled={page <= 1 || loading}
           onClick={() => onPageChange(page - 1)}
           className="px-2.5 py-1.5 rounded-lg text-xs font-bold border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
@@ -74,7 +76,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         )}
         <button
           type="button"
-          disabled={page >= totalPages}
+          disabled={page >= totalPages || loading}
           onClick={() => onPageChange(page + 1)}
           className="px-2.5 py-1.5 rounded-lg text-xs font-bold border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
