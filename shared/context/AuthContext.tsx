@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+﻿import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
 import { User } from '../types';
 import { api, onAuthExpired } from '../services/api';
 import { subscribeRealtime, stopRealtime } from '../services/realtime';
@@ -137,7 +137,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     restoreSession().finally(() => setIsLoading(false));
   }, []);
 
-  const login = async (mobile: string, pass: string) => {
+  const login = useCallback(async (mobile: string, pass: string) => {
     const cleanMobile = String(mobile || '').trim();
     const cleanPass = String(pass || '').trim();
     const loggedInUser = (await api.auth.login(cleanMobile, cleanPass)) as User;
@@ -145,9 +145,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try { localStorage.setItem('mobo_session', JSON.stringify(loggedInUser)); } catch { /* storage full or restricted */ }
     emitAuthChange();
     return loggedInUser;
-  };
+  }, []);
 
-  const loginAdmin = async (username: string, pass: string) => {
+  const loginAdmin = useCallback(async (username: string, pass: string) => {
     const cleanUsername = String(username || '').trim();
     const cleanPass = String(pass || '').trim();
     const loggedInUser = (await api.auth.loginAdmin(cleanUsername, cleanPass)) as User;
@@ -155,16 +155,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try { localStorage.setItem('mobo_session', JSON.stringify(loggedInUser)); } catch { /* storage full or restricted */ }
     emitAuthChange();
     return loggedInUser;
-  };
+  }, []);
 
-  const register = async (name: string, mobile: string, pass: string, mediatorCode: string) => {
+  const register = useCallback(async (name: string, mobile: string, pass: string, mediatorCode: string) => {
     const newUser = await api.auth.register(name, mobile, pass, mediatorCode);
     setUser(newUser);
     try { localStorage.setItem('mobo_session', JSON.stringify(newUser)); } catch { /* storage full or restricted */ }
     emitAuthChange();
-  };
+  }, []);
 
-  const registerOps = async (
+  const registerOps = useCallback(async (
     name: string,
     mobile: string,
     pass: string,
@@ -182,22 +182,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(newUser);
     try { localStorage.setItem('mobo_session', JSON.stringify(newUser)); } catch { /* storage full or restricted */ }
     emitAuthChange();
-  };
+  }, []);
 
-  const registerBrand = async (name: string, mobile: string, pass: string, brandCode: string) => {
+  const registerBrand = useCallback(async (name: string, mobile: string, pass: string, brandCode: string) => {
     const newUser = await api.auth.registerBrand(name, mobile, pass, brandCode);
     setUser(newUser);
     try { localStorage.setItem('mobo_session', JSON.stringify(newUser)); } catch { /* storage full or restricted */ }
     emitAuthChange();
-  };
+  }, []);
 
-  const updateUser = async (updates: Partial<User>) => {
+  const updateUser = useCallback(async (updates: Partial<User>) => {
     if (!user) return;
     const updatedUser = await api.auth.updateProfile(user.id, updates);
     setUser(updatedUser);
     try { localStorage.setItem('mobo_session', JSON.stringify(updatedUser)); } catch { /* storage full or restricted */ }
     emitAuthChange();
-  };
+  }, [user]);
 
   const refreshSession = useCallback(async () => {
     try {
@@ -226,22 +226,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return unsub;
   }, [logout]);
 
+  const value = useMemo(() => ({
+    user,
+    isAuthenticated: !!user,
+    login,
+    loginAdmin,
+    register,
+    registerOps,
+    registerBrand,
+    updateUser,
+    refreshSession,
+    logout,
+    isLoading,
+  }), [user, isLoading, login, loginAdmin, register, registerOps, registerBrand, updateUser, refreshSession, logout]);
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated: !!user,
-        login,
-        loginAdmin,
-        register,
-        registerOps,
-        registerBrand,
-        updateUser,
-        refreshSession,
-        logout,
-        isLoading,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
