@@ -18,6 +18,7 @@ interface AuthContextType {
   ) => Promise<{ pendingApproval?: boolean; message?: string } | void>;
   registerBrand: (name: string, mobile: string, pass: string, brandCode: string) => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
+  refreshSession: () => Promise<void>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -198,6 +199,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     emitAuthChange();
   };
 
+  const refreshSession = useCallback(async () => {
+    try {
+      const me = await api.auth.me();
+      setUser(me);
+      try { localStorage.setItem('mobo_session', JSON.stringify(me)); } catch { /* storage full */ }
+      emitAuthChange();
+    } catch { /* ignore — stale cache persists until next successful load */ }
+  }, []);
+
   const logout = useCallback(() => {
     setUser(null);
     if (typeof window !== 'undefined') {
@@ -227,6 +237,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         registerOps,
         registerBrand,
         updateUser,
+        refreshSession,
         logout,
         isLoading,
       }}

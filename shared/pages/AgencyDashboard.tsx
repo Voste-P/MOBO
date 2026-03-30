@@ -1137,6 +1137,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
 };
 
 const BrandsView = () => {
+  const { refreshSession } = useAuth();
   const [brandCode, setBrandCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -1153,6 +1154,7 @@ const BrandsView = () => {
       await api.ops.connectBrand(code);
       setSuccessMsg(`Request sent to Brand ${code}.`);
       setBrandCode('');
+      await refreshSession();
     } catch (e: any) {
       // Idempotent UX: if it's already connected/pending, treat as success.
       if (e?.code === 'ALREADY_REQUESTED') {
