@@ -109,6 +109,9 @@ async function buildTicketAudience(ticket: any) {
   return { roles: privilegedRoles, userIds: Array.from(userIds), mediatorCodes, agencyCodes };
 }
 
+/** Max recent orders to fetch for ticket permission scoping per user/role. */
+const TICKET_SCOPE_LIMIT = 500;
+
 async function getScopedOrderMongoIds(params: {
   roles: string[];
   pgUserId: string;
@@ -124,7 +127,7 @@ async function getScopedOrderMongoIds(params: {
       where: { brandUserId: pgUserId, isDeleted: false },
       select: { mongoId: true },
       orderBy: { createdAt: 'desc' },
-      take: 500,
+      take: TICKET_SCOPE_LIMIT,
     });
     return orders.map((o) => o.mongoId!).filter(Boolean);
   }
@@ -136,7 +139,7 @@ async function getScopedOrderMongoIds(params: {
       where: { managerName: mediatorCode, isDeleted: false },
       select: { mongoId: true },
       orderBy: { createdAt: 'desc' },
-      take: 500,
+      take: TICKET_SCOPE_LIMIT,
     });
     return orders.map((o) => o.mongoId!).filter(Boolean);
   }
@@ -150,7 +153,7 @@ async function getScopedOrderMongoIds(params: {
       where: { managerName: { in: mediatorCodes }, isDeleted: false },
       select: { mongoId: true },
       orderBy: { createdAt: 'desc' },
-      take: 500,
+      take: TICKET_SCOPE_LIMIT,
     });
     return orders.map((o) => o.mongoId!).filter(Boolean);
   }

@@ -1,3 +1,25 @@
+// ── Cross-platform env accessors (avoid `as any`) ───────────────────────
+type EnvRecord = Record<string, string | undefined>;
+
+/** Safely read a `process.env` variable (Node.js / Next.js). */
+export function readProcessEnv(key: string): string | undefined {
+  if (typeof process === 'undefined') return undefined;
+  const env = (process as unknown as { env?: EnvRecord }).env;
+  return env?.[key] ?? undefined;
+}
+
+/** Safely read an `import.meta.env` variable (Vite). */
+function readViteEnv(key: string): string | undefined {
+  if (typeof import.meta === 'undefined') return undefined;
+  const env = (import.meta as unknown as { env?: EnvRecord }).env;
+  return env?.[key] ?? undefined;
+}
+
+/** Safely read a globalThis property. */
+export function readGlobal<T = unknown>(key: string): T | undefined {
+  return (globalThis as unknown as Record<string, unknown>)[key] as T | undefined;
+}
+
 /**
  * Canonical API base URL resolver.
  *
@@ -15,28 +37,19 @@
  *  6. `/api`                        (catch-all relative path)
  */
 export function getApiBaseUrl(): string {
-  const fromGlobal = (globalThis as any).__MOBO_API_URL__ as string | undefined;
+  const fromGlobal = readGlobal<string>('__MOBO_API_URL__');
 
-  const fromVite =
-    typeof import.meta !== 'undefined' &&
-    (import.meta as any).env &&
-    (import.meta as any).env.VITE_API_URL
-      ? String((import.meta as any).env.VITE_API_URL)
-      : undefined;
+  const fromVite = readViteEnv('VITE_API_URL')
+    ? String(readViteEnv('VITE_API_URL'))
+    : undefined;
 
-  const fromNext =
-    typeof process !== 'undefined' &&
-    (process as any).env &&
-    (process as any).env.NEXT_PUBLIC_API_URL
-      ? String((process as any).env.NEXT_PUBLIC_API_URL)
-      : undefined;
+  const fromNext = readProcessEnv('NEXT_PUBLIC_API_URL')
+    ? String(readProcessEnv('NEXT_PUBLIC_API_URL'))
+    : undefined;
 
-  const fromNextProxyTarget =
-    typeof process !== 'undefined' &&
-    (process as any).env &&
-    (process as any).env.NEXT_PUBLIC_API_PROXY_TARGET
-      ? String((process as any).env.NEXT_PUBLIC_API_PROXY_TARGET)
-      : undefined;
+  const fromNextProxyTarget = readProcessEnv('NEXT_PUBLIC_API_PROXY_TARGET')
+    ? String(readProcessEnv('NEXT_PUBLIC_API_PROXY_TARGET'))
+    : undefined;
 
   // In Next.js deployments we rely on same-origin `/api/*` + Next rewrites.
   // This avoids CORS/preflight problems when env vars point at a different origin.
@@ -44,10 +57,8 @@ export function getApiBaseUrl(): string {
   const preferSameOriginProxy =
     !hasDirectApiUrl &&
     typeof window !== 'undefined' &&
-    typeof process !== 'undefined' &&
-    (process as any).env &&
-    (String((process as any).env.NEXT_PUBLIC_API_PROXY_TARGET || '').trim() ||
-      String((process as any).env.NEXT_PUBLIC_API_URL || '').trim());
+    (String(readProcessEnv('NEXT_PUBLIC_API_PROXY_TARGET') || '').trim() ||
+      String(readProcessEnv('NEXT_PUBLIC_API_URL') || '').trim());
 
   const fromProxy = preferSameOriginProxy
     ? '/api'
@@ -105,22 +116,14 @@ export function getApiBaseAbsolute(): string {
  *  3. Falls back to `getApiBaseAbsolute()`     (same-origin proxy as last resort)
  */
 export function getDirectBackendUrl(): string {
-  const proxyTarget =
-    typeof process !== 'undefined' &&
-    (process as any).env?.NEXT_PUBLIC_API_PROXY_TARGET
-      ? String((process as any).env.NEXT_PUBLIC_API_PROXY_TARGET).trim()
-      : '';
+  const proxyTarget = readProcessEnv('NEXT_PUBLIC_API_PROXY_TARGET')?.trim() || '';
 
   if (proxyTarget) {
     const base = proxyTarget.endsWith('/') ? proxyTarget.slice(0, -1) : proxyTarget;
     return base.endsWith('/api') ? base : `${base}/api`;
   }
 
-  const directUrl =
-    typeof process !== 'undefined' &&
-    (process as any).env?.NEXT_PUBLIC_API_URL
-      ? String((process as any).env.NEXT_PUBLIC_API_URL).trim()
-      : '';
+  const directUrl = readProcessEnv('NEXT_PUBLIC_API_URL')?.trim() || '';
 
   if (directUrl) {
     return directUrl.endsWith('/') ? directUrl.slice(0, -1) : directUrl;

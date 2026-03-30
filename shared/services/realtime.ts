@@ -1,5 +1,5 @@
 import { fixMojibakeDeep } from '../utils/mojibake';
-import { getApiBaseUrl } from '../utils/apiBaseUrl';
+import { getApiBaseUrl, readProcessEnv, readGlobal } from '../utils/apiBaseUrl';
 import { readTokens, refreshTokens, TOKEN_STORAGE_KEY } from './api';
 
 type Listener = (msg: RealtimeMessage) => void;
@@ -26,16 +26,9 @@ function normalizeApiRoot(raw: string | undefined): string | undefined {
 // (when we have an absolute URL) because some hosting proxies/CDNs buffer or disrupt SSE.
 function getRealtimeApiBaseUrl(): string {
   const baseFromEnv = normalizeApiRoot(
-    (typeof process !== 'undefined' && (process as any).env && (process as any).env.NEXT_PUBLIC_API_PROXY_TARGET
-      ? String((process as any).env.NEXT_PUBLIC_API_PROXY_TARGET)
-      : undefined) ||
-      (typeof process !== 'undefined' && (process as any).env && (process as any).env.NEXT_PUBLIC_API_URL
-        ? String((process as any).env.NEXT_PUBLIC_API_URL)
-        : undefined) ||
-      (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL
-        ? String((import.meta as any).env.VITE_API_URL)
-        : undefined) ||
-      ((globalThis as any).__MOBO_API_URL__ as string | undefined)
+    readProcessEnv('NEXT_PUBLIC_API_PROXY_TARGET') ||
+      readProcessEnv('NEXT_PUBLIC_API_URL') ||
+      readGlobal<string>('__MOBO_API_URL__')
   );
 
   // Keep local dev behavior: talk directly to localhost backend when possible.
@@ -239,7 +232,7 @@ class RealtimeClient {
 
           const innerPayload =
             payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'payload')
-              ? (payload as any).payload
+              ? (payload as Record<string, unknown>).payload
               : payload;
 
           this.dispatch({ type: eventName, ts, payload: fixMojibakeDeep(innerPayload) });
@@ -283,7 +276,7 @@ class RealtimeClient {
         }
       } catch (e) {
         this._connected = false;
-        if ((e as any)?.name !== 'AbortError') {
+        if ((e as { name?: string })?.name !== 'AbortError') {
           await this.sleep(this.backoffMs);
           this.backoffMs = Math.min(Math.floor(this.backoffMs * 1.8 + Math.random() * 250), this.maxBackoffMs);
         }

@@ -1,6 +1,6 @@
 ﻿import { User, Product, Order, Ticket } from '../types';
 import { fixMojibakeDeep, maybeFixMojibake } from '../utils/mojibake';
-import { getApiBaseUrl } from '../utils/apiBaseUrl';
+import { getApiBaseUrl, readGlobal } from '../utils/apiBaseUrl';
 import { isNetworkError, isTimeoutError, httpStatusToFriendlyMessage } from '../utils/errors';
 
 // Real API Base URL
@@ -15,8 +15,9 @@ let _serverWarmedUp = false;
  */
 export function asArray<T = any>(response: unknown): T[] {
   if (Array.isArray(response)) return response;
-  if (response && typeof response === 'object' && Array.isArray((response as any).data)) {
-    return (response as any).data;
+  const obj = response as Record<string, unknown> | null | undefined;
+  if (obj && typeof obj === 'object' && Array.isArray(obj.data)) {
+    return obj.data;
   }
   return [];
 }
@@ -38,10 +39,10 @@ export function extractPaginationMeta(response: unknown): PaginationMeta | null 
     response &&
     typeof response === 'object' &&
     !Array.isArray(response) &&
-    'total' in (response as any) &&
-    'page' in (response as any)
+    'total' in response &&
+    'page' in response
   ) {
-    const r = response as any;
+    const r = response as Record<string, unknown>;
     return {
       total: Number(r.total) || 0,
       page: Number(r.page) || 1,
@@ -56,8 +57,8 @@ export const TOKEN_STORAGE_KEY = 'mobo_tokens_v1';
 
 function makeRequestId(): string {
   try {
-    if (typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function') {
-      return (crypto as any).randomUUID() as string;
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
     }
   } catch {
     // ignore
@@ -213,16 +214,16 @@ function toErrorFromPayload(payload: any, fallback: string): Error {
     (typeof payload?.error === 'string' ? payload.error : null) ||
     (typeof payload === 'string' ? payload : null) ||
     fallback;
-  const err = new Error(maybeFixMojibake(String(message)));
+  const err: Error & { code?: string; requestId?: string } = new Error(maybeFixMojibake(String(message)));
   const code = payload?.error?.code || payload?.code;
-  if (code) (err as any).code = code;
+  if (code) err.code = code;
   const requestId = payload?.requestId || payload?.error?.requestId;
-  if (requestId) (err as any).requestId = String(requestId);
+  if (requestId) err.requestId = String(requestId);
   return err;
 }
 
 function isPwaGuardEnabled(): boolean {
-  return typeof window !== 'undefined' && (globalThis as any).__MOBO_ENABLE_PWA_GUARDS__ === true;
+  return typeof window !== 'undefined' && readGlobal<boolean>('__MOBO_ENABLE_PWA_GUARDS__') === true;
 }
 
 function assertOnlineForWrite(init?: RequestInit) {
@@ -678,7 +679,8 @@ export const api = {
       // Backend returns paginated envelope { data: [...] } when page/limit are sent.
       // Use asArray-compatible unwrap so callers get the actual deals array.
       if (Array.isArray(data)) return data;
-      if (data && typeof data === 'object' && Array.isArray((data as any).data)) return (data as any).data;
+      const obj = data as Record<string, unknown> | null | undefined;
+      if (obj && typeof obj === 'object' && Array.isArray(obj.data)) return obj.data;
       return [];
     },
   },
