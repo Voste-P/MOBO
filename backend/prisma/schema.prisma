@@ -98,7 +98,6 @@ enum AffiliateStatus {
   Pending_Cooling
   Approved_Settled
   Rejected
-  Fraud_Alert
   Cap_Exceeded
   Frozen_Disputed
 
@@ -626,6 +625,7 @@ model Order {
   @@index([managerName, workflowStatus, isDeleted])  // ops dashboard mediator-scoped queries
   @@index([brandName, isDeleted, createdAt(sort: Desc)]) // brand getOrders by name
   @@index([affiliateStatus, workflowStatus, expectedSettlementDate, frozen, isDeleted]) // cooling period auto-settlement
+  @@index([managerName, affiliateStatus, createdAt(sort: Desc)]) // revenue aggregation queries (agency dashboard)
   @@map("orders")
 }
 

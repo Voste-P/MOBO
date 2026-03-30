@@ -232,7 +232,7 @@ export function makeAdminController() {
               COUNT(*)::int AS total_orders,
               COALESCE(SUM("total_paise"), 0)::int AS total_revenue_paise,
               COALESCE(SUM(CASE WHEN "affiliate_status"::text = 'Pending_Cooling' THEN "total_paise" ELSE 0 END), 0)::int AS pending_revenue_paise,
-              COALESCE(SUM(CASE WHEN "affiliate_status"::text IN ('Fraud_Alert', 'Unchecked') THEN 1 ELSE 0 END), 0)::int AS risk_orders
+              COALESCE(SUM(CASE WHEN "affiliate_status"::text = 'Unchecked' THEN 1 ELSE 0 END), 0)::int AS risk_orders
             FROM "orders"
             WHERE "is_deleted" = false`,
         ]);

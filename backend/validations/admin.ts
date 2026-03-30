@@ -38,7 +38,7 @@ export const adminUsersQuerySchema = z.object({
 export const adminFinancialsQuerySchema = z.object({
   status: z.preprocess(
     normalizeOptionalString,
-    z.enum(['all', 'Pending_Cooling', 'Approved_Settled', 'Rejected', 'Fraud_Alert', 'Unchecked', 'Cap_Exceeded', 'Frozen_Disputed']).default('all')
+    z.enum(['all', 'Pending_Cooling', 'Approved_Settled', 'Rejected', 'Unchecked', 'Cap_Exceeded', 'Frozen_Disputed']).default('all')
   ),
   search: z.preprocess(normalizeOptionalString, z.string().max(120).optional()),
   page: z.coerce.number().int().min(1).optional(),

@@ -47,6 +47,7 @@ export const ProxiedImage = React.memo<ProxiedImageProps>(
     return (
       <img
         loading="lazy"
+        decoding="async"
         src={resolved}
         alt={alt}
         className={className}

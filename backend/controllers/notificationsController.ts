@@ -156,7 +156,7 @@ export function makeNotificationsController() {
               continue;
             }
 
-            if (wf === 'REJECTED' || wf === 'FAILED' || aff === 'Rejected' || aff === 'Fraud_Alert' || aff === 'Frozen_Disputed' || aff === 'Cap_Exceeded') {
+            if (wf === 'REJECTED' || wf === 'FAILED' || aff === 'Rejected' || aff === 'Frozen_Disputed' || aff === 'Cap_Exceeded') {
               notifications.push({
                 id: `order:${oid}:issue:${ts}`,
                 type: 'alert',
