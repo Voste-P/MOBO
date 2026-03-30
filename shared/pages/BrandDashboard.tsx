@@ -2143,7 +2143,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
 };
 
 export const BrandDashboard: React.FC = () => {
-  const { user, logout, updateUser, refreshSession } = useAuth();
+  const { user, logout, refreshSession } = useAuth();
   const { toast } = useToast();
   const { confirm: confirmDialog, ConfirmDialogElement: BrandConfirmDialog } = useConfirm();
   useRealtimeConnection();
