@@ -148,6 +148,10 @@ export interface Order {
     ratingVerifiedAt?: string;
     returnWindowVerified?: boolean;
     returnWindowVerifiedAt?: string;
+    order?: { verifiedAt?: string; verifiedBy?: string; autoVerified?: boolean };
+    review?: { verifiedAt?: string; verifiedBy?: string; autoVerified?: boolean };
+    rating?: { verifiedAt?: string; verifiedBy?: string; autoVerified?: boolean };
+    returnWindow?: { verifiedAt?: string; verifiedBy?: string; autoVerified?: boolean };
   };
   requirements?: {
     required?: Array<'review' | 'rating' | 'returnWindow'>;
@@ -266,6 +270,8 @@ export interface Ticket {
   userId: string;
   userName: string;
   role: Role;
+  /** The role of the user who created the ticket (populated by backend JOIN) */
+  userRole?: string;
   orderId?: string;
   /** Enriched external order ID (e.g. Amazon/Flipkart order ID) resolved by backend */
   externalOrderId?: string;

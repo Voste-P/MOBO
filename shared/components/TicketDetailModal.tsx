@@ -45,7 +45,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [resolutionNote, setResolutionNote] = useState('');
   const [showResolveForm, setShowResolveForm] = useState(false);
-  const [orderDetails, setOrderDetails] = useState<any>(null);
+  const [orderDetails, setOrderDetails] = useState<Record<string, string | number | null> | null>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
   const userRole = user?.role || 'user';
@@ -60,7 +60,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
   const isAdmin = userRole === 'admin';
   // Escalate: the targeted role can escalate, OR any higher-tier role can escalate (not admin, not owner)
   // Buyer/mediator tickets cannot be escalated beyond agency
-  const ticketOriginRole = ((ticket as any)?.userRole || ticket?.role || '').toLowerCase();
+  const ticketOriginRole = (ticket?.userRole || ticket?.role || '').toLowerCase();
   const isBuyerMediatorTicketAtAgency = ['shopper', 'user', 'mediator'].includes(ticketOriginRole) && ticket?.targetRole === 'agency';
   const canEscalate = isOpen && !isOwner && canManageTarget && !!ESCALATION_PATH[ticket?.targetRole || ''] && !isAdmin && !isBuyerMediatorTicketAtAgency;
   // Resolve/reject: ticket owner can always resolve/reject their own, OR targeted role+ can for any in-network ticket
@@ -89,7 +89,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
       setShowResolveForm(false);
       setOrderDetails(null);
       // Fetch full ticket details including order info
-      api.tickets.getById(ticket.id).then((resp: any) => {
+      api.tickets.getById(ticket.id).then((resp: { orderDetails?: Record<string, string | number | null> }) => {
         if (resp.orderDetails) setOrderDetails(resp.orderDetails);
       }).catch(() => {});
     }
@@ -229,7 +229,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
               {ticket.description}
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-zinc-500">
-              <span>By: <strong className={roleColors[(ticket as any).userRole || ticket.role] || ''}>{ticket.userName}</strong> ({(ticket as any).userRole || ticket.role})</span>
+              <span>By: <strong className={roleColors[ticket.userRole || ticket.role] || ''}>{ticket.userName}</strong> ({ticket.userRole || ticket.role})</span>
               {(ticket.externalOrderId || ticket.orderId) && <span>Order: <strong>{ticket.externalOrderId || ticket.orderId}</strong></span>}
               {ticket.targetRole && <span>Assigned to: <strong>{ticket.targetRole}</strong></span>}
             </div>
@@ -308,11 +308,11 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
               <div className="relative">
                 <div className="absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full bg-blue-400 border-2 border-white" />
                 <p className="text-[10px] text-zinc-600">
-                  <strong className={roleColors[(ticket as any).userRole || ticket.role] || ''}>{ticket.userName}</strong> created this ticket
+                  <strong className={roleColors[ticket.userRole || ticket.role] || ''}>{ticket.userName}</strong> created this ticket
                   <span className="text-zinc-400 ml-1">{new Date(ticket.createdAt).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                 </p>
               </div>
-              {ticket.targetRole && ticket.targetRole !== ((ticket as any).userRole === 'shopper' ? 'mediator' : ESCALATION_PATH[(ticket as any).userRole || '']) && (
+              {ticket.targetRole && ticket.targetRole !== (ticket.userRole === 'shopper' ? 'mediator' : ESCALATION_PATH[ticket.userRole || '']) && (
                 <div className="relative">
                   <div className="absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full bg-violet-400 border-2 border-white" />
                   <p className="text-[10px] text-zinc-600">

@@ -95,7 +95,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
     if (!user?.id) return;
     if (user.role !== 'user') return;
 
-    let timer: any = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const schedule = () => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
@@ -106,7 +106,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
       }, 800);
     };
 
-    const unsub = subscribeRealtime((msg: any) => {
+    const unsub = subscribeRealtime((msg) => {
       if (msg.type === 'orders.changed') schedule();
     });
 
@@ -502,7 +502,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
                     });
                     setFeedbackSent(true);
                     toast.success('Feedback submitted — thank you!');
-                  } catch (err: any) {
+                  } catch (err) {
                     toast.error(formatErrorMessage(err, 'Failed to send feedback'));
                   } finally {
                     setFeedbackSubmitting(false);

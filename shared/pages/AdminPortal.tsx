@@ -762,11 +762,11 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       csvSafe(t.description),
       csvSafe(t.userName),
       csvSafe(t.role || ''),
-      csvSafe((t as any).targetRole || ''),
+      csvSafe(t.targetRole || ''),
       csvSafe(t.externalOrderId || t.orderId || ''),
-      csvSafe((t as any).resolutionNote || ''),
-      csvSafe((t as any).resolvedByName || ''),
-      csvSafe((t as any).resolvedAt ? new Date((t as any).resolvedAt).toLocaleDateString('en-GB') : ''),
+      csvSafe(t.resolutionNote || ''),
+      csvSafe(t.resolvedByName || ''),
+      csvSafe(t.resolvedAt ? new Date(t.resolvedAt).toLocaleDateString('en-GB') : ''),
       csvSafe(t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''),
     ].join(','));
     downloadCsv(`tickets_${new Date().toISOString().slice(0, 10)}.csv`, [header, ...rows].join('\n'));
@@ -880,7 +880,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         timeStr,
         csvSafe(order.buyerName || ''),
         csvSafe(order.buyerMobile || ''),
-        csvSafe((order as any).reviewerName || ''),
+        csvSafe(order.reviewerName || ''),
         csvSafe(order.brandName ?? item?.brandName ?? ''),
         csvSafe(item?.title ?? ''),
         csvSafe(item?.platform ?? ''),
@@ -888,12 +888,12 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         item?.quantity ?? 1,
         item?.priceAtPurchase ?? 0,
         order.total,
-        (order as any).expectedSettlementDate ? new Date((order as any).expectedSettlementDate).toLocaleDateString('en-GB') : '',
+        order.expectedSettlementDate ? new Date(order.expectedSettlementDate).toLocaleDateString('en-GB') : '',
         csvSafe(order.status || ''),
         csvSafe(order.paymentStatus || ''),
         csvSafe(order.affiliateStatus || ''),
         csvSafe(order.managerName || ''),
-        csvSafe((order as any).mediatorCode || (order as any).managerCode || ''),
+        csvSafe(order.mediatorCode || order.managerCode || ''),
         csvSafe(order.agencyName || 'Direct'),
         order.id,
         csvSafe(order.soldBy || ''),
@@ -907,7 +907,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         (order.reviewLink || order.screenshots?.review)
           ? hyperlinkYes(buildSignedProofUrl(order.id, 'review'))
           : 'No',
-        (order.screenshots as any)?.returnWindow
+        order.screenshots?.returnWindow
           ? hyperlinkYes(buildSignedProofUrl(order.id, 'returnWindow'))
           : 'No',
       ];
@@ -934,7 +934,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         dateObj.toLocaleTimeString('en-GB'),
         order.buyerName || '',
         order.buyerMobile || '',
-        (order as any).reviewerName || '',
+        order.reviewerName || '',
         order.brandName ?? item?.brandName ?? '',
         item?.title ?? '',
         item?.platform ?? '',
@@ -942,12 +942,12 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         item?.quantity ?? 1,
         item?.priceAtPurchase ?? 0,
         order.total,
-        (order as any).expectedSettlementDate ? new Date((order as any).expectedSettlementDate).toLocaleDateString('en-GB') : '',
+        order.expectedSettlementDate ? new Date(order.expectedSettlementDate).toLocaleDateString('en-GB') : '',
         order.status,
         order.paymentStatus,
         order.affiliateStatus || '',
         order.managerName || '',
-        (order as any).mediatorCode || (order as any).managerCode || '',
+        order.mediatorCode || order.managerCode || '',
         order.agencyName || 'Direct',
         order.id,
         order.soldBy || '',
@@ -1548,10 +1548,10 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         </div>
 
                         {/* Resolution Note */}
-                        {t.status !== 'Open' && (t as any).resolutionNote && (
+                        {t.status !== 'Open' && t.resolutionNote && (
                           <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-xl mb-4">
                             <p className="text-[10px] font-bold text-emerald-700 uppercase mb-1">Resolution Note</p>
-                            <p className="text-xs text-emerald-600 font-medium">{(t as any).resolutionNote}</p>
+                            <p className="text-xs text-emerald-600 font-medium">{t.resolutionNote}</p>
                           </div>
                         )}
 
@@ -1562,7 +1562,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                             </div>
                             <div className="text-[10px]">
                               <p className="font-bold text-slate-900">{t.userName}</p>
-                              <p className="text-slate-400 font-mono capitalize">{normalizeRole(t.role)} → {normalizeRole((t as any).targetRole || 'admin')}</p>
+                              <p className="text-slate-400 font-mono capitalize">{normalizeRole(t.role)} → {normalizeRole(t.targetRole || 'admin')}</p>
                             </div>
                           </div>
 
@@ -1914,7 +1914,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     <div className="flex gap-4">
                       <select
                         value={inviteRole}
-                        onChange={(e) => setInviteRole(e.target.value as any)}
+                        onChange={(e) => setInviteRole(e.target.value as typeof inviteRole)}
                         aria-label="Invite role"
                         className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                       >
@@ -1979,7 +1979,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                                 <Copy size={18} />
                               </button>
 
-                              {inv.status === 'active' && Number((inv as any).useCount ?? 0) === 0 && (
+                              {inv.status === 'active' && Number(inv.useCount ?? 0) === 0 && (
                                 <button
                                   type="button"
                                   onClick={() => deleteInvite(inv.code)}
@@ -2553,10 +2553,10 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
               )}
 
               {/* 4. Return Window Proof */}
-              {(proofModal.screenshots as any)?.returnWindow && (
+              {proofModal.screenshots?.returnWindow && (
                 <div>
                   <h4 className="flex items-center gap-2 text-xs font-extrabold text-teal-500 uppercase tracking-wider mb-2"><Package size={14} /> Return Window Proof</h4>
-                  <ProofImage orderId={proofModal.id} proofType="returnWindow" existingSrc={(proofModal.screenshots as any).returnWindow !== 'exists' ? (proofModal.screenshots as any).returnWindow : undefined} alt="Return Window Proof" className="w-full max-h-[300px] object-contain rounded-xl border border-teal-200 bg-teal-50" />
+                  <ProofImage orderId={proofModal.id} proofType="returnWindow" existingSrc={proofModal.screenshots.returnWindow !== 'exists' ? proofModal.screenshots.returnWindow : undefined} alt="Return Window Proof" className="w-full max-h-[300px] object-contain rounded-xl border border-teal-200 bg-teal-50" />
                   {/* AI Return Window Verification */}
                   {proofModal.returnWindowAiVerification && (
                     <ReturnWindowVerificationBadge
