@@ -626,7 +626,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       setOrderIdLocked(false);
       // Surface meaningful error so users know what went wrong
       const msg =
-        typeof e?.message === 'string' && e.message.length > 0
+        e instanceof Error && e.message.length > 0
           ? e.message
           : 'Could not extract details from screenshot';
       toast.error(`${msg}. Please enter Order ID and Amount manually.`);
