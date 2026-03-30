@@ -16,4 +16,4 @@ export const Navbar: React.FC = React.memo(() => {
     </nav>
   );
 });
-(Navbar as any).displayName = 'Navbar';
+Navbar.displayName = 'Navbar';
