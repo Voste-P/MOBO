@@ -1625,7 +1625,7 @@ const DashboardView = ({ stats, revenueTrendData, brandPerfData, onRangeChange }
   );
 };
 
-const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrders }: any) => {
+const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrders, setCampaigns }: any) => {
   const { toast } = useToast();
   const { confirm, ConfirmDialogElement: InventoryConfirmDialog } = useConfirm();
   const [subTab, setSubTab] = useState<'inventory' | 'offered'>('inventory');
@@ -1939,6 +1939,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     setStatusUpdatingId(campaign.id);
     try {
       await api.ops.updateCampaignStatus(campaign.id, next);
+      setCampaigns((prev: any[]) => prev.map(c => c.id === campaign.id ? { ...c, status: next } : c));
       toast.success(next === 'paused' ? 'Campaign paused' : 'Campaign resumed');
       onRefresh(['campaigns']);
     } catch (err) {
@@ -1954,6 +1955,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     setDeletingId(campaign.id);
     try {
       await api.ops.deleteCampaign(campaign.id);
+      setCampaigns((prev: any[]) => prev.filter(c => c.id !== campaign.id));
       toast.success('Campaign deleted');
       onRefresh(['campaigns']);
     } catch (err) {
@@ -2379,6 +2381,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                           setDecliningId(c.id);
                           try {
                             await api.ops.declineOffer(c.id);
+                            setCampaigns((prev: any[]) => prev.filter(camp => camp.id !== c.id));
                             toast.success('Offer declined');
                             onRefresh(['campaigns']);
                           } catch (err) {
@@ -3439,7 +3442,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
   );
 };
 
-const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
+const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators }: any) => {
   const { toast } = useToast();
   const [subTab, setSubTab] = useState<'roster' | 'requests'>('roster');
   const [searchTerm, setSearchTerm] = useState('');
@@ -3515,14 +3518,26 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
     }
   };
 
+  const [processingMediatorId, setProcessingMediatorId] = useState<string | null>(null);
+
   const handleApproval = async (e: React.MouseEvent, id: string, action: 'approve' | 'reject') => {
     e.stopPropagation(); // Prevents opening the modal row
+    if (processingMediatorId) return; // Guard against double-click
+    setProcessingMediatorId(id);
     try {
       if (action === 'approve') await api.ops.approveMediator(id);
       else await api.ops.rejectMediator(id);
+      // Optimistic update: change status locally
+      if (setMediators) {
+        setMediators((prev: any[]) => prev.map((m: any) =>
+          m.id === id ? { ...m, status: action === 'approve' ? 'active' : 'rejected', isVerifiedByMediator: action === 'approve' } : m
+        ));
+      }
       onRefresh(['mediators']);
     } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to update mediator request'));
+    } finally {
+      setProcessingMediatorId(null);
     }
   };
 
@@ -4686,6 +4701,7 @@ export const AgencyDashboard: React.FC = () => {
           loading={isDataLoading}
           onRefresh={refreshData}
           allOrders={orders}
+          setMediators={setMediators}
         />
       )}
       {activeTab === 'inventory' && (
@@ -4696,6 +4712,7 @@ export const AgencyDashboard: React.FC = () => {
           onRefresh={refreshData}
           mediators={mediators}
           allOrders={orders}
+          setCampaigns={setCampaigns}
         />
       )}
       {activeTab === 'orders' && (

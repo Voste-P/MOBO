@@ -1479,7 +1479,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
   );
 };
 
-const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) => {
+const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampaigns }: any) => {
   const { toast } = useToast();
   const { confirm, ConfirmDialogElement } = useConfirm();
   const [view, setView] = useState<'list' | 'create'>('list');
@@ -1603,6 +1603,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
     setStatusUpdatingId(campaign.id);
     try {
       await api.brand.updateCampaign(campaign.id, { status: next });
+      setCampaigns((prev: any[]) => prev.map(c => c.id === campaign.id ? { ...c, status: next } : c));
       toast.success(next === 'paused' ? 'Campaign paused' : 'Campaign resumed');
       onRefresh(['campaigns']);
     } catch (err) {
@@ -1619,6 +1620,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
     setDeletingId(campaign.id);
     try {
       await api.brand.deleteCampaign(campaign.id);
+      setCampaigns((prev: any[]) => prev.filter(c => c.id !== campaign.id));
       toast.success('Campaign deleted');
       onRefresh(['campaigns']);
     } catch (err: any) {
@@ -2172,6 +2174,9 @@ export const BrandDashboard: React.FC = () => {
   const [resolutionNote, setResolutionNote] = useState('');
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
+  // Optimistic UI: track dismissed connection requests so they disappear instantly
+  const [dismissedRequestIds, setDismissedRequestIds] = useState<Set<string>>(new Set());
+
   const loadedRef = useRef<Set<string>>(new Set());
   const inFlightRef = useRef<Set<string>>(new Set());
   const lastFetchedAt = useRef<Record<string, number>>({});
@@ -2412,7 +2417,11 @@ export const BrandDashboard: React.FC = () => {
     }));
   };
 
-  const pendingRequests = user?.pendingConnections?.length || 0;
+  // Filter out optimistically dismissed requests
+  const visiblePendingConnections = (user?.pendingConnections ?? []).filter(
+    (p: any) => !dismissedRequestIds.has(p.agencyId)
+  );
+  const pendingRequests = visiblePendingConnections.length;
 
   return (
     <>
@@ -2585,6 +2594,7 @@ export const BrandDashboard: React.FC = () => {
             user={user}
             loading={isDataLoading}
             onRefresh={refreshData}
+            setCampaigns={setCampaigns}
           />
         )}
         {activeTab === 'orders' && <OrdersView orders={orders} isLoading={isDataLoading} />}
@@ -2832,7 +2842,9 @@ export const BrandDashboard: React.FC = () => {
                         e.stopPropagation();
                         if (!user) return;
                         if (await confirmDialog({ message: 'Disconnect this Agency?', confirmLabel: 'Disconnect', variant: 'destructive' })) {
-                          api.brand.removeAgency(user.id, ag.mediatorCode!).then(async () => { await refreshSession(); refreshData(['agencies']); }).catch((err: any) => toast.error(formatErrorMessage(err, 'Failed to disconnect agency')));
+                          const code = ag.mediatorCode!;
+                          setAgencies(prev => prev.filter(a => a.mediatorCode !== code));
+                          api.brand.removeAgency(user.id, code).then(async () => { await refreshSession(); refreshData(['agencies']); }).catch((err: any) => { refreshData(['agencies']); toast.error(formatErrorMessage(err, 'Failed to disconnect agency')); });
                         }
                       }}
                       aria-label="Disconnect agency"
@@ -2956,7 +2968,7 @@ export const BrandDashboard: React.FC = () => {
                 icon={<Spinner className="w-6 h-6 text-zinc-400" />}
                 className="bg-transparent"
               />
-            ) : !user?.pendingConnections || user.pendingConnections.length === 0 ? (
+            ) : visiblePendingConnections.length === 0 ? (
               <EmptyState
                 title="No pending requests"
                 description={`Share your Brand Code: ${user?.brandCode || ''}`}
@@ -2965,7 +2977,7 @@ export const BrandDashboard: React.FC = () => {
               />
             ) : (
               <div className="space-y-4">
-                {user.pendingConnections.map((req: any) => (
+                {visiblePendingConnections.map((req: any) => (
                   <div
                     key={req.agencyId}
                     className="bg-white p-3 rounded-[1.5rem] shadow-sm border border-zinc-100 flex flex-col sm:flex-row justify-between items-center pr-4 transition-all hover:shadow-md gap-4"
@@ -2985,14 +2997,16 @@ export const BrandDashboard: React.FC = () => {
                       <button
                         onClick={async () => {
                           try {
+                            setDismissedRequestIds(prev => new Set(prev).add(req.agencyId));
                             await api.brand.resolveConnectionRequest(
-                              user.id,
+                              user!.id,
                               req.agencyId,
                               'reject'
                             );
                             await refreshSession();
                             fetchData({ keys: ['agencies'] });
                           } catch (e) {
+                            setDismissedRequestIds(prev => { const next = new Set(prev); next.delete(req.agencyId); return next; });
                             if (process.env.NODE_ENV !== 'production') console.error('Failed to decline', e);
                             toast.error(formatErrorMessage(e, 'Failed to decline connection'));
                           }
@@ -3004,14 +3018,16 @@ export const BrandDashboard: React.FC = () => {
                       <button
                         onClick={async () => {
                           try {
+                            setDismissedRequestIds(prev => new Set(prev).add(req.agencyId));
                             await api.brand.resolveConnectionRequest(
-                              user.id,
+                              user!.id,
                               req.agencyId,
                               'approve'
                             );
                             await refreshSession();
                             fetchData({ keys: ['agencies'] });
                           } catch (e) {
+                            setDismissedRequestIds(prev => { const next = new Set(prev); next.delete(req.agencyId); return next; });
                             if (process.env.NODE_ENV !== 'production') console.error('Failed to approve', e);
                             toast.error(formatErrorMessage(e, 'Failed to approve connection'));
                           }

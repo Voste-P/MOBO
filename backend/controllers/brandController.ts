@@ -510,11 +510,18 @@ export function makeBrandController() {
         }
 
         // Soft-delete the pending connection
+        // Match by agencyCode OR any known agency identifier (mongoId, pgId, body.agencyId)
+        // to handle legacy records where agencyId may be stored in different formats.
+        const agencyIdVariants = [agencyMongoId, agency.id, body.agencyId].filter(Boolean);
+        const uniqueAgencyIds = [...new Set(agencyIdVariants)];
         await db().pendingConnection.updateMany({
           where: {
             userId: brand.id,
             isDeleted: false,
-            OR: [{ agencyCode }, { agencyId: agencyMongoId }],
+            OR: [
+              { agencyCode },
+              ...uniqueAgencyIds.map(id => ({ agencyId: id })),
+            ],
           },
           data: { isDeleted: true },
         });

@@ -105,9 +105,10 @@ interface InboxViewProps {
   onViewProof: (order: Order) => void;
   onGoToUnpublished: () => void;
   unpublishedCount: number;
+  setPendingUsers?: React.Dispatch<React.SetStateAction<User[]>>;
 }
 
-const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewProof, onGoToUnpublished, unpublishedCount }: InboxViewProps) => {
+const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewProof, onGoToUnpublished, unpublishedCount, setPendingUsers }: InboxViewProps) => {
   // Verification queue is workflow-driven.
   // Orders can remain UNDER_REVIEW even after purchase verification if review/rating is still pending.
   const { toast } = useToast();
@@ -283,12 +284,13 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                     type="button"
                     aria-label={`Approve ${u.name}`}
                     title="Approve"
-                    onClick={() =>
-                      api.ops
-                        .approveUser(u.id)
-                        .then(() => onRefresh(['pending', 'verified']))
-                        .catch((e: any) => toast.error(formatErrorMessage(e, 'Failed to approve user')))
-                    }
+                    onClick={async () => {
+                      try {
+                        await api.ops.approveUser(u.id);
+                        if (setPendingUsers) setPendingUsers(prev => prev.filter(p => p.id !== u.id));
+                        onRefresh(['pending', 'verified']);
+                      } catch (e: any) { toast.error(formatErrorMessage(e, 'Failed to approve user')); }
+                    }}
                     className="w-8 h-8 rounded-lg bg-zinc-900 text-white flex items-center justify-center hover:bg-[#CCF381] hover:text-black transition-all shadow-md active:scale-90"
                   >
                     <Check size={14} strokeWidth={3} />
@@ -297,12 +299,13 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                     type="button"
                     aria-label={`Reject ${u.name}`}
                     title="Reject"
-                    onClick={() =>
-                      api.ops
-                        .rejectUser(u.id)
-                        .then(() => onRefresh(['pending']))
-                        .catch((e: any) => toast.error(formatErrorMessage(e, 'Failed to reject user')))
-                    }
+                    onClick={async () => {
+                      try {
+                        await api.ops.rejectUser(u.id);
+                        if (setPendingUsers) setPendingUsers(prev => prev.filter(p => p.id !== u.id));
+                        onRefresh(['pending']);
+                      } catch (e: any) { toast.error(formatErrorMessage(e, 'Failed to reject user')); }
+                    }}
                     className="w-8 h-8 rounded-lg bg-zinc-50 text-zinc-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all active:scale-90"
                   >
                     <X size={14} strokeWidth={3} />
@@ -769,7 +772,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
   );
 };
 
-const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: any) => {
+const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, setCampaigns }: any) => {
   const { toast } = useToast();
   const { confirm, ConfirmDialogElement } = useConfirm();
   const [marketSearch, setMarketSearch] = useState('');
@@ -1089,6 +1092,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish }: a
                         try {
                           if (!(await confirm({ message: 'Delete this unpublished campaign?', confirmLabel: 'Delete', variant: 'destructive' }))) return;
                           await api.ops.deleteCampaign(String(c.id));
+                          if (setCampaigns) setCampaigns((prev: any[]) => prev.filter((camp: any) => camp.id !== c.id));
                           toast.success('Campaign deleted.');
                           onRefresh?.(['campaigns', 'deals']);
                         } catch (err) {
@@ -2301,6 +2305,7 @@ export const MediatorDashboard: React.FC = () => {
             loading={loading}
             onRefresh={refreshData}
             unpublishedCount={unpublishedCount}
+            setPendingUsers={setPendingUsers}
             onGoToUnpublished={() => handleTabChange('market')}
             onViewProof={(order: Order) => {
               setProofModal(order);
@@ -2315,6 +2320,7 @@ export const MediatorDashboard: React.FC = () => {
             user={user}
             onRefresh={refreshData}
             onPublish={setDealBuilder}
+            setCampaigns={setCampaigns}
           />
         )}
         {activeTab === 'squad' && user && (
