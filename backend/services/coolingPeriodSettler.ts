@@ -18,6 +18,8 @@ interface SettlePrefetch {
   dealMap: Map<string, { id: string; mongoId: string | null; payoutPaise: number }>;
   userMap: Map<string, { id: string; mongoId: string | null; status: string; isDeleted: boolean }>;
   mediatorMap: Map<string, { id: string; mediatorCode: string | null }>;
+  /** Batch cap counts: "mediatorCode::campaignId" -> count of already settled orders */
+  capCountMap: Map<string, number>;
 }
 
 /**
@@ -105,15 +107,18 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
       typeof rawAssigned === 'number' ? rawAssigned : Number(rawAssigned?.limit ?? 0);
 
     if (assignedLimit > 0) {
-      const settledCount = await db().order.count({
-        where: {
-          managerName: mediatorCode,
-          items: { some: { campaignId } },
-          OR: [{ affiliateStatus: 'Approved_Settled' }, { paymentStatus: 'Paid' }],
-          id: { not: order.id },
-          isDeleted: false,
-        },
-      });
+      const capKey = `${mediatorCode}::${campaignId}`;
+      const settledCount = prefetch?.capCountMap.has(capKey)
+        ? prefetch.capCountMap.get(capKey)!
+        : await db().order.count({
+            where: {
+              managerName: mediatorCode,
+              items: { some: { campaignId } },
+              OR: [{ affiliateStatus: 'Approved_Settled' }, { paymentStatus: 'Paid' }],
+              id: { not: order.id },
+              isDeleted: false,
+            },
+          });
       if (settledCount >= assignedLimit) isOverLimit = true;
     }
   }
@@ -404,8 +409,30 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
   const userMap = new Map(usersArr.map(u => [u.id, u]));
   const mediatorMap = new Map(mediatorsArr.map(m => [m.mediatorCode!, m]));
 
+  // Batch cap counts: for each unique (mediatorCode, campaignId) pair, count settled orders
+  const capPairs = [...new Set(
+    orders
+      .filter(o => o.managerName && o.items?.[0]?.campaignId)
+      .map(o => `${String(o.managerName).trim()}::${o.items![0].campaignId}`),
+  )];
+  const capCountMap = new Map<string, number>();
+  if (capPairs.length > 0) {
+    await Promise.all(capPairs.map(async (pair) => {
+      const [mc, cid] = pair.split('::');
+      const count = await db().order.count({
+        where: {
+          managerName: mc,
+          items: { some: { campaignId: cid } },
+          OR: [{ affiliateStatus: 'Approved_Settled' }, { paymentStatus: 'Paid' }],
+          isDeleted: false,
+        },
+      });
+      capCountMap.set(pair, count);
+    }));
+  }
+
   // Attach prefetched data to a context object passed into settleOne
-  const prefetch = { disputeOrderIds, campaignMap, dealMap, userMap, mediatorMap };
+  const prefetch = { disputeOrderIds, campaignMap, dealMap, userMap, mediatorMap, capCountMap };
 
   for (const order of orders) {
     try {

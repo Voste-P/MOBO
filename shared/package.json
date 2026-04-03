@@ -9,6 +9,7 @@
     "react-dom": "^19.0.0"
   },
   "dependencies": {
+    "framer-motion": "^12.38.0",
     "lucide-react": "^0.556.0",
     "recharts": "^2.12.0"
   },

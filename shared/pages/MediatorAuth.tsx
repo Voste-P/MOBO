@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Users, ArrowRight, Lock, User, Phone, CheckCircle, ChevronLeft, Clock } from 'lucide-react';
-import { Button, Input, Spinner } from '../components/ui';
+import { Button, Input, Spinner, AnimatedView } from '../components/ui';
 import { SecurityQuestionsSetup, type SecurityQA } from '../components/SecurityQuestionsSetup';
 import { ForgotPassword } from './ForgotPassword';
 import { normalizeMobileTo10Digits } from '../utils/mobiles';
@@ -109,24 +109,29 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
 
   if (view === 'forgotPassword') {
     return (
-      <ForgotPassword
-        onBack={() => { setView('login'); setError(''); }}
-        onSuccess={() => { setView('login'); setError(''); }}
-      />
+      <AnimatedView viewKey="forgotPassword" variant="slideRight">
+        <ForgotPassword
+          onBack={() => { setView('login'); setError(''); }}
+          onSuccess={() => { setView('login'); setError(''); }}
+        />
+      </AnimatedView>
     );
   }
 
   if (view === 'securityQuestions') {
     return (
-      <SecurityQuestionsSetup
-        onComplete={handleSecurityQuestionsComplete}
-        onBack={() => setView('register')}
-      />
+      <AnimatedView viewKey="securityQuestions" variant="slideUp">
+        <SecurityQuestionsSetup
+          onComplete={handleSecurityQuestionsComplete}
+          onBack={() => setView('register')}
+        />
+      </AnimatedView>
     );
   }
 
   if (view === 'pending') {
     return (
+      <AnimatedView viewKey="pending" variant="scale">
       <div className="flex-1 flex flex-col bg-white relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
         <Button
           type="button"
@@ -199,10 +204,12 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
           </Button>
         </div>
       </div>
+      </AnimatedView>
     );
   }
   if (view === 'splash') {
     return (
+      <AnimatedView viewKey="splash" variant="fade">
       <div className="flex-1 flex flex-col bg-zinc-900 text-white relative overflow-x-hidden pb-[env(safe-area-inset-bottom)]" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
         <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-black"></div>
         {onBack && (
@@ -243,10 +250,12 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
           </div>
         </div>
       </div>
+      </AnimatedView>
     );
   }
 
   return (
+    <AnimatedView viewKey={view} variant="slideUp">
     <div className="flex-1 flex flex-col bg-white relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
       <Button
         type="button"
@@ -368,5 +377,6 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
         </p>
       </div>
     </div>
+    </AnimatedView>
   );
 };

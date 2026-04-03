@@ -65,14 +65,14 @@ const envSchema = z.object({
   AI_CIRCUIT_BREAKER_COOLDOWN_MS: z.coerce.number().int().min(1000).default(300_000),
 
   // Minimum AI confidence score (0-100) required for proof verification to pass.
-  // Scores below this threshold will reject the proof. 75 is recommended for production
+  // Scores below this threshold will reject the proof. 70 is recommended for production
   // anti-fraud gating; lower values increase false-positive risk.
-  AI_PROOF_CONFIDENCE_THRESHOLD: z.coerce.number().int().min(0).max(100).default(75),
+  AI_PROOF_CONFIDENCE_THRESHOLD: z.coerce.number().int().min(0).max(100).default(70),
 
   // AI confidence score (0-100) at or above which a proof step is auto-verified
   // without manual mediator review.  Set to 101 to disable auto-verification.
-  // 90 strikes a good balance between speed and fraud safety.
-  AI_AUTO_VERIFY_THRESHOLD: z.coerce.number().int().min(0).max(101).default(90),
+  // 85 balances speed and fraud safety; more proofs auto-verify without mediator.
+  AI_AUTO_VERIFY_THRESHOLD: z.coerce.number().int().min(0).max(101).default(85),
 
   // Confidence score assigned to review links from recognized marketplace domains.
   // URL validation acts as the "AI" for review proofs — no screenshot analysis needed.

@@ -1,7 +1,7 @@
 ﻿import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Bot, ArrowRight, Lock, User, Phone, Hash, ChevronLeft } from 'lucide-react';
-import { Button, Input } from '../components/ui';
+import { Button, Input, AnimatedView } from '../components/ui';
 import { SecurityQuestionsSetup, type SecurityQA } from '../components/SecurityQuestionsSetup';
 import { ForgotPassword } from './ForgotPassword';
 import { normalizeMobileTo10Digits } from '../utils/mobiles';
@@ -127,26 +127,31 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
   // Forgot Password Flow
   if (view === 'forgotPassword') {
     return (
-      <ForgotPassword
-        onBack={() => { setView('login'); setError(''); }}
-        onSuccess={() => { setView('login'); setError(''); }}
-      />
+      <AnimatedView viewKey="forgotPassword" variant="slideRight">
+        <ForgotPassword
+          onBack={() => { setView('login'); setError(''); }}
+          onSuccess={() => { setView('login'); setError(''); }}
+        />
+      </AnimatedView>
     );
   }
 
   // Security Questions Setup (after registration form submit)
   if (view === 'securityQuestions') {
     return (
-      <SecurityQuestionsSetup
-        onComplete={handleSecurityQuestionsComplete}
-        onBack={() => setView('register')}
-      />
+      <AnimatedView viewKey="securityQuestions" variant="slideUp">
+        <SecurityQuestionsSetup
+          onComplete={handleSecurityQuestionsComplete}
+          onBack={() => setView('register')}
+        />
+      </AnimatedView>
     );
   }
 
   // 1. Splash Screen (Dark Theme)
   if (view === 'splash') {
     return (
+      <AnimatedView viewKey="splash" variant="fade">
       <div className="flex-1 flex flex-col bg-black text-white relative overflow-x-hidden pb-[env(safe-area-inset-bottom)]" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
         {/* Background Effects */}
         <div className="absolute top-[-20%] right-[-20%] w-[500px] h-[500px] bg-lime-500/20 rounded-full blur-[120px] pointer-events-none animate-pulse motion-reduce:animate-none"></div>
@@ -195,11 +200,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
           </div>
         </div>
       </div>
+      </AnimatedView>
     );
   }
 
   // 2. Login / Register Form
   return (
+    <AnimatedView viewKey={view} variant="slideUp">
     <div className="flex-1 flex flex-col bg-white relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
       <div className="mb-8">
         <Button
@@ -323,5 +330,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
         </p>
       </div>
     </div>
+    </AnimatedView>
   );
 };
