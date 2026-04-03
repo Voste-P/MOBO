@@ -375,7 +375,9 @@ export function makeAuthController(env: Env) {
           throw new AppError(429, 'ACCOUNT_LOCKED', `Account locked. Try again in ${minutesLeft} minute${minutesLeft > 1 ? 's' : ''}.`);
         }
 
-        const ok = await verifyPassword(password, authUser.passwordHash);
+        const ok = authUser.passwordHash
+          ? await verifyPassword(password, authUser.passwordHash)
+          : false;
         if (!ok) {
           const newAttempts = (authUser.failedLoginAttempts ?? 0) + 1;
           await db().user.update({
