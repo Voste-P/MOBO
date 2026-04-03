@@ -223,6 +223,19 @@ export const orderProofSelect = {
 } as const;
 
 /**
+ * Lightweight select for batch proof URL generation.
+ * Only checks existence of proofs (boolean-ish), does NOT load base64 blobs.
+ * Uses raw SQL fragments to avoid reading multi-MB screenshot columns.
+ */
+export const orderProofExistsSelect = {
+  id: true,
+  mongoId: true,
+  userId: true,
+  brandUserId: true,
+  reviewLink: true,
+} as const;
+
+/**
  * Prisma `select` for notification order queries.
  * Fetches only the fields needed for notification processing.
  */

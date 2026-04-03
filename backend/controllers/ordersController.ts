@@ -9,7 +9,7 @@ import { pgOrder } from '../utils/pgMappers.js';
 import { createOrderSchema, submitClaimSchema } from '../validations/orders.js';
 import { rupeesToPaise } from '../utils/money.js';
 import { toUiOrder, toUiOrderSummary } from '../utils/uiMappers.js';
-import { orderListSelectLite, orderProofSelect, getProofFlags } from '../utils/querySelect.js';
+import { orderListSelectLite, orderProofSelect, orderProofExistsSelect, getProofFlags } from '../utils/querySelect.js';
 import { parsePagination, paginatedResponse } from '../utils/pagination.js';
 import { pushOrderEvent, isTerminalAffiliateStatus } from '../services/orderEvents.js';
 import { transitionOrderWorkflow } from '../services/orderWorkflow.js';
@@ -454,21 +454,46 @@ export function makeOrdersController(env: Env) {
         const proofTypes = ['order', 'payment', 'rating', 'review', 'returnwindow'] as const;
         const tokens: Record<string, Record<string, string | null>> = {};
 
-        // Fetch all orders in one query
+        // Fetch all orders in one query — lightweight select (no base64 blobs)
         const orders = await db().order.findMany({
           where: {
             OR: orderIds.map(id => UUID_RE.test(id) ? { id } : { mongoId: id }),
             isDeleted: false,
           },
-          select: orderProofSelect,
+          select: orderProofExistsSelect,
         });
+
+        // Use raw SQL to check which proofs exist without loading the data
+        const idsForSql = orders.map(o => o.id);
+        let proofExistenceMap = new Map<string, Record<string, boolean>>();
+        if (idsForSql.length > 0) {
+          const existenceRows: any[] = await db().$queryRawUnsafe(
+            `SELECT id, mongo_id,
+              (screenshot_order IS NOT NULL) AS has_order,
+              (screenshot_payment IS NOT NULL) AS has_payment,
+              (screenshot_review IS NOT NULL) AS has_review,
+              (screenshot_rating IS NOT NULL) AS has_rating,
+              (screenshot_return_window IS NOT NULL) AS has_return_window,
+              review_link
+            FROM orders WHERE id = ANY($1::uuid[]) AND is_deleted = false`,
+            idsForSql,
+          );
+          for (const row of existenceRows) {
+            proofExistenceMap.set(String(row.id), {
+              order: !!row.has_order,
+              payment: !!row.has_payment,
+              review: !!(row.has_review || row.review_link),
+              rating: !!row.has_rating,
+              returnWindow: !!row.has_return_window,
+            });
+          }
+        }
 
         // Map by both id and mongoId for quick lookup
         const orderMap = new Map<string, any>();
         for (const o of orders) {
-          const mapped = pgOrder(o);
-          orderMap.set(String(o.id), mapped);
-          if (o.mongoId) orderMap.set(String(o.mongoId), mapped);
+          orderMap.set(String(o.id), o);
+          if (o.mongoId) orderMap.set(String(o.mongoId), o);
         }
 
         // Authorization: only privileged roles (admin/ops) can batch across all orders.
@@ -488,13 +513,14 @@ export function makeOrdersController(env: Env) {
         for (const oid of orderIds) {
           const order = orderMap.get(oid);
           if (!order) { tokens[oid] = {}; continue; }
+          const existence = proofExistenceMap.get(order.id || oid) || {};
           const entry: Record<string, string | null> = {};
           for (const pt of proofTypes) {
-            const val = resolveProofValue(order, pt);
-            if (val) {
-              entry[pt === 'returnwindow' ? 'returnWindow' : pt] = createProofToken(order.id || oid, pt, env);
+            const normalizedKey = pt === 'returnwindow' ? 'returnWindow' : pt;
+            if (existence[normalizedKey]) {
+              entry[normalizedKey] = createProofToken(order.id || oid, pt, env);
             } else {
-              entry[pt === 'returnwindow' ? 'returnWindow' : pt] = null;
+              entry[normalizedKey] = null;
             }
           }
           tokens[oid] = entry;
@@ -1571,6 +1597,26 @@ export function makeOrdersController(env: Env) {
                   (returnWindowResult.discrepancyNote || ''));
               }
               // Return window open/closed, amount — stored for mediator review, NOT blocking
+
+              // ── Server-side return window timing validation ──
+              // Cross-reference the order's creation date and returnWindowDays to verify
+              // whether the return window should realistically be closed.
+              // This prevents accepting a "return window closed" screenshot uploaded
+              // too soon (before the return period has actually elapsed).
+              const orderCreatedAt = order.createdAt ? new Date(order.createdAt) : null;
+              const rwDays = order.returnWindowDays ?? 7;
+              if (orderCreatedAt && rwDays > 0) {
+                const expectedReturnWindowEnd = new Date(orderCreatedAt.getTime() + rwDays * 86400000);
+                const now = new Date();
+                if (now < expectedReturnWindowEnd && returnWindowResult?.returnWindowClosed) {
+                  // The AI says return window is closed, but it's too soon per our records.
+                  // Reduce confidence to flag for mediator review.
+                  const daysRemaining = Math.ceil((expectedReturnWindowEnd.getTime() - now.getTime()) / 86400000);
+                  returnWindowResult.confidenceScore = Math.min(returnWindowResult.confidenceScore, 50);
+                  returnWindowResult.discrepancyNote = (returnWindowResult.discrepancyNote || '') +
+                    ` [Server: Return window should not be closed yet — ${daysRemaining} day(s) remaining per order records.]`;
+                }
+              }
             }
           }
 

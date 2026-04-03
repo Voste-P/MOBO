@@ -325,7 +325,7 @@ const inflightGets = new Map<string, Promise<any>>();
 // LRU eviction when capacity exceeded (promotes on read, evicts least-recently-accessed).
 interface GETCacheEntry { data: any; expiresAt: number }
 const getCache = new Map<string, GETCacheEntry>();
-const GET_CACHE_TTL_MS = 5_000;
+const GET_CACHE_TTL_MS = 15_000;
 const GET_CACHE_MAX = 200;
 
 function getCachedResponse(path: string): any | undefined {
