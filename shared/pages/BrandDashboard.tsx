@@ -1690,15 +1690,6 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                       <option value="">Select Platform</option>
                       <option value="Amazon">Amazon</option>
                       <option value="Flipkart">Flipkart</option>
-                      <option value="Myntra">Myntra</option>
-                      <option value="Meesho">Meesho</option>
-                      <option value="Ajio">Ajio</option>
-                      <option value="JioMart">JioMart</option>
-                      <option value="Nykaa">Nykaa</option>
-                      <option value="Blinkit">Blinkit</option>
-                      <option value="Zepto">Zepto</option>
-                      <option value="Snapdeal">Snapdeal</option>
-                      <option value="Lenskart">Lenskart</option>
                     </select>
                   </div>
                   <div>

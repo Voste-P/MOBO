@@ -237,11 +237,14 @@ export function makeOrdersController(env: Env) {
     let events = Array.isArray(order.events) ? [...(order.events as any[])] : [];
 
     for (const { key, confidence } of stepsToVerify) {
+      // Sanitize AI confidence to valid 0-100 range
+      const safeConfidence = Number.isFinite(confidence) ? Math.max(0, Math.min(100, confidence)) : 0;
+      if (safeConfidence < baselineThreshold) continue; // skip corrupted scores
       v[key] = v[key] ?? {};
       v[key].verifiedAt = now;
       v[key].verifiedBy = 'SYSTEM_AI_BULK';
       v[key].autoVerified = true;
-      v[key].aiConfidenceScore = confidence;
+      v[key].aiConfidenceScore = safeConfidence;
 
       events = pushOrderEvent(events, {
         type: 'VERIFIED',
@@ -465,6 +468,9 @@ export function makeOrdersController(env: Env) {
 
         // Use raw SQL to check which proofs exist without loading the data
         const idsForSql = orders.map(o => o.id);
+        if (idsForSql.length > 500) {
+          throw new AppError(400, 'TOO_MANY_IDS', 'Cannot batch more than 500 orders at once');
+        }
         const proofExistenceMap = new Map<string, Record<string, boolean>>();
         if (idsForSql.length > 0) {
           const existenceRows: any[] = await db().$queryRawUnsafe(

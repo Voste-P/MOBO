@@ -1,6 +1,6 @@
 ﻿import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
 import { User } from '../types';
-import { api, onAuthExpired } from '../services/api';
+import { api, onAuthExpired, invalidateGetCache } from '../services/api';
 import { subscribeRealtime, stopRealtime } from '../services/realtime';
 
 interface AuthContextType {
@@ -217,6 +217,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       localStorage.removeItem('mobo_tokens_v1');
     }
     stopRealtime();
+    invalidateGetCache();  // Clear cached API data from previous session
     emitAuthChange();
   }, []);
 

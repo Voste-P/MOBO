@@ -188,6 +188,16 @@ export function initAiServiceConfig(env: { AI_OCR_POOL_SIZE?: number; AI_CIRCUIT
   if (env.AI_CIRCUIT_BREAKER_COOLDOWN_MS) _circuitBreakerCooldownMs = env.AI_CIRCUIT_BREAKER_COOLDOWN_MS;
 }
 
+/** Terminate all OCR workers — call during graceful shutdown. */
+export async function terminateOcrPool(): Promise<void> {
+  for (const worker of _ocrPool) {
+    try { await worker.terminate(); } catch { /* ignore */ }
+  }
+  _ocrPool.length = 0;
+  _ocrPoolReady = null;
+  _ocrPoolInitializing = false;
+}
+
 async function _initOcrPool(): Promise<void> {
   if (_ocrPool.length >= OCR_POOL_SIZE || _ocrPoolInitializing) return;
   _ocrPoolInitializing = true;

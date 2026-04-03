@@ -298,6 +298,9 @@ export function makeAuthController(env: Env) {
           : await withDbRetry(() => db().user.findFirst({ where: { username, roles: { hasSome: ['admin', 'ops'] as any }, isDeleted: false }, select: authSelect }));
 
         if (!authUser) {
+          // Prevent timing side-channel: always run bcrypt so response time
+          // is comparable whether or not the user exists.
+          await verifyPassword(password, '$2a$12$DUMMY_HASH_TO_PREVENT_TIMING_ATTACK_000000000000');
           businessLog.warn('Login failed — user not found', { identifier: mobile || username, ip: req.ip });
           logAuthEvent('LOGIN_FAILURE', {
             identifier: mobile || username,
