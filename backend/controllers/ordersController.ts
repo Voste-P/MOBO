@@ -465,7 +465,7 @@ export function makeOrdersController(env: Env) {
 
         // Use raw SQL to check which proofs exist without loading the data
         const idsForSql = orders.map(o => o.id);
-        let proofExistenceMap = new Map<string, Record<string, boolean>>();
+        const proofExistenceMap = new Map<string, Record<string, boolean>>();
         if (idsForSql.length > 0) {
           const existenceRows: any[] = await db().$queryRawUnsafe(
             `SELECT id, mongo_id,
