@@ -112,7 +112,7 @@ export const BrandAuthScreen: React.FC<BrandAuthProps> = ({ onBack }) => {
 
   if (view === 'splash') {
     return (
-      <div className="flex min-h-[100dvh] w-full bg-zinc-950 text-white overflow-x-hidden relative font-sans">
+      <div className="flex w-full bg-zinc-950 text-white overflow-x-hidden relative font-sans" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
         {/* Abstract Background */}
         <div className="absolute inset-0 z-0">
           <div className="absolute top-[-10%] left-[-10%] w-[60vw] h-[60vw] bg-lime-500/10 rounded-full blur-[150px] animate-pulse motion-reduce:animate-none"></div>
@@ -174,7 +174,7 @@ export const BrandAuthScreen: React.FC<BrandAuthProps> = ({ onBack }) => {
 
   // --- SPLIT LAYOUT FOR FORMS ---
   return (
-    <div className="flex min-h-[100dvh] w-full bg-white font-sans">
+    <div className="flex w-full bg-white font-sans" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
       {/* Left Visual Side */}
       <div className="hidden lg:flex lg:w-1/2 bg-zinc-950 relative overflow-hidden flex-col justify-between p-12 text-white">
         <div className="absolute inset-0 z-0">

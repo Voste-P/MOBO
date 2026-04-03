@@ -121,7 +121,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSucces
   /* ── Success Screen ── */
   if (step === 'done') {
     return (
-      <div className="flex-1 flex flex-col bg-white min-h-[100dvh] relative px-6 py-12 overflow-y-auto scrollbar-styled items-center justify-center text-center">
+      <div className="flex-1 flex flex-col bg-white relative px-6 py-12 overflow-y-auto scrollbar-styled items-center justify-center text-center" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
         <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6 ring-4 ring-emerald-50">
           <CheckCircle size={40} className="text-emerald-600" />
         </div>
@@ -143,7 +143,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSucces
 
   /* ── Main Form ── */
   return (
-    <div className="flex-1 flex flex-col bg-white min-h-[100dvh] relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled">
+    <div className="flex-1 flex flex-col bg-white relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
       {/* Back button */}
       <button
         type="button"

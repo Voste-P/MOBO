@@ -206,7 +206,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-[#F4F4F5] relative overflow-y-auto scrollbar-styled overscroll-none">
-      <div className="max-w-xl mx-auto w-full p-6 pb-32 space-y-6">
+      <div className="max-w-xl mx-auto w-full p-6 space-y-6" style={{ paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))' }}>
         {/* Identity Card */}
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-zinc-100 relative overflow-hidden animate-enter">
           <div className="flex justify-between items-center mb-8">

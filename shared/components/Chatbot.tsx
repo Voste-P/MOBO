@@ -94,6 +94,13 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const handleScrollContainer = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setIsAtBottom(distanceFromBottom < 80);
+  }, []);
+
   // Cache for context API calls to avoid fetching on every single message
   const contextCacheRef = useRef<{
     products: Product[];
@@ -513,12 +520,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
 
       <div
         ref={scrollContainerRef}
-        onScroll={() => {
-          const el = scrollContainerRef.current;
-          if (!el) return;
-          const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-          setIsAtBottom(distanceFromBottom < 80);
-        }}
+        onScroll={handleScrollContainer}
         className="flex-1 min-h-0 overflow-y-auto px-4 py-6 scrollbar-styled"
       >
         <div className="flex flex-col gap-6">
@@ -716,7 +718,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
         </div>
       </div>
 
-      <div className="shrink-0 w-full px-4 pb-20 safe-bottom">
+      <div className="shrink-0 w-full px-4 pb-20" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
         <div className="flex flex-nowrap gap-2 justify-center pb-3 overflow-x-auto scrollbar-styled">
           {quickActions.map((action) => (
             <button

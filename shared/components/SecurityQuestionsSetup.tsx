@@ -58,7 +58,7 @@ export const SecurityQuestionsSetup: React.FC<SecurityQuestionsSetupProps> = ({ 
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-white min-h-[100dvh] relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled">
+    <div className="flex-1 flex flex-col bg-white relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
       {/* Back button */}
       <button
         type="button"

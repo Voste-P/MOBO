@@ -147,7 +147,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
   // 1. Splash Screen (Dark Theme)
   if (view === 'splash') {
     return (
-      <div className="flex-1 flex flex-col bg-black text-white relative overflow-x-hidden min-h-[100dvh] pb-[env(safe-area-inset-bottom)]">
+      <div className="flex-1 flex flex-col bg-black text-white relative overflow-x-hidden pb-[env(safe-area-inset-bottom)]" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
         {/* Background Effects */}
         <div className="absolute top-[-20%] right-[-20%] w-[500px] h-[500px] bg-lime-500/20 rounded-full blur-[120px] pointer-events-none animate-pulse motion-reduce:animate-none"></div>
         <div className="absolute bottom-[-10%] left-[-10%] w-[300px] h-[300px] bg-indigo-600/20 rounded-full blur-[100px] pointer-events-none"></div>
@@ -200,7 +200,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
 
   // 2. Login / Register Form
   return (
-    <div className="flex-1 flex flex-col bg-white min-h-[100dvh] relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled">
+    <div className="flex-1 flex flex-col bg-white relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
       <div className="mb-8">
         <Button
           type="button"

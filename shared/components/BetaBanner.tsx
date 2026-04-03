@@ -15,6 +15,11 @@ export function BetaBanner() {
     }
   }, []);
 
+  // Keep --banner-h CSS variable in sync so auth pages can account for the spacer
+  useEffect(() => {
+    document.documentElement.style.setProperty('--banner-h', dismissed ? '0px' : '34px');
+  }, [dismissed]);
+
   const handleDismiss = () => {
     setDismissed(true);
     try { sessionStorage.setItem(DISMISS_KEY, "1"); } catch { /* quota */ }

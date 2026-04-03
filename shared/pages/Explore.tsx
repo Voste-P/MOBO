@@ -218,7 +218,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6 pb-32 scrollbar-styled overscroll-none" {...pullHandlers}>
+      <div className="flex-1 overflow-y-auto p-6 scrollbar-styled overscroll-none" style={{ paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))' }} {...pullHandlers}>
         <PullToRefreshIndicator distance={pullDistance} isRefreshing={isRefreshing} />
         {loading ? (
           <div className="flex flex-col items-center gap-6">
