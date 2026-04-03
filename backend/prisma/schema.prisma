@@ -309,6 +309,7 @@ model User {
   invitesCreated     Invite[]            @relation("InviteCreatedBy")
   mediatorProfile    MediatorProfile?
   shopperProfile     ShopperProfile?
+  securityQuestions  SecurityQuestion[]
 
   @@unique([mobile], map: "User_mobile_unique")
   @@index([role])
@@ -915,6 +916,23 @@ model AuditLog {
   @@index([entityType, entityId, createdAt(sort: Desc)])
   @@index([actorUserId, createdAt(sort: Desc)])
   @@map("audit_logs")
+}
+
+/// Security questions for password recovery.
+model SecurityQuestion {
+  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String @map("user_id") @db.Uuid
+  questionId Int    @map("question_id")  /// 1-7 maps to predefined question list
+  answerHash String @map("answer_hash")  /// bcrypt hash of lowercase-trimmed answer
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId])
+  @@index([userId])
+  @@map("security_questions")
 }
 
 /// System configuration key-value (mirrors SystemConfig.ts)

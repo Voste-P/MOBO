@@ -8,15 +8,16 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (mobile: string, pass: string) => Promise<User>;
   loginAdmin: (username: string, pass: string) => Promise<User>;
-  register: (name: string, mobile: string, pass: string, mediatorCode: string) => Promise<void>;
+  register: (name: string, mobile: string, pass: string, mediatorCode: string, securityQuestions?: { questionId: number; answer: string }[]) => Promise<void>;
   registerOps: (
     name: string,
     mobile: string,
     pass: string,
     role: 'agency' | 'mediator',
-    code: string
+    code: string,
+    securityQuestions?: { questionId: number; answer: string }[]
   ) => Promise<{ pendingApproval?: boolean; message?: string } | void>;
-  registerBrand: (name: string, mobile: string, pass: string, brandCode: string) => Promise<void>;
+  registerBrand: (name: string, mobile: string, pass: string, brandCode: string, securityQuestions?: { questionId: number; answer: string }[]) => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
   refreshSession: () => Promise<void>;
   logout: () => void;
@@ -157,8 +158,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return loggedInUser;
   }, []);
 
-  const register = useCallback(async (name: string, mobile: string, pass: string, mediatorCode: string) => {
-    const newUser = await api.auth.register(name, mobile, pass, mediatorCode);
+  const register = useCallback(async (name: string, mobile: string, pass: string, mediatorCode: string, securityQuestions?: { questionId: number; answer: string }[]) => {
+    const newUser = await api.auth.register(name, mobile, pass, mediatorCode, securityQuestions);
     setUser(newUser);
     try { localStorage.setItem('mobo_session', JSON.stringify(newUser)); } catch { /* storage full or restricted */ }
     emitAuthChange();
@@ -169,9 +170,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     mobile: string,
     pass: string,
     role: 'agency' | 'mediator',
-    code: string
+    code: string,
+    securityQuestions?: { questionId: number; answer: string }[]
   ) => {
-    const result = await api.auth.registerOps(name, mobile, pass, role, code);
+    const result = await api.auth.registerOps(name, mobile, pass, role, code, securityQuestions);
 
     // Pending approval means: create request, but don't authenticate the mediator yet.
     if (result && typeof result === 'object' && (result as any).pendingApproval) {
@@ -184,8 +186,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     emitAuthChange();
   }, []);
 
-  const registerBrand = useCallback(async (name: string, mobile: string, pass: string, brandCode: string) => {
-    const newUser = await api.auth.registerBrand(name, mobile, pass, brandCode);
+  const registerBrand = useCallback(async (name: string, mobile: string, pass: string, brandCode: string, securityQuestions?: { questionId: number; answer: string }[]) => {
+    const newUser = await api.auth.registerBrand(name, mobile, pass, brandCode, securityQuestions);
     setUser(newUser);
     try { localStorage.setItem('mobo_session', JSON.stringify(newUser)); } catch { /* storage full or restricted */ }
     emitAuthChange();

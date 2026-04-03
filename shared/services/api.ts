@@ -625,20 +625,20 @@ export const api = {
       return unwrapAuthResponse(data);
     },
     /** [FIX] Added missing register method for AuthContext.tsx */
-    register: async (name: string, mobile: string, pass: string, mediatorCode: string) => {
+    register: async (name: string, mobile: string, pass: string, mediatorCode: string, securityQuestions?: { questionId: number; answer: string }[]) => {
       const data = await fetchJson('/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, mobile, password: pass, mediatorCode }),
+        body: JSON.stringify({ name, mobile, password: pass, mediatorCode, securityQuestions }),
       });
       return unwrapAuthResponse(data);
     },
     /** [FIX] Added missing registerOps method for AuthContext.tsx */
-    registerOps: async (name: string, mobile: string, pass: string, role: string, code: string) => {
+    registerOps: async (name: string, mobile: string, pass: string, role: string, code: string, securityQuestions?: { questionId: number; answer: string }[]) => {
       const data = await fetchJson('/auth/register-ops', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, mobile, password: pass, role, code }),
+        body: JSON.stringify({ name, mobile, password: pass, role, code, securityQuestions }),
       });
 
       // Mediator join via agency code returns an accepted-but-pending response.
@@ -652,11 +652,11 @@ export const api = {
       return unwrapAuthResponse(data);
     },
     /** [FIX] Added missing registerBrand method for AuthContext.tsx */
-    registerBrand: async (name: string, mobile: string, pass: string, brandCode: string) => {
+    registerBrand: async (name: string, mobile: string, pass: string, brandCode: string, securityQuestions?: { questionId: number; answer: string }[]) => {
       const data = await fetchJson('/auth/register-brand', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, mobile, password: pass, brandCode }),
+        body: JSON.stringify({ name, mobile, password: pass, brandCode, securityQuestions }),
       });
       return unwrapAuthResponse(data);
     },
@@ -667,6 +667,34 @@ export const api = {
         body: JSON.stringify({ userId, ...updates }),
       });
       return unwrapAuthResponse(data);
+    },
+
+    saveSecurityQuestions: async (questions: { questionId: number; answer: string }[]) => {
+      return fetchJson('/auth/security-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify(questions),
+      });
+    },
+
+    forgotPasswordLookup: async (mobile: string) => {
+      return fetchJson('/auth/forgot-password/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile }),
+      }) as Promise<{ questionIds: number[] }>;
+    },
+
+    forgotPasswordReset: async (
+      mobile: string,
+      answers: { questionId: number; answer: string }[],
+      newPassword: string
+    ) => {
+      return fetchJson('/auth/forgot-password/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile, answers, newPassword }),
+      }) as Promise<{ ok: boolean; message: string }>;
     },
   },
   products: {

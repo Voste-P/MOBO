@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Users, ArrowRight, Lock, User, Phone, CheckCircle, ChevronLeft, Clock } from 'lucide-react';
 import { Button, Input, Spinner } from '../components/ui';
+import { SecurityQuestionsSetup, type SecurityQA } from '../components/SecurityQuestionsSetup';
+import { ForgotPassword } from './ForgotPassword';
 import { normalizeMobileTo10Digits } from '../utils/mobiles';
 import { formatErrorMessage } from '../utils/errors';
 
@@ -10,7 +12,7 @@ interface MediatorAuthProps {
 }
 
 export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
-  const [view, setView] = useState<'splash' | 'login' | 'register' | 'pending'>('splash');
+  const [view, setView] = useState<'splash' | 'login' | 'register' | 'pending' | 'securityQuestions' | 'forgotPassword'>('splash');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [pendingMessage, setPendingMessage] = useState<string>('');
@@ -20,6 +22,8 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [agencyCode, setAgencyCode] = useState('');
+
+  const pendingRegRef = useRef<{ name: string; mobile: string; password: string; agencyCode: string } | null>(null);
 
   const { login, registerOps, logout } = useAuth();
 
@@ -68,12 +72,21 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
       setError('Password needs 8+ chars with uppercase, lowercase, number, and special character.');
       return;
     }
+    // Store data and go to security questions step
+    pendingRegRef.current = { name, mobile, password, agencyCode };
+    setError('');
+    setView('securityQuestions');
+  };
+
+  const handleSecurityQuestionsComplete = async (questions: SecurityQA[]) => {
+    const reg = pendingRegRef.current;
+    if (!reg) return;
+
     setIsLoading(true);
     setError('');
     try {
-      const result = await registerOps(name, mobile, password, 'mediator', agencyCode.toUpperCase());
-      
-      // If account is pending approval, show the pending screen (no auto-login)
+      const result = await registerOps(reg.name, reg.mobile, reg.password, 'mediator', reg.agencyCode.toUpperCase(), questions);
+
       if (result && typeof result === 'object' && 'pendingApproval' in result && result.pendingApproval) {
         const msg = (result as any)?.message;
         setPendingMessage(
@@ -85,17 +98,36 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
         setIsLoading(false);
         return;
       }
-      
-      // Otherwise, registration succeeded and user is auto-logged in (handled by registerOps)
     } catch (err: any) {
       setError(formatErrorMessage(err, 'Registration failed'));
+      setView('register');
+    } finally {
       setIsLoading(false);
+      pendingRegRef.current = null;
     }
   };
 
+  if (view === 'forgotPassword') {
+    return (
+      <ForgotPassword
+        onBack={() => { setView('login'); setError(''); }}
+        onSuccess={() => { setView('login'); setError(''); }}
+      />
+    );
+  }
+
+  if (view === 'securityQuestions') {
+    return (
+      <SecurityQuestionsSetup
+        onComplete={handleSecurityQuestionsComplete}
+        onBack={() => setView('register')}
+      />
+    );
+  }
+
   if (view === 'pending') {
     return (
-      <div className="flex-1 flex flex-col bg-white h-full relative px-8 pt-12 pb-[env(safe-area-inset-bottom)] overflow-y-auto scrollbar-styled">
+      <div className="flex-1 flex flex-col bg-white min-h-[100dvh] relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled">
         <Button
           type="button"
           variant="secondary"
@@ -171,7 +203,7 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
   }
   if (view === 'splash') {
     return (
-      <div className="flex-1 flex flex-col bg-zinc-900 text-white relative overflow-hidden h-full pb-[env(safe-area-inset-bottom)]">
+      <div className="flex-1 flex flex-col bg-zinc-900 text-white relative overflow-x-hidden min-h-[100dvh] pb-[env(safe-area-inset-bottom)]">
         <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-black"></div>
         {onBack && (
           <div className="absolute top-6 left-6 z-50">
@@ -215,7 +247,7 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-white h-full relative px-8 pt-12 pb-[env(safe-area-inset-bottom)] overflow-y-auto scrollbar-styled">
+    <div className="flex-1 flex flex-col bg-white min-h-[100dvh] relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled">
       <Button
         type="button"
         variant="secondary"
@@ -305,6 +337,16 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
             'Register'
           )}
         </Button>
+
+        {view === 'login' && (
+          <button
+            type="button"
+            onClick={() => { setView('forgotPassword'); setError(''); }}
+            className="w-full text-center text-sm text-gray-500 font-bold hover:text-black transition-colors mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white rounded py-1"
+          >
+            Forgot Password?
+          </button>
+        )}
       </form>
     </div>
   );

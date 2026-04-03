@@ -14,6 +14,9 @@ import {
   registerSchema,
   refreshSchema,
   updateProfileSchema,
+  securityQuestionsPayloadSchema,
+  forgotPasswordLookupSchema,
+  forgotPasswordResetSchema,
 } from '../validations/auth.js';
 import { generateHumanCode } from '../services/codes.js';
 import { writeAuditLog } from '../services/audit.js';
@@ -77,6 +80,10 @@ export function makeAuthController(env: Env) {
     register: async (req: Request, res: Response, next: NextFunction) => {
       try {
         const body = registerSchema.parse(req.body);
+
+        // Parse optional security questions from request body
+        const rawSQ = Array.isArray(req.body?.securityQuestions) ? req.body.securityQuestions : null;
+        const parsedSQ = rawSQ ? securityQuestionsPayloadSchema.safeParse(rawSQ) : null;
 
         const existing = await db().user.findFirst({ where: { mobile: body.mobile, isDeleted: false }, select: { id: true } });
         if (existing) {
@@ -231,6 +238,19 @@ export function makeAuthController(env: Env) {
               ...(agencyCode ? { agencyCodes: [agencyCode] } : {}),
               roles: ['admin', 'ops'],
             },
+          });
+        }
+        // Save security questions if provided during registration
+        if (parsedSQ?.success && parsedSQ.data.length === 3) {
+          const sqRecords = await Promise.all(
+            parsedSQ.data.map(async (q) => ({
+              userId: user.id,
+              questionId: q.questionId,
+              answerHash: await hashPassword(q.answer.trim().toLowerCase()),
+            }))
+          );
+          await db().securityQuestion.createMany({ data: sqRecords }).catch((sqErr) => {
+            businessLog.warn('Failed to save security questions during registration', { userId: user.id, error: sqErr?.message });
           });
         }
         res.status(201).json({
@@ -520,6 +540,10 @@ export function makeAuthController(env: Env) {
       try {
         const body = registerOpsSchema.parse(req.body);
 
+        // Parse optional security questions from request body
+        const rawSQOps = Array.isArray(req.body?.securityQuestions) ? req.body.securityQuestions : null;
+        const parsedSQOps = rawSQOps ? securityQuestionsPayloadSchema.safeParse(rawSQOps) : null;
+
         const existing = await db().user.findFirst({ where: { mobile: body.mobile, isDeleted: false }, select: { id: true } });
         if (existing) {
           throw new AppError(409, 'MOBILE_ALREADY_EXISTS', 'Mobile already registered');
@@ -709,6 +733,19 @@ export function makeAuthController(env: Env) {
               audience: { agencyCodes: [agencyCode], roles: ['admin', 'ops'] },
             });
           }
+          // Save security questions if provided during ops registration
+          if (parsedSQOps?.success && parsedSQOps.data.length === 3) {
+            const sqOpsRecords = await Promise.all(
+              parsedSQOps.data.map(async (q) => ({
+                userId: user.id,
+                questionId: q.questionId,
+                answerHash: await hashPassword(q.answer.trim().toLowerCase()),
+              }))
+            );
+            await db().securityQuestion.createMany({ data: sqOpsRecords }).catch((sqErr) => {
+              businessLog.warn('Failed to save security questions during ops registration', { userId: user.id, error: sqErr?.message });
+            });
+          }
           res.status(202).json({
             pendingApproval: true,
             message: 'Request sent to agency for approval',
@@ -737,6 +774,10 @@ export function makeAuthController(env: Env) {
     registerBrand: async (req: Request, res: Response, next: NextFunction) => {
       try {
         const body = registerBrandSchema.parse(req.body);
+
+        // Parse optional security questions from request body
+        const rawSQBrand = Array.isArray(req.body?.securityQuestions) ? req.body.securityQuestions : null;
+        const parsedSQBrand = rawSQBrand ? securityQuestionsPayloadSchema.safeParse(rawSQBrand) : null;
 
         const existing = await db().user.findFirst({ where: { mobile: body.mobile, isDeleted: false }, select: { id: true } });
         if (existing) {
@@ -842,6 +883,20 @@ export function makeAuthController(env: Env) {
         const refreshToken = signRefreshToken(env, user.id, user.roles as any);
 
         const wallet = await ensureWallet(user.id);
+
+        // Save security questions if provided during brand registration
+        if (parsedSQBrand?.success && parsedSQBrand.data.length === 3) {
+          const sqBrandRecords = await Promise.all(
+            parsedSQBrand.data.map(async (q) => ({
+              userId: user.id,
+              questionId: q.questionId,
+              answerHash: await hashPassword(q.answer.trim().toLowerCase()),
+            }))
+          );
+          await db().securityQuestion.createMany({ data: sqBrandRecords }).catch((sqErr) => {
+            businessLog.warn('Failed to save security questions during brand registration', { userId: user.id, error: sqErr?.message });
+          });
+        }
 
         res.status(201).json({
           user: toUiUser(pgUser(user), pgWallet(wallet)),
@@ -978,6 +1033,210 @@ export function makeAuthController(env: Env) {
           category: 'AUTHENTICATION',
           severity: 'medium',
           userId: req.auth?.userId,
+          ip: req.ip,
+          requestId: String(res.locals?.requestId || ''),
+          metadata: { error: err instanceof Error ? err.message : String(err) },
+        });
+        next(err);
+      }
+    },
+
+    // ─── Security Questions: save during registration ──────────────
+    saveSecurityQuestions: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const userId = String(req.auth?.userId || '').trim();
+        if (!userId) throw new AppError(401, 'UNAUTHENTICATED', 'Missing auth context');
+
+        const body = securityQuestionsPayloadSchema.parse(req.body);
+
+        const user = await db().user.findFirst({ where: { id: userId, isDeleted: false }, select: { id: true } });
+        if (!user) throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
+
+        // Check if user already has security questions
+        const existing = await db().securityQuestion.count({ where: { userId: user.id } });
+        if (existing > 0) {
+          throw new AppError(409, 'SECURITY_QUESTIONS_ALREADY_SET', 'Security questions are already configured');
+        }
+
+        // Hash all answers (lowercase + trimmed) and store
+        const records = await Promise.all(
+          body.map(async (q) => ({
+            userId: user.id,
+            questionId: q.questionId,
+            answerHash: await hashPassword(q.answer.trim().toLowerCase()),
+          }))
+        );
+
+        await db().securityQuestion.createMany({ data: records });
+
+        await writeAuditLog({
+          req,
+          action: 'SECURITY_QUESTIONS_SET',
+          entityType: 'User',
+          entityId: user.id,
+          metadata: { questionIds: body.map((q) => q.questionId) },
+        });
+
+        businessLog.info('Security questions set', { userId: user.id, ip: req.ip });
+        res.json({ ok: true });
+      } catch (err) {
+        logErrorEvent({
+          message: 'Failed to save security questions',
+          category: 'AUTHENTICATION',
+          severity: 'medium',
+          userId: req.auth?.userId,
+          ip: req.ip,
+          requestId: String(res.locals?.requestId || ''),
+          metadata: { error: err instanceof Error ? err.message : String(err) },
+        });
+        next(err);
+      }
+    },
+
+    // ─── Forgot Password: Step 1 — lookup user & return question IDs ───
+    forgotPasswordLookup: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = forgotPasswordLookupSchema.parse(req.body);
+
+        const user = await db().user.findFirst({
+          where: { mobile: body.mobile, isDeleted: false },
+          select: { id: true, status: true },
+        });
+
+        if (!user) {
+          // Don't reveal whether the mobile exists — generic error
+          throw new AppError(404, 'USER_NOT_FOUND', 'No account found with this mobile number');
+        }
+        if (user.status !== 'active') {
+          throw new AppError(403, 'USER_NOT_ACTIVE', 'Account is not active');
+        }
+
+        const questions = await db().securityQuestion.findMany({
+          where: { userId: user.id },
+          select: { questionId: true },
+          orderBy: { questionId: 'asc' },
+        });
+
+        if (questions.length < 3) {
+          throw new AppError(400, 'NO_SECURITY_QUESTIONS', 'Security questions are not configured for this account. Please contact support.');
+        }
+
+        logAuthEvent('FORGOT_PASSWORD_LOOKUP', {
+          identifier: body.mobile,
+          ip: req.ip,
+          requestId: String(res.locals.requestId || ''),
+        });
+
+        res.json({ questionIds: questions.map((q) => q.questionId) });
+      } catch (err) {
+        logErrorEvent({
+          message: 'Forgot password lookup failed',
+          category: 'AUTHENTICATION',
+          severity: 'medium',
+          ip: req.ip,
+          requestId: String(res.locals?.requestId || ''),
+          metadata: { error: err instanceof Error ? err.message : String(err) },
+        });
+        next(err);
+      }
+    },
+
+    // ─── Forgot Password: Step 2 — verify answers & reset password ───
+    forgotPasswordReset: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = forgotPasswordResetSchema.parse(req.body);
+
+        const user = await db().user.findFirst({
+          where: { mobile: body.mobile, isDeleted: false },
+          select: { id: true, status: true, lockoutUntil: true },
+        });
+
+        if (!user) {
+          throw new AppError(404, 'USER_NOT_FOUND', 'No account found with this mobile number');
+        }
+        if (user.status !== 'active') {
+          throw new AppError(403, 'USER_NOT_ACTIVE', 'Account is not active');
+        }
+
+        const storedQuestions = await db().securityQuestion.findMany({
+          where: { userId: user.id },
+          select: { questionId: true, answerHash: true },
+        });
+
+        if (storedQuestions.length < 3) {
+          throw new AppError(400, 'NO_SECURITY_QUESTIONS', 'Security questions not configured. Contact support.');
+        }
+
+        // Verify each answer
+        for (const submitted of body.answers) {
+          const stored = storedQuestions.find((q) => q.questionId === submitted.questionId);
+          if (!stored) {
+            logSecurityIncident('FORGOT_PASSWORD_INVALID_QUESTION', {
+              severity: 'medium',
+              ip: req.ip,
+              userId: user.id,
+              route: req.originalUrl,
+              method: req.method,
+              requestId: String(res.locals.requestId || ''),
+              metadata: { questionId: submitted.questionId },
+            });
+            throw new AppError(400, 'SECURITY_ANSWER_INCORRECT', 'One or more security answers are incorrect');
+          }
+
+          const isMatch = await verifyPassword(
+            submitted.answer.trim().toLowerCase(),
+            stored.answerHash
+          );
+          if (!isMatch) {
+            logSecurityIncident('FORGOT_PASSWORD_WRONG_ANSWER', {
+              severity: 'medium',
+              ip: req.ip,
+              userId: user.id,
+              route: req.originalUrl,
+              method: req.method,
+              requestId: String(res.locals.requestId || ''),
+              metadata: { questionId: submitted.questionId },
+            });
+            throw new AppError(400, 'SECURITY_ANSWER_INCORRECT', 'One or more security answers are incorrect');
+          }
+        }
+
+        // All answers correct — reset password
+        const newHashedPassword = await hashPassword(body.newPassword);
+
+        await db().user.update({
+          where: { id: user.id },
+          data: {
+            passwordHash: newHashedPassword,
+            failedLoginAttempts: 0,
+            lockoutUntil: null,
+          },
+        });
+
+        await writeAuditLog({
+          req,
+          action: 'PASSWORD_RESET_VIA_SECURITY_QUESTIONS',
+          entityType: 'User',
+          entityId: user.id,
+          metadata: { mobile: body.mobile },
+        });
+
+        businessLog.info('Password reset via security questions', { userId: user.id, mobile: body.mobile, ip: req.ip });
+        logAuthEvent('PASSWORD_RESET', {
+          userId: user.id,
+          identifier: body.mobile,
+          ip: req.ip,
+          requestId: String(res.locals.requestId || ''),
+          userAgent: req.get('user-agent'),
+          metadata: { method: 'security_questions' },
+        });
+
+        res.json({ ok: true, message: 'Password has been reset successfully. You can now login with your new password.' });
+      } catch (err) {
+        logErrorEvent({
+          message: 'Forgot password reset failed',
+          category: 'AUTHENTICATION',
+          severity: 'high',
           ip: req.ip,
           requestId: String(res.locals?.requestId || ''),
           metadata: { error: err instanceof Error ? err.message : String(err) },

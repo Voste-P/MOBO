@@ -78,3 +78,63 @@ export const updateProfileSchema = z.object({
 export const refreshSchema = z.object({
   refreshToken: z.string().min(1).max(5000),
 });
+
+// ── Forgot Password / Security Questions ──
+
+/** Valid question IDs (1-7 predefined questions) */
+const questionIdSchema = z.number().int().min(1).max(7);
+
+/** Three distinct security question+answer pairs — set during registration */
+export const securityQuestionsPayloadSchema = z
+  .array(
+    z.object({
+      questionId: questionIdSchema,
+      answer: z.string().min(1, 'Answer is required').max(200),
+    })
+  )
+  .length(3)
+  .refine(
+    (items) => new Set(items.map((i) => i.questionId)).size === 3,
+    { message: 'All three security questions must be different' }
+  );
+
+export const registerWithSecurityQuestionsSchema = registerSchema.extend({
+  securityQuestions: securityQuestionsPayloadSchema,
+});
+
+export const registerOpsWithSecurityQuestionsSchema = registerOpsSchema.extend({
+  securityQuestions: securityQuestionsPayloadSchema,
+});
+
+export const registerBrandWithSecurityQuestionsSchema = registerBrandSchema.extend({
+  securityQuestions: securityQuestionsPayloadSchema,
+});
+
+export const forgotPasswordLookupSchema = z.object({
+  mobile: mobile10Schema,
+});
+
+export const forgotPasswordVerifySchema = z.object({
+  mobile: mobile10Schema,
+  answers: z
+    .array(
+      z.object({
+        questionId: questionIdSchema,
+        answer: z.string().min(1).max(200),
+      })
+    )
+    .length(3),
+});
+
+export const forgotPasswordResetSchema = z.object({
+  mobile: mobile10Schema,
+  answers: z
+    .array(
+      z.object({
+        questionId: questionIdSchema,
+        answer: z.string().min(1).max(200),
+      })
+    )
+    .length(3),
+  newPassword: strongPasswordSchema,
+});

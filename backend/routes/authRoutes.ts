@@ -44,5 +44,10 @@ export function authRoutes(env: Env): Router {
   router.post('/register-brand', authLimiter, controller.registerBrand);
   router.patch('/profile', requireAuth(env), controller.updateProfile);
 
+  // Security questions & forgot password
+  router.post('/security-questions', requireAuth(env), controller.saveSecurityQuestions);
+  router.post('/forgot-password/lookup', authLimiter, controller.forgotPasswordLookup);
+  router.post('/forgot-password/reset', authLimiter, controller.forgotPasswordReset);
+
   return router;
 }
