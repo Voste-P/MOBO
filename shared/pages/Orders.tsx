@@ -12,7 +12,7 @@ import { formatCurrency } from '../utils/formatCurrency';
 import { getPrimaryOrderId } from '../utils/orderHelpers';
 import { csvSafe, downloadCsv } from '../utils/csvHelpers';
 import { Order, Product, Ticket } from '../types';
-import { Button, EmptyState, Spinner } from '../components/ui';
+import { Button, EmptyState, Spinner, ExpandableText } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { ProxiedImage } from '../components/ProxiedImage';
 import { ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
@@ -1662,7 +1662,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                         {t.status}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600 line-clamp-2">{t.description}</p>
+                    <ExpandableText text={t.description} clampClass="line-clamp-2" className="text-[11px] text-slate-600" as="p">{t.description}</ExpandableText>
                     {t.orderId && (
                       <p className="text-[10px] text-slate-400"><span className="font-bold">Order:</span> {t.orderId}</p>
                     )}
@@ -1860,7 +1860,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           alt={p.title || 'Product'}
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-slate-900 truncate">{p.title}</p>
+                          <ExpandableText text={p.title} clampClass="truncate" className="text-sm font-bold text-slate-900" as="p">{p.title}</ExpandableText>
                           <div className="flex items-center justify-between mt-1">
                             <span className="text-[10px] font-bold text-slate-400 uppercase">
                               {p.platform}
@@ -1881,9 +1881,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       alt={selectedProduct.title || 'Product'}
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-slate-900 line-clamp-2">
+                      <ExpandableText text={selectedProduct.title} clampClass="line-clamp-2" className="text-sm font-bold text-slate-900" as="p">
                         {selectedProduct.title}
-                      </p>
+                      </ExpandableText>
                       <p className="text-xs font-bold text-lime-600 mt-1">
                         Target Price: {formatCurrency(selectedProduct.price)}
                       </p>
@@ -2464,9 +2464,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           {ratingVerification.accountNameMatch ? '✓ Match' : '✗ Mismatch'}
                         </div>
                         {ratingVerification.detectedAccountName && (
-                          <div className="text-[10px] text-slate-500 mt-0.5 truncate">
+                          <ExpandableText text={ratingVerification.detectedAccountName} clampClass="truncate" className="text-[10px] text-slate-500 mt-0.5" as="div">
                             Detected: {ratingVerification.detectedAccountName}
-                          </div>
+                          </ExpandableText>
                         )}
                       </div>
                       <div className={`p-2.5 rounded-xl text-center ${ratingVerification.productNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
@@ -2475,9 +2475,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           {ratingVerification.productNameMatch ? '✓ Match' : '✗ Mismatch'}
                         </div>
                         {ratingVerification.detectedProductName && (
-                          <div className="text-[10px] text-slate-500 mt-0.5 truncate">
+                          <ExpandableText text={ratingVerification.detectedProductName} clampClass="truncate" className="text-[10px] text-slate-500 mt-0.5" as="div">
                             Found: {ratingVerification.detectedProductName}
-                          </div>
+                          </ExpandableText>
                         )}
                       </div>
                     </div>

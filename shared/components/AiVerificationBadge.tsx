@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { ExpandableText } from './ui';
 
 /* ── Types ──────────────────────────────────────────────────────────── */
 
@@ -90,9 +91,9 @@ function VerifyItem({
         {match ? trueLabel : falseLabel}
       </p>
       {detected && (
-        <p className={`text-[9px] ${s.detailText} truncate mt-0.5`}>
+        <ExpandableText text={detected} clampClass="truncate" className={`text-[9px] ${s.detailText} mt-0.5`} as="p">
           Found: {detected}
-        </p>
+        </ExpandableText>
       )}
     </div>
   );

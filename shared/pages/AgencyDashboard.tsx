@@ -10,7 +10,7 @@ import { getDirectBackendUrl } from '../utils/apiBaseUrl';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 import { User, Campaign, Order, Ticket } from '../types';
-import { EmptyState, Spinner, Pagination, SidebarItem } from '../components/ui';
+import { EmptyState, Spinner, Pagination, SidebarItem, ExpandableText } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { DesktopShell } from '../components/DesktopShell';
 import { formatCurrency } from '../utils/formatCurrency';
@@ -872,9 +872,9 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
                       <div className="font-bold text-slate-900 text-sm mb-0.5">
                         {o.brandName || 'Brand'}
                       </div>
-                      <div className="text-[10px] text-slate-500 truncate max-w-[180px]">
+                      <ExpandableText text={o.items?.[0]?.title || 'Unknown Product'} clampClass="truncate" className="text-[10px] text-slate-500 max-w-[180px]" as="div">
                         {o.items?.[0]?.title || 'Unknown Product'}
-                      </div>
+                      </ExpandableText>
                       {o.soldBy && o.soldBy !== 'null' && o.soldBy !== 'undefined' && (
                         <div className="text-[9px] text-slate-400 mt-0.5">Seller: {o.soldBy}</div>
                       )}
@@ -973,7 +973,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
                         </div>
                       </td>
                       <td className="p-4">
-                        <div className="text-xs font-semibold text-slate-700 max-w-[150px] truncate" title={o.items?.[0]?.productName || ''}>{o.items?.[0]?.productName || 'Product'}</div>
+                        <ExpandableText text={o.items?.[0]?.productName || 'Product'} clampClass="truncate" className="text-xs font-semibold text-slate-700 max-w-[150px]" as="div">{o.items?.[0]?.productName || 'Product'}</ExpandableText>
                         <div className="text-[9px] text-slate-400">Qty: {o.items?.[0]?.qty || 1}</div>
                       </td>
                       <td className="p-4 text-right font-mono font-bold text-slate-900">{formatCurrency(o.total)}</td>
@@ -1024,7 +1024,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
                         <div className="text-xs font-bold text-slate-700">{o.brandName || o.items?.[0]?.brandName || 'Brand'}</div>
                       </td>
                       <td className="p-4">
-                        <div className="text-xs font-semibold text-slate-700 max-w-[150px] truncate" title={o.items?.[0]?.productName || ''}>{o.items?.[0]?.productName || 'Product'}</div>
+                        <ExpandableText text={o.items?.[0]?.productName || 'Product'} clampClass="truncate" className="text-xs font-semibold text-slate-700 max-w-[150px]" as="div">{o.items?.[0]?.productName || 'Product'}</ExpandableText>
                       </td>
                       <td className="p-4 text-center">
                         <span className="text-xs font-bold text-slate-600">{o.items?.[0]?.qty || 1}</span>
@@ -2115,9 +2115,9 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                             className="w-10 h-10 object-contain rounded-lg bg-slate-50 border border-slate-100 p-1 group-hover:scale-105 transition-transform"
                           />
                           <div>
-                            <span className="font-bold text-slate-900 truncate max-w-[200px] block" title={c.title || ''}>
+                            <ExpandableText text={c.title || ''} clampClass="truncate" className="font-bold text-slate-900 max-w-[200px] block" as="span">
                               {c.title}
-                            </span>
+                            </ExpandableText>
                             <span
                               className="text-[9px] text-slate-400 font-mono cursor-pointer hover:text-purple-600 transition-colors"
                               title="Click to copy Campaign ID"
@@ -2137,9 +2137,9 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                         </div>
                       </td>
                       <td className="p-5">
-                        <span className="text-xs font-bold text-indigo-700 truncate max-w-[120px] block">
+                        <ExpandableText text={c.brand || '—'} clampClass="truncate" className="text-xs font-bold text-indigo-700 max-w-[120px] block" as="span">
                           {c.brand || '—'}
-                        </span>
+                        </ExpandableText>
                       </td>
                       <td className="p-5">
                         <span className="text-[10px] font-bold text-slate-500 uppercase bg-slate-100 px-2 py-1 rounded border border-slate-200">
@@ -2322,9 +2322,9 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                             {c.dealType || 'Discount'}
                           </span>
                         </div>
-                        <h4 className="font-bold text-slate-900 text-sm leading-tight line-clamp-2 mb-2" title={c.title || ''}>
+                        <ExpandableText text={c.title || ''} clampClass="line-clamp-2" className="font-bold text-slate-900 text-sm leading-tight mb-2" as="h4">
                           {c.title}
-                        </h4>
+                        </ExpandableText>
                         <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
                           Offered by <span className="text-indigo-600">"{c.brand}"</span>
                         </p>
@@ -2586,9 +2586,9 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                   <p className="text-xs text-slate-400 font-extrabold mb-1 uppercase tracking-widest">
                     Selected Campaign
                   </p>
-                  <h4 className="text-sm sm:text-base font-black text-slate-900 mb-0.5 leading-tight line-clamp-1" title={assignModal.title || ''}>
+                  <ExpandableText text={assignModal.title || ''} clampClass="line-clamp-1" className="text-sm sm:text-base font-black text-slate-900 mb-0.5 leading-tight" as="h4">
                     {assignModal.title}
-                  </h4>
+                  </ExpandableText>
                   <span
                     className="text-[9px] text-slate-400 font-mono cursor-pointer hover:text-purple-600 transition-colors"
                     title="Click to copy Campaign ID"
@@ -2843,9 +2843,9 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-slate-900 group-hover:text-purple-700 transition-colors truncate">
+                          <ExpandableText text={m.name || 'Unknown'} clampClass="truncate" className="text-sm font-bold text-slate-900 group-hover:text-purple-700 transition-colors" as="p">
                             {m.name || 'Unknown'}
-                          </p>
+                          </ExpandableText>
                           <div className="flex items-center gap-2 mt-0.5">
                             <p className="text-[10px] text-slate-400 font-mono bg-slate-50 px-1.5 py-0.5 rounded w-fit border border-slate-100">
                               {m.mediatorCode}
@@ -3171,14 +3171,14 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
                         <div className="text-[10px] text-slate-400 font-bold mt-0.5">{new Date(o.createdAt).toLocaleDateString('en-GB')}</div>
                       </td>
                       <td className="p-4">
-                        <div className="font-bold text-slate-900 text-xs truncate max-w-[160px]">{o.buyerName || 'Unknown'}</div>
-                        <div className="text-[10px] text-slate-500 truncate max-w-[160px]" title={o.items?.[0]?.title || ''}>{o.items?.[0]?.title}</div>
+                        <ExpandableText text={o.buyerName || 'Unknown'} clampClass="truncate" className="font-bold text-slate-900 text-xs max-w-[160px]" as="div">{o.buyerName || 'Unknown'}</ExpandableText>
+                        <ExpandableText text={o.items?.[0]?.title || ''} clampClass="truncate" className="text-[10px] text-slate-500 max-w-[160px]" as="div">{o.items?.[0]?.title}</ExpandableText>
                       </td>
                       <td className="p-4">
                         <div className="text-xs font-bold text-slate-700">{o.managerName || 'Unknown'}</div>
                       </td>
                       <td className="p-4">
-                        <div className="text-xs text-slate-600 truncate max-w-[120px]">{campTitle}</div>
+                        <ExpandableText text={campTitle} clampClass="truncate" className="text-xs text-slate-600 max-w-[120px]" as="div">{campTitle}</ExpandableText>
                       </td>
                       <td className="p-4 text-right font-mono font-bold text-slate-900 text-xs">{formatCurrency(o.total)}</td>
                       <td className="p-4 text-center">
@@ -3304,7 +3304,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
               <div className="flex gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <ProxiedImage src={proofOrder.items?.[0]?.image} alt={proofOrder.items?.[0]?.title || 'Product'} className="w-12 h-12 object-contain mix-blend-multiply rounded-lg bg-white border border-slate-100 p-1" />
                 <div>
-                  <p className="text-sm font-bold text-slate-900 line-clamp-1" title={proofOrder.items?.[0]?.title || ''}>{proofOrder.items?.[0]?.title}</p>
+                  <ExpandableText text={proofOrder.items?.[0]?.title || ''} clampClass="line-clamp-1" className="text-sm font-bold text-slate-900" as="p">{proofOrder.items?.[0]?.title}</ExpandableText>
                   <p className="text-xs text-slate-500 mt-0.5">Total: <span className="font-mono font-bold text-zinc-900">{formatCurrency(proofOrder.total)}</span></p>
                   <p className="text-[10px] text-slate-400 mt-0.5">Mediator: {proofOrder.managerName} · Buyer: {proofOrder.buyerName}</p>
                   {proofOrder.reviewerName && <p className="text-[10px] text-indigo-500 font-bold mt-0.5">Reviewer: {proofOrder.reviewerName}</p>}
@@ -3853,9 +3853,9 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators
                             </span>
                             {getStatusBadge(o)}
                           </div>
-                          <h4 className="font-bold text-slate-900 text-sm truncate">
+                          <ExpandableText text={o.items?.[0]?.title || ''} clampClass="truncate" className="font-bold text-slate-900 text-sm" as="h4">
                             {o.items?.[0]?.title}
-                          </h4>
+                          </ExpandableText>
                           <div className="flex justify-between items-center mt-1">
                             <span className="text-xs text-slate-500">Buyer: {o.buyerName}</span>
                             <button
@@ -4066,9 +4066,9 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators
                   className="w-14 h-14 object-contain mix-blend-multiply rounded-xl bg-white border border-slate-100 p-1"
                 />
                 <div>
-                  <p className="text-sm font-bold text-slate-900 line-clamp-1">
+                  <ExpandableText text={proofOrder.items?.[0]?.title || ''} clampClass="line-clamp-1" className="text-sm font-bold text-slate-900" as="p">
                     {proofOrder.items?.[0]?.title}
-                  </p>
+                  </ExpandableText>
                   <p className="text-xs text-slate-500 mt-1">
                     Total:{' '}
                     <span className="font-mono font-bold text-zinc-900">{formatCurrency(proofOrder.total)}</span>
@@ -4190,7 +4190,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators
                             {proofOrder.ratingAiVerification.accountNameMatch ? '✓ Match' : '✗ Mismatch'}
                           </p>
                           {proofOrder.ratingAiVerification.detectedAccountName && (
-                            <p className="text-[9px] text-slate-500 truncate mt-0.5">Found: {proofOrder.ratingAiVerification.detectedAccountName}</p>
+                            <ExpandableText text={`Found: ${proofOrder.ratingAiVerification.detectedAccountName}`} clampClass="truncate" className="text-[9px] text-slate-500 mt-0.5" as="p">Found: {proofOrder.ratingAiVerification.detectedAccountName}</ExpandableText>
                           )}
                         </div>
                         <div className={`p-2 rounded-lg text-center ${proofOrder.ratingAiVerification.productNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
@@ -4199,7 +4199,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators
                             {proofOrder.ratingAiVerification.productNameMatch ? '✓ Match' : '✗ Mismatch'}
                           </p>
                           {proofOrder.ratingAiVerification.detectedProductName && (
-                            <p className="text-[9px] text-slate-500 truncate mt-0.5">Found: {proofOrder.ratingAiVerification.detectedProductName}</p>
+                            <ExpandableText text={`Found: ${proofOrder.ratingAiVerification.detectedProductName}`} clampClass="truncate" className="text-[9px] text-slate-500 mt-0.5" as="p">Found: {proofOrder.ratingAiVerification.detectedProductName}</ExpandableText>
                           )}
                         </div>
                       </div>
@@ -4801,9 +4801,9 @@ export const AgencyDashboard: React.FC = () => {
                     <span className="text-[10px] text-slate-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''}</span>
                   </div>
                   {t.description && (
-                    <div className="text-xs text-slate-600 bg-slate-50 rounded-lg px-3 py-2 line-clamp-3">
+                    <ExpandableText text={String(t.description)} clampClass="line-clamp-3" className="text-xs text-slate-600 bg-slate-50 rounded-lg px-3 py-2" as="div">
                       &ldquo;{String(t.description)}&rdquo;
-                    </div>
+                    </ExpandableText>
                   )}
                   {t.userName && (
                     <div className="text-[10px] text-slate-400">From: {String(t.userName)} ({String(t.userRole || '')})</div>

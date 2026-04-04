@@ -16,3 +16,4 @@ export * from './Modal';
 export * from './Skeleton';
 export * from './Tabs';
 export * from './SidebarItem';
+export * from './ExpandableText';

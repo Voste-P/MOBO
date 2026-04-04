@@ -51,7 +51,7 @@ import {
   Package,
 } from 'lucide-react';
 
-import { EmptyState, Spinner, Pagination } from '../components/ui';
+import { EmptyState, Spinner, Pagination, ExpandableText } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { RatingVerificationBadge, ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
 import { MobileTabBar } from '../components/MobileTabBar';
@@ -275,7 +275,9 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                     )}
                   </div>
                   <div>
-                    <h4 className="font-bold text-zinc-900 text-xs line-clamp-1">{u.name || 'Unknown'}</h4>
+                    <ExpandableText text={u.name || 'Unknown'} clampClass="line-clamp-1" className="font-bold text-zinc-900 text-xs" as="h4">
+                      {u.name || 'Unknown'}
+                    </ExpandableText>
                     <p className="text-[10px] text-zinc-400 font-mono tracking-wide">{maskMobile(u.mobile)}</p>
                   </div>
                 </div>
@@ -484,9 +486,9 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                     </div>
                     <div className="min-w-0 flex-1 py-0.5">
                       <div className="flex justify-between items-start">
-                        <h4 className="font-bold text-zinc-900 text-sm line-clamp-1 pr-2" title={o.items?.[0]?.title || ''}>
+                        <ExpandableText text={o.items?.[0]?.title || ''} clampClass="line-clamp-1" className="font-bold text-zinc-900 text-sm pr-2" as="h4">
                           {o.items?.[0]?.title}
-                        </h4>
+                        </ExpandableText>
                         <span
                           className={`text-[9px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap uppercase border ${getDealTypeBadge(dealType)}`}
                         >
@@ -501,9 +503,9 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                       <div className="mt-1 flex items-center justify-between">
                         <div className="flex items-center gap-1.5 text-[11px]">
                           <span className="font-semibold text-zinc-400">Buyer:</span>
-                          <span className="font-bold text-zinc-900 truncate max-w-[120px]">
+                          <ExpandableText text={o.buyerName || ''} clampClass="truncate" className="font-bold text-zinc-900 max-w-[120px]" as="span">
                             {o.buyerName}
-                          </span>
+                          </ExpandableText>
                         </div>
                         <div className="flex items-center gap-1 text-[11px]">
                           <span className="font-black text-zinc-900">
@@ -658,9 +660,9 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                   <span className="text-[9px] text-zinc-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''}</span>
                 </div>
                 {t.description && (
-                  <div className="text-[10px] text-zinc-600 bg-zinc-50 rounded-lg px-2 py-1.5 line-clamp-3">
+                  <ExpandableText text={String(t.description)} clampClass="line-clamp-3" className="text-[10px] text-zinc-600 bg-zinc-50 rounded-lg px-2 py-1.5" as="div">
                     &ldquo;{String(t.description)}&rdquo;
-                  </div>
+                  </ExpandableText>
                 )}
                 {t.userName && (
                   <div className="text-[9px] text-zinc-400">From: {String(t.userName)} ({String(t.userRole || '')})</div>
@@ -943,9 +945,9 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                           Published
                         </span>
                       </div>
-                      <h4 className="font-bold text-zinc-900 text-base leading-tight line-clamp-1 mb-1" title={d.title || ''}>
+                      <ExpandableText text={d.title || ''} clampClass="line-clamp-1" className="font-bold text-zinc-900 text-base leading-tight mb-1" as="h4">
                         {d.title}
-                      </h4>
+                      </ExpandableText>
                       {d.campaignId && (
                         <span
                           className="text-[8px] text-zinc-400 font-mono cursor-pointer hover:text-zinc-600 transition-colors mb-1 block"
@@ -1066,9 +1068,9 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                           </span>
                         )}
                       </div>
-                      <h4 className="font-bold text-zinc-900 text-base leading-tight line-clamp-1 mb-1" title={c.title || ''}>
+                      <ExpandableText text={c.title || ''} clampClass="line-clamp-1" className="font-bold text-zinc-900 text-base leading-tight mb-1" as="h4">
                         {c.title}
-                      </h4>
+                      </ExpandableText>
                       <span
                         className="text-[8px] text-zinc-400 font-mono cursor-pointer hover:text-zinc-600 transition-colors mb-1 block"
                         title="Click to copy Campaign ID"
@@ -1641,9 +1643,9 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
               </div>
               <div className="min-w-0">
                 <p className="text-[9px] font-bold text-zinc-400 uppercase">UPI Address</p>
-                <p className="font-bold text-zinc-900 text-sm truncate">
+                <ExpandableText text={buyer.upiId || 'Not Linked'} clampClass="truncate" className="font-bold text-zinc-900 text-sm" as="p">
                   {buyer.upiId || 'Not Linked'}
-                </p>
+                </ExpandableText>
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -1739,9 +1741,9 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
                             {o.items?.[0]?.dealType}
                           </span>
                         </div>
-                        <p className="text-xs font-bold text-zinc-900 line-clamp-1">
+                        <ExpandableText text={o.items?.[0]?.title || ''} clampClass="line-clamp-1" className="text-xs font-bold text-zinc-900" as="p">
                           {o.items?.[0]?.title}
-                        </p>
+                        </ExpandableText>
                       </div>
                     </div>
                     <div className="text-right">
@@ -2267,9 +2269,9 @@ export const MediatorDashboard: React.FC = () => {
                       <div className="flex-1 pl-1">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <p className="text-[11px] font-black text-zinc-900 leading-tight mb-0.5 truncate">
+                            <ExpandableText text={n.title || 'Notification'} clampClass="truncate" className="text-[11px] font-black text-zinc-900 leading-tight mb-0.5" as="p">
                               {n.title || 'Notification'}
-                            </p>
+                            </ExpandableText>
                             <p className="text-[10px] text-zinc-600 leading-tight">
                               {n.message}
                             </p>
@@ -2423,7 +2425,9 @@ export const MediatorDashboard: React.FC = () => {
                   {proofModal.extractedProductName && (
                     <div className="bg-black/40 p-2.5 rounded-xl border border-white/5">
                       <p className="text-[9px] text-zinc-500 font-bold uppercase mb-1">Product Name</p>
-                      <p className="text-[11px] font-bold text-zinc-200 line-clamp-2">{proofModal.extractedProductName}</p>
+                      <ExpandableText text={proofModal.extractedProductName || ''} clampClass="line-clamp-2" className="text-[11px] font-bold text-zinc-200" as="p">
+                        {proofModal.extractedProductName}
+                      </ExpandableText>
                     </div>
                   )}
                   {proofModal.soldBy && proofModal.soldBy !== 'null' && proofModal.soldBy !== 'undefined' && (
@@ -3105,9 +3109,9 @@ export const MediatorDashboard: React.FC = () => {
                 />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-black text-zinc-900 leading-tight line-clamp-2 mb-1">
+                <ExpandableText text={dealBuilder.title || ''} clampClass="line-clamp-2" className="text-lg font-black text-zinc-900 leading-tight mb-1" as="h3">
                   {dealBuilder.title}
-                </h3>
+                </ExpandableText>
                 <span className="text-[9px] font-bold bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full uppercase tracking-wider">
                   {dealBuilder.platform}
                 </span>

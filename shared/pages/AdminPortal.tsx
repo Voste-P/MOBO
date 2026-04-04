@@ -10,7 +10,7 @@ import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage } from '../components/ProxiedImage';
 
 import { subscribeRealtime } from '../services/realtime';
-import { Button, EmptyState, IconButton, Input, Spinner, Pagination, SidebarItem } from '../components/ui';
+import { Button, EmptyState, IconButton, Input, Spinner, Pagination, SidebarItem, ExpandableText } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { RatingVerificationBadge, ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
 import { DesktopShell } from '../components/DesktopShell';
@@ -2064,7 +2064,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                           <td className="p-5 font-mono text-slate-900 font-bold">{o.total}</td>
                           <td className="p-5 text-slate-700">{o.buyerName}</td>
                           <td className="p-5 text-slate-600 text-xs">{o.managerName || '-'}</td>
-                          <td className="p-5 text-slate-600 text-xs truncate max-w-[160px]" title={o.items?.[0]?.campaignId || ''}>{o.items?.[0]?.campaignId ? (campaignTitleMap.get(o.items[0].campaignId) || o.items[0].campaignId.slice(-8)) : '-'}</td>
+                          <td className="p-5 text-slate-600 text-xs max-w-[160px]"><ExpandableText text={o.items?.[0]?.campaignId ? (campaignTitleMap.get(o.items[0].campaignId) || o.items[0].campaignId.slice(-8)) : '-'} clampClass="truncate" className="text-slate-600 text-xs" as="span">{o.items?.[0]?.campaignId ? (campaignTitleMap.get(o.items[0].campaignId) || o.items[0].campaignId.slice(-8)) : '-'}</ExpandableText></td>
                           <td className="p-5">
                             <button
                               type="button"
@@ -2137,9 +2137,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         <td className="p-5">
                           <div className="flex items-center gap-3">
                             <ProxiedImage src={p.image} alt={p.title ? String(p.title) : 'Product image'} className="w-8 h-8 rounded-lg object-contain bg-white border border-slate-100 p-1" />
-                            <span className="truncate max-w-[200px] text-slate-900 font-bold" title={p.title ? String(p.title) : ''}>
+                            <ExpandableText text={p.title ? String(p.title) : ''} clampClass="truncate" className="max-w-[200px] text-slate-900 font-bold" as="span">
                               {p.title}
-                            </span>
+                            </ExpandableText>
                           </div>
                         </td>
                         <td className="p-5 text-slate-500 uppercase text-xs font-bold">
@@ -2366,8 +2366,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                             <td className="p-4 text-xs font-mono text-slate-500">
                               {log.actorUserId?.slice(-8) || 'System'}
                             </td>
-                            <td className="p-4 text-[10px] text-slate-400 max-w-[200px] truncate">
-                              {log.metadata ? JSON.stringify(log.metadata).slice(0, 80) : '-'}
+                            <td className="p-4 max-w-[200px]">
+                              <ExpandableText text={log.metadata ? JSON.stringify(log.metadata).slice(0, 80) : '-'} clampClass="truncate" className="text-[10px] text-slate-400" as="span">{log.metadata ? JSON.stringify(log.metadata).slice(0, 80) : '-'}</ExpandableText>
                             </td>
                           </tr>
                         ))}

@@ -16,6 +16,7 @@ import { api } from '../services/api';
 import { Ticket, Order, Product, AiNavigateTo } from '../types';
 import { ProductCard } from './ProductCard';
 import { ProxiedImage } from './ProxiedImage';
+import { ExpandableText } from './ui';
 
 interface ChatbotProps {
   isVisible?: boolean;
@@ -614,7 +615,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                     {msg.extractedValues.productName && (
                       <div className="flex justify-between items-center">
                         <span className="text-[11px] text-slate-500">Product</span>
-                        <span className="text-[11px] font-semibold text-slate-700 truncate max-w-[180px]">{msg.extractedValues.productName}</span>
+                        <ExpandableText text={msg.extractedValues.productName} clampClass="truncate" className="text-[11px] font-semibold text-slate-700 max-w-[180px]" as="span">{msg.extractedValues.productName}</ExpandableText>
                       </div>
                     )}
                     {msg.extractedValues.platform && (
@@ -626,7 +627,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                     {msg.extractedValues.seller && (
                       <div className="flex justify-between items-center">
                         <span className="text-[11px] text-slate-500">Seller</span>
-                        <span className="text-[11px] font-semibold text-slate-700 truncate max-w-[180px]">{msg.extractedValues.seller}</span>
+                        <ExpandableText text={msg.extractedValues.seller} clampClass="truncate" className="text-[11px] font-semibold text-slate-700 max-w-[180px]" as="span">{msg.extractedValues.seller}</ExpandableText>
                       </div>
                     )}
                     {msg.extractedValues.orderDate && (
@@ -667,9 +668,9 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                           />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-bold text-slate-900 truncate mb-1">
+                          <ExpandableText text={order.items?.[0]?.title || 'Order'} clampClass="truncate" className="text-sm font-bold text-slate-900 mb-1" as="p">
                             {order.items?.[0]?.title || 'Order'}
-                          </p>
+                          </ExpandableText>
                           <div className="flex justify-between items-end">
                             <div className="flex flex-col">
                               <span

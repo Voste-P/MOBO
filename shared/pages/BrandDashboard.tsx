@@ -58,7 +58,7 @@ import { api, asArray, invalidateGetCache } from '../services/api';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 import { User, Campaign, Order, Ticket } from '../types';
-import { EmptyState, Spinner, Pagination, SidebarItem } from '../components/ui';
+import { EmptyState, Spinner, Pagination, SidebarItem, ExpandableText } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { FeedbackCard } from '../components/FeedbackCard';
 import { RatingVerificationBadge, ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
@@ -993,9 +993,9 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                               className="w-full h-full object-contain mix-blend-multiply"
                             />
                           </div>
-                          <span className="text-sm font-bold text-zinc-900 line-clamp-1" title={o.items?.[0]?.title || ''}>
+                          <ExpandableText text={o.items?.[0]?.title || 'Unknown'} clampClass="line-clamp-1" className="text-sm font-bold text-zinc-900">
                             {o.items?.[0]?.title || 'Unknown'}
-                          </span>
+                          </ExpandableText>
                         </div>
                       </td>
                       <td className="p-6">
@@ -1077,7 +1077,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                           )}
                         </td>
                         <td className="p-6">
-                          <span className="text-sm font-bold text-zinc-900 line-clamp-1" title={o.items?.[0]?.title || ''}>{o.items?.[0]?.title || 'Product'}</span>
+                          <ExpandableText text={o.items?.[0]?.title || 'Product'} clampClass="line-clamp-1" className="text-sm font-bold text-zinc-900">{o.items?.[0]?.title || 'Product'}</ExpandableText>
                           <div className="text-[9px] text-zinc-400">Qty: {o.items?.[0]?.quantity || 1}</div>
                         </td>
                         <td className="p-6 text-right font-bold text-zinc-900">{formatCurrency(o.total)}</td>
@@ -1137,7 +1137,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                           )}
                         </td>
                         <td className="p-6">
-                          <span className="text-sm font-bold text-zinc-900 line-clamp-1" title={o.items?.[0]?.title || ''}>{o.items?.[0]?.title || 'Product'}</span>
+                          <ExpandableText text={o.items?.[0]?.title || 'Product'} clampClass="line-clamp-1" className="text-sm font-bold text-zinc-900">{o.items?.[0]?.title || 'Product'}</ExpandableText>
                         </td>
                         <td className="p-6 text-center">
                           <span className="text-xs font-bold text-zinc-600">{o.items?.[0]?.quantity || 1}</span>
@@ -1230,9 +1230,9 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                   className="w-14 h-14 object-contain mix-blend-multiply rounded-xl bg-white border border-zinc-100 p-1"
                 />
                 <div>
-                  <p className="text-sm font-bold text-zinc-900 line-clamp-1" title={viewProofOrder.items?.[0]?.title || ''}>
+                  <ExpandableText as="p" text={viewProofOrder.items?.[0]?.title || ''} clampClass="line-clamp-1" className="text-sm font-bold text-zinc-900">
                     {viewProofOrder.items?.[0]?.title}
-                  </p>
+                  </ExpandableText>
                   <p className="text-xs text-zinc-500 mt-1">
                     Value:{' '}
                     <span className="font-mono font-bold text-zinc-900">
@@ -2014,9 +2014,9 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                       {c.platform}
                     </span>
                   </div>
-                  <h3 className="font-bold text-zinc-900 text-sm line-clamp-1 leading-tight mb-1" title={c.title || ''}>
+                  <ExpandableText as="h3" text={c.title || ''} clampClass="line-clamp-1" className="font-bold text-zinc-900 text-sm leading-tight mb-1">
                     {c.title}
-                  </h3>
+                  </ExpandableText>
                   <span
                     className="text-[9px] text-zinc-400 font-mono cursor-pointer hover:text-lime-600 transition-colors mb-2 block"
                     title="Click to copy Campaign ID"
@@ -2669,9 +2669,9 @@ export const BrandDashboard: React.FC = () => {
                       <span className="text-[10px] text-zinc-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''}</span>
                     </div>
                     {t.description && (
-                      <div className="text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2 line-clamp-3">
+                      <ExpandableText as="div" text={String(t.description)} clampClass="line-clamp-3" className="text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2">
                         &ldquo;{String(t.description)}&rdquo;
-                      </div>
+                      </ExpandableText>
                     )}
                     {t.userName && (
                       <div className="text-[10px] text-zinc-400">From: {String(t.userName)} ({String(t.userRole || '')})</div>
@@ -2813,7 +2813,7 @@ export const BrandDashboard: React.FC = () => {
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-xl font-bold text-zinc-900 truncate">{ag.name || 'Unknown'}</h3>
+                      <ExpandableText as="h3" text={ag.name || 'Unknown'} clampClass="truncate" className="text-xl font-bold text-zinc-900">{ag.name || 'Unknown'}</ExpandableText>
                       <p className="text-xs text-zinc-400 font-mono mt-1 mb-3 bg-zinc-50 px-2 py-0.5 rounded w-fit">
                         {ag.mediatorCode}
                       </p>

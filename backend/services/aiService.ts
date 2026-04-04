@@ -102,7 +102,11 @@ function editDistance(a: string, b: string): number {
 // Product-type words (oil, cream, gel, serum, spray, lotion, perfume, etc.) are intentionally
 // EXCLUDED from stop words because they distinguish different products from the same brand
 // (e.g. "Avimee Herbal Scalptone Hair Growth Serum" vs "Avimee Herbal Keshpallav Hair Oil").
-const PRODUCT_STOP_WORDS = new Set(['the','for','and','with','from','that','this','you','your','was','are','has','have','been','not','but','all','can','had','her','his','one','our','out','use','how','its','may','new','now','old','see','way','who','boy','did','get','him','let','say','she','too','any','per','set','top','end','off','big','own','put','run','two','via','free','pack','item','best','good','great','nice','size','pair','home','made','full','high','low','day','box','buy','kit','men','man','women','woman','long','lasting','100ml','50ml','200ml','ml','gm','kg','ltr','white','black','red','blue','green','pink','gold','silver','natural','pure','premium','original','genuine','quality','gift','type','style','brand','product','online','india','combo','super','ultra','pro','plus','lite','mini','max','extra']);
+const PRODUCT_STOP_WORDS = new Set(['the','for','and','with','from','that','this','you','your','was','are','has','have','been','not','but','all','can','had','her','his','one','our','out','use','how','its','may','new','now','old','see','way','who','boy','did','get','him','let','say','she','too','any','per','set','top','end','off','big','own','put','run','two','via','free','pack','item','best','good','great','nice','size','pair','home','made','full','high','low','day','box','buy','kit','men','man','women','woman','long','lasting','100ml','50ml','200ml','250ml','300ml','500ml','750ml','1000ml','ml','gm','kg','ltr','white','black','red','blue','green','pink','gold','silver','natural','pure','premium','original','genuine','quality','gift','type','style','brand','product','online','india','combo','super','ultra','pro','plus','lite','mini','max','extra']);
+
+// ── Variant / measurement tokens that often differ between product listing and order page ──
+// Pure numeric tokens and measurement units are not product-distinguishing.
+const VARIANT_RE = /^\d+$/;          // Pure numbers like "100", "50", "200"
 
 /**
  * Robust product name token matching.
@@ -116,7 +120,9 @@ const PRODUCT_STOP_WORDS = new Set(['the','for','and','with','from','that','this
  */
 function isProductNameMatch(expected: string, detected: string): boolean {
   if (!expected || !detected) return false;
-  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const norm = (s: string) => s.toLowerCase()
+    .replace(/\((?:\d+\s*(?:ml|gm|g|kg|ltr|l|oz|fl\s*oz|pcs?|pack|count|pieces?|units?|tablets?|capsules?)(?:\s*(?:x|×)\s*\d+)?)\)/gi, '')  // strip variant suffixes like (100 ml), (Pack of 2)
+    .replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   const eNorm = norm(expected);
   let dNorm = norm(detected);
 
@@ -149,7 +155,7 @@ function isProductNameMatch(expected: string, detected: string): boolean {
 
   const tokenize = (s: string) => {
     const all = [...new Set(s.split(/\s+/).filter(t => t.length >= 2))];
-    const filtered = all.filter(t => !PRODUCT_STOP_WORDS.has(t) && t.length >= 3);
+    const filtered = all.filter(t => !PRODUCT_STOP_WORDS.has(t) && !VARIANT_RE.test(t) && t.length >= 3);
     return filtered.length > 0 ? filtered : all;
   };
   const eTokens = tokenize(eNorm);
@@ -2314,12 +2320,13 @@ export async function verifyReturnWindowWithAi(
                 returnWindowClosed: { type: Type.BOOLEAN },
                 reviewerNameMatch: { type: Type.BOOLEAN },
                 confidenceScore: { type: Type.INTEGER },
+                detectedProductName: { type: Type.STRING, description: 'The product name exactly as shown in the screenshot. Return the full visible text of the product name/title.' },
                 detectedReturnWindow: { type: Type.STRING },
                 detectedAccountName: { type: Type.STRING, description: 'Name from the header/greeting area (e.g. "Hello, Ashok" → "Ashok"). Strip greeting prefix. Null if not visible.' },
                 screenshotCropped: { type: Type.BOOLEAN, description: 'true if the screenshot appears cropped, cut off, or incomplete' },
                 discrepancyNote: { type: Type.STRING },
               },
-              required: ['orderIdMatch', 'productNameMatch', 'amountMatch', 'soldByMatch', 'returnWindowClosed', 'reviewerNameMatch', 'confidenceScore', 'screenshotCropped'],
+              required: ['orderIdMatch', 'productNameMatch', 'amountMatch', 'soldByMatch', 'returnWindowClosed', 'reviewerNameMatch', 'confidenceScore', 'screenshotCropped', 'detectedProductName'],
             },
           },
         }));
