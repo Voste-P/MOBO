@@ -109,7 +109,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
     tickets: Ticket[];
     fetchedAt: number;
   } | null>(null);
-  const CONTEXT_CACHE_TTL = 2 * 60_000; // 2 minutes Ã¢â‚¬â€ keep context fresh across tab switches
+  const CONTEXT_CACHE_TTL = 2 * 60_000; // 2 minutes — keep context fresh across tab switches
 
   // Clear context cache when user changes (prevents data leaking across accounts)
   const prevUserIdRef = useRef<string | null | undefined>(user?.id);

@@ -221,7 +221,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
           <h2 className="text-3xl font-black text-zinc-900 tracking-tighter leading-none">
             {unpublishedCount ?? 0}
           </h2>
-          <p className="text-[10px] text-lime-600 font-bold mt-1">Tap to publish â†’</p>
+          <p className="text-[10px] text-lime-600 font-bold mt-1">Tap to publish →</p>
         </div>
       </div>
 
@@ -341,7 +341,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
             if (!allOrders.length) { toast.error('No orders to export'); return; }
             const mediatorHeaders = [
               'External Order ID', 'Date', 'Time', 'Product', 'Platform', 'Brand', 'Deal Type',
-              'Unit Price (â‚¹)', 'Quantity', 'Total (â‚¹)', 'Commission (â‚¹)', 'Settlement Date',
+              'Unit Price (₹)', 'Quantity', 'Total (₹)', 'Commission (₹)', 'Settlement Date',
               'Agency Name', 'Buyer Name', 'Buyer Mobile', 'Reviewer Name',
               'Workflow Status', 'Affiliate Status', 'Payment Status',
               'Sold By', 'Order Date', 'Extracted Product',
@@ -705,7 +705,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                                 onRefresh(['tickets']);
                               } catch (err) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
                             }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
-                              âœ“ Resolve
+                              ✔ Resolve
                             </button>
                             <button type="button" onClick={async () => {
                               try {
@@ -715,7 +715,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                                 onRefresh(['tickets']);
                               } catch (err) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
                             }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-50 border border-red-200 text-red-600 hover:bg-red-100">
-                              âœ— Reject
+                              ✗ Reject
                             </button>
                             <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
                               className="px-2 py-1 rounded-lg text-[10px] font-bold text-zinc-400 hover:text-zinc-600">
@@ -727,7 +727,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                         <>
                           <button type="button" onClick={() => { setResolvingTicketId(t.id); setResolutionNote(''); }}
                             className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
-                            âœ“ Resolve / Reject
+                            ✔ Resolve / Reject
                           </button>
 
                         </>
@@ -975,7 +975,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                               Commission
                             </p>
                             <p className={`text-sm font-black ${d.commission < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
-                              {d.commission < 0 ? `âˆ’${formatCurrency(Math.abs(d.commission))}` : formatCurrency(d.commission)}
+                              {d.commission < 0 ? `−${formatCurrency(Math.abs(d.commission))}` : formatCurrency(d.commission)}
                             </p>
                           </div>
                         )}
@@ -1061,7 +1061,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                         </span>
                         {c.openToAll ? (
                           <span className="bg-emerald-50 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide border border-emerald-200">
-                            ðŸŒ Open to All Â· {c.totalSlots - c.usedSlots} left
+                            🌐 Open to All · {c.totalSlots - c.usedSlots} left
                           </span>
                         ) : (
                           <span className="bg-mobo-accent/20 text-lime-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide">
@@ -1949,7 +1949,7 @@ export const MediatorDashboard: React.FC = () => {
     }
   }, [dealBuilder, deals]);
 
-  // AI Analysis â€” now reads stored data from order, no Gemini calls needed
+  // AI Analysis — now reads stored data from order, no Gemini calls needed
 
   const loadedRef = useRef<Set<string>>(new Set());
   const inFlightRef = useRef<Set<string>>(new Set());
@@ -2077,7 +2077,7 @@ export const MediatorDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load on tab change â€” only fetches keys not already cached
+  // Trigger data load on tab change — only fetches keys not already cached
   const prevTabRef = useRef(activeTab);
   useEffect(() => {
     const tabChanged = prevTabRef.current !== activeTab;
@@ -2291,7 +2291,7 @@ export const MediatorDashboard: React.FC = () => {
                           </button>
                         </div>
                         <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide mt-1">
-                          {n.read ? 'Read' : 'New'} Â· {n.createdAt ? `${formatRelativeTime(n.createdAt)}` : ''}
+                          {n.read ? 'Read' : 'New'} · {n.createdAt ? `${formatRelativeTime(n.createdAt)}` : ''}
                         </p>
                       </div>
                     </div>
@@ -2566,7 +2566,7 @@ export const MediatorDashboard: React.FC = () => {
               )}
             </div>
 
-            {/* STEP PROGRESS BAR â€” shows mediator what stage the order is at */}
+            {/* STEP PROGRESS BAR — shows mediator what stage the order is at */}
             {(proofModal.requirements?.required?.length ?? 0) > 0 && (
               <div className="bg-zinc-800/80 rounded-2xl border border-zinc-700/50 p-4 mt-1">
                 <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-wider mb-3">Verification Progress</h4>
@@ -2575,7 +2575,7 @@ export const MediatorDashboard: React.FC = () => {
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${
                       proofModal.verification?.orderVerified ? 'bg-green-500 text-white' : 'bg-zinc-600 text-zinc-300'
                     }`}>
-                      {proofModal.verification?.orderVerified ? 'âœ“' : '1'}
+                      {proofModal.verification?.orderVerified ? '✔' : '1'}
                     </div>
                     <span className={`text-[10px] font-bold ${proofModal.verification?.orderVerified ? 'text-green-400' : 'text-zinc-400'}`}>Buy</span>
                   </div>
@@ -2589,7 +2589,7 @@ export const MediatorDashboard: React.FC = () => {
                             : proofModal.verification?.orderVerified ? 'bg-purple-500 text-white'
                             : 'bg-zinc-600 text-zinc-400'
                         }`}>
-                          {proofModal.verification?.reviewVerified ? 'âœ“' : '2'}
+                          {proofModal.verification?.reviewVerified ? '✔' : '2'}
                         </div>
                         <span className={`text-[10px] font-bold ${
                           proofModal.verification?.reviewVerified ? 'text-green-400'
@@ -2609,7 +2609,7 @@ export const MediatorDashboard: React.FC = () => {
                             : proofModal.verification?.orderVerified ? 'bg-purple-500 text-white'
                             : 'bg-zinc-600 text-zinc-400'
                         }`}>
-                          {proofModal.verification?.ratingVerified ? 'âœ“' : proofModal.requirements?.required?.includes('review') ? '3' : '2'}
+                          {proofModal.verification?.ratingVerified ? '✔' : proofModal.requirements?.required?.includes('review') ? '3' : '2'}
                         </div>
                         <span className={`text-[10px] font-bold ${
                           proofModal.verification?.ratingVerified ? 'text-green-400'
@@ -2629,7 +2629,7 @@ export const MediatorDashboard: React.FC = () => {
                             : proofModal.verification?.orderVerified ? 'bg-purple-500 text-white'
                             : 'bg-zinc-600 text-zinc-400'
                         }`}>
-                          {proofModal.verification?.returnWindowVerified ? 'âœ“' :
+                          {proofModal.verification?.returnWindowVerified ? '✔' :
                             ((proofModal.requirements?.required?.includes('review') && proofModal.requirements?.required?.includes('rating')) ? '4' :
                              (proofModal.requirements?.required?.includes('review') || proofModal.requirements?.required?.includes('rating')) ? '3' : '2')}
                         </div>
@@ -2646,7 +2646,7 @@ export const MediatorDashboard: React.FC = () => {
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${
                       proofModal.affiliateStatus === 'Pending_Cooling' ? 'bg-green-500 text-white' : 'bg-zinc-600 text-zinc-400'
                     }`}>
-                      {proofModal.affiliateStatus === 'Pending_Cooling' ? 'âœ“' : 'âš¡'}
+                      {proofModal.affiliateStatus === 'Pending_Cooling' ? '✔' : '⚡'}
                     </div>
                     <span className={`text-[10px] font-bold ${proofModal.affiliateStatus === 'Pending_Cooling' ? 'text-green-400' : 'text-zinc-500'}`}>Done</span>
                   </div>
@@ -2835,12 +2835,12 @@ export const MediatorDashboard: React.FC = () => {
                       resp?.missingVerifications || [];
 
                     if (resp?.approved) {
-                      toast.success('Order approved! Cashback is now in cooling period. âœ“');
+                      toast.success('Order approved! Cashback is now in cooling period. ✔');
                       setProofModal(null);
                     } else if (missingProofs.length) {
-                      toast.info(`Purchase verified âœ“ Buyer needs to upload: ${missingProofs.join(' + ')} proof.`);
+                      toast.info(`Purchase verified ✔ Buyer needs to upload: ${missingProofs.join(' + ')} proof.`);
                     } else if (missingVerifications.length) {
-                      toast.info(`Purchase verified âœ“ You can now verify: ${missingVerifications.join(' + ')} proof.`);
+                      toast.info(`Purchase verified ✔ You can now verify: ${missingVerifications.join(' + ')} proof.`);
                     } else {
                       toast.success('Purchase verified.');
                     }
@@ -2862,7 +2862,7 @@ export const MediatorDashboard: React.FC = () => {
               </button>
             ) : (
               <>
-                {/* â”€â”€ Primary: Verify Deal (all steps at once) â”€â”€ */}
+                {/* ─Primary: Verify Deal (all steps at once) ─*/}
                 {(proofModal?.requirements?.missingVerifications as string[] ?? []).length > 0 && (
                   <button
                     onClick={async () => {
@@ -2870,10 +2870,10 @@ export const MediatorDashboard: React.FC = () => {
                         const resp = await api.ops.verifyAllSteps(proofModal.id);
 
                         if (resp?.approved) {
-                          toast.success('Deal verified âœ“ Cashback is now in cooling period!');
+                          toast.success('Deal verified ✔ Cashback is now in cooling period!');
                           setProofModal(null);
                         } else {
-                          toast.success('Deal verified âœ“');
+                          toast.success('Deal verified ✔');
                         }
 
                         await loadData({ keys: ['orders'] });
@@ -3021,7 +3021,7 @@ export const MediatorDashboard: React.FC = () => {
                 onClick={async () => {
                   try {
                     await api.ops.forceApproveOrder(proofModal.id, actionNote || undefined);
-                    toast.success('Order approved â†’ Pending Cooling (14 days)');
+                    toast.success('Order approved → Pending Cooling (14 days)');
                     setApproveModalOpen(false);
                     setProofModal(null);
                     await loadData({ keys: ['orders'] });
@@ -3117,10 +3117,10 @@ export const MediatorDashboard: React.FC = () => {
                   {dealBuilder.platform}
                 </span>
               </div>
-              {/* Agency commission badge â€” visible at top-right of deal card */}
+              {/* Agency commission badge — visible at top-right of deal card */}
               <div className="flex-shrink-0 bg-blue-50 border-2 border-blue-300 rounded-[1rem] px-3 py-2 flex flex-col items-center justify-center shadow-sm">
                 <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Agency Commission</p>
-                <p className="text-lg font-black text-blue-700">â‚¹{dealBuilder.assignmentPayout ?? dealBuilder.payout ?? 0}</p>
+                <p className="text-lg font-black text-blue-700">₹{dealBuilder.assignmentPayout ?? dealBuilder.payout ?? 0}</p>
                 <p className="text-[7px] text-blue-400 font-semibold">from agency</p>
               </div>
             </div>
@@ -3156,25 +3156,25 @@ export const MediatorDashboard: React.FC = () => {
               // Your commission = what mediator adds to the deal price (can be negative)
               const buyerComm = parseInt(commission) || 0;
               // Net earnings = agency commission + your commission
-              // Example: agency pays â‚¹10, mediator adds â‚¹5 buyer commission â†’ net = â‚¹15
-              // Example: agency pays â‚¹10, mediator adds -â‚¹5 (discount) â†’ net = â‚¹5
+              // Example: agency pays ₹10, mediator adds ₹5 buyer commission → net = ₹15
+              // Example: agency pays ₹10, mediator adds -₹5 (discount) → net = ₹5
               const net = agencyComm + buyerComm;
               return (
                 <div className={`p-3 rounded-[1rem] border mb-4 text-center ${net < 0 ? 'bg-red-50 border-red-200' : net === 0 ? 'bg-zinc-50 border-zinc-100' : 'bg-green-50 border-green-200'}`}>
                   <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-0.5">Your Net Earnings</p>
                   <p className={`text-xl font-black ${net < 0 ? 'text-red-600' : net === 0 ? 'text-zinc-500' : 'text-green-700'}`}>
-                    {net < 0 ? `âˆ’â‚¹${Math.abs(net)}` : formatCurrency(net)}
+                    {net < 0 ? `−₹${Math.abs(net)}` : formatCurrency(net)}
                   </p>
-                  {net < 0 && <p className="text-[10px] text-red-500 mt-1">You absorb â‚¹{Math.abs(net)} loss on this deal</p>}
+                  {net < 0 && <p className="text-[10px] text-red-500 mt-1">You absorb ₹{Math.abs(net)} loss on this deal</p>}
                   <p className="text-[10px] text-zinc-400 mt-1">
-                    Agency â‚¹{agencyComm} {buyerComm >= 0 ? '+' : 'âˆ’'} Your Commission â‚¹{Math.abs(buyerComm)} = â‚¹{net}
+                    Agency ₹{agencyComm} {buyerComm >= 0 ? '+' : '−'} Your Commission ₹{Math.abs(buyerComm)} = ₹{net}
                   </p>
                 </div>
               );
             })()}
             <div className="space-y-3 mb-6">
               <label className="text-[10px] font-black text-zinc-900 uppercase ml-2 block tracking-wide">
-                Your commission (â‚¹)
+                Your commission (₹)
               </label>
               <input
                 type="number"

@@ -8,7 +8,7 @@ import { getApiBaseAbsolute } from '../utils/apiBaseUrl';
  *   hotlink protection on Amazon, Flipkart, etc.
  * • Shows an SVG placeholder on error (never a broken-image icon).
  * • Adds native lazy loading by default.
- * ────────────────────────────────────────────────────────── */
+ * ─────────────────────────────────────────────────────────*/
 
 const PLACEHOLDER =
   'data:image/svg+xml;utf8,' +

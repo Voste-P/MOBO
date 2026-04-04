@@ -454,7 +454,7 @@ const DashboardView = ({
                   contentStyle={{
                     borderRadius: '16px',
                     border: 'none',
-                    boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)',
+                    boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1₹
                     padding: '12px 20px',
                   }}
                   itemStyle={{ color: '#18181b', fontWeight: 'bold' }}

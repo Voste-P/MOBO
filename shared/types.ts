@@ -317,7 +317,7 @@ export interface ChatMessage {
   extractedValues?: ExtractedValues;
 }
 
-// ─── AI Response Types ───────────────────────────────────
+// ──AI Response Types ───────────────────────────────────
 export type AiIntent =
   | 'greeting'
   | 'search_deals'
@@ -380,7 +380,7 @@ export interface ExtractedOrderDetails {
   notes?: string;
 }
 
-// ─── Financial / Backtracking Types ──────────────────────
+// ──Financial / Backtracking Types ──────────────────────
 export type TransactionType =
   | 'brand_deposit'
   | 'agency_payout'
@@ -464,7 +464,7 @@ export interface AuditLog {
   createdAt: string;
 }
 
-// ─── KYC Types ───────────────────────────────────────────
+// ──KYC Types ───────────────────────────────────────────
 export interface KycDocument {
   type: 'aadhaar' | 'pan' | 'gst' | 'business_license' | 'other';
   documentId: string;
@@ -474,7 +474,7 @@ export interface KycDocument {
   fileUrl?: string;
 }
 
-// ─── System Config Types ─────────────────────────────────
+// ──System Config Types ─────────────────────────────────
 export interface SystemConfig {
   adminContactEmail?: string;
   platformName?: string;

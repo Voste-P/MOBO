@@ -300,7 +300,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     }
   }, [view]);
 
-  // Fetch dashboard stats when switching to dashboard view (skip initial mount â€” handled above)
+  // Fetch dashboard stats when switching to dashboard view (skip initial mount — handled above)
   const dashboardMountedRef = useRef(false);
   useEffect(() => {
     if (!user?.id || user.role !== 'admin') return;
@@ -1011,7 +1011,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     );
   }, [products, inventorySearch]);
 
-  // Campaign title map: campaignId â†’ product title (for order table display)
+  // Campaign title map: campaignId → product title (for order table display)
   const campaignTitleMap = useMemo(() => {
     const map = new Map<string, string>();
     products.forEach((p) => { if (p.campaignId && p.title) map.set(p.campaignId, p.title); });
@@ -1064,7 +1064,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
               type="password"
               value={passkey}
               onChange={(e) => setPasskey(e.target.value)}
-              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+              placeholder="••••••••"
               leftIcon={<Key size={18} />}
               className="font-mono text-sm"
               minLength={8}
@@ -1329,7 +1329,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                             contentStyle={{
                               borderRadius: '16px',
                               border: 'none',
-                              boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)',
+                              boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1₹
                               padding: '12px 20px',
                             }}
                             itemStyle={{ color: '#1e293b', fontWeight: 'bold' }}
@@ -1559,7 +1559,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                             </div>
                             <div className="text-[10px]">
                               <p className="font-bold text-slate-900">{t.userName}</p>
-                              <p className="text-slate-400 font-mono capitalize">{normalizeRole(t.role)} â†’ {normalizeRole(t.targetRole || 'admin')}</p>
+                              <p className="text-slate-400 font-mono capitalize">{normalizeRole(t.role)} → {normalizeRole(t.targetRole || 'admin')}</p>
                             </div>
                           </div>
 
@@ -1577,9 +1577,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                                 className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
                               <div className="flex items-center gap-2">
                                 <button type="button" onClick={() => resolveTicket(t.id, 'Resolved', resolutionNote)}
-                                  className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">âœ“ Resolve</button>
+                                  className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✔ Resolve</button>
                                 <button type="button" onClick={() => resolveTicket(t.id, 'Rejected', resolutionNote)}
-                                  className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">âœ— Reject</button>
+                                  className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
                                 <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
                                   className="px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 hover:bg-slate-200">Cancel</button>
                               </div>
@@ -2186,7 +2186,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                               {p.sellingSpeed}/day
                             </span>
                           ) : (
-                            <span className="text-[10px] text-slate-400">â€”</span>
+                            <span className="text-[10px] text-slate-400">—</span>
                           )}
                         </td>
                         <td className="p-5 text-right">
@@ -2394,7 +2394,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       {auditLogs.length === 0 && (
                         <tr>
                           <td colSpan={5} className="p-8 text-center text-sm text-slate-400 font-bold">
-                            {auditLoading ? 'Loading audit logsâ€¦' : 'No audit logs found for the selected filters.'}
+                            {auditLoading ? 'Loading audit logs…' : 'No audit logs found for the selected filters.'}
                           </td>
                         </tr>
                       )}
@@ -2453,7 +2453,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                 {proofModal.screenshots?.order ? (
                   <>
                     <ProofImage orderId={proofModal.id} proofType="order" existingSrc={proofModal.screenshots.order !== 'exists' ? proofModal.screenshots.order : undefined} alt="Purchase Proof" className="w-full max-h-[300px] object-contain rounded-xl border border-blue-200 bg-blue-50" />
-                    {/* AI Verification â€” stored from buyer's proof submission */}
+                    {/* AI Verification — stored from buyer's proof submission */}
                     {proofModal.orderAiVerification && (
                     <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200 mt-3">
                       <div className="flex justify-between items-center mb-2">
@@ -2472,14 +2472,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                                   <div className={`flex-1 p-2 rounded-lg border text-center ${aiData?.orderIdMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                                     <p className="text-[10px] font-bold text-slate-400 uppercase">Order ID</p>
                                     <p className={`text-xs font-bold ${aiData?.orderIdMatch ? 'text-green-600' : 'text-red-600'}`}>
-                                      {aiData?.orderIdMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
+                                      {aiData?.orderIdMatch ? '✔ Match' : '✗ Mismatch'}
                                     </p>
                                     {aiData?.detectedOrderId && <p className="text-[10px] text-slate-500 font-mono mt-0.5">Detected: {aiData.detectedOrderId}</p>}
                                   </div>
                                   <div className={`flex-1 p-2 rounded-lg border text-center ${aiData?.amountMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                                     <p className="text-[10px] font-bold text-slate-400 uppercase">Amount</p>
                                     <p className={`text-xs font-bold ${aiData?.amountMatch ? 'text-green-600' : 'text-red-600'}`}>
-                                      {aiData?.amountMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
+                                      {aiData?.amountMatch ? '✔ Match' : '✗ Mismatch'}
                                     </p>
                                     {aiData?.detectedAmount != null && <p className="text-[10px] text-slate-500 font-mono mt-0.5">Detected: {formatCurrency(aiData.detectedAmount)}</p>}
                                   </div>

@@ -118,7 +118,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSucces
     else if (step === 'newPassword') setStep('answers');
   };
 
-  /* ── Success Screen ── */
+  /* ─Success Screen ─*/
   if (step === 'done') {
     return (
       <div className="flex-1 flex flex-col bg-white relative px-6 py-12 overflow-y-auto scrollbar-styled items-center justify-center text-center" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
@@ -141,7 +141,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSucces
     );
   }
 
-  /* ── Main Form ── */
+  /* ─Main Form ─*/
   return (
     <div className="flex-1 flex flex-col bg-white relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
       {/* Back button */}

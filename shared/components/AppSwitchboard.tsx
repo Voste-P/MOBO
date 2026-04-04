@@ -85,7 +85,7 @@ export const AppSwitchboard: React.FC<{ onSelect: (role: string) => void }> = ({
       </div>
 
       <footer className="mt-20 text-slate-600 text-[10px] font-bold uppercase tracking-[0.3em]">
-        BUZZMAOS v1.0 â€¢ Unified Commerce Platform
+        BUZZMAOS v1.0 • Unified Commerce Platform
       </footer>
     </div>
   </div>

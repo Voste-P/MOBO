@@ -472,7 +472,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
     return result;
   }, [allOrders, financeSearch, financeStatusFilter, financeDealTypeFilter, financeMediatorFilter, financeProductFilter]);
 
-  // [PERF] Memoize volume calculations â€” only recalculate when ledger changes
+  // [PERF] Memoize volume calculations — only recalculate when ledger changes
   const { settledVolume, coolingVolume, pendingReviewVolume, grossPayableAmount } = useMemo(() => ({
     settledVolume: ledger
       .filter((o: Order) => o.paymentStatus === 'Paid' && o.affiliateStatus === 'Approved_Settled')
@@ -548,7 +548,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
       'Unit Price',
       'Quantity',
       'Total Value',
-      'Commission (â‚¹)',
+      'Commission (₹)',
       'Settlement Date',
       'Agency Name',
       'Mediator Name',
@@ -676,7 +676,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
 
     import('../utils/exportToSheets').then(({ exportToGoogleSheet }) => exportToGoogleSheet({
       title: `Agency Orders Report - ${new Date().toISOString().slice(0, 10)}`,
-      headers: ['Order ID','Date','Time','Product','Brand','Platform','Deal Type','Unit Price','Quantity','Total Value','Commission (â‚¹)','Settlement Date','Agency Name','Mediator Name','Mediator Code','Buyer Name','Buyer Mobile','Reviewer Name','Workflow Status','Payment Status','Verification Status','Internal Ref','Sold By','Order Date','Extracted Product','UTR/Reference','Payment Mode'],
+      headers: ['Order ID','Date','Time','Product','Brand','Platform','Deal Type','Unit Price','Quantity','Total Value','Commission (₹)','Settlement Date','Agency Name','Mediator Name','Mediator Code','Buyer Name','Buyer Mobile','Reviewer Name','Workflow Status','Payment Status','Verification Status','Internal Ref','Sold By','Order Date','Extracted Product','UTR/Reference','Payment Mode'],
       rows: orderRows,
       sheetName: 'Agency Orders',
       onStart: () => setSheetsExporting(true),
@@ -802,7 +802,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
           >
             <option value="All">All Products</option>
             {productOptions.map((p) => (
-              <option key={p} value={p}>{p.length > 30 ? p.slice(0, 30) + 'â€¦' : p}</option>
+              <option key={p} value={p}>{p.length > 30 ? p.slice(0, 30) + '…' : p}</option>
             ))}
           </select>
           <span className="text-xs text-slate-400 font-bold">{ledger.length} records</span>
@@ -1391,7 +1391,7 @@ const PayoutsView = ({ payouts, loading, onRefresh }: { payouts: Record<string, 
                       </div>
                     </td>
                     <td className="p-5">
-                      <span className="font-mono text-xs font-bold text-slate-500">{p.ref || 'â€”'}</span>
+                      <span className="font-mono text-xs font-bold text-slate-500">{p.ref || '—'}</span>
                     </td>
                     <td className="p-5 text-right font-mono font-bold text-slate-900">
                       {formatCurrency(p.amount)}
@@ -1537,7 +1537,7 @@ const DashboardView = ({ stats, revenueTrendData, brandPerfData, onRangeChange }
                   contentStyle={{
                     borderRadius: '12px',
                     border: 'none',
-                    boxShadow: '0 10px 30px -5px rgba(0,0,0,0.1)',
+                    boxShadow: '0 10px 30px -5px rgba(0,0,0,0.1₹
                     padding: '12px 16px',
                   }}
                   itemStyle={{ fontSize: '13px', fontWeight: 'bold', color: '#1e293b' }}
@@ -1587,7 +1587,7 @@ const DashboardView = ({ stats, revenueTrendData, brandPerfData, onRangeChange }
                   contentStyle={{
                     borderRadius: '12px',
                     border: 'none',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.05₹
                   }}
                 />
                 <Bar dataKey="count" fill="#a855f7" radius={[0, 4, 4, 0]} />
@@ -1734,7 +1734,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
       const dealType = selectedDealType !== (assignModal.dealType || 'Discount') ? selectedDealType : undefined;
       try {
         await api.ops.assignSlots(assignModal.id, {}, dealType, undefined, undefined, commission, true);
-        toast.success('Open to All distribution saved â€” all mediators can now publish this deal');
+        toast.success('Open to All distribution saved — all mediators can now publish this deal');
         setAssignModal(null);
         setAssignments({});
         setMediatorPayouts({});
@@ -2137,8 +2137,8 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                         </div>
                       </td>
                       <td className="p-5">
-                        <ExpandableText text={c.brand || 'â€”'} clampClass="truncate" className="text-xs font-bold text-indigo-700 max-w-[120px] block" as="span">
-                          {c.brand || 'â€”'}
+                        <ExpandableText text={c.brand || '—'} clampClass="truncate" className="text-xs font-bold text-indigo-700 max-w-[120px] block" as="span">
+                          {c.brand || '—'}
                         </ExpandableText>
                       </td>
                       <td className="p-5">
@@ -2168,14 +2168,14 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                       </td>
                       <td className="p-5">
                         <span className="text-[10px] font-medium text-slate-500">
-                          {c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB') : 'â€”'}
+                          {c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB') : '—'}
                         </span>
                       </td>
                       <td className="p-5 text-right font-mono text-slate-700 font-bold">
                         <div className="flex flex-col items-end gap-1">
                           {c.openToAll && (
                             <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 whitespace-nowrap inline-flex items-center gap-1">
-                              ðŸŒ Open to All
+                              🌐 Open to All
                             </span>
                           )}
                           <span className="whitespace-nowrap">
@@ -2244,7 +2244,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                               try {
                                 const res = await api.ops.copyCampaign(c.id);
                                 if (res.ok) {
-                                  toast.success('Campaign copied as Draft â€” configure distribution');
+                                  toast.success('Campaign copied as Draft — configure distribution');
                                   await onRefresh(['campaigns']);
                                   // Open distribute modal for the new draft campaign
                                   if (res.campaign) {
@@ -2486,7 +2486,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">
-                    Product Price (â‚¹)
+                    Product Price (₹)
                   </label>
                   <input
                     type="number"
@@ -2498,7 +2498,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">
-                    Deal Price (â‚¹)
+                    Deal Price (₹)
                   </label>
                   <input
                     type="number"
@@ -2652,7 +2652,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
 
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
-                    Deal Price (â‚¹)
+                    Deal Price (₹)
                   </label>
                   <div className="bg-slate-50 border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center">
                     <span className="text-xs font-bold text-slate-400 mr-2"></span>
@@ -2671,7 +2671,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                 {!isAgencyCampaign && (
                   <div className="flex flex-col gap-1">
                     <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
-                      Commission from Brand (â‚¹)
+                      Commission from Brand (₹)
                     </label>
                     <div className="bg-slate-50 border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center">
                       <span className="text-xs font-bold text-slate-400 mr-2"></span>
@@ -2691,7 +2691,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                 {!isAgencyCampaign && (
                   <div className="flex flex-col gap-1">
                     <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
-                      Commission on Deal (â‚¹)
+                      Commission on Deal (₹)
                     </label>
                     <div className="bg-white border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center focus-within:ring-2 focus-within:ring-purple-100 transition-all">
                       <span className="text-xs font-bold text-slate-400 mr-2"></span>
@@ -2708,7 +2708,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
 
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest ml-1">
-                    Default Commission to Mediator (â‚¹)
+                    Default Commission to Mediator (₹)
                   </label>
                   <div className="bg-white border border-slate-200 rounded-lg shadow-sm h-8 px-2 flex items-center focus-within:ring-2 focus-within:ring-purple-100 transition-all">
                     <span className="text-xs font-bold text-slate-400 mr-2"></span>
@@ -2740,7 +2740,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
               </div>
             </div>
 
-            {/* â”€â”€ Open to All Toggle â”€â”€ */}
+            {/* ─Open to All Toggle ─*/}
             <div className={`px-3 py-1.5 rounded-xl mb-1 border transition-all shrink-0 ${openToAll ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'}`}>
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -2751,7 +2751,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                   >
                     <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${openToAll ? 'translate-x-5' : 'translate-x-0'}`} />
                   </button>
-                  <p className="text-xs font-black text-slate-900">ðŸŒ Open to All Mediators</p>
+                  <p className="text-xs font-black text-slate-900">🌐 Open to All Mediators</p>
                   <p className="text-[10px] text-slate-400 font-medium hidden sm:block">
                     {openToAll
                       ? 'All mediators can publish. First-come-first-serve.'
@@ -2786,7 +2786,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
               </div>
             </div>
 
-            {/* List Header â€” sticky so column names stay visible when scrolling 50+ mediators */}
+            {/* List Header — sticky so column names stay visible when scrolling 50+ mediators */}
             <div className="grid grid-cols-12 gap-3 px-4 py-1 bg-slate-50 rounded-lg border border-slate-100 mb-1 shrink-0 sticky top-0 z-10">
               <div className="col-span-4 text-xs font-extrabold text-slate-400 uppercase tracking-wider pl-2">
                 Mediator Profile
@@ -2795,14 +2795,14 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                 Sales Performance
               </div>
               <div className="col-span-2 text-xs font-extrabold text-slate-400 uppercase tracking-wider text-center">
-                Commission (â‚¹)
+                Commission (₹)
               </div>
               <div className="col-span-3 text-xs font-extrabold text-slate-400 uppercase tracking-wider text-right pr-2">
                 Allocation
               </div>
             </div>
 
-            {/* Mediator List â€” scrollable container sized to fill modal */}
+            {/* Mediator List — scrollable container sized to fill modal */}
             <div className="flex-1 min-h-[280px] overflow-y-auto scrollbar-styled space-y-1 pr-2 mb-1">
               {activeMediatorsForAssign.length === 0 ? (
                 loading ? (
@@ -2953,7 +2953,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
             {openToAll && (
               <div className="flex-1 min-h-0 flex items-center justify-center">
                 <div className="text-center py-4">
-                  <div className="text-4xl mb-2">ðŸŒ</div>
+                  <div className="text-4xl mb-2">🌐</div>
                   <h4 className="text-base font-black text-slate-900 mb-1">Open to All Mediators</h4>
                   <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
                     All <strong>{mediators.filter((m: any) => m.status === 'active').length}</strong> connected mediators will be able to publish and sell this deal.
@@ -2979,7 +2979,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                 disabled={!openToAll && (assignedTotal <= 0 || assignedTotal > availableForAssign)}
                 className={`px-6 py-2.5 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center gap-2 ${openToAll ? 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-emerald-200' : 'bg-purple-600 hover:bg-purple-700 hover:shadow-purple-200'}`}
               >
-                {openToAll ? 'ðŸŒ Confirm Open to All' : 'Confirm Distribution'} <CheckCircle size={18} />
+                {openToAll ? '🌐 Confirm Open to All' : 'Confirm Distribution'} <CheckCircle size={18} />
               </button>
             </div>
           </div>
@@ -2989,7 +2989,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
   );
 };
 
-/* â”€â”€â”€ ORDER REVIEW TAB â”€â”€â”€ */
+/* ──ORDER REVIEW TAB ──*/
 const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading, onRefresh }: { allOrders: Order[]; campaigns: Campaign[]; mediators: User[]; loading: boolean; onRefresh: (keys?: string[]) => void }) => {
   const { toast } = useToast();
   const [campaignFilter, setCampaignFilter] = useState('all');
@@ -3047,7 +3047,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
     setRejecting(true);
     try {
       await api.ops.rejectOrderProof(rejectModal.order.id, rejectModal.type, rejectReason.trim());
-      toast.success('Proof rejected â€” buyer has been notified');
+      toast.success('Proof rejected — buyer has been notified');
       setRejectModal(null);
       setRejectReason('');
       onRefresh(['orders']);
@@ -3062,7 +3062,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
     setApprovingId(order.id);
     try {
       await api.ops.forceApproveOrder(order.id, 'Agency approved');
-      toast.success('Order approved â€” moved to cooling period');
+      toast.success('Order approved — moved to cooling period');
       onRefresh(['orders']);
     } catch (e: any) {
       toast.error(formatErrorMessage(e, 'Failed to approve order'));
@@ -3096,10 +3096,10 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
           <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Order Review</h2>
-          <p className="text-xs text-slate-500 mt-1">{filtered.length} orders Â· {manualCount} manually approved</p>
+          <p className="text-xs text-slate-500 mt-1">{filtered.length} orders · {manualCount} manually approved</p>
         </div>
         <button onClick={() => onRefresh(['orders', 'campaigns', 'mediators'])} disabled={loading} className="text-xs font-bold text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 px-4 py-2 rounded-xl transition-colors">
-          {loading ? 'Refreshingâ€¦' : 'Refresh'}
+          {loading ? 'Refreshing…' : 'Refresh'}
         </button>
       </div>
 
@@ -3109,7 +3109,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
           <Filter size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search ordersâ€¦"
+            placeholder="Search orders…"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-8 pr-4 py-2 text-xs border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-300 outline-none w-48"
@@ -3167,7 +3167,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
                   const method = getApprovalMethod(o);
                   const isManual = method === 'manual';
                   const wf = (o.workflowStatus || 'CREATED').toUpperCase();
-                  const campTitle = campaigns.find((c: Campaign) => c.id === o.items?.[0]?.campaignId)?.title || 'â€”';
+                  const campTitle = campaigns.find((c: Campaign) => c.id === o.items?.[0]?.campaignId)?.title || '—';
                   return (
                     <tr key={o.id} className={`hover:bg-slate-50/80 transition-colors group ${isManual ? 'bg-amber-50/40' : ''}`}>
                       <td className="p-4 pl-6">
@@ -3219,7 +3219,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
                                 disabled={approvingId === o.id}
                                 className="text-[10px] font-bold text-green-600 hover:text-green-700 bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50"
                               >
-                                <CheckCircle size={12} /> {approvingId === o.id ? 'Approvingâ€¦' : 'Approve'}
+                                <CheckCircle size={12} /> {approvingId === o.id ? 'Approving…' : 'Approve'}
                               </button>
                               <button
                                 onClick={() => {
@@ -3310,7 +3310,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
                 <div>
                   <ExpandableText text={proofOrder.items?.[0]?.title || ''} clampClass="line-clamp-1" className="text-sm font-bold text-slate-900" as="p">{proofOrder.items?.[0]?.title}</ExpandableText>
                   <p className="text-xs text-slate-500 mt-0.5">Total: <span className="font-mono font-bold text-zinc-900">{formatCurrency(proofOrder.total)}</span></p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Mediator: {proofOrder.managerName} Â· Buyer: {proofOrder.buyerName}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Mediator: {proofOrder.managerName} · Buyer: {proofOrder.buyerName}</p>
                   {proofOrder.reviewerName && <p className="text-[10px] text-indigo-500 font-bold mt-0.5">Reviewer: {proofOrder.reviewerName}</p>}
                   {proofOrder.items?.[0]?.platform && <p className="text-[10px] text-slate-400 mt-0.5">Platform: {proofOrder.items[0].platform}</p>}
                 </div>
@@ -3358,7 +3358,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
                       <ProofImage orderId={proofOrder.id} proofType="rating" existingSrc={proofOrder.screenshots.rating !== 'exists' ? proofOrder.screenshots.rating : undefined} alt="Rating Proof" className="w-full h-auto block" />
                     </div>
                   ) : (
-                    <div className="p-4 border-2 border-dashed border-orange-200 bg-orange-50 rounded-2xl text-center"><p className="text-xs font-bold text-orange-500">Awaiting rating proofâ€¦</p></div>
+                    <div className="p-4 border-2 border-dashed border-orange-200 bg-orange-50 rounded-2xl text-center"><p className="text-xs font-bold text-orange-500">Awaiting rating proof…</p></div>
                   )}
                 </div>
               )}
@@ -3404,17 +3404,17 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
         <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in" onClick={() => { setRejectModal(null); setRejectReason(''); }}>
           <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl max-h-[90dvh] overflow-y-auto scrollbar-styled" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-extrabold text-lg text-red-600 mb-1 flex items-center gap-2"><AlertTriangle size={20} /> Reject Proof</h3>
-            <p className="text-xs text-slate-500 mb-4">Order {getPrimaryOrderId(rejectModal.order)} Â· Rejecting <strong>{rejectModal.type}</strong> proof</p>
+            <p className="text-xs text-slate-500 mb-4">Order {getPrimaryOrderId(rejectModal.order)} · Rejecting <strong>{rejectModal.type}</strong> proof</p>
             <textarea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="Reason for rejection (min 5 characters)â€¦"
+              placeholder="Reason for rejection (min 5 characters)…"
               className="w-full border border-slate-200 rounded-xl p-3 text-sm resize-none h-24 focus:ring-2 focus:ring-red-200 focus:border-red-300 outline-none"
             />
             <div className="flex gap-3 mt-4">
               <button onClick={() => { setRejectModal(null); setRejectReason(''); }} className="flex-1 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">Cancel</button>
               <button onClick={handleReject} disabled={rejecting || rejectReason.trim().length < 5} className="flex-1 py-2.5 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                {rejecting ? 'Rejectingâ€¦' : 'Reject Proof'}
+                {rejecting ? 'Rejecting…' : 'Reject Proof'}
               </button>
             </div>
           </div>
@@ -3484,7 +3484,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators
   const totalTeamPages = Math.max(1, Math.ceil(filtered.length / TEAM_PER_PAGE));
   const paginatedTeam = filtered.slice((teamPage - 1) * TEAM_PER_PAGE, teamPage * TEAM_PER_PAGE);
 
-  // Filter orders for selected mediator â€” uses orders from parent or lazy-loaded
+  // Filter orders for selected mediator — uses orders from parent or lazy-loaded
   const mediatorOrders = useMemo(() => {
     if (!selectedMediator) return [];
     return effectiveOrders.filter((o: Order) => (o.mediatorCode || o.managerName) === selectedMediator.mediatorCode);
@@ -3723,10 +3723,10 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators
                     <td className="p-5 text-center">
                       <div className="text-xs font-bold text-slate-600">
                         {loadingOrders
-                          ? 'â€¦'
+                          ? '…'
                           : ordersAvailable
                             ? `${effectiveOrders.filter((o: Order) => (o.mediatorCode || o.managerName) === m.mediatorCode).length} Orders`
-                            : 'â€“'}
+                            : '—'}
                       </div>
                     </td>
                     <td className="p-5 text-right">
@@ -4096,7 +4096,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators
                         className="w-full h-auto block"
                       />
                     </div>
-                    {/* AI Verification â€” stored from buyer's proof submission */}
+                    {/* AI Verification — stored from buyer's proof submission */}
                     {proofOrder.orderAiVerification && (
                     <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mt-3 relative overflow-hidden">
                       <div className="flex justify-between items-center mb-3">
@@ -4191,7 +4191,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators
                         <div className={`p-2 rounded-lg text-center ${proofOrder.ratingAiVerification.accountNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                           <p className="text-[10px] font-bold text-slate-400 uppercase">Account Name</p>
                           <p className={`text-xs font-bold ${proofOrder.ratingAiVerification.accountNameMatch ? 'text-green-600' : 'text-red-600'}`}>
-                            {proofOrder.ratingAiVerification.accountNameMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
+                            {proofOrder.ratingAiVerification.accountNameMatch ? '✔ Match' : '✗ Mismatch'}
                           </p>
                           {proofOrder.ratingAiVerification.detectedAccountName && (
                             <ExpandableText text={`Found: ${proofOrder.ratingAiVerification.detectedAccountName}`} clampClass="truncate" className="text-[10px] text-slate-500 mt-0.5" as="p">Found: {proofOrder.ratingAiVerification.detectedAccountName}</ExpandableText>
@@ -4200,7 +4200,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators
                         <div className={`p-2 rounded-lg text-center ${proofOrder.ratingAiVerification.productNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                           <p className="text-[10px] font-bold text-slate-400 uppercase">Product Name</p>
                           <p className={`text-xs font-bold ${proofOrder.ratingAiVerification.productNameMatch ? 'text-green-600' : 'text-red-600'}`}>
-                            {proofOrder.ratingAiVerification.productNameMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
+                            {proofOrder.ratingAiVerification.productNameMatch ? '✔ Match' : '✗ Mismatch'}
                           </p>
                           {proofOrder.ratingAiVerification.detectedProductName && (
                             <ExpandableText text={`Found: ${proofOrder.ratingAiVerification.detectedProductName}`} clampClass="truncate" className="text-[10px] text-slate-500 mt-0.5" as="p">Found: {proofOrder.ratingAiVerification.detectedProductName}</ExpandableText>
@@ -4263,7 +4263,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators
                           <div className={`p-2 rounded-lg text-center ${proofOrder.returnWindowAiVerification.orderIdMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                             <p className="text-[10px] font-bold text-slate-400 uppercase">Order ID</p>
                             <p className={`text-xs font-bold ${proofOrder.returnWindowAiVerification.orderIdMatch ? 'text-green-600' : 'text-red-600'}`}>
-                              {proofOrder.returnWindowAiVerification.orderIdMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
+                              {proofOrder.returnWindowAiVerification.orderIdMatch ? '✔ Match' : '✗ Mismatch'}
                             </p>
                           </div>
                         )}
@@ -4271,7 +4271,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators
                           <div className={`p-2 rounded-lg text-center ${proofOrder.returnWindowAiVerification.productNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                             <p className="text-[10px] font-bold text-slate-400 uppercase">Product Name</p>
                             <p className={`text-xs font-bold ${proofOrder.returnWindowAiVerification.productNameMatch ? 'text-green-600' : 'text-red-600'}`}>
-                              {proofOrder.returnWindowAiVerification.productNameMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
+                              {proofOrder.returnWindowAiVerification.productNameMatch ? '✔ Match' : '✗ Mismatch'}
                             </p>
                           </div>
                         )}
@@ -4279,7 +4279,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators
                           <div className={`p-2 rounded-lg text-center ${proofOrder.returnWindowAiVerification.amountMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                             <p className="text-[10px] font-bold text-slate-400 uppercase">Amount</p>
                             <p className={`text-xs font-bold ${proofOrder.returnWindowAiVerification.amountMatch ? 'text-green-600' : 'text-red-600'}`}>
-                              {proofOrder.returnWindowAiVerification.amountMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
+                              {proofOrder.returnWindowAiVerification.amountMatch ? '✔ Match' : '✗ Mismatch'}
                             </p>
                           </div>
                         )}
@@ -4287,7 +4287,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators
                           <div className={`p-2 rounded-lg text-center ${proofOrder.returnWindowAiVerification.returnWindowClosed ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'}`}>
                             <p className="text-[10px] font-bold text-slate-400 uppercase">Window Closed</p>
                             <p className={`text-xs font-bold ${proofOrder.returnWindowAiVerification.returnWindowClosed ? 'text-green-600' : 'text-yellow-600'}`}>
-                              {proofOrder.returnWindowAiVerification.returnWindowClosed ? 'âœ“ Closed' : 'â³ Open'}
+                              {proofOrder.returnWindowAiVerification.returnWindowClosed ? '✔ Closed' : '⏳ Open'}
                             </p>
                           </div>
                         )}
@@ -4425,7 +4425,7 @@ export const AgencyDashboard: React.FC = () => {
       // Discard stale results if a newer fetch was started (rapid tab switch) or if aborted
       if (fetchSeqRef.current !== seq || controller.signal.aborted) return;
 
-      // Map results back to state â€” read current values from ref to avoid stale closures
+      // Map results back to state — read current values from ref to avoid stale closures
       let safeMeds = dataRef.current.mediators;
       let safeCamps = dataRef.current.campaigns;
       let safeOrds = dataRef.current.orders;
@@ -4463,7 +4463,7 @@ export const AgencyDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load on tab change â€” only fetches keys not already cached
+  // Trigger data load on tab change — only fetches keys not already cached
   const prevTabRef = useRef(activeTab);
   useEffect(() => {
     const tabChanged = prevTabRef.current !== activeTab;
@@ -4831,7 +4831,7 @@ export const AgencyDashboard: React.FC = () => {
                     {String(t.status || '').toLowerCase() === 'open' && resolvingTicketId !== t.id && (
                         <button type="button" onClick={() => { setResolvingTicketId(t.id); setResolutionNote(''); }}
                           className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
-                          âœ“ Resolve / Reject
+                          ✔ Resolve / Reject
                         </button>
                     )}
                     {String(t.status || '').toLowerCase() === 'open' && resolvingTicketId === t.id && (
@@ -4841,10 +4841,10 @@ export const AgencyDashboard: React.FC = () => {
                         <div className="flex items-center gap-2">
                           <button type="button" onClick={async () => {
                             try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
-                          }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">âœ“ Resolve</button>
+                          }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✔ Resolve</button>
                           <button type="button" onClick={async () => {
                             try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
-                          }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">âœ— Reject</button>
+                          }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
                           <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
                             className="px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 hover:bg-slate-200">Cancel</button>
                         </div>

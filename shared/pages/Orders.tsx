@@ -44,7 +44,7 @@ import {
   TicketCheck,
 } from 'lucide-react';
 
-/* â”€â”€â”€ Sample Screenshot Guide â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──Sample Screenshot Guide ────────────────────────────────────────*/
 const SAMPLE_IMAGES: Record<string, string> = {
   order: '/screenshots/sample-order.png',
   rating: '/screenshots/sample-rating.png',
@@ -111,7 +111,7 @@ const SampleScreenshotGuide: React.FC<{
           {/* Sample annotated image */}
           {sampleImg && (
             <div className="mt-2 rounded-lg border border-blue-200 overflow-hidden bg-white">
-              <p className="text-[10px] font-bold text-blue-500 px-2 pt-1.5 pb-0.5">ðŸ“¸ Example â€” key fields highlighted</p>
+              <p className="text-[10px] font-bold text-blue-500 px-2 pt-1.5 pb-0.5">📸 Example — key fields highlighted</p>
               <img
                 src={sampleImg}
                 alt={`Sample ${g.title}`}
@@ -149,7 +149,7 @@ const SampleScreenshotGuide: React.FC<{
 
 const MAX_PROOF_SIZE_BYTES = 10 * 1024 * 1024;
 
-/** Allowed MIME types for proof images â€” matches what backend AI pipeline can process. */
+/** Allowed MIME types for proof images — matches what backend AI pipeline can process. */
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 type ImageValidationError = 'invalid_type' | 'too_large' | null;
@@ -360,7 +360,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       const mine = asArray<Ticket>(data)
         .filter((t: Ticket) => t.userId === user.id && t.issueType !== 'Feedback');
       setMyTickets(mine.sort((a: Ticket, b: Ticket) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-    } catch { /* silently degrade â€” tickets are secondary */ }
+    } catch { /* silently degrade — tickets are secondary */ }
   };
 
   // Merge a submitClaim response (toUiOrder) into the orders list so the UI
@@ -575,15 +575,15 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       });
 
       // [AI] Smart Extraction Verification Logic
-      // Use capturedProduct (snapshot before await) â€” NOT selectedProduct which may have changed
+      // Use capturedProduct (snapshot before await) — NOT selectedProduct which may have changed
       if (capturedProduct) {
         const hasId = Boolean(safeOrderId);
         const hasAmount = typeof safeAmount === 'number';
-        const tolerance = Math.max(10, capturedProduct.price * 0.02); // 2% or â‚¹10 minimum
+        const tolerance = Math.max(10, capturedProduct.price * 0.02); // 2% or ₹10 minimum
         const amountMatch = hasAmount && Math.abs(safeAmount - capturedProduct.price) < tolerance;
         const idValid = hasId && safeOrderId.length > 5;
 
-        // Product name similarity check â€” strict matching to prevent fraud
+        // Product name similarity check — strict matching to prevent fraud
         const productNameStatus = checkProductNameMatch(details.productName, capturedProduct.title);
 
         // Reviewer name matching against extracted account name
@@ -667,7 +667,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       const productName = selectedOrder.items?.[0]?.title || '';
       // Use marketplace reviewer name (provided during order creation) as primary match target.
       // When buyer ordered from a different person's marketplace account, the reviewer name
-      // is the name shown on that account â€” use it instead of the buyer's app account name.
+      // is the name shown on that account — use it instead of the buyer's app account name.
       const reviewerName = selectedOrder.reviewerName || '';
       const hasReviewerName = !!selectedOrder.reviewerName;
 
@@ -676,7 +676,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       if (!hasReviewerName) {
         if (productName) {
           const result = await api.orders.verifyRating(file, buyerName || '', productName, undefined, selectedOrder.id, controller.signal);
-          // Override account name match â€” we can't verify without a reviewer name
+          // Override account name match — we can't verify without a reviewer name
           setRatingVerification({ ...result, accountNameMatch: true });
           if (result.screenshotCropped) {
             toast.error('Screenshot appears cropped or incomplete. Please upload a FULL screenshot showing the complete page including the account name header at the top.');
@@ -713,9 +713,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
         }
       }
     } catch (err) {
-      if ((err as Error)?.name === 'AbortError') return; // Cancelled by re-upload â€” ignore silently
+      if ((err as Error)?.name === 'AbortError') return; // Cancelled by re-upload — ignore silently
       if (process.env.NODE_ENV !== 'production') console.error('Rating pre-validation failed:', err);
-      // Keep verification null â€” submit button stays disabled until user retries
+      // Keep verification null — submit button stays disabled until user retries
       setRatingVerification(null);
       const msg = (err as Error)?.message || 'AI verification failed. Please try uploading the screenshot again.';
       toast.error(msg);
@@ -813,9 +813,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       const reviewerName = selectedOrder.reviewerName || '';
 
       if (!(orderId && productName && amount > 0)) {
-        // Missing order data â€” block verification instead of silently approving
+        // Missing order data — block verification instead of silently approving
         setRwVerification(null);
-        toast.error('Order data incomplete â€” please re-upload the order screenshot first so we can verify this return window screenshot.');
+        toast.error('Order data incomplete — please re-upload the order screenshot first so we can verify this return window screenshot.');
         return;
       }
 
@@ -843,9 +843,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
         }
       }
     } catch (err) {
-      if ((err as Error)?.name === 'AbortError') return; // Cancelled by re-upload â€” ignore silently
+      if ((err as Error)?.name === 'AbortError') return; // Cancelled by re-upload — ignore silently
       if (process.env.NODE_ENV !== 'production') console.error('Return window pre-validation failed:', err);
-      // Keep verification null â€” submit button stays disabled until user retries
+      // Keep verification null — submit button stays disabled until user retries
       setRwVerification(null);
       const msg = (err as Error)?.message || 'AI verification failed. Please try uploading the screenshot again.';
       toast.error(msg);
@@ -927,10 +927,10 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       toast.error('Reviewer name does not match the account in screenshot. Please correct it.');
       return;
     }
-    // Require reviewer/account name for Rating & Review deals â€” it's used for
+    // Require reviewer/account name for Rating & Review deals — it's used for
     // AI screenshot verification and cannot be added later (prevents cheating).
     if ((selectedProduct.dealType === 'Rating' || selectedProduct.dealType === 'Review') && !reviewerNameInput.trim()) {
-      toast.error('Please enter the reviewer name â€” the marketplace account name used for this order.');
+      toast.error('Please enter the reviewer name — the marketplace account name used for this order.');
       return;
     }
     submittingRef.current = true;
@@ -1019,7 +1019,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
               if (!orders.length) { toast.error('No orders to export'); return; }
               const h = [
                 'External Order ID', 'Date', 'Time', 'Product', 'Platform', 'Brand', 'Deal Type',
-                'Unit Price (â‚¹)', 'Quantity', 'Total (â‚¹)', 'Commission/Cashback (â‚¹)',
+                'Unit Price (₹)', 'Quantity', 'Total (₹)', 'Commission/Cashback (₹)',
                 'Workflow Status', 'Affiliate Status', 'Payment Status', 'Settlement Date',
                 'Mediator', 'Agency', 'Reviewer Name', 'Sold By', 'Order Date', 'Extracted Product', 'Internal Ref',
               ];
@@ -1280,7 +1280,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                   </div>
                 </div>
 
-                {/* Reviewer / Marketplace Account Name (read-only â€” set during order creation) */}
+                {/* Reviewer / Marketplace Account Name (read-only — set during order creation) */}
                 {(isRating || isReview) && order.reviewerName && (
                   <div className="mb-3">
                     <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
@@ -1346,7 +1346,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                   </div>
                 )}
 
-                {/* STEP PROGRESS INDICATOR â€” shows buyers what step they're at */}
+                {/* STEP PROGRESS INDICATOR — shows buyers what step they're at */}
                 {hasExtraSteps && displayStatus !== 'SETTLED' && displayStatus !== 'FROZEN' && (
                   <div className="mb-3 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Steps to complete</p>
@@ -1475,17 +1475,17 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                     {/* Context message under the step bar */}
                     {!purchaseVerified && !rejectionReason && (
                       <p className="text-[10px] text-slate-400 mt-2 font-medium">
-                        Waiting for your mediator to verify purchase proofâ€¦
+                        Waiting for your mediator to verify purchase proof…
                       </p>
                     )}
                     {purchaseVerified && missingProofs.length > 0 && !rejectionReason && (
                       <p className="text-[10px] text-yellow-700 mt-2 font-bold">
-                        â†“ Upload your {(missingProofs as string[]).map(p => p === 'returnWindow' ? 'return window' : p).join(' & ')} proof below to continue.
+                        ↓ Upload your {(missingProofs as string[]).map(p => p === 'returnWindow' ? 'return window' : p).join(' & ')} proof below to continue.
                       </p>
                     )}
                     {purchaseVerified && missingProofs.length === 0 && missingVerifications.length > 0 && !rejectionReason && (
                       <p className="text-[10px] text-purple-600 mt-2 font-medium">
-                        All proofs uploaded! Waiting for mediator approvalâ€¦
+                        All proofs uploaded! Waiting for mediator approval…
                       </p>
                     )}
                   </div>
@@ -1576,7 +1576,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
           })
         )}
 
-        {/* â”€â”€â”€ My Tickets Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ──My Tickets Section ───────────────────────────*/}
         <div className="mt-6">
           <button
             type="button"
@@ -1847,7 +1847,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           setMatchStatus({ id: 'none', amount: 'none', productName: 'none', reviewerName: 'none' });
                           setOrderIdLocked(false);
                           setSelectedProduct(p);
-                          // Don't auto-fill reviewer name â€” buyer must explicitly enter the
+                          // Don't auto-fill reviewer name — buyer must explicitly enter the
                           // marketplace account name used for this order.  They may have ordered
                           // from someone else's account (e.g. brother's Amazon).
                           setReviewerNameInput('');
@@ -2013,7 +2013,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       {matchStatus.productName === 'mismatch' && (
                         <div className="bg-red-50 border-2 border-red-300 p-3 rounded-lg animate-enter">
                           <p className="text-[11px] text-red-700 font-bold flex items-center gap-1.5">
-                            <AlertTriangle size={14} /> WRONG PRODUCT â€” The product in this screenshot does not match the selected deal.
+                            <AlertTriangle size={14} /> WRONG PRODUCT — The product in this screenshot does not match the selected deal.
                           </p>
                           <p className="text-[10px] text-red-600 mt-1">Please upload a screenshot of the correct order.</p>
                         </div>
@@ -2044,9 +2044,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                             <ul className="list-disc pl-3 mt-1 space-y-0.5 leading-relaxed">
                               <li>Take a <strong>clear, full-screen screenshot</strong> of the order details page</li>
                               <li>Ensure <strong>Order ID</strong> and <strong>Total Amount</strong> are both visible</li>
-                              <li><strong>Amazon:</strong> Go to Your Orders â†’ View Order Details</li>
-                              <li><strong>Flipkart:</strong> Go to My Orders â†’ tap the order</li>
-                              <li><strong>Myntra/Ajio:</strong> Go to Orders â†’ Order Details</li>
+                              <li><strong>Amazon:</strong> Go to Your Orders → View Order Details</li>
+                              <li><strong>Flipkart:</strong> Go to My Orders → tap the order</li>
+                              <li><strong>Myntra/Ajio:</strong> Go to Orders → Order Details</li>
                               <li>Avoid screenshots of delivery tracking or payment pages</li>
                               <li>Use good lighting and avoid dark mode if possible</li>
                             </ul>
@@ -2056,13 +2056,13 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       {/* Guidance when only one field is extracted */}
                       {!isAnalyzing && (!!extractedDetails.orderId !== !!extractedDetails.amount) && (
                         <p className="text-[10px] text-blue-600 font-medium bg-blue-50 p-2 rounded-lg flex items-center gap-1.5">
-                          <AlertTriangle size={10} /> {extractedDetails.orderId ? 'Amount not detected â€” please enter the Paid Amount manually.' : 'Order ID not detected â€” please enter the Order ID manually.'}
+                          <AlertTriangle size={10} /> {extractedDetails.orderId ? 'Amount not detected — please enter the Paid Amount manually.' : 'Order ID not detected — please enter the Order ID manually.'}
                         </p>
                       )}
                     </div>
                   )}
 
-                  {/* Show AI-extracted metadata â€” editable so users can correct AI mistakes */}
+                  {/* Show AI-extracted metadata — editable so users can correct AI mistakes */}
                   {/* Always show after extraction completes so users can manually fill missing fields */}
                   {formScreenshot && !isAnalyzing && (extractedDetails.orderId || extractedDetails.amount) && (
                     <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 space-y-2 animate-enter">
@@ -2107,7 +2107,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                     </div>
                   )}
 
-                  {/* Reviewer name â€” only for Rating/Review deals (Discount deals don't need it) */}
+                  {/* Reviewer name — only for Rating/Review deals (Discount deals don't need it) */}
                   {formScreenshot && (selectedProduct?.dealType === 'Rating' || selectedProduct?.dealType === 'Review') && (
                     <div className="space-y-1 animate-enter">
                       <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">
@@ -2140,7 +2140,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                         <div className="flex items-center gap-1.5 mt-1">
                           <AlertTriangle size={11} className="text-red-500 flex-shrink-0" />
                           <p className="text-[10px] font-bold text-red-600">
-                            Account name mismatch â€” screenshot shows &quot;{extractedDetails.accountName}&quot;
+                            Account name mismatch — screenshot shows &quot;{extractedDetails.accountName}&quot;
                           </p>
                         </div>
                       )}
@@ -2153,7 +2153,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                         </div>
                       )}
                       <p className="text-[10px] text-zinc-400 ml-1">
-                        Enter the name shown on the marketplace account used for this order. If you ordered from someone else's account (e.g. brother, friend), enter their name â€” your rating/review screenshots will be verified against this name.
+                        Enter the name shown on the marketplace account used for this order. If you ordered from someone else's account (e.g. brother, friend), enter their name — your rating/review screenshots will be verified against this name.
                       </p>
                     </div>
                   )}
@@ -2372,7 +2372,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
 
             {uploadType === 'review' ? (
               <div className="space-y-3">
-                {/* Reviewer Name â€” display for identity consistency */}
+                {/* Reviewer Name — display for identity consistency */}
                 {selectedOrder?.reviewerName && (
                   <div className="bg-green-50 border border-green-200 rounded-xl p-3">
                     <p className="text-[10px] font-bold text-green-700 flex items-center gap-1.5">
@@ -2404,7 +2404,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
             ) : uploadType === 'rating' ? (
               /* Enhanced rating upload with AI pre-validation */
               <div className="space-y-4">
-                {/* Reviewer Name â€” display only, set during order creation */}
+                {/* Reviewer Name — display only, set during order creation */}
                 {selectedOrder?.reviewerName && (
                   <div className="bg-green-50 border border-green-200 rounded-xl p-3">
                     <p className="text-[10px] font-bold text-green-700 flex items-center gap-1.5">
@@ -2461,7 +2461,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           {selectedOrder?.reviewerName ? 'Reviewer Name' : 'Account Name'}
                         </div>
                         <div className={`text-xs font-bold ${ratingVerification.accountNameMatch ? 'text-green-600' : 'text-red-600'}`}>
-                          {ratingVerification.accountNameMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
+                          {ratingVerification.accountNameMatch ? '✔ Match' : '✗ Mismatch'}
                         </div>
                         {ratingVerification.detectedAccountName && (
                           <ExpandableText text={ratingVerification.detectedAccountName} clampClass="truncate" className="text-[10px] text-slate-500 mt-0.5" as="div">
@@ -2472,7 +2472,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       <div className={`p-2.5 rounded-xl text-center ${ratingVerification.productNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Product Name</div>
                         <div className={`text-xs font-bold ${ratingVerification.productNameMatch ? 'text-green-600' : 'text-red-600'}`}>
-                          {ratingVerification.productNameMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
+                          {ratingVerification.productNameMatch ? '✔ Match' : '✗ Mismatch'}
                         </div>
                         {ratingVerification.detectedProductName && (
                           <ExpandableText text={ratingVerification.detectedProductName} clampClass="truncate" className="text-[10px] text-slate-500 mt-0.5" as="div">
@@ -2506,7 +2506,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                         <AlertTriangle size={12} />
                         {selectedOrder?.reviewerName
                           ? `Reviewer name "${selectedOrder.reviewerName}" not found in screenshot. ${ratingVerification.detectedAccountName ? `Found "${ratingVerification.detectedAccountName}" instead.` : ''} Please upload a screenshot from the correct account.`
-                          : 'Account name mismatch â€” please ensure the rating was posted from the correct marketplace account.'}
+                          : 'Account name mismatch — please ensure the rating was posted from the correct marketplace account.'}
                       </p>
                     )}
                     {ratingVerification.accountNameMatch && !ratingVerification.productNameMatch && (
@@ -2552,7 +2552,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
             ) : uploadType === 'returnWindow' ? (
               /* Enhanced return window upload with AI pre-validation */
               <div className="space-y-4">
-                {/* Reviewer Name â€” display for identity consistency */}
+                {/* Reviewer Name — display for identity consistency */}
                 {selectedOrder?.reviewerName && (
                   <div className="bg-green-50 border border-green-200 rounded-xl p-3">
                     <p className="text-[10px] font-bold text-green-700 flex items-center gap-1.5">
@@ -2607,19 +2607,19 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       <div className={`p-2.5 rounded-xl text-center ${rwVerification.orderIdMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Order ID</div>
                         <div className={`text-xs font-bold ${rwVerification.orderIdMatch ? 'text-green-600' : 'text-red-600'}`}>
-                          {rwVerification.orderIdMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
+                          {rwVerification.orderIdMatch ? '✔ Match' : '✗ Mismatch'}
                         </div>
                       </div>
                       <div className={`p-2.5 rounded-xl text-center ${rwVerification.productNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Product</div>
                         <div className={`text-xs font-bold ${rwVerification.productNameMatch ? 'text-green-600' : 'text-red-600'}`}>
-                          {rwVerification.productNameMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
+                          {rwVerification.productNameMatch ? '✔ Match' : '✗ Mismatch'}
                         </div>
                       </div>
                       <div className={`p-2.5 rounded-xl text-center ${rwVerification.returnWindowClosed ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Return Window</div>
                         <div className={`text-xs font-bold ${rwVerification.returnWindowClosed ? 'text-green-600' : 'text-red-600'}`}>
-                          {rwVerification.returnWindowClosed ? 'âœ“ Closed' : 'âœ— Still Open'}
+                          {rwVerification.returnWindowClosed ? '✔ Closed' : '✗ Still Open'}
                         </div>
                       </div>
                     </div>
@@ -2627,14 +2627,14 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       <div className={`p-2.5 rounded-xl text-center ${rwVerification.amountMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Amount</div>
                         <div className={`text-xs font-bold ${rwVerification.amountMatch ? 'text-green-600' : 'text-red-600'}`}>
-                          {rwVerification.amountMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
+                          {rwVerification.amountMatch ? '✔ Match' : '✗ Mismatch'}
                         </div>
                       </div>
                       {selectedOrder?.soldBy && (
                       <div className={`p-2.5 rounded-xl text-center ${rwVerification.soldByMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Seller</div>
                         <div className={`text-xs font-bold ${rwVerification.soldByMatch ? 'text-green-600' : 'text-red-600'}`}>
-                          {rwVerification.soldByMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
+                          {rwVerification.soldByMatch ? '✔ Match' : '✗ Mismatch'}
                         </div>
                       </div>
                       )}
@@ -2642,7 +2642,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                         <div className={`p-2.5 rounded-xl text-center ${rwVerification.reviewerNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                           <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Reviewer</div>
                           <div className={`text-xs font-bold ${rwVerification.reviewerNameMatch ? 'text-green-600' : 'text-red-600'}`}>
-                            {rwVerification.reviewerNameMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
+                            {rwVerification.reviewerNameMatch ? '✔ Match' : '✗ Mismatch'}
                           </div>
                         </div>
                       )}

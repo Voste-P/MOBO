@@ -75,7 +75,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
       const resp = await api.tickets.getComments(ticket.id);
       setComments(resp.comments || []);
     } catch {
-      // Silently handle poll failures Ã¢â‚¬â€ comments stay as-is
+      // Silently handle poll failures — comments stay as-is
     } finally {
       setLoadingComments(false);
     }
@@ -95,7 +95,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
     }
   }, [open, ticket, loadComments]);
 
-  // Realtime: refresh comments on tickets.changed (no polling Ã¢â‚¬â€ SSE handles updates)
+  // Realtime: refresh comments on tickets.changed (no polling — SSE handles updates)
   useEffect(() => {
     if (!open || !ticket) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -265,16 +265,16 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
                   <div><span className="text-zinc-500">Brand:</span> <strong className="text-zinc-800">{orderDetails.brand}</strong></div>
                 )}
                 {orderDetails.unitPrice != null && (
-                  <div><span className="text-zinc-500">Unit Price:</span> <strong className="text-zinc-800">Ã¢â€šÂ¹{orderDetails.unitPrice}</strong></div>
+                  <div><span className="text-zinc-500">Unit Price:</span> <strong className="text-zinc-800">₹{orderDetails.unitPrice}</strong></div>
                 )}
                 {orderDetails.quantity != null && (
                   <div><span className="text-zinc-500">Qty:</span> <strong className="text-zinc-800">{orderDetails.quantity}</strong></div>
                 )}
                 {orderDetails.total != null && (
-                  <div><span className="text-zinc-500">Total:</span> <strong className="text-zinc-800">Ã¢â€šÂ¹{orderDetails.total}</strong></div>
+                  <div><span className="text-zinc-500">Total:</span> <strong className="text-zinc-800">₹{orderDetails.total}</strong></div>
                 )}
                 {orderDetails.commission != null && (
-                  <div><span className="text-zinc-500">Commission:</span> <strong className="text-zinc-800">Ã¢â€šÂ¹{orderDetails.commission}</strong></div>
+                  <div><span className="text-zinc-500">Commission:</span> <strong className="text-zinc-800">₹{orderDetails.commission}</strong></div>
                 )}
                 {orderDetails.dealType && (
                   <div><span className="text-zinc-500">Deal Type:</span> <strong className="text-zinc-800">{orderDetails.dealType}</strong></div>

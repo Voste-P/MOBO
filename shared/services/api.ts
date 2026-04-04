@@ -1428,7 +1428,7 @@ export const api = {
     },
   },
 
-  /** ── Google Sheets Export ─────────────────────────────────── */
+  /** ─Google Sheets Export ──────────────────────────────────*/
   sheets: {
     /** Export data to a new Google Spreadsheet. Returns spreadsheet URL. */
     export: async (data: {
@@ -1445,7 +1445,7 @@ export const api = {
     },
   },
 
-  /** ── Google OAuth (for user-level Sheets export to their own Drive) ── */
+  /** ─Google OAuth (for user-level Sheets export to their own Drive) ─*/
   google: {
     /** Get the Google OAuth consent URL. Frontend opens this in a popup. */
     getAuthUrl: async (): Promise<{ url: string }> => {

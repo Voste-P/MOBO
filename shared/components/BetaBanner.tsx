@@ -45,7 +45,7 @@ export function BetaBanner() {
             className="shrink-0 mt-px text-yellow-500 hover:text-yellow-800 text-xs leading-none transition-colors"
             aria-label="Dismiss beta banner"
           >
-            âœ•
+            ✕
           </button>
         </div>
         <style>{`

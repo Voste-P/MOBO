@@ -98,13 +98,13 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
           accountName: result.accountName || undefined,
         });
 
-        // Ã¢â€â‚¬Ã¢â€â‚¬ Product name matching (shared strict algorithm) Ã¢â€â‚¬Ã¢â€â‚¬
+        // —— Product name matching (shared strict algorithm) ——
         const nameMatchResult = checkProductNameMatch(result.productName, product?.title);
         if (nameMatchResult === 'mismatch') {
           setProductNameMismatch(true);
           toast.error('Product name in screenshot does not match this deal. Please upload the correct order screenshot.');
         }
-        // Ã¢â€â‚¬Ã¢â€â‚¬ Platform matching Ã¢â€â‚¬Ã¢â€â‚¬
+        // —— Platform matching ——
         if (result.platform && product?.platform) {
           const extractedPlatform = String(result.platform).toLowerCase().trim();
           const expectedPlatform = String(product.platform).toLowerCase().trim();
@@ -113,14 +113,14 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
             toast.error(`Screenshot appears to be from ${result.platform}, but this deal is for ${product.platform}. Please upload the correct screenshot.`);
           }
         }
-        // Ã¢â€â‚¬Ã¢â€â‚¬ Reviewer name matching against extracted account name Ã¢â€â‚¬Ã¢â€â‚¬
+        // —— Reviewer name matching against extracted account name ——
         if (result.accountName && reviewerName.trim()) {
           const rnMatch = checkReviewerNameMatch(reviewerName, result.accountName);
           setReviewerNameMismatch(rnMatch === 'mismatch');
         }
       }
     } catch {
-      // Extraction is optional Ã¢â‚¬â€ notify user gracefully
+      // Extraction is optional — notify user gracefully
       toast.info('Could not auto-extract details. You can enter them manually.');
     } finally {
       setExtracting(false);
@@ -146,7 +146,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
     }
     // Require reviewer name for Rating/Review deals to prevent cheating
     if ((product.dealType === 'Rating' || product.dealType === 'Review') && !reviewerName.trim()) {
-      toast.error('Please enter the reviewer name Ã¢â‚¬â€ the marketplace account name used for this order.');
+      toast.error('Please enter the reviewer name — the marketplace account name used for this order.');
       return;
     }
     setSubmitting(true);
@@ -229,7 +229,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
             </div>
             <div className="flex-1 min-w-0">
               <ExpandableText text={product.title || ''} clampClass="line-clamp-2" className="font-bold text-sm text-slate-900" as="h3">{product.title}</ExpandableText>
-              <p className="text-lg font-extrabold text-lime-600 mt-0.5">Ã¢â€šÂ¹{product.price.toLocaleString('en-IN')}</p>
+              <p className="text-lg font-extrabold text-lime-600 mt-0.5">₹{product.price.toLocaleString('en-IN')}</p>
               <p className="text-[10px] text-slate-400 uppercase font-bold">{product.platform} &bull; {product.dealType === 'Discount' ? 'Order' : product.dealType} Deal</p>
             </div>
           </div>
@@ -293,14 +293,14 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} aria-label="Upload order screenshot" />
           </div>
 
-          {/* Step 3: Order Details Ã¢â‚¬â€ ALWAYS shown after screenshot upload */}
+          {/* Step 3: Order Details — ALWAYS shown after screenshot upload */}
           {preview && !extracting && (
             <div className="space-y-3 animate-enter">
               {/* AI status indicator */}
               {(extractedDetails.orderId || extractedDetails.amount || extractedDetails.productName || extractedDetails.soldBy || extractedDetails.orderDate) ? (
                 <div className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl">
                   <CheckCircle size={13} className="text-emerald-600 flex-shrink-0" />
-                  <p className="text-[10px] font-bold text-emerald-700">AI extracted details below Ã¢â‚¬â€ please verify &amp; correct if needed</p>
+                  <p className="text-[10px] font-bold text-emerald-700">AI extracted details below — please verify &amp; correct if needed</p>
                 </div>
               ) : (
                 <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
@@ -311,7 +311,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
                 </div>
               )}
 
-              {/* All 5 editable fields Ã¢â‚¬â€ always visible */}
+              {/* All 5 editable fields — always visible */}
               <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2.5">
                 <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Order Details</p>
 
@@ -327,7 +327,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Amount (Ã¢â€šÂ¹) *</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Amount (₹) *</label>
                     <input
                       type="text"
                       inputMode="decimal"
@@ -356,7 +356,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
                     <div className="mt-1.5 flex items-start gap-1.5 px-2.5 py-2 bg-red-50 border border-red-200 rounded-lg">
                       <AlertCircle size={13} className="text-red-500 mt-0.5 flex-shrink-0" />
                       <p className="text-[10px] font-bold text-red-600">
-                        Product name mismatch Ã¢â‚¬â€ this screenshot is for a different product.
+                        Product name mismatch — this screenshot is for a different product.
                       </p>
                     </div>
                   )}
@@ -364,7 +364,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
                     <div className="mt-1.5 flex items-start gap-1.5 px-2.5 py-2 bg-red-50 border border-red-200 rounded-lg">
                       <AlertCircle size={13} className="text-red-500 mt-0.5 flex-shrink-0" />
                       <p className="text-[10px] font-bold text-red-600">
-                        Platform mismatch Ã¢â‚¬â€ this screenshot is not from {product?.platform || 'the required platform'}.
+                        Platform mismatch — this screenshot is not from {product?.platform || 'the required platform'}.
                       </p>
                     </div>
                   )}
@@ -426,7 +426,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
                   <div className="flex items-center gap-1 mt-0.5">
                     <AlertCircle size={10} className="text-red-500 flex-shrink-0" />
                     <p className="text-[10px] font-bold text-red-600">
-                      Account name mismatch Ã¢â‚¬â€ screenshot shows &quot;{extractedDetails.accountName}&quot;
+                      Account name mismatch — screenshot shows &quot;{extractedDetails.accountName}&quot;
                     </p>
                   </div>
                 )}

@@ -75,7 +75,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
     if (!value) return ''; // optional field
     if (value.length > 50) return 'UPI ID is too long (max 50 characters)';
     if (!/^[a-zA-Z0-9._-]+@[a-zA-Z0-9]+$/.test(value)) {
-      return 'Invalid format â€” use handle@provider (e.g. name@upi)';
+      return 'Invalid format — use handle@provider (e.g. name@upi)';
     }
     return '';
   }
@@ -158,7 +158,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
       }
       if (!isEditing) {
         setIsEditing(true);
-        toast.info('Editing enabled â€” make changes, then tap Save.');
+        toast.info('Editing enabled — make changes, then tap Save.');
       }
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -352,7 +352,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
               {isStatsLoading ? (
                 <div className="w-8 h-8 border-2 border-zinc-200 border-t-zinc-600 rounded-full animate-spin motion-reduce:animate-none mx-auto" role="status" aria-label="Loading wallet stats" />
               ) : (
-                `â‚¹${totalSpent.toLocaleString('en-IN')}`
+                `₹${totalSpent.toLocaleString('en-IN')}`
               )}
             </h2>
             <div className="flex items-center gap-2 mt-4 bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-xs font-bold border border-green-100">
@@ -501,7 +501,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
                       description: `Rating: ${feedbackRating}/5\n${feedbackText.trim()}`,
                     });
                     setFeedbackSent(true);
-                    toast.success('Feedback submitted â€” thank you!');
+                    toast.success('Feedback submitted — thank you!');
                   } catch (err) {
                     toast.error(formatErrorMessage(err, 'Failed to send feedback'));
                   } finally {
