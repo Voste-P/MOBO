@@ -7,17 +7,20 @@ const Chatbot = lazy(() =>
 
 class ChatbotErrorBoundary extends Component<
   { children: React.ReactNode },
-  { hasError: boolean }
+  { hasError: boolean; retryKey: number }
 > {
-  state = { hasError: false };
+  state = { hasError: false, retryKey: 0 };
   static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('[ChatbotErrorBoundary]', error, info.componentStack);
+  }
   render() {
     if (this.state.hasError) {
       return (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center">
           <p className="text-sm font-bold text-zinc-700">Failed to load chat.</p>
           <button
-            onClick={() => this.setState({ hasError: false })}
+            onClick={() => this.setState((s) => ({ hasError: false, retryKey: s.retryKey + 1 }))}
             className="px-5 py-2.5 bg-black text-white text-sm font-bold rounded-2xl hover:bg-zinc-800 transition-colors"
           >
             Retry
@@ -25,7 +28,7 @@ class ChatbotErrorBoundary extends Component<
         </div>
       );
     }
-    return this.props.children;
+    return <React.Fragment key={this.state.retryKey}>{this.props.children}</React.Fragment>;
   }
 }
 

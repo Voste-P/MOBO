@@ -73,8 +73,10 @@ export function Modal({
 
           {/* Panel */}
           <motion.div
+            ref={(el) => el?.focus()}
+            tabIndex={-1}
             className={cn(
-              'relative w-full bg-white rounded-[2rem] shadow-2xl overflow-hidden',
+              'relative w-full bg-white rounded-[2rem] shadow-2xl overflow-hidden outline-none',
               sizeMap[size],
               className,
             )}

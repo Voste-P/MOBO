@@ -485,6 +485,9 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
                   className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-lime-400 h-24 resize-none"
                   placeholder="What do you like? What can be better?"
                 />
+                {feedbackText.length > 0 && (
+                  <p className="text-[10px] text-zinc-400 text-right mt-1">{feedbackText.length}/2000</p>
+                )}
               </div>
 
               <button

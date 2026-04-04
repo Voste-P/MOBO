@@ -19,6 +19,28 @@ interface TabsProps {
 }
 
 export function Tabs({ tabs, activeTab, onTabChange, className, variant = 'pill' }: TabsProps) {
+  const handleKeyDown = (e: React.KeyboardEvent, idx: number) => {
+    let targetIdx = -1;
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      targetIdx = (idx + 1) % tabs.length;
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      targetIdx = (idx - 1 + tabs.length) % tabs.length;
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      targetIdx = 0;
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      targetIdx = tabs.length - 1;
+    }
+    if (targetIdx >= 0) {
+      onTabChange(tabs[targetIdx].id);
+      const btn = (e.currentTarget.parentElement as HTMLElement)?.querySelectorAll<HTMLElement>('[role="tab"]')?.[targetIdx];
+      btn?.focus();
+    }
+  };
+
   return (
     <div
       className={cn(
@@ -29,14 +51,16 @@ export function Tabs({ tabs, activeTab, onTabChange, className, variant = 'pill'
       )}
       role="tablist"
     >
-      {tabs.map((tab) => {
+      {tabs.map((tab, idx) => {
         const active = tab.id === activeTab;
         return (
           <button
             key={tab.id}
             role="tab"
             aria-selected={active}
+            tabIndex={active ? 0 : -1}
             onClick={() => onTabChange(tab.id)}
+            onKeyDown={(e) => handleKeyDown(e, idx)}
             className={cn(
               'relative flex items-center gap-1.5 px-4 py-2 text-sm font-bold whitespace-nowrap transition-colors rounded-xl',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-400/60 focus-visible:ring-offset-1',

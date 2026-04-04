@@ -57,7 +57,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
     const unsub = subscribeRealtime((msg: any) => {
       if (msg.type === 'deals.changed') {
         if (timer) clearTimeout(timer);
-        timer = setTimeout(() => { timer = null; loadProducts(); }, 1500);
+        timer = setTimeout(() => { timer = null; loadProducts(); }, 500);
       }
     });
     return () => { unsub(); if (timer) clearTimeout(timer); };
@@ -107,16 +107,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
       const selectedLower = selectedCategory.toLowerCase();
       result = result.filter((p) => {
         const category = String(p.category || '').toLowerCase();
-        const dealType = String(p.dealType || '').toLowerCase();
-        const platform = String(p.platform || '').toLowerCase();
-        const title = String(p.title || '').toLowerCase();
-
-        return (
-          category === selectedLower ||
-          dealType === selectedLower ||
-          platform === selectedLower ||
-          title.includes(selectedLower)
-        );
+        return category === selectedLower;
       });
     }
 

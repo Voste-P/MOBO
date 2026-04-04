@@ -3,7 +3,7 @@ import type { Env } from '../config/env.js';
 import { randomUUID } from 'node:crypto';
 import { AppError } from '../middleware/errors.js';
 import { prisma as db } from '../database/prisma.js';
-import { Prisma } from '../generated/prisma/client.js';
+import { Prisma as _Prisma } from '../generated/prisma/client.js';
 import { orderLog, businessLog } from '../config/logger.js';
 import { logChangeEvent, logAccessEvent, logPerformance, logErrorEvent } from '../config/appLogs.js';
 import { pgOrder } from '../utils/pgMappers.js';

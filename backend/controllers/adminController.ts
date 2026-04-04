@@ -828,7 +828,7 @@ export function makeAdminController() {
         } = adminAuditLogsQuerySchema.parse(req.query);
 
         const page = Math.max(1, parsedPage ?? 1);
-        const limit = Math.min(500, Math.max(1, parsedLimit ?? 200));
+        const limit = Math.min(200, Math.max(1, parsedLimit ?? 50));
         const skip = (page - 1) * limit;
 
         const where: any = {};

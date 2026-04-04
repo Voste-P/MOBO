@@ -23,6 +23,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, Props>(function Ic
   return (
     <button
       ref={ref}
+      type={props.type ?? 'button'}
       disabled={disabled}
       className={cn(
         'inline-flex items-center justify-center',
