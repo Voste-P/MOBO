@@ -59,6 +59,7 @@ export async function listMediatorCodesForAgency(agencyCode: string): Promise<st
   const mediators = await db.user.findMany({
     where: { roles: { has: 'mediator' as any }, parentCode: agencyCode, isDeleted: false },
     select: { mediatorCode: true },
+    take: 5000,
   });
   const codes = mediators.map((m) => String(m.mediatorCode || '')).filter(Boolean);
   setCached(mediatorCodesCache, agencyCode, codes);
@@ -94,6 +95,7 @@ export async function getAgencyCodesForMediatorCodes(mediatorCodes: string[]): P
     const mediators = await db.user.findMany({
       where: { roles: { has: 'mediator' as any }, mediatorCode: { in: uncached }, isDeleted: false },
       select: { mediatorCode: true, parentCode: true },
+      take: 5000,
     });
     const byCode = new Map(mediators.map((m) => [String(m.mediatorCode), String(m.parentCode || '').trim() || null]));
     for (const code of uncached) {

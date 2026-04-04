@@ -205,7 +205,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#F4F4F5] relative overflow-y-auto scrollbar-styled overscroll-none">
+    <div className="flex flex-col h-full min-h-0 bg-mobo-dark-100 relative overflow-y-auto scrollbar-styled overscroll-none">
       <div className="max-w-xl mx-auto w-full p-6 space-y-6" style={{ paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))' }}>
         {/* Identity Card */}
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-zinc-100 relative overflow-hidden animate-enter">
@@ -465,7 +465,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
                     >
                       <Star
                         size={28}
-                        fill={s <= feedbackRating ? '#facc15' : 'none'}
+                        fill={s <= feedbackRating ? 'currentColor' : 'none'}
                         className={s <= feedbackRating ? 'text-yellow-400' : 'text-zinc-200'}
                       />
                     </button>

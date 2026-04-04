@@ -36,7 +36,7 @@ interface HomeProps {
 
 export const Home: React.FC<HomeProps> = ({ onVoiceNavigate, isActive = true }) => {
   return (
-    <div className="h-full w-full flex flex-col relative bg-[#F4F4F5]">
+    <div className="h-full w-full flex flex-col relative bg-mobo-dark-100">
       <ChatbotErrorBoundary>
         <Suspense fallback={
           <div className="flex-1 flex items-center justify-center" role="status" aria-label="Loading chat">

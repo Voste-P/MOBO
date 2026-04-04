@@ -18,8 +18,8 @@ export const AppSwitchboard: React.FC<{ onSelect: (role: string) => void }> = ({
   <div className="min-h-[100dvh] bg-slate-950 text-white flex flex-col font-sans selection:bg-lime-400 selection:text-black">
     {/* Animated Background */}
     <div className="fixed inset-0 z-0">
-      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_-20%,#312e81,transparent)] opacity-40"></div>
-      <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(circle_at_80%_120%,#1e1b4b,transparent)] opacity-30"></div>
+      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_-20%,theme(colors.indigo.900),transparent)] opacity-40"></div>
+      <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(circle_at_80%_120%,theme(colors.indigo.950),transparent)] opacity-30"></div>
     </div>
 
     <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-6">

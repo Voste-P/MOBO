@@ -25,6 +25,7 @@ async function enrichTicketsWithResolverNames(tickets: any[]): Promise<any[]> {
   const resolvers = await db.user.findMany({
     where: { id: { in: resolverIds.slice(0, 500) } },
     select: { id: true, name: true },
+    take: 500,
   });
   const nameMap = new Map(resolvers.map(r => [r.id, r.name]));
   return tickets.map(t => ({
@@ -442,6 +443,7 @@ async function canManageTicketByRole(params: {
               const allMedU = await db.user.findMany({
                 where: { parentCode: { in: connectedCodes }, roles: { has: 'mediator' as any }, isDeleted: false },
                 select: { mediatorCode: true },
+                take: 5000,
               });
               const allMediatorCodes: string[] = allMedU.map(u => u.mediatorCode).filter(Boolean) as string[];
               if (allMediatorCodes.includes(creatorParent) || allMediatorCodes.includes(creatorMediator)) return true;
@@ -763,6 +765,7 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
             const allMediatorUsers = await db.user.findMany({
               where: { parentCode: { in: connectedCodes }, roles: { has: 'mediator' as any }, isDeleted: false },
               select: { mediatorCode: true },
+              take: 5000,
             });
             const allMediatorCodes: string[] = allMediatorUsers.map(u => u.mediatorCode).filter(Boolean) as string[];
 

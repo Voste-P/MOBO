@@ -1002,7 +1002,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
 
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#f8f9fa]">
+    <div className="flex flex-col h-full min-h-0 bg-slate-50">
       <div className="p-6 pb-4 bg-white shadow-sm z-10 sticky top-0 flex justify-between items-end">
         <div>
           <h1 className="text-2xl font-extrabold text-slate-900">My Orders</h1>

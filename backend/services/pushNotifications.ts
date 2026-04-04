@@ -82,6 +82,7 @@ export async function sendPushToUser(params: {
       subscriptions = await db.pushSubscription.findMany({
         where: { userId: pgUser.id, app: dbApp, isDeleted: false },
         select: { endpoint: true, keysP256dh: true, keysAuth: true, expirationTime: true },
+        take: 1000,
       });
     }
   }

@@ -189,13 +189,13 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
     <div className="space-y-6 animate-enter">
       {/* Header Stats */}
       <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-styled px-1 snap-x">
-        <div className="min-w-[150px] bg-[#18181B] p-4 rounded-[1.5rem] shadow-xl relative overflow-hidden snap-center flex-1">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-[#CCF381]/10 rounded-full blur-2xl -mr-6 -mt-6"></div>
+        <div className="min-w-[150px] bg-mobo-dark-900 p-4 rounded-[1.5rem] shadow-xl relative overflow-hidden snap-center flex-1">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-mobo-accent/10 rounded-full blur-2xl -mr-6 -mt-6"></div>
           <div className="relative z-10">
             <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-1">
               Today's Profit
             </p>
-            <h2 className="text-3xl font-black text-[#CCF381] tracking-tighter leading-none">
+            <h2 className="text-3xl font-black text-mobo-accent tracking-tighter leading-none">
               {formatCurrency(todayEarnings)}
             </h2>
           </div>
@@ -291,7 +291,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                         onRefresh(['pending', 'verified']);
                       } catch (e: any) { toast.error(formatErrorMessage(e, 'Failed to approve user')); }
                     }}
-                    className="w-8 h-8 rounded-lg bg-zinc-900 text-white flex items-center justify-center hover:bg-[#CCF381] hover:text-black transition-all shadow-md active:scale-90"
+                    className="w-8 h-8 rounded-lg bg-zinc-900 text-white flex items-center justify-center hover:bg-mobo-accent hover:text-black transition-all shadow-md active:scale-90"
                   >
                     <Check size={14} strokeWidth={3} />
                   </button>
@@ -466,7 +466,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                     </div>
                   )}
                   <div className="p-2 pb-0 flex gap-3 mb-3">
-                    <div className="w-14 h-14 bg-[#F4F4F5] rounded-[1rem] p-1.5 flex-shrink-0 relative overflow-hidden">
+                    <div className="w-14 h-14 bg-mobo-dark-100 rounded-[1rem] p-1.5 flex-shrink-0 relative overflow-hidden">
                       <ProxiedImage
                         src={o.items?.[0]?.image}
                         alt={o.items?.[0]?.title || 'Order item'}
@@ -514,7 +514,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                         className={`py-3 rounded-[1rem] font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-95 ${
                           isDisputed
                             ? 'bg-red-50 text-red-400 cursor-not-allowed'
-                            : 'bg-[#18181B] text-white hover:bg-[#CCF381] hover:text-black hover:shadow-md'
+                            : 'bg-mobo-dark-900 text-white hover:bg-mobo-accent hover:text-black hover:shadow-md'
                         }`}
                       >
                         {isDisputed ? (
@@ -816,8 +816,8 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
   return (
     <div className="space-y-5 animate-enter">
       {ConfirmDialogElement}
-      <div className="bg-[#18181B] p-5 rounded-[1.5rem] shadow-xl text-white relative overflow-hidden">
-        <div className="absolute top-[-50%] right-[-10%] w-40 h-40 bg-[#CCF381] rounded-full blur-[60px] opacity-20 animate-pulse"></div>
+      <div className="bg-mobo-dark-900 p-5 rounded-[1.5rem] shadow-xl text-white relative overflow-hidden">
+        <div className="absolute top-[-50%] right-[-10%] w-40 h-40 bg-mobo-accent rounded-full blur-[60px] opacity-20 animate-pulse"></div>
         <div className="relative z-10">
           <h2 className="text-xl font-black mb-1 tracking-tight">Inventory Deck</h2>
           <p className="text-zinc-400 text-xs font-medium">
@@ -915,7 +915,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                   className="bg-white p-4 rounded-[1.5rem] border border-zinc-100 shadow-sm flex flex-col relative overflow-hidden"
                 >
                   <div className="flex gap-4 mb-4">
-                    <div className="w-16 h-16 bg-[#F4F4F5] rounded-[1rem] p-2 flex-shrink-0">
+                    <div className="w-16 h-16 bg-mobo-dark-100 rounded-[1rem] p-2 flex-shrink-0">
                         <ProxiedImage
                           src={d.image}
                           alt={d.title}
@@ -978,7 +978,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                         toast.error('Campaign data not found for this deal');
                       }
                     }}
-                    className="w-full py-3 bg-[#18181B] text-white rounded-[1rem] font-bold text-xs shadow-md hover:bg-[#CCF381] hover:text-black transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                    className="w-full py-3 bg-mobo-dark-900 text-white rounded-[1rem] font-bold text-xs shadow-md hover:bg-mobo-accent hover:text-black transition-all active:scale-95 flex items-center justify-center gap-1.5"
                   >
                     <ArrowUpRight size={14} strokeWidth={2.5} /> Edit Deal
                   </button>
@@ -1032,7 +1032,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                   className="bg-white p-4 rounded-[1.5rem] border border-zinc-100 shadow-sm flex flex-col relative overflow-hidden hover:shadow-lg transition-all duration-300"
                 >
                   <div className="flex gap-4 mb-4">
-                    <div className="w-16 h-16 bg-[#F4F4F5] rounded-[1rem] p-2 flex-shrink-0">
+                    <div className="w-16 h-16 bg-mobo-dark-100 rounded-[1rem] p-2 flex-shrink-0">
                         <ProxiedImage
                           src={c.image}
                           alt={c.title}
@@ -1049,7 +1049,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                             🌐 Open to All · {c.totalSlots - c.usedSlots} left
                           </span>
                         ) : (
-                          <span className="bg-[#CCF381]/20 text-[#5f7a28] text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide">
+                          <span className="bg-mobo-accent/20 text-lime-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide">
                             {(user.mediatorCode ? c.assignments[(user.mediatorCode || '').toLowerCase()] : 0) || 0} Slots
                           </span>
                         )}
@@ -1081,7 +1081,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                     <button
                       type="button"
                       onClick={() => onPublish(c)}
-                      className="w-full py-3 bg-[#18181B] text-white rounded-[1rem] font-bold text-xs hover:bg-[#CCF381] hover:text-black transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"
+                      className="w-full py-3 bg-mobo-dark-900 text-white rounded-[1rem] font-bold text-xs hover:bg-mobo-accent hover:text-black transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"
                     >
                       <ArrowUpRight size={14} strokeWidth={2.5} /> Configure & Publish
                     </button>
@@ -1159,7 +1159,7 @@ const SquadView = ({ user, pendingUsers, verifiedUsers, loading, orders: _orders
   return (
     <div className="space-y-5 animate-enter">
       <div
-        className="bg-[#4F46E5] p-5 rounded-[1.5rem] shadow-xl shadow-indigo-500/20 text-white relative overflow-hidden group active:scale-[0.98] transition-transform cursor-pointer"
+        className="bg-indigo-600 p-5 rounded-[1.5rem] shadow-xl shadow-indigo-500/20 text-white relative overflow-hidden group active:scale-[0.98] transition-transform cursor-pointer"
         onClick={() => {
           navigator.clipboard.writeText(user.mediatorCode!);
           toast.success('Code copied');
@@ -1566,10 +1566,10 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
     >
       {ConfirmDialogElement}
       <div
-        className="bg-[#F8F9FA] w-full rounded-t-[2.5rem] max-h-[92%] h-[92%] shadow-2xl animate-slide-up relative flex flex-col"
+        className="bg-slate-50 w-full rounded-t-[2.5rem] max-h-[92%] h-[92%] shadow-2xl animate-slide-up relative flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex-none p-5 bg-[#18181B] rounded-t-[2.5rem] text-white pb-8">
+        <div className="flex-none p-5 bg-mobo-dark-900 rounded-t-[2.5rem] text-white pb-8">
           <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6"></div>
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
@@ -1602,7 +1602,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-[#CCF381] p-4 rounded-[1.5rem] text-black shadow-lg">
+            <div className="bg-mobo-accent p-4 rounded-[1.5rem] text-black shadow-lg">
               <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-1">
                 Total Payable
               </p>
@@ -1801,7 +1801,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
                         <button
                           type="button"
                           onClick={handleSettle}
-                          className="flex-1 py-2 bg-[#CCF381] text-black rounded-lg text-[10px] font-black hover:brightness-90 shadow-sm"
+                          className="flex-1 py-2 bg-mobo-accent text-black rounded-lg text-[10px] font-black hover:brightness-90 shadow-sm"
                         >
                           Confirm Payment
                         </button>
@@ -2155,11 +2155,11 @@ export const MediatorDashboard: React.FC = () => {
   }, [campaigns, deals]);
 
   return (
-    <div className="flex flex-col h-[100dvh] min-h-0 bg-[#FAFAFA] font-sans relative overflow-hidden text-zinc-900 select-none">
+    <div className="flex flex-col h-[100dvh] min-h-0 bg-mobo-dark-50 font-sans relative overflow-hidden text-zinc-900 select-none">
       {/* Top Bar */}
-      <div className="pt-safe-top pt-6 px-4 pb-2 bg-[#FAFAFA] z-30 flex justify-between items-center sticky top-0">
+      <div className="pt-safe-top pt-6 px-4 pb-2 bg-mobo-dark-50 z-30 flex justify-between items-center sticky top-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-[0.8rem] bg-[#18181B] text-white flex items-center justify-center font-black text-lg shadow-lg border-2 border-white overflow-hidden">
+          <div className="w-10 h-10 rounded-[0.8rem] bg-mobo-dark-900 text-white flex items-center justify-center font-black text-lg shadow-lg border-2 border-white overflow-hidden">
             {user?.avatar ? (
               <ProxiedImage
                 src={user.avatar}
@@ -2171,12 +2171,12 @@ export const MediatorDashboard: React.FC = () => {
             )}
           </div>
           <div>
-            <h1 className="text-lg font-black text-[#18181B] leading-none tracking-tight">
+            <h1 className="text-lg font-black text-mobo-dark-900 leading-none tracking-tight">
               {user?.name || 'Unknown'}
             </h1>
             <div className="mt-1 flex items-center gap-2">
               <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-[#CCF381] rounded-full animate-pulse shadow-[0_0_6px_#CCF381]"></span>{' '}
+                <span className="w-1.5 h-1.5 bg-mobo-accent rounded-full animate-pulse shadow-[0_0_6px_theme(colors.mobo.accent)]"></span>{' '}
                 {user?.mediatorCode}
               </p>
             </div>
@@ -2357,7 +2357,7 @@ export const MediatorDashboard: React.FC = () => {
           className="absolute inset-0 z-50 bg-black/95 flex flex-col animate-enter backdrop-blur-sm overflow-hidden"
           onClick={() => {}}
         >
-          <div className="flex justify-between items-center p-5 text-white pt-safe-top border-b border-white/10 bg-[#18181B] z-10 sticky top-0">
+          <div className="flex justify-between items-center p-5 text-white pt-safe-top border-b border-white/10 bg-mobo-dark-900 z-10 sticky top-0">
             <div>
               <h3 className="font-bold text-base">Verification Station</h3>
               <div className="flex items-center gap-2 text-[10px] text-zinc-400 font-mono mt-0.5">
@@ -2729,7 +2729,7 @@ export const MediatorDashboard: React.FC = () => {
           </div>
 
           {/* ACTION BAR */}
-          <div className="absolute bottom-0 left-0 w-full p-4 bg-[#18181B] border-t border-white/10 z-20 flex gap-3">
+          <div className="absolute bottom-0 left-0 w-full p-4 bg-mobo-dark-900 border-t border-white/10 z-20 flex gap-3">
             <button
               onClick={() => setProofModal(null)}
               className="flex-1 py-4 bg-white/10 text-white font-bold text-sm rounded-[1.2rem] hover:bg-white/20 transition-colors"
@@ -2839,7 +2839,7 @@ export const MediatorDashboard: React.FC = () => {
                     toast.error(formatErrorMessage(err, 'Failed to verify purchase'));
                   }
                 }}
-                className="flex-[2] py-4 bg-[#CCF381] text-black font-black text-sm rounded-[1.2rem] shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+                className="flex-[2] py-4 bg-mobo-accent text-black font-black text-sm rounded-[1.2rem] shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
               >
                 <CheckCircle2 size={18} strokeWidth={3} /> Verify Purchase
               </button>
@@ -2870,7 +2870,7 @@ export const MediatorDashboard: React.FC = () => {
                       }
                     }}
                     disabled={!!(proofModal?.requirements?.missingProofs as string[] ?? []).length}
-                    className="flex-[2] py-4 bg-[#CCF381] text-black font-black text-sm rounded-[1.2rem] shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:hover:scale-100"
+                    className="flex-[2] py-4 bg-mobo-accent text-black font-black text-sm rounded-[1.2rem] shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:hover:scale-100"
                     title={
                       (proofModal?.requirements?.missingProofs as string[] ?? []).length
                         ? `Buyer hasn't uploaded: ${(proofModal?.requirements?.missingProofs as string[] ?? []).join(', ')}`
@@ -2901,7 +2901,7 @@ export const MediatorDashboard: React.FC = () => {
           onClick={() => setRejectModalOpen(false)}
         >
           <div
-            className="w-full max-w-sm rounded-2xl bg-[#18181B] border border-white/10 p-5 text-white"
+            className="w-full max-w-sm rounded-2xl bg-mobo-dark-900 border border-white/10 p-5 text-white"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
@@ -2979,7 +2979,7 @@ export const MediatorDashboard: React.FC = () => {
           onClick={() => setApproveModalOpen(false)}
         >
           <div
-            className="w-full max-w-sm rounded-2xl bg-[#18181B] border border-white/10 p-5 text-white"
+            className="w-full max-w-sm rounded-2xl bg-mobo-dark-900 border border-white/10 p-5 text-white"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
@@ -3028,7 +3028,7 @@ export const MediatorDashboard: React.FC = () => {
           onClick={() => setCancelModalOpen(false)}
         >
           <div
-            className="w-full max-w-sm rounded-2xl bg-[#18181B] border border-white/10 p-5 text-white"
+            className="w-full max-w-sm rounded-2xl bg-mobo-dark-900 border border-white/10 p-5 text-white"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
@@ -3123,7 +3123,7 @@ export const MediatorDashboard: React.FC = () => {
                 <p className="text-[9px] text-zinc-400 font-black uppercase tracking-widest mb-1">
                   Final Price
                 </p>
-                <p className="text-2xl font-black text-[#65a30d]">
+                <p className="text-2xl font-black text-mobo-lime-600">
                   {formatCurrency(
                     dealBuilder.price +
                       (dealBuilder.assignmentCommission || 0) +
@@ -3173,7 +3173,7 @@ export const MediatorDashboard: React.FC = () => {
                   const n = Math.trunc(Number(raw));
                   setCommission(String(n));
                 }}
-                className="w-full bg-white border-2 border-zinc-100 rounded-[1.5rem] p-4 text-2xl font-black text-center focus:border-[#CCF381] focus:ring-4 focus:ring-[#CCF381]/20 outline-none transition-all placeholder:text-zinc-200"
+                className="w-full bg-white border-2 border-zinc-100 rounded-[1.5rem] p-4 text-2xl font-black text-center focus:border-mobo-accent focus:ring-4 focus:ring-mobo-accent/20 outline-none transition-all placeholder:text-zinc-200"
                 placeholder="0"
               />
               <p className="text-[9px] text-zinc-400 text-center">Use negative value to give buyers a discount from your commission</p>
@@ -3181,7 +3181,7 @@ export const MediatorDashboard: React.FC = () => {
             <button
               onClick={handlePublish}
               disabled={!user?.mediatorCode}
-              className="w-full py-4 bg-[#18181B] text-white rounded-[1.5rem] font-black text-base shadow-xl hover:bg-[#CCF381] hover:text-black transition-all disabled:opacity-50 disabled:scale-100 active:scale-95 flex items-center justify-center gap-2"
+              className="w-full py-4 bg-mobo-dark-900 text-white rounded-[1.5rem] font-black text-base shadow-xl hover:bg-mobo-accent hover:text-black transition-all disabled:opacity-50 disabled:scale-100 active:scale-95 flex items-center justify-center gap-2"
             >
               {isEditingPublishedDeal ? 'Update Deal' : 'Publish Deal'} <Tag size={16} strokeWidth={3} className="fill-current" />
             </button>

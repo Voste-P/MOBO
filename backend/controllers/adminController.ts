@@ -683,11 +683,11 @@ export function makeAdminController() {
             const mediatorCode = String(user.mediatorCode || '').trim();
 
             if (roles.includes('shopper')) {
-              writeAuditLog({ req, action: 'ORDERS_FROZEN_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'USER_SUSPENDED', role: 'shopper' } }).catch(() => { });
+              writeAuditLog({ req, action: 'ORDERS_FROZEN_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'USER_SUSPENDED', role: 'shopper' } }).catch(e => orderLog.warn('[audit] ORDERS_FROZEN_CASCADE failed', { error: e }));
             }
             if (roles.includes('mediator') && mediatorCode) {
-              writeAuditLog({ req, action: 'DEALS_DEACTIVATED_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'MEDIATOR_SUSPENDED', mediatorCode } }).catch(() => { });
-              writeAuditLog({ req, action: 'ORDERS_FROZEN_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'MEDIATOR_SUSPENDED', mediatorCode } }).catch(() => { });
+              writeAuditLog({ req, action: 'DEALS_DEACTIVATED_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'MEDIATOR_SUSPENDED', mediatorCode } }).catch(e => orderLog.warn('[audit] DEALS_DEACTIVATED_CASCADE failed', { error: e }));
+              writeAuditLog({ req, action: 'ORDERS_FROZEN_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'MEDIATOR_SUSPENDED', mediatorCode } }).catch(e => orderLog.warn('[audit] ORDERS_FROZEN_CASCADE failed', { error: e }));
               const agencyCode = (await getAgencyCodeForMediatorCode(mediatorCode)) || '';
               publishRealtime({
                 type: 'deals.changed',
@@ -704,8 +704,8 @@ export function makeAdminController() {
             if (roles.includes('agency') && mediatorCode) {
               const mediatorCodes = await listMediatorCodesForAgency(mediatorCode);
               if (mediatorCodes.length) {
-                writeAuditLog({ req, action: 'DEALS_DEACTIVATED_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'AGENCY_SUSPENDED', agencyCode: mediatorCode, mediatorCount: mediatorCodes.length } }).catch(() => { });
-                writeAuditLog({ req, action: 'ORDERS_FROZEN_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'AGENCY_SUSPENDED', agencyCode: mediatorCode, mediatorCount: mediatorCodes.length } }).catch(() => { });
+                writeAuditLog({ req, action: 'DEALS_DEACTIVATED_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'AGENCY_SUSPENDED', agencyCode: mediatorCode, mediatorCount: mediatorCodes.length } }).catch(e => orderLog.warn('[audit] DEALS_DEACTIVATED_CASCADE failed', { error: e }));
+                writeAuditLog({ req, action: 'ORDERS_FROZEN_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'AGENCY_SUSPENDED', agencyCode: mediatorCode, mediatorCount: mediatorCodes.length } }).catch(e => orderLog.warn('[audit] ORDERS_FROZEN_CASCADE failed', { error: e }));
                 publishRealtime({
                   type: 'deals.changed',
                   ts: new Date().toISOString(),
@@ -720,8 +720,8 @@ export function makeAdminController() {
               }
             }
             if (roles.includes('brand')) {
-              writeAuditLog({ req, action: 'CAMPAIGNS_PAUSED_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'BRAND_SUSPENDED' } }).catch(() => { });
-              writeAuditLog({ req, action: 'ORDERS_FROZEN_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'BRAND_SUSPENDED' } }).catch(() => { });
+              writeAuditLog({ req, action: 'CAMPAIGNS_PAUSED_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'BRAND_SUSPENDED' } }).catch(e => orderLog.warn('[audit] CAMPAIGNS_PAUSED_CASCADE failed', { error: e }));
+              writeAuditLog({ req, action: 'ORDERS_FROZEN_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'BRAND_SUSPENDED' } }).catch(e => orderLog.warn('[audit] ORDERS_FROZEN_CASCADE failed', { error: e }));
             }
           }
 

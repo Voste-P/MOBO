@@ -147,7 +147,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
   }, [dealTypes, selectedDealType]);
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#F4F4F5]">
+    <div className="flex flex-col h-full min-h-0 bg-mobo-dark-100">
       {/* Header — compact for maximum content visibility */}
       <div className="px-4 pt-10 pb-2 bg-white/95 backdrop-blur-md shadow-sm z-10 border-b border-gray-100 sticky top-0">
         <div className="flex justify-between items-center mb-2">

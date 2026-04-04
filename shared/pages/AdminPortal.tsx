@@ -78,7 +78,8 @@ type ViewMode =
   | 'feedback'
   | 'audit-logs';
 
-const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+const CHART_COLORS = { indigo: '#6366f1', emerald: '#10b981', amber: '#f59e0b', red: '#ef4444', violet: '#8b5cf6' } as const;
+const COLORS = Object.values(CHART_COLORS);
 
 // --- COMPONENTS ---
 
@@ -1000,11 +1001,11 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   // --- AUTH GUARD ---
   if (!user || user.role !== 'admin') {
     return (
-      <div className="min-h-[100dvh] bg-[#0F172A] flex items-center justify-center p-6 font-sans relative overflow-hidden">
+      <div className="min-h-[100dvh] bg-slate-950 flex items-center justify-center p-6 font-sans relative overflow-hidden">
         {/* Background Grid */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-20"></div>
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,theme(colors.slate.800)_1px,transparent_1px),linear-gradient(to_bottom,theme(colors.slate.800)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-20"></div>
 
-        <div className="bg-[#1E293B] p-10 rounded-[2rem] w-full max-w-md border border-slate-700 shadow-2xl relative z-10">
+        <div className="bg-slate-800 p-10 rounded-[2rem] w-full max-w-md border border-slate-700 shadow-2xl relative z-10">
           <div className="flex justify-center mb-8">
             <div className="w-20 h-20 bg-indigo-500/10 rounded-3xl flex items-center justify-center border border-indigo-500/20 shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)]">
               <ShieldAlert size={40} className="text-indigo-400" />
@@ -1075,9 +1076,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       isSidebarOpen={isSidebarOpen}
       onSidebarOpenChange={setIsSidebarOpen}
       showMobileHeader={false}
-      containerClassName="flex h-[100dvh] min-h-0 bg-[#F8F9FA] font-sans overflow-hidden relative"
+      containerClassName="flex h-[100dvh] min-h-0 bg-slate-50 font-sans overflow-hidden relative"
       sidebarWidthClassName="w-72"
-      asideClassName="bg-[#0F172A] flex flex-col border-r border-slate-800"
+      asideClassName="bg-slate-950 flex flex-col border-r border-slate-800"
       mainClassName="flex-1 min-w-0 min-h-0 overflow-hidden relative flex flex-col"
       sidebar={
         <>
@@ -1227,7 +1228,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-8 scrollbar-styled bg-[#F8FAFC]">
+        <div className="flex-1 overflow-y-auto p-8 scrollbar-styled bg-slate-50">
           <div className="max-w-[1600px] mx-auto space-y-8 animate-enter">
             {/* DASHBOARD VIEW */}
             {view === 'dashboard' && stats && (
@@ -1285,8 +1286,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         <AreaChart data={chartData}>
                           <defs>
                             <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
-                              <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                              <stop offset="5%" stopColor={CHART_COLORS.indigo} stopOpacity={0.2} />
+                              <stop offset="95%" stopColor={CHART_COLORS.indigo} stopOpacity={0} />
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -1316,7 +1317,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                           <Area
                             type="monotone"
                             dataKey="revenue"
-                            stroke="#6366f1"
+                            stroke={CHART_COLORS.indigo}
                             strokeWidth={3}
                             fillOpacity={1}
                             fill="url(#colorRev)"
