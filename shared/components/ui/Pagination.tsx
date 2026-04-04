@@ -43,7 +43,7 @@ export const Pagination: React.FC<PaginationProps> = ({
   }
 
   return (
-    <div className={`flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/50 ${className}`}>
+    <nav aria-label="Pagination" className={`flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/50 ${className}`}>
       <span className="text-xs text-slate-400 font-semibold">
         {from}–{to} of {total.toLocaleString()}
       </span>
@@ -65,6 +65,8 @@ export const Pagination: React.FC<PaginationProps> = ({
               key={p}
               type="button"
               onClick={() => onPageChange(p)}
+              aria-label={`Page ${p}`}
+              aria-current={p === page ? 'page' : undefined}
               className={`min-w-[32px] px-2 py-1.5 rounded-lg text-xs font-bold transition-colors ${
                 p === page
                   ? 'bg-slate-900 text-white shadow-sm'
@@ -85,6 +87,6 @@ export const Pagination: React.FC<PaginationProps> = ({
           Next ›
         </button>
       </div>
-    </div>
+    </nav>
   );
 };

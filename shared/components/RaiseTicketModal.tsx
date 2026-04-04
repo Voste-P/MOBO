@@ -90,6 +90,9 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = React.memo(func
     <div
       className="fixed inset-0 z-modal flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
       onClick={handleClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Raise a ticket"
     >
       <div
         className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl animate-slide-up relative max-h-[90dvh] overflow-y-auto scrollbar-styled"

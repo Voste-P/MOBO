@@ -105,7 +105,7 @@ const bgLightFromText: Record<string, string> = {
   'text-pink-600': 'bg-pink-50',
 };
 
-const StatCard = ({ title, value, subtext, icon: Icon, colorClass }: any) => (
+const StatCard = ({ title, value, subtext, icon: Icon, colorClass = 'text-slate-600' }: { title: string; value: string | number; subtext?: string; icon: React.ComponentType<{ size: number }>; colorClass?: string }) => (
   <div className="bg-white p-6 rounded-[1.5rem] shadow-[0_2px_20px_-12px_rgba(0,0,0,0.1)] border border-slate-100 relative overflow-hidden flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300">
     <div
       className={`absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-[0.08] group-hover:opacity-[0.15] transition-opacity ${bgFromText[colorClass] || 'bg-slate-600'}`}
@@ -1329,7 +1329,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                             contentStyle={{
                               borderRadius: '16px',
                               border: 'none',
-                              boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1₹
+                              boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)',
                               padding: '12px 20px',
                             }}
                             itemStyle={{ color: '#1e293b', fontWeight: 'bold' }}

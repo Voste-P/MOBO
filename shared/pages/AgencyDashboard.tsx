@@ -1537,7 +1537,7 @@ const DashboardView = ({ stats, revenueTrendData, brandPerfData, onRangeChange }
                   contentStyle={{
                     borderRadius: '12px',
                     border: 'none',
-                    boxShadow: '0 10px 30px -5px rgba(0,0,0,0.1₹
+                    boxShadow: '0 10px 30px -5px rgba(0,0,0,0.1)',
                     padding: '12px 16px',
                   }}
                   itemStyle={{ fontSize: '13px', fontWeight: 'bold', color: '#1e293b' }}
@@ -1587,7 +1587,7 @@ const DashboardView = ({ stats, revenueTrendData, brandPerfData, onRangeChange }
                   contentStyle={{
                     borderRadius: '12px',
                     border: 'none',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.05₹
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
                   }}
                 />
                 <Bar dataKey="count" fill="#a855f7" radius={[0, 4, 4, 0]} />

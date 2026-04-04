@@ -743,6 +743,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
               onFocus={() => setIsInputFocused(true)}
               onBlur={() => setIsInputFocused(false)}
               placeholder={placeholders[placeholderIndex]}
+              aria-label="Type a message to BUZZMA"
               className="w-full bg-transparent border-none outline-none text-sm font-semibold text-slate-900 h-11 placeholder:text-slate-400"
             />
           </form>

@@ -1628,7 +1628,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                   const active = ticketStatusFilter === st;
                   return (
                     <button key={st} type="button" onClick={() => setTicketStatusFilter(st)}
-                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all border ${
+                      className={`px-2.5 py-1.5 rounded-full text-[10px] font-bold transition-all border ${
                         active
                           ? st === 'Open' ? 'bg-amber-500 text-white border-amber-500' :
                             st === 'Resolved' ? 'bg-green-500 text-white border-green-500' :

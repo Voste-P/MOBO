@@ -194,6 +194,9 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
     <div
       className="fixed inset-0 z-modal flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Ticket: ${ticket.issueType}`}
     >
       <div
         className="bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[85dvh] animate-slide-up"
