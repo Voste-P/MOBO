@@ -335,6 +335,7 @@ const BrandProfileView = () => {
                   disabled={!isEditing}
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  aria-label="Email Address"
                   placeholder="brand@company.com"
                   className="w-full pl-12 pr-4 py-4 bg-zinc-50 rounded-2xl font-bold text-zinc-900 outline-none focus:ring-4 focus:ring-lime-100 focus:bg-white transition-all disabled:opacity-70 disabled:bg-zinc-50/50"
                 />
@@ -1670,7 +1671,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                     </label>
                     <input
                       type="number"
-                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none"
+                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-lime-400"
                       placeholder="1000"
                       value={form.totalSlots}
                       onChange={(e) => setForm({ ...form, totalSlots: e.target.value })}
@@ -1683,7 +1684,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                     </label>
                     <input
                       type="url"
-                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none"
+                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-lime-400"
                       placeholder="https://..."
                       value={form.image}
                       onChange={(e) => setForm({ ...form, image: e.target.value })}
@@ -1696,7 +1697,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                     </label>
                     <input
                       type="url"
-                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none"
+                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-lime-400"
                       placeholder="https://amazon.in/..."
                       value={form.productUrl}
                       onChange={(e) => setForm({ ...form, productUrl: e.target.value })}
@@ -1721,7 +1722,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                     </label>
                     <input
                       type="number"
-                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none"
+                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-lime-400"
                       placeholder="2000"
                       value={form.originalPrice}
                       onChange={(e) => setForm({ ...form, originalPrice: e.target.value })}
@@ -1734,7 +1735,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                     </label>
                     <input
                       type="number"
-                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none"
+                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-lime-400"
                       placeholder="1000"
                       value={form.price}
                       onChange={(e) => setForm({ ...form, price: e.target.value })}
@@ -1747,7 +1748,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                     </label>
                     <input
                       type="number"
-                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none"
+                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-lime-400"
                       placeholder="200"
                       value={form.payout}
                       onChange={(e) => setForm({ ...form, payout: e.target.value })}

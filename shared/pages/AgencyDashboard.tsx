@@ -326,6 +326,7 @@ const AgencyProfile = ({ user }: any) => {
                 disabled={!isEditing}
                 value={form.upiId}
                 onChange={(e) => setForm({ ...form, upiId: e.target.value })}
+                aria-label="Official UPI ID"
                 placeholder="agency@upi"
                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:opacity-70 disabled:bg-slate-50/50 transition-all"
               />
@@ -341,6 +342,7 @@ const AgencyProfile = ({ user }: any) => {
                   disabled={!isEditing}
                   value={form.bankName}
                   onChange={(e) => setForm({ ...form, bankName: e.target.value })}
+                  aria-label="Bank Name"
                   placeholder="e.g. HDFC"
                   className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:opacity-70 disabled:bg-slate-50/50 transition-all"
                 />
@@ -354,6 +356,7 @@ const AgencyProfile = ({ user }: any) => {
                   disabled={!isEditing}
                   value={form.ifsc}
                   onChange={(e) => setForm({ ...form, ifsc: e.target.value })}
+                  aria-label="IFSC Code"
                   placeholder="HDFC000..."
                   className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:opacity-70 disabled:bg-slate-50/50 transition-all"
                 />

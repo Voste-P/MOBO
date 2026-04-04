@@ -291,7 +291,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                         onRefresh(['pending', 'verified']);
                       } catch (e: any) { toast.error(formatErrorMessage(e, 'Failed to approve user')); }
                     }}
-                    className="w-8 h-8 rounded-lg bg-zinc-900 text-white flex items-center justify-center hover:bg-mobo-accent hover:text-black transition-all shadow-md active:scale-90"
+                    className="w-10 h-10 rounded-lg bg-zinc-900 text-white flex items-center justify-center hover:bg-mobo-accent hover:text-black transition-all shadow-md active:scale-90"
                   >
                     <Check size={14} strokeWidth={3} />
                   </button>
@@ -306,7 +306,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                         onRefresh(['pending']);
                       } catch (e: any) { toast.error(formatErrorMessage(e, 'Failed to reject user')); }
                     }}
-                    className="w-8 h-8 rounded-lg bg-zinc-50 text-zinc-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all active:scale-90"
+                    className="w-10 h-10 rounded-lg bg-zinc-50 text-zinc-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all active:scale-90"
                   >
                     <X size={14} strokeWidth={3} />
                   </button>
@@ -383,6 +383,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
             toast.success('Orders exported');
           }}
           className="p-2.5 rounded-xl border border-zinc-100 bg-white hover:bg-zinc-50 transition-colors"
+          aria-label="Export orders CSV"
         >
           <Download size={14} className="text-zinc-600" />
         </button>
@@ -492,7 +493,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                       <div className="mt-1 flex items-center justify-between">
                         <div className="flex items-center gap-1.5 text-[11px]">
                           <span className="font-semibold text-zinc-400">Buyer:</span>
-                          <span className="font-bold text-zinc-900 truncate max-w-[80px]">
+                          <span className="font-bold text-zinc-900 truncate max-w-[120px]">
                             {o.buyerName}
                           </span>
                         </div>

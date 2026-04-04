@@ -40,7 +40,7 @@ export const Home: React.FC<HomeProps> = ({ onVoiceNavigate, isActive = true }) 
       <ChatbotErrorBoundary>
         <Suspense fallback={
           <div className="flex-1 flex items-center justify-center" role="status" aria-label="Loading chat">
-            <div className="w-8 h-8 border-3 border-lime-200 border-t-lime-500 rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-lime-200 border-t-lime-500 rounded-full animate-spin motion-reduce:animate-none" />
           </div>
         }>
           <Chatbot onNavigate={onVoiceNavigate} isActive={isActive} />
