@@ -88,7 +88,7 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = React.memo(func
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
+      className="fixed inset-0 z-modal flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
       onClick={handleClose}
     >
       <div

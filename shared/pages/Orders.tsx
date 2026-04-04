@@ -2215,7 +2215,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
 
       {proofToView && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in"
+          className="fixed inset-0 z-modal flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in"
           onClick={() => setProofToView(null)}
         >
           <div
@@ -2330,7 +2330,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       {/* ADD REVIEW / RATING MODAL */}
       {selectedOrder && (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
+          className="fixed inset-0 z-modal flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
           onClick={() => {
             setSelectedOrder(null);
             setInputValue('');

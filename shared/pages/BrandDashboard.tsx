@@ -1185,7 +1185,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
 
       {viewProofOrder && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-enter"
+          className="fixed inset-0 z-modal flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-enter"
           onClick={() => { setViewProofOrder(null); }}
         >
           <div
@@ -3034,7 +3034,7 @@ export const BrandDashboard: React.FC = () => {
       {/* AGENCY DETAIL / PAYMENT MODAL */}
       {selectedAgency && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-enter"
+          className="fixed inset-0 z-modal flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-enter"
           onClick={() => setSelectedAgency(null)}
         >
           <div

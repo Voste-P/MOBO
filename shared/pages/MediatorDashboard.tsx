@@ -1573,7 +1573,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
 
   return (
     <div
-      className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-md flex items-end animate-fade-in"
+      className="fixed inset-0 z-modal bg-black/60 backdrop-blur-md flex items-end animate-fade-in"
       onClick={onClose}
     >
       {ConfirmDialogElement}
@@ -2909,7 +2909,7 @@ export const MediatorDashboard: React.FC = () => {
 
       {rejectModalOpen && proofModal && (
         <div
-          className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
+          className="fixed inset-0 z-modal bg-black/80 flex items-center justify-center p-4"
           onClick={() => setRejectModalOpen(false)}
         >
           <div
@@ -2987,7 +2987,7 @@ export const MediatorDashboard: React.FC = () => {
       {/* FORCE APPROVE MODAL */}
       {approveModalOpen && proofModal && (
         <div
-          className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
+          className="fixed inset-0 z-modal bg-black/80 flex items-center justify-center p-4"
           onClick={() => setApproveModalOpen(false)}
         >
           <div
@@ -3036,7 +3036,7 @@ export const MediatorDashboard: React.FC = () => {
       {/* CANCEL ORDER MODAL */}
       {cancelModalOpen && proofModal && (
         <div
-          className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
+          className="fixed inset-0 z-modal bg-black/80 flex items-center justify-center p-4"
           onClick={() => setCancelModalOpen(false)}
         >
           <div

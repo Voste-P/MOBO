@@ -3267,7 +3267,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
       {/* Proof Modal (reusable) */}
       {proofOrder && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in"
+          className="fixed inset-0 z-modal flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in"
           onClick={() => setProofOrder(null)}
         >
           <div
@@ -3397,7 +3397,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
 
       {/* Reject Modal */}
       {rejectModal && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in" onClick={() => { setRejectModal(null); setRejectReason(''); }}>
+        <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in" onClick={() => { setRejectModal(null); setRejectReason(''); }}>
           <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl max-h-[90dvh] overflow-y-auto scrollbar-styled" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-extrabold text-lg text-red-600 mb-1 flex items-center gap-2"><AlertTriangle size={20} /> Reject Proof</h3>
             <p className="text-xs text-slate-500 mb-4">Order {getPrimaryOrderId(rejectModal.order)} Â· Rejecting <strong>{rejectModal.type}</strong> proof</p>
@@ -4020,7 +4020,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators
       {/* PROOF MODAL */}
       {proofOrder && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in"
+          className="fixed inset-0 z-modal flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in"
           onClick={() => setProofOrder(null)}
         >
           <div

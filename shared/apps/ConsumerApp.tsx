@@ -132,7 +132,7 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
         <CartProvider>
           <ChatProvider>
             <NotificationProvider>
-            <div className="flex flex-col h-full bg-[#F2F2F7] relative overflow-hidden font-sans">
+            <div className="flex flex-col h-full bg-surface relative overflow-hidden font-sans">
               <div className="flex-1 overflow-hidden overscroll-none" {...swipeHandlers}>
                   {visitedTabs.has('explore') && (
                     <div className={`h-full ${activeTab === 'explore' ? '' : 'hidden'}`}>

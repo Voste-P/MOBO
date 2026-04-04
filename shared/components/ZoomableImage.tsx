@@ -121,7 +121,7 @@ export const ZoomableImage: React.FC<{
           role="dialog"
           aria-label={`Zoomed view: ${alt}`}
           aria-modal="true"
-          className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4 cursor-zoom-out animate-fade-in"
+          className="fixed inset-0 z-overlay bg-black/95 flex items-center justify-center p-4 cursor-zoom-out animate-fade-in"
           onClick={() => setZoomed(false)}
           onKeyDown={(e) => { if (e.key === 'Escape') setZoomed(false); }}
           tabIndex={-1}
