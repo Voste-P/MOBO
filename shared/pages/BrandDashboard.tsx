@@ -950,13 +950,19 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
               <tbody className="divide-y divide-zinc-50">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={7} className="p-8">
-                      <EmptyState
-                        title="Loading orders"
-                        description="Fetching the latest orders"
-                        icon={<Spinner className="w-6 h-6 text-zinc-400" />}
-                        className="bg-transparent"
-                      />
+                    <td colSpan={7} className="p-4">
+                      <div className="space-y-3">
+                        {[0, 1, 2].map((i) => (
+                          <div key={i} className="flex items-center gap-4 animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
+                            <div className="w-10 h-10 rounded-lg bg-zinc-200" />
+                            <div className="flex-1 space-y-2">
+                              <div className="h-4 bg-zinc-200 rounded w-1/2" />
+                              <div className="h-3 bg-zinc-100 rounded w-1/3" />
+                            </div>
+                            <div className="h-6 w-16 bg-zinc-100 rounded-full" />
+                          </div>
+                        ))}
+                      </div>
                     </td>
                   </tr>
                 ) : filtered.length === 0 ? (
@@ -1957,12 +1963,20 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
       </div>
 
       {loading ? (
-        <EmptyState
-          title="Loading campaigns"
-          description="Fetching your latest campaigns"
-          icon={<Spinner className="w-6 h-6 text-zinc-400" />}
-          className="bg-transparent"
-        />
+        <div className="space-y-3 py-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="bg-white rounded-2xl p-5 shadow-sm border border-zinc-100 animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-zinc-200 flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-zinc-200 rounded w-2/3" />
+                  <div className="h-3 bg-zinc-100 rounded w-1/3" />
+                </div>
+                <div className="h-6 w-16 bg-zinc-100 rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : filteredCampaigns.length === 0 ? (
         <EmptyState
           title={campaigns.length === 0 ? "No campaigns yet" : "No matching campaigns"}

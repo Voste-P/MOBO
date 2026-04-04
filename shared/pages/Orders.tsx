@@ -1111,8 +1111,19 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
         </div>
 
         {isLoading ? (
-          <div className="flex justify-center py-10 text-lime-500">
-            <Spinner className="w-6 h-6" />
+          <div className="space-y-3 py-2">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-zinc-100 animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-zinc-200 flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-zinc-200 rounded w-2/3" />
+                    <div className="h-3 bg-zinc-100 rounded w-1/3" />
+                  </div>
+                  <div className="h-6 w-16 bg-zinc-100 rounded-full" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : orders.length === 0 ? (
           <EmptyState

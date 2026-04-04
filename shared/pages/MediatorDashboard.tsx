@@ -411,11 +411,20 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
 
         {(viewMode === 'todo' ? actionRequiredOrders : coolingOrders).length === 0 ? (
           loading ? (
-            <EmptyState
-              title="Loading orders"
-              description="Fetching the latest verification queue."
-              icon={<Spinner className="w-5 h-5 text-zinc-400" />}
-            />
+            <div className="space-y-3 py-4">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-zinc-100 animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-zinc-200 flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-zinc-200 rounded w-3/4" />
+                      <div className="h-3 bg-zinc-100 rounded w-1/2" />
+                    </div>
+                    <div className="h-6 w-14 bg-zinc-100 rounded-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <EmptyState
               title={viewMode === 'todo' ? 'No orders to verify' : 'No orders in cooling'}
