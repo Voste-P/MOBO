@@ -383,7 +383,6 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
             toast.success('Orders exported');
           }}
           className="p-2.5 rounded-xl border border-zinc-100 bg-white hover:bg-zinc-50 transition-colors"
-          aria-label="Export orders CSV"
         >
           <Download size={14} className="text-zinc-600" />
         </button>
