@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import { getDirectBackendUrl } from '../utils/apiBaseUrl';
 import { maskMobile } from '../utils/mobiles';
 import { formatErrorMessage } from '../utils/errors';
@@ -58,7 +58,7 @@ import { api, asArray, invalidateGetCache } from '../services/api';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 import { User, Campaign, Order, Ticket } from '../types';
-import { EmptyState, Spinner, Pagination } from '../components/ui';
+import { EmptyState, Spinner, Pagination, SidebarItem } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { FeedbackCard } from '../components/FeedbackCard';
 import { RatingVerificationBadge, ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
@@ -94,35 +94,7 @@ type Tab = 'dashboard' | 'agencies' | 'campaigns' | 'requests' | 'orders' | 'tic
 
 // --- COMPONENTS ---
 
-const SidebarItem = ({ icon, label, active, onClick, badge }: any) => (
-  <button
-    onClick={onClick}
-    aria-current={active ? 'page' : undefined}
-    className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl transition-all duration-300 group mb-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white motion-reduce:transition-none motion-reduce:transform-none ${
-      active
-        ? 'bg-zinc-900 text-white shadow-xl shadow-zinc-900/10 scale-100'
-        : 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900'
-    }`}
-  >
-    <div className="flex items-center gap-4 min-w-0 flex-1">
-      <span
-        className={`transition-colors flex-shrink-0 ${active ? 'text-lime-400' : 'group-hover:text-zinc-900'}`}
-      >
-        {React.cloneElement(icon, { size: 20, strokeWidth: active ? 2.5 : 2 })}
-      </span>
-      <span
-        className={`font-bold text-[15px] tracking-wide whitespace-nowrap truncate ${active ? 'font-extrabold' : ''}`}
-      >
-        {label}
-      </span>
-    </div>
-    {badge > 0 && (
-      <span className="bg-lime-500 text-zinc-900 text-[10px] font-extrabold px-2.5 py-1 rounded-full shadow-sm flex-shrink-0 ml-2">
-        {badge}
-      </span>
-    )}
-  </button>
-);
+// SidebarItem imported from shared/components/ui
 
 const StatCard = ({ label, value, icon, trend, dark }: any) => (
   <div
@@ -711,7 +683,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
       'Unit Price',
       'Quantity',
       'Total Value',
-      'Commission (₹)',
+      'Commission (â‚¹)',
       'Settlement Date',
       'Agency Name',
       'Mediator Name',
@@ -804,7 +776,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
 
   const handleExportToSheets = () => {
     if (!filtered.length) { toast.info('No orders to export'); return; }
-    const sheetHeaders = ['Order ID','Date','Time','Product','Platform','Deal Type','Unit Price','Quantity','Total Value','Commission (₹)','Settlement Date','Agency Name','Mediator Name','Mediator Code','Buyer Name','Buyer Mobile','Reviewer Name','Workflow Status','Payment Status','Verification Status','Internal Ref','Sold By','Order Date','Extracted Product','UTR/Reference','Payment Mode'];
+    const sheetHeaders = ['Order ID','Date','Time','Product','Platform','Deal Type','Unit Price','Quantity','Total Value','Commission (â‚¹)','Settlement Date','Agency Name','Mediator Name','Mediator Code','Buyer Name','Buyer Mobile','Reviewer Name','Workflow Status','Payment Status','Verification Status','Internal Ref','Sold By','Order Date','Extracted Product','UTR/Reference','Payment Mode'];
     const sheetRows = filtered.map((o) => {
       const dateObj = new Date(o.createdAt);
       const item = o.items?.[0];
@@ -921,7 +893,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
             >
               <option value="All">All Products</option>
               {productOptions.map((p) => (
-                <option key={p} value={p}>{p.length > 30 ? p.slice(0, 30) + '…' : p}</option>
+                <option key={p} value={p}>{p.length > 30 ? p.slice(0, 30) + 'â€¦' : p}</option>
               ))}
             </select>
             <button
@@ -1299,7 +1271,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                         className="w-full h-auto block"
                       />
                     </div>
-                    {/* AI Verification — stored from buyer's proof submission */}
+                    {/* AI Verification â€” stored from buyer's proof submission */}
                     {viewProofOrder.orderAiVerification && (
                     <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-200 mt-2">
                       <div className="flex justify-between items-center mb-2">
@@ -1318,14 +1290,14 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                                   <div className={`flex-1 p-2 rounded-lg border text-center ${aiData?.orderIdMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                                     <p className="text-[9px] font-bold text-zinc-400 uppercase">Order ID</p>
                                     <p className={`text-xs font-bold ${aiData?.orderIdMatch ? 'text-green-600' : 'text-red-600'}`}>
-                                      {aiData?.orderIdMatch ? '✓ Match' : '✗ Mismatch'}
+                                      {aiData?.orderIdMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
                                     </p>
                                     {aiData?.detectedOrderId && <p className="text-[9px] text-zinc-500 font-mono mt-0.5">Detected: {aiData.detectedOrderId}</p>}
                                   </div>
                                   <div className={`flex-1 p-2 rounded-lg border text-center ${aiData?.amountMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                                     <p className="text-[9px] font-bold text-zinc-400 uppercase">Amount</p>
                                     <p className={`text-xs font-bold ${aiData?.amountMatch ? 'text-green-600' : 'text-red-600'}`}>
-                                      {aiData?.amountMatch ? '✓ Match' : '✗ Mismatch'}
+                                      {aiData?.amountMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
                                     </p>
                                     {aiData?.detectedAmount != null && <p className="text-[9px] text-zinc-500 font-mono mt-0.5">Detected: {formatCurrency(aiData.detectedAmount)}</p>}
                                   </div>
@@ -1745,7 +1717,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <div>
                     <label className="text-xs font-bold text-zinc-400 uppercase ml-1 mb-2 block">
-                      Product Price (₹)
+                      Product Price (â‚¹)
                     </label>
                     <input
                       type="number"
@@ -1758,7 +1730,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                   </div>
                   <div>
                     <label className="text-xs font-bold text-zinc-400 uppercase ml-1 mb-2 block">
-                      Deal Price (₹)
+                      Deal Price (â‚¹)
                     </label>
                     <input
                       type="number"
@@ -1771,7 +1743,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                   </div>
                   <div>
                     <label className="text-xs font-bold text-zinc-400 uppercase ml-1 mb-2 block whitespace-nowrap">
-                      Agency Commission (₹)
+                      Agency Commission (â‚¹)
                     </label>
                     <input
                       type="number"
@@ -2052,7 +2024,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                     <div className="w-[1px] h-6 bg-zinc-100"></div>
                     <div className="flex flex-col">
                       <span className="text-[9px] font-bold text-zinc-400 uppercase">Created</span>
-                      <span className="text-[10px] font-medium text-zinc-500">{c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB') : '—'}</span>
+                      <span className="text-[10px] font-medium text-zinc-500">{c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB') : 'â€”'}</span>
                     </div>
                   </div>
                 </div>
@@ -2119,7 +2091,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                       setCopyingId(c.id);
                       try {
                         await api.brand.copyCampaign(c.id);
-                        toast.success('Campaign copied as Draft — you can now edit it');
+                        toast.success('Campaign copied as Draft â€” you can now edit it');
                         onRefresh(['campaigns']);
                       } catch (err) {
                         toast.error(formatErrorMessage(err, 'Copy failed'));
@@ -2279,7 +2251,7 @@ export const BrandDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load on tab change — only fetches keys not already cached
+  // Trigger data load on tab change â€” only fetches keys not already cached
   const prevTabRef = useRef(activeTab);
   useEffect(() => {
     const tabChanged = prevTabRef.current !== activeTab;
@@ -2479,7 +2451,7 @@ export const BrandDashboard: React.FC = () => {
               </button>
             </div>
             <nav className="space-y-1">
-              <SidebarItem
+              <SidebarItem theme="brand"
                 icon={<LayoutDashboard />}
                 label="Command Center"
                 active={activeTab === 'dashboard'}
@@ -2488,7 +2460,7 @@ export const BrandDashboard: React.FC = () => {
                   setIsSidebarOpen(false);
                 }}
               />
-              <SidebarItem
+              <SidebarItem theme="brand"
                 icon={<Briefcase />}
                 label="Campaigns"
                 active={activeTab === 'campaigns'}
@@ -2498,7 +2470,7 @@ export const BrandDashboard: React.FC = () => {
                 }}
                 badge={campaigns.filter((c) => c.status === 'Active').length}
               />
-              <SidebarItem
+              <SidebarItem theme="brand"
                 icon={<ShoppingBag />}
                 label="Order Intelligence"
                 active={activeTab === 'orders'}
@@ -2507,7 +2479,7 @@ export const BrandDashboard: React.FC = () => {
                   setIsSidebarOpen(false);
                 }}
               />
-              <SidebarItem
+              <SidebarItem theme="brand"
                 icon={<Users />}
                 label="Agency Partners"
                 active={activeTab === 'agencies'}
@@ -2516,7 +2488,7 @@ export const BrandDashboard: React.FC = () => {
                   setIsSidebarOpen(false);
                 }}
               />
-              <SidebarItem
+              <SidebarItem theme="brand"
                 icon={<Bell />}
                 label="Requests"
                 active={activeTab === 'requests'}
@@ -2526,7 +2498,7 @@ export const BrandDashboard: React.FC = () => {
                 }}
                 badge={pendingRequests}
               />
-              <SidebarItem
+              <SidebarItem theme="brand"
                 icon={<HelpCircle />}
                 label="Tickets"
                 active={activeTab === 'tickets'}
@@ -2709,7 +2681,7 @@ export const BrandDashboard: React.FC = () => {
                         <>
                           <button type="button" onClick={() => { setResolvingTicketId(t.id); setResolutionNote(''); }}
                             className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
-                            ✓ Resolve / Reject
+                            âœ“ Resolve / Reject
                           </button>
                           <button
                             type="button"
@@ -2724,7 +2696,7 @@ export const BrandDashboard: React.FC = () => {
                             }}
                             className="px-3 py-1.5 rounded-lg text-xs font-bold bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100"
                           >
-                            ↑ Escalate
+                            â†‘ Escalate
                           </button>
                         </>
                       )}
@@ -2735,10 +2707,10 @@ export const BrandDashboard: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <button type="button" onClick={async () => {
                               try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
-                            }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✓ Resolve</button>
+                            }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">âœ“ Resolve</button>
                             <button type="button" onClick={async () => {
                               try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
-                            }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
+                            }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">âœ— Reject</button>
                             <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
                               className="px-3 py-1 rounded-lg text-xs font-bold bg-zinc-100 text-zinc-500 hover:bg-zinc-200">Cancel</button>
                           </div>
@@ -2936,7 +2908,7 @@ export const BrandDashboard: React.FC = () => {
                               </div>
                             </td>
                             <td className="p-6 font-mono text-xs font-bold text-zinc-500">
-                              {tx.ref || '—'}
+                              {tx.ref || 'â€”'}
                             </td>
                             <td className="p-6 text-right font-mono font-bold text-zinc-900">
                               {tx.amount}

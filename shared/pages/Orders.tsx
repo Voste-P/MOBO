@@ -177,6 +177,8 @@ const isValidReviewLink = (value: string) => {
     const url = new URL(trimmed);
     if (url.protocol !== 'https:') return false;
     const host = url.hostname.toLowerCase().replace(/^www\./, '');
+    // Strict match: host must exactly equal the domain or end with '.domain'
+    // Prevents subdomain spoofing like amazon.in.attacker.com
     return KNOWN_REVIEW_DOMAINS.some(d => host === d || host.endsWith('.' + d));
   } catch {
     return false;
@@ -577,7 +579,8 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       if (capturedProduct) {
         const hasId = Boolean(safeOrderId);
         const hasAmount = typeof safeAmount === 'number';
-        const amountMatch = hasAmount && Math.abs(safeAmount - capturedProduct.price) < 10;
+        const tolerance = Math.max(10, capturedProduct.price * 0.02); // 2% or ₹10 minimum
+        const amountMatch = hasAmount && Math.abs(safeAmount - capturedProduct.price) < tolerance;
         const idValid = hasId && safeOrderId.length > 5;
 
         // Product name similarity check — strict matching to prevent fraud

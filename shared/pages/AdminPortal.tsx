@@ -10,7 +10,7 @@ import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage } from '../components/ProxiedImage';
 
 import { subscribeRealtime } from '../services/realtime';
-import { Button, EmptyState, IconButton, Input, Spinner, Pagination } from '../components/ui';
+import { Button, EmptyState, IconButton, Input, Spinner, Pagination, SidebarItem } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { RatingVerificationBadge, ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
 import { DesktopShell } from '../components/DesktopShell';
@@ -82,34 +82,7 @@ const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 // --- COMPONENTS ---
 
-const SidebarItem = ({ icon: Icon, label, active, onClick, badge }: any) => (
-  <button
-    type="button"
-    onClick={onClick}
-    aria-current={active ? 'page' : undefined}
-    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 motion-reduce:transition-none motion-reduce:transform-none ${
-      active
-        ? 'bg-white/10 text-white shadow-lg backdrop-blur-sm border border-white/5'
-        : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
-    }`}
-  >
-    {active && (
-      <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 rounded-r-full"></div>
-    )}
-    <div className="flex items-center gap-3">
-      <Icon
-        size={18}
-        className={active ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-300'}
-      />
-      <span className="font-medium text-sm tracking-wide">{label}</span>
-    </div>
-    {badge > 0 && (
-      <span className="bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
-        {badge}
-      </span>
-    )}
-  </button>
-);
+// SidebarItem imported from shared/components/ui
 
 const StatCard = ({ title, value, subtext, icon: Icon, colorClass }: any) => (
   <div className="bg-white p-6 rounded-[1.5rem] shadow-[0_2px_20px_-12px_rgba(0,0,0,0.1)] border border-slate-100 relative overflow-hidden flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300">

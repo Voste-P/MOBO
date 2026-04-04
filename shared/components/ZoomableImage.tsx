@@ -118,8 +118,14 @@ export const ZoomableImage: React.FC<{
       {/* Fullscreen zoom overlay */}
       {zoomed && (
         <div
+          role="dialog"
+          aria-label={`Zoomed view: ${alt}`}
+          aria-modal="true"
           className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4 cursor-zoom-out animate-fade-in"
           onClick={() => setZoomed(false)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setZoomed(false); }}
+          tabIndex={-1}
+          ref={(el) => el?.focus()}
         >
           <img loading="lazy"
             src={src}
@@ -137,7 +143,8 @@ export const ZoomableImage: React.FC<{
             <span className="text-sm">Image unavailable</span>
           </div>
           <button
-            onClick={() => setZoomed(false)}
+            onClick={(e) => { e.stopPropagation(); setZoomed(false); }}
+            aria-label="Close zoomed view"
             className="absolute top-4 right-4 p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors"
           >
             <X size={20} className="text-white" />
