@@ -95,7 +95,7 @@ import {
 
 // SidebarItem imported from shared/components/ui
 
-const StatCard = ({ label, value, icon: Icon, trend, colorClass = 'bg-white' }: any) => (
+const StatCard = ({ label, value, icon: Icon, trend, colorClass = 'bg-white' }: { label: string; value: string | number; icon: React.ComponentType<{ size: number }>; trend?: string; colorClass?: string }) => (
   <div
     className={`${colorClass} p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 group`}
   >

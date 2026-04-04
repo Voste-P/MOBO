@@ -96,7 +96,7 @@ type Tab = 'dashboard' | 'agencies' | 'campaigns' | 'requests' | 'orders' | 'tic
 
 // SidebarItem imported from shared/components/ui
 
-const StatCard = ({ label, value, icon, trend, dark }: any) => (
+const StatCard = ({ label, value, icon, trend, dark }: { label: string; value: string | number; icon: React.ReactNode; trend?: string; dark?: boolean }) => (
   <div
     className={`p-6 rounded-[2rem] flex flex-col justify-between h-44 relative overflow-hidden group hover:-translate-y-1 transition-all duration-300 ${
       dark
@@ -1510,7 +1510,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
   const [form, setForm] = useState(initialForm);
   const [selAgencies, setSelAgencies] = useState<string[]>([]);
 
-  const handleCreate = async (e: any) => {
+  const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const price = Number(form.price);
     const payout = Number(form.payout);
