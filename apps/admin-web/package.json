@@ -9,6 +9,7 @@
     "start": "node ../../scripts/next.mjs start -p 3005"
   },
   "dependencies": {
+    "framer-motion": "^12.38.0",
     "next": "^15.1.0",
     "lucide-react": "^0.556.0",
     "recharts": "^2.12.0",
