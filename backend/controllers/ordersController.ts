@@ -3,6 +3,7 @@ import type { Env } from '../config/env.js';
 import { randomUUID } from 'node:crypto';
 import { AppError } from '../middleware/errors.js';
 import { prisma as db } from '../database/prisma.js';
+import { Prisma } from '../generated/prisma/client.js';
 import { orderLog, businessLog } from '../config/logger.js';
 import { logChangeEvent, logAccessEvent, logPerformance, logErrorEvent } from '../config/appLogs.js';
 import { pgOrder } from '../utils/pgMappers.js';
@@ -25,7 +26,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 import { writeAuditLog } from '../services/audit.js';
 
 export function makeOrdersController(env: Env) {
-  const MAX_PROOF_BYTES = 50 * 1024 * 1024;
+  const MAX_PROOF_BYTES = 10 * 1024 * 1024; // 10MB — must fit within EXPRESS body limit (12MB)
   const MIN_PROOF_BYTES = (env.NODE_ENV !== 'production') ? 1 : 10 * 1024;
 
   const getDataUrlByteSize = (raw: string) => {
@@ -194,7 +195,7 @@ export function makeOrdersController(env: Env) {
     if (!v.order?.verifiedAt) {
       // Check if purchase proof has AI confidence data
       const orderAi = order.orderAiVerification as any;
-      const orderConfidence = orderAi?.confidenceScore ?? 0;
+      const orderConfidence = Number(orderAi?.confidenceScore) || 0;
       const baselineThreshold = envRef.AI_PROOF_CONFIDENCE_THRESHOLD ?? 75;
       if (orderConfidence < baselineThreshold) return order;
     }
@@ -210,12 +211,12 @@ export function makeOrdersController(env: Env) {
       // Get AI confidence for this step
       let confidence = 0;
       if (step === 'rating') {
-        confidence = (order.ratingAiVerification as any)?.confidenceScore ?? 0;
+        confidence = Number((order.ratingAiVerification as any)?.confidenceScore) || 0;
       } else if (step === 'returnWindow') {
-        confidence = (order.returnWindowAiVerification as any)?.confidenceScore ?? 0;
+        confidence = Number((order.returnWindowAiVerification as any)?.confidenceScore) || 0;
       } else if (step === 'review') {
         // Review links get confidence from the review link validation
-        confidence = (v.review?.aiConfidenceScore) ?? (envRef.AI_REVIEW_LINK_CONFIDENCE ?? 95);
+        confidence = Number(v.review?.aiConfidenceScore) || (envRef.AI_REVIEW_LINK_CONFIDENCE ?? 95);
         if (!order.reviewLink && !order.screenshotReview) confidence = 0;
       }
 
@@ -225,7 +226,7 @@ export function makeOrdersController(env: Env) {
 
     // Also check purchase proof if not yet verified
     if (!v.order?.verifiedAt) {
-      const orderConfidence = (order.orderAiVerification as any)?.confidenceScore ?? 0;
+      const orderConfidence = Number((order.orderAiVerification as any)?.confidenceScore) || 0;
       if (orderConfidence < baselineThreshold) return order;
       stepsToVerify.push({ key: 'order', confidence: orderConfidence });
     }
@@ -473,17 +474,15 @@ export function makeOrdersController(env: Env) {
         }
         const proofExistenceMap = new Map<string, Record<string, boolean>>();
         if (idsForSql.length > 0) {
-          const existenceRows: any[] = await db().$queryRawUnsafe(
-            `SELECT id, mongo_id,
+          const existenceRows: any[] = await db().$queryRaw`
+            SELECT id, mongo_id,
               (screenshot_order IS NOT NULL) AS has_order,
               (screenshot_payment IS NOT NULL) AS has_payment,
               (screenshot_review IS NOT NULL) AS has_review,
               (screenshot_rating IS NOT NULL) AS has_rating,
               (screenshot_return_window IS NOT NULL) AS has_return_window,
               review_link
-            FROM orders WHERE id = ANY($1::uuid[]) AND is_deleted = false`,
-            idsForSql,
-          );
+            FROM orders WHERE id = ANY(${idsForSql}::uuid[]) AND is_deleted = false`;
           for (const row of existenceRows) {
             proofExistenceMap.set(String(row.id), {
               order: !!row.has_order,

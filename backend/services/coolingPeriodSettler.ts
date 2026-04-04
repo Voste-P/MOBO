@@ -322,12 +322,14 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
  */
 export async function processCoolingPeriodSettlements(env: Env): Promise<{ settled: number; skipped: number; errors: number }> {
   const BATCH_SIZE = 50;
+  const MAX_BATCHES = 20; // Safety cap: process at most 1000 orders per run
   let settled = 0;
   let skipped = 0;
   let errors = 0;
 
   orderLog.info('[cooling-settler] Starting cooling period settlement run');
 
+  for (let batch = 0; batch < MAX_BATCHES; batch++) {
   // Find orders past their cooling period that haven't been settled
   const orders = await db().order.findMany({
     where: {
@@ -343,8 +345,8 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
   });
 
   if (orders.length === 0) {
-    orderLog.info('[cooling-settler] No orders ready for settlement');
-    return { settled, skipped, errors };
+    if (batch === 0) orderLog.info('[cooling-settler] No orders ready for settlement');
+    break; // No more orders to process
   }
 
   orderLog.info(`[cooling-settler] Found ${orders.length} orders ready for settlement`);
@@ -451,7 +453,11 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
     }
   }
 
-  orderLog.info('[cooling-settler] Settlement run complete', { settled, skipped, errors, total: orders.length });
+  // If this batch was smaller than BATCH_SIZE, no more orders remain
+  if (orders.length < BATCH_SIZE) break;
+  } // end batch loop
+
+  orderLog.info('[cooling-settler] Settlement run complete', { settled, skipped, errors });
   return { settled, skipped, errors };
 }
 
