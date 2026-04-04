@@ -40,8 +40,8 @@ describe('env config', () => {
     it('sets correct AI defaults', () => {
       const env = loadEnv({ NODE_ENV: 'test' });
       expect(env.AI_ENABLED).toBe(true);
-      expect(env.AI_PROOF_CONFIDENCE_THRESHOLD).toBe(75);
-      expect(env.AI_AUTO_VERIFY_THRESHOLD).toBe(90);
+      expect(env.AI_PROOF_CONFIDENCE_THRESHOLD).toBe(70);
+      expect(env.AI_AUTO_VERIFY_THRESHOLD).toBe(85);
       expect(env.COOLING_PERIOD_DAYS).toBe(14);
       expect(env.MAX_REPROOF_ATTEMPTS).toBe(5);
     });
