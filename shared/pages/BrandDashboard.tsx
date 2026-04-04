@@ -2654,7 +2654,7 @@ export const BrandDashboard: React.FC = () => {
                   }
                   return true;
                 }).map((t: Ticket) => (
-                  <div key={t.id} className="rounded-xl border border-zinc-100 bg-white px-3 py-3 shadow-sm space-y-2 cursor-pointer hover:border-zinc-300 transition-colors" onClick={() => setSelectedTicket(t)}>
+                  <div key={t.id} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTicket(t); } }} className="rounded-xl border border-zinc-100 bg-white px-3 py-3 shadow-sm space-y-2 cursor-pointer hover:border-zinc-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setSelectedTicket(t)}>
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">

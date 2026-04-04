@@ -13,6 +13,16 @@ module.exports = {
           dark: { 50: '#fafafa', 100: '#f4f4f5', 200: '#e4e4e7', 300: '#d4d4d8', 400: '#a1a1aa', 500: '#71717a', 600: '#52525b', 700: '#3f3f46', 800: '#27272a', 900: '#18181b', 950: '#09090b' },
           accent: '#CCF381',
         },
+        surface: { DEFAULT: '#F4F4F5', soft: '#FAFAFA', muted: '#E4E4E7' },
+      },
+      zIndex: {
+        dropdown: '50',
+        sticky: '100',
+        overlay: '200',
+        modal: '300',
+        popover: '400',
+        toast: '500',
+        banner: '490',
       },
       fontFamily: {
         sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],

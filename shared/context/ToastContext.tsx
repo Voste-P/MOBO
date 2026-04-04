@@ -119,7 +119,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={value}>
       {children}
 
-      <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[9999] w-[min(92vw,520px)] pointer-events-none">
+      <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-toast w-[min(92vw,520px)] pointer-events-none">
         <div className="flex flex-col gap-3">
           {toasts.map((t) => (
             <div

@@ -41,7 +41,7 @@ function RowSkeleton() {
 export function PageSkeleton({ variant = 'cards' }: { variant?: 'cards' | 'dashboard' | 'minimal' }) {
   if (variant === 'minimal') {
     return (
-      <div className="flex-1 flex items-center justify-center min-h-[100dvh] bg-[#F4F4F5]" role="status" aria-busy="true" aria-label="Loading content">
+      <div className="flex-1 flex items-center justify-center min-h-[100dvh] bg-surface" role="status" aria-busy="true" aria-label="Loading content">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-3 border-gray-200 border-t-gray-500 rounded-full animate-spin motion-reduce:animate-none" />
           <Bone className="h-3 w-24" />
@@ -53,7 +53,7 @@ export function PageSkeleton({ variant = 'cards' }: { variant?: 'cards' | 'dashb
 
   if (variant === 'dashboard') {
     return (
-      <div className="min-h-[100dvh] bg-[#F4F4F5] p-4 space-y-4" role="status" aria-busy="true" aria-label="Loading dashboard">
+      <div className="min-h-[100dvh] bg-surface p-4 space-y-4" role="status" aria-busy="true" aria-label="Loading dashboard">
         {/* Header skeleton */}
         <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-100">
           <div className="flex items-center gap-3">
@@ -86,7 +86,7 @@ export function PageSkeleton({ variant = 'cards' }: { variant?: 'cards' | 'dashb
 
   // cards variant — mimics Explore page
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#F4F4F5]" role="status" aria-busy="true" aria-label="Loading deals">
+    <div className="flex flex-col h-full min-h-0 bg-surface" role="status" aria-busy="true" aria-label="Loading deals">
       {/* Header skeleton */}
       <div className="px-4 pt-10 pb-3 bg-white border-b border-gray-100 space-y-2.5">
         <div className="flex justify-between items-center">

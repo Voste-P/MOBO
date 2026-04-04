@@ -348,7 +348,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                 type="button"
                 aria-label="Remove screenshot"
                 onClick={() => { setScreenshot(null); setPreview(null); setExtractedDetails({ orderId: '', amount: '' }); setFieldsLocked(false); }}
-                className="absolute top-1.5 right-1.5 p-1 bg-white/90 rounded-full shadow hover:bg-red-50 transition"
+                className="absolute top-1.5 right-1.5 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center bg-white/90 rounded-full shadow hover:bg-red-50 transition"
               >
                 <X size={12} className="text-red-500" />
               </button>

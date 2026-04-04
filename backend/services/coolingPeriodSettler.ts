@@ -1,4 +1,5 @@
 import { prisma as db } from '../database/prisma.js';
+import { Prisma } from '../generated/prisma/client.js';
 import { orderLog } from '../config/logger.js';
 import { logErrorEvent, logChangeEvent } from '../config/appLogs.js';
 import { ensureWallet, applyWalletDebit, applyWalletCredit } from './walletService.js';
@@ -411,7 +412,7 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
   const userMap = new Map(usersArr.map(u => [u.id, u]));
   const mediatorMap = new Map(mediatorsArr.map(m => [m.mediatorCode!, m]));
 
-  // Batch cap counts: for each unique (mediatorCode, campaignId) pair, count settled orders
+  // Batch cap counts: single GROUP BY aggregate instead of N individual count queries
   const capPairs = [...new Set(
     orders
       .filter(o => o.managerName && o.items?.[0]?.campaignId)
@@ -419,18 +420,23 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
   )];
   const capCountMap = new Map<string, number>();
   if (capPairs.length > 0) {
-    await Promise.all(capPairs.map(async (pair) => {
-      const [mc, cid] = pair.split('::');
-      const count = await db().order.count({
-        where: {
-          managerName: mc,
-          items: { some: { campaignId: cid } },
-          OR: [{ affiliateStatus: 'Approved_Settled' }, { paymentStatus: 'Paid' }],
-          isDeleted: false,
-        },
-      });
-      capCountMap.set(pair, count);
-    }));
+    const mcCodes = [...new Set(capPairs.map(p => p.split('::')[0]))];
+    const cids = [...new Set(capPairs.map(p => p.split('::')[1]))];
+    const rows = await db().$queryRaw<Array<{ manager_name: string; campaign_id: string; cnt: bigint }>>(
+      Prisma.sql`
+        SELECT o."managerName" AS manager_name, oi."campaignId" AS campaign_id, COUNT(DISTINCT o.id)::bigint AS cnt
+        FROM "Order" o
+        JOIN "OrderItem" oi ON oi."orderId" = o.id AND oi."isDeleted" = false
+        WHERE o."managerName" IN (${Prisma.join(mcCodes)})
+          AND oi."campaignId" IN (${Prisma.join(cids)})
+          AND (o."affiliateStatus" = 'Approved_Settled' OR o."paymentStatus" = 'Paid')
+          AND o."isDeleted" = false
+        GROUP BY o."managerName", oi."campaignId"
+      `
+    );
+    for (const r of rows) {
+      capCountMap.set(`${r.manager_name}::${r.campaign_id}`, Number(r.cnt));
+    }
   }
 
   // Attach prefetched data to a context object passed into settleOne

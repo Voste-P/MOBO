@@ -382,7 +382,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
   }, [clearChat]);
 
   return (
-    <div className="flex flex-col h-full min-h-0 w-full bg-[#F4F4F5] relative">
+    <div className="flex flex-col h-full min-h-0 w-full bg-surface relative">
       {/* Header */}
       <div className="shrink-0 w-full bg-white border-b border-gray-100 shadow-sm px-5 py-4 safe-top flex justify-between items-center">
         <div className="flex items-center gap-3">

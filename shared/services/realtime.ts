@@ -207,7 +207,7 @@ class RealtimeClient {
               // ignore
             }
           }
-        }, 30_000);
+        }, 15_000);
 
         const flushEvent = () => {
           if (!dataLines.length) {
