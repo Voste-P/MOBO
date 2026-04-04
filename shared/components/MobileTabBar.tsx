@@ -100,7 +100,7 @@ export const MobileTabBar = React.memo(function MobileTabBar({
               </div>
               <span
                 className={cn(
-                  'text-[9px] font-bold tracking-wide transition-all duration-300',
+                  'text-[10px] font-bold tracking-wide transition-all duration-300',
                   active
                     ? 'text-indigo-300 opacity-100'
                     : 'text-zinc-500 opacity-0 scale-0 group-hover:opacity-100 group-hover:scale-100'

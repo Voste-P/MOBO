@@ -3,7 +3,7 @@
 import React from 'react';
 import { ExpandableText } from './ui';
 
-/* ── Types ──────────────────────────────────────────────────────────── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Types Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
 
 export interface RatingAiVerification {
   accountNameMatch?: boolean;
@@ -31,7 +31,7 @@ export interface OrderAiVerification {
   confidenceScore?: number;
 }
 
-/* ── Theme variants for light/dark portals ──────────────────────────── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Theme variants for light/dark portals Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
 
 type Theme = 'light' | 'dark';
 
@@ -62,15 +62,15 @@ const themeStyles = {
   },
 } as const;
 
-/* ── Single verification item ───────────────────────────────────────── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Single verification item Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
 
 function VerifyItem({
   label,
   match,
   detected,
   theme,
-  trueLabel = '✓ Match',
-  falseLabel = '✗ Mismatch',
+  trueLabel = 'Ã¢Å“â€œ Match',
+  falseLabel = 'Ã¢Å“â€” Mismatch',
 }: {
   label: string;
   match: boolean | undefined;
@@ -86,12 +86,12 @@ function VerifyItem({
 
   return (
     <div className={`p-2 rounded-lg text-center ${bg}`}>
-      <p className="text-[9px] font-bold text-slate-400 uppercase">{label}</p>
+      <p className="text-[10px] font-bold text-slate-400 uppercase">{label}</p>
       <p className={`text-xs font-bold ${text}`}>
         {match ? trueLabel : falseLabel}
       </p>
       {detected && (
-        <ExpandableText text={detected} clampClass="truncate" className={`text-[9px] ${s.detailText} mt-0.5`} as="p">
+        <ExpandableText text={detected} clampClass="truncate" className={`text-[10px] ${s.detailText} mt-0.5`} as="p">
           Found: {detected}
         </ExpandableText>
       )}
@@ -99,7 +99,7 @@ function VerifyItem({
   );
 }
 
-/* ── Rating AI Verification Badge ───────────────────────────────────── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Rating AI Verification Badge Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
 
 export const RatingVerificationBadge = React.memo(function RatingVerificationBadge({
   data,
@@ -119,13 +119,13 @@ export const RatingVerificationBadge = React.memo(function RatingVerificationBad
         <VerifyItem label="Product Name" match={data.productNameMatch} detected={data.detectedProductName} theme={theme} />
       </div>
       {data.confidenceScore !== undefined && (
-        <p className={`text-[9px] ${s.confidenceText}`}>Confidence: {data.confidenceScore}%</p>
+        <p className={`text-[10px] ${s.confidenceText}`}>Confidence: {data.confidenceScore}%</p>
       )}
     </div>
   );
 });
 
-/* ── Return Window AI Verification Badge ────────────────────────────── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Return Window AI Verification Badge Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
 
 export const ReturnWindowVerificationBadge = React.memo(function ReturnWindowVerificationBadge({
   data,
@@ -148,24 +148,24 @@ export const ReturnWindowVerificationBadge = React.memo(function ReturnWindowVer
           label="Return Window"
           match={data.returnWindowClosed}
           theme={theme}
-          trueLabel="✓ Closed"
-          falseLabel="⏳ Open"
+          trueLabel="Ã¢Å“â€œ Closed"
+          falseLabel="Ã¢ÂÂ³ Open"
         />
       </div>
       {data.detectedReturnWindow && (
-        <p className={`text-[9px] ${s.detailText}`}>Detected Window: {data.detectedReturnWindow}</p>
+        <p className={`text-[10px] ${s.detailText}`}>Detected Window: {data.detectedReturnWindow}</p>
       )}
       {data.discrepancyNote && (
-        <p className={`text-[9px] ${s.noteText} font-semibold`}>Note: {data.discrepancyNote}</p>
+        <p className={`text-[10px] ${s.noteText} font-semibold`}>Note: {data.discrepancyNote}</p>
       )}
       {data.confidenceScore !== undefined && (
-        <p className={`text-[9px] ${s.confidenceText}`}>Confidence: {data.confidenceScore}%</p>
+        <p className={`text-[10px] ${s.confidenceText}`}>Confidence: {data.confidenceScore}%</p>
       )}
     </div>
   );
 });
 
-/* ── Order Proof AI Verification Badge ──────────────────────────────── */
+/* Ã¢â€â‚¬Ã¢â€â‚¬ Order Proof AI Verification Badge Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
 
 export const OrderVerificationBadge = React.memo(function OrderVerificationBadge({
   data,
@@ -179,13 +179,13 @@ export const OrderVerificationBadge = React.memo(function OrderVerificationBadge
   const s = themeStyles[theme];
   return (
     <div className={className ?? 'space-y-1'}>
-      <p className={`text-[10px] font-semibold ${s.headerText}`}>🤖 AI Order Proof Verification</p>
+      <p className={`text-[10px] font-semibold ${s.headerText}`}>Ã°Å¸Â¤â€“ AI Order Proof Verification</p>
       <div className="grid grid-cols-2 gap-1">
         <VerifyItem label="Order ID" match={data.orderIdMatch} theme={theme} />
         <VerifyItem label="Amount" match={data.amountMatch} theme={theme} />
       </div>
       {data.confidenceScore !== undefined && (
-        <p className={`text-[9px] ${s.confidenceText}`}>Confidence: {data.confidenceScore}%</p>
+        <p className={`text-[10px] ${s.confidenceText}`}>Confidence: {data.confidenceScore}%</p>
       )}
     </div>
   );

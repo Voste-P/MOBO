@@ -52,6 +52,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           type="button"
           disabled={page <= 1 || loading}
           onClick={() => onPageChange(page - 1)}
+          aria-label="Previous page"
           className="px-2.5 py-1.5 rounded-lg text-xs font-bold border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           ‹ Prev
@@ -78,6 +79,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           type="button"
           disabled={page >= totalPages || loading}
           onClick={() => onPageChange(page + 1)}
+          aria-label="Next page"
           className="px-2.5 py-1.5 rounded-lg text-xs font-bold border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           Next ›

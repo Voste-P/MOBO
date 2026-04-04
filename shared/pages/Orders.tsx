@@ -44,7 +44,7 @@ import {
   TicketCheck,
 } from 'lucide-react';
 
-/* ─── Sample Screenshot Guide ───────────────────────────────────────── */
+/* â”€â”€â”€ Sample Screenshot Guide â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const SAMPLE_IMAGES: Record<string, string> = {
   order: '/screenshots/sample-order.png',
   rating: '/screenshots/sample-rating.png',
@@ -111,7 +111,7 @@ const SampleScreenshotGuide: React.FC<{
           {/* Sample annotated image */}
           {sampleImg && (
             <div className="mt-2 rounded-lg border border-blue-200 overflow-hidden bg-white">
-              <p className="text-[9px] font-bold text-blue-500 px-2 pt-1.5 pb-0.5">📸 Example — key fields highlighted</p>
+              <p className="text-[10px] font-bold text-blue-500 px-2 pt-1.5 pb-0.5">ðŸ“¸ Example â€” key fields highlighted</p>
               <img
                 src={sampleImg}
                 alt={`Sample ${g.title}`}
@@ -124,19 +124,19 @@ const SampleScreenshotGuide: React.FC<{
           <ul className="space-y-1.5 mt-2">
             {g.bullets.map((b, i) => (
               <li key={`bullet-${i}`} className="flex items-start gap-1.5 text-[10px] text-slate-600">
-                <span className="w-4 h-4 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-[9px] font-black shrink-0 mt-0.5">{i + 1}</span>
+                <span className="w-4 h-4 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">{i + 1}</span>
                 {b}
               </li>
             ))}
           </ul>
           <div className="flex flex-wrap gap-1 mt-1">
             {g.highlights.map((h) => (
-              <span key={h} className="text-[9px] font-bold bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded">
+              <span key={h} className="text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded">
                 {h}
               </span>
             ))}
           </div>
-          <p className="text-[9px] text-blue-400 font-semibold italic mt-1">
+          <p className="text-[10px] text-blue-400 font-semibold italic mt-1">
             Tip: Use a full-page screenshot in good lighting for best AI detection results.
           </p>
         </div>
@@ -149,7 +149,7 @@ const SampleScreenshotGuide: React.FC<{
 
 const MAX_PROOF_SIZE_BYTES = 10 * 1024 * 1024;
 
-/** Allowed MIME types for proof images — matches what backend AI pipeline can process. */
+/** Allowed MIME types for proof images â€” matches what backend AI pipeline can process. */
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 type ImageValidationError = 'invalid_type' | 'too_large' | null;
@@ -360,7 +360,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       const mine = asArray<Ticket>(data)
         .filter((t: Ticket) => t.userId === user.id && t.issueType !== 'Feedback');
       setMyTickets(mine.sort((a: Ticket, b: Ticket) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-    } catch { /* silently degrade — tickets are secondary */ }
+    } catch { /* silently degrade â€” tickets are secondary */ }
   };
 
   // Merge a submitClaim response (toUiOrder) into the orders list so the UI
@@ -575,15 +575,15 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       });
 
       // [AI] Smart Extraction Verification Logic
-      // Use capturedProduct (snapshot before await) — NOT selectedProduct which may have changed
+      // Use capturedProduct (snapshot before await) â€” NOT selectedProduct which may have changed
       if (capturedProduct) {
         const hasId = Boolean(safeOrderId);
         const hasAmount = typeof safeAmount === 'number';
-        const tolerance = Math.max(10, capturedProduct.price * 0.02); // 2% or ₹10 minimum
+        const tolerance = Math.max(10, capturedProduct.price * 0.02); // 2% or â‚¹10 minimum
         const amountMatch = hasAmount && Math.abs(safeAmount - capturedProduct.price) < tolerance;
         const idValid = hasId && safeOrderId.length > 5;
 
-        // Product name similarity check — strict matching to prevent fraud
+        // Product name similarity check â€” strict matching to prevent fraud
         const productNameStatus = checkProductNameMatch(details.productName, capturedProduct.title);
 
         // Reviewer name matching against extracted account name
@@ -667,7 +667,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       const productName = selectedOrder.items?.[0]?.title || '';
       // Use marketplace reviewer name (provided during order creation) as primary match target.
       // When buyer ordered from a different person's marketplace account, the reviewer name
-      // is the name shown on that account — use it instead of the buyer's app account name.
+      // is the name shown on that account â€” use it instead of the buyer's app account name.
       const reviewerName = selectedOrder.reviewerName || '';
       const hasReviewerName = !!selectedOrder.reviewerName;
 
@@ -676,7 +676,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       if (!hasReviewerName) {
         if (productName) {
           const result = await api.orders.verifyRating(file, buyerName || '', productName, undefined, selectedOrder.id, controller.signal);
-          // Override account name match — we can't verify without a reviewer name
+          // Override account name match â€” we can't verify without a reviewer name
           setRatingVerification({ ...result, accountNameMatch: true });
           if (result.screenshotCropped) {
             toast.error('Screenshot appears cropped or incomplete. Please upload a FULL screenshot showing the complete page including the account name header at the top.');
@@ -713,9 +713,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
         }
       }
     } catch (err) {
-      if ((err as Error)?.name === 'AbortError') return; // Cancelled by re-upload — ignore silently
+      if ((err as Error)?.name === 'AbortError') return; // Cancelled by re-upload â€” ignore silently
       if (process.env.NODE_ENV !== 'production') console.error('Rating pre-validation failed:', err);
-      // Keep verification null — submit button stays disabled until user retries
+      // Keep verification null â€” submit button stays disabled until user retries
       setRatingVerification(null);
       const msg = (err as Error)?.message || 'AI verification failed. Please try uploading the screenshot again.';
       toast.error(msg);
@@ -813,9 +813,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       const reviewerName = selectedOrder.reviewerName || '';
 
       if (!(orderId && productName && amount > 0)) {
-        // Missing order data — block verification instead of silently approving
+        // Missing order data â€” block verification instead of silently approving
         setRwVerification(null);
-        toast.error('Order data incomplete — please re-upload the order screenshot first so we can verify this return window screenshot.');
+        toast.error('Order data incomplete â€” please re-upload the order screenshot first so we can verify this return window screenshot.');
         return;
       }
 
@@ -843,9 +843,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
         }
       }
     } catch (err) {
-      if ((err as Error)?.name === 'AbortError') return; // Cancelled by re-upload — ignore silently
+      if ((err as Error)?.name === 'AbortError') return; // Cancelled by re-upload â€” ignore silently
       if (process.env.NODE_ENV !== 'production') console.error('Return window pre-validation failed:', err);
-      // Keep verification null — submit button stays disabled until user retries
+      // Keep verification null â€” submit button stays disabled until user retries
       setRwVerification(null);
       const msg = (err as Error)?.message || 'AI verification failed. Please try uploading the screenshot again.';
       toast.error(msg);
@@ -927,10 +927,10 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       toast.error('Reviewer name does not match the account in screenshot. Please correct it.');
       return;
     }
-    // Require reviewer/account name for Rating & Review deals — it's used for
+    // Require reviewer/account name for Rating & Review deals â€” it's used for
     // AI screenshot verification and cannot be added later (prevents cheating).
     if ((selectedProduct.dealType === 'Rating' || selectedProduct.dealType === 'Review') && !reviewerNameInput.trim()) {
-      toast.error('Please enter the reviewer name — the marketplace account name used for this order.');
+      toast.error('Please enter the reviewer name â€” the marketplace account name used for this order.');
       return;
     }
     submittingRef.current = true;
@@ -1019,7 +1019,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
               if (!orders.length) { toast.error('No orders to export'); return; }
               const h = [
                 'External Order ID', 'Date', 'Time', 'Product', 'Platform', 'Brand', 'Deal Type',
-                'Unit Price (₹)', 'Quantity', 'Total (₹)', 'Commission/Cashback (₹)',
+                'Unit Price (â‚¹)', 'Quantity', 'Total (â‚¹)', 'Commission/Cashback (â‚¹)',
                 'Workflow Status', 'Affiliate Status', 'Payment Status', 'Settlement Date',
                 'Mediator', 'Agency', 'Reviewer Name', 'Sold By', 'Order Date', 'Extracted Product', 'Internal Ref',
               ];
@@ -1215,7 +1215,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                 className={`bg-white rounded-[1.5rem] p-5 shadow-sm border relative overflow-hidden group transition-all duration-200 hover:shadow-md ${order.affiliateStatus === 'Frozen_Disputed' ? 'border-red-200' : 'border-slate-100'}`}
               >
                 {order.affiliateStatus === 'Frozen_Disputed' && (
-                  <div className="absolute top-0 left-0 w-full bg-red-500 text-white text-[9px] font-black py-1 text-center uppercase tracking-widest z-20">
+                  <div className="absolute top-0 left-0 w-full bg-red-500 text-white text-[10px] font-black py-1 text-center uppercase tracking-widest z-20">
                     Support Hold Active
                   </div>
                 )}
@@ -1280,7 +1280,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                   </div>
                 </div>
 
-                {/* Reviewer / Marketplace Account Name (read-only — set during order creation) */}
+                {/* Reviewer / Marketplace Account Name (read-only â€” set during order creation) */}
                 {(isRating || isReview) && order.reviewerName && (
                   <div className="mb-3">
                     <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
@@ -1321,7 +1321,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                   <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-bold text-red-700 flex items-start gap-2">
                     <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
                     <div>
-                      <span className="uppercase text-[9px] tracking-wider font-black text-red-500 block mb-0.5">
+                      <span className="uppercase text-[10px] tracking-wider font-black text-red-500 block mb-0.5">
                         {rejectionType === 'order' ? 'Purchase Proof' : rejectionType === 'review' ? 'Review Proof' : rejectionType === 'rating' ? 'Rating Proof' : rejectionType === 'returnWindow' ? 'Return Window Proof' : 'Proof'} Rejected
                       </span>
                       {rejectionReason}
@@ -1333,7 +1333,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                   <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-800 flex items-start gap-2">
                     <Zap size={14} className="flex-shrink-0 mt-0.5 text-amber-500" />
                     <div>
-                      <span className="uppercase text-[9px] tracking-wider font-black text-amber-600 block mb-0.5">
+                      <span className="uppercase text-[10px] tracking-wider font-black text-amber-600 block mb-0.5">
                         Action Required
                       </span>
                       {(order.missingProofRequests ?? []).map((r, i) => (
@@ -1346,10 +1346,10 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                   </div>
                 )}
 
-                {/* STEP PROGRESS INDICATOR — shows buyers what step they're at */}
+                {/* STEP PROGRESS INDICATOR â€” shows buyers what step they're at */}
                 {hasExtraSteps && displayStatus !== 'SETTLED' && displayStatus !== 'FROZEN' && (
                   <div className="mb-3 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-2">Steps to complete</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Steps to complete</p>
                     <div className="flex items-center gap-0.5">
                       {/* Step 1: Purchase */}
                       <div className="flex items-center gap-1 min-w-0 shrink-0">
@@ -1362,7 +1362,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                         }`}>
                           {purchaseVerified ? <Check size={12} strokeWidth={3} /> : '1'}
                         </div>
-                        <span className={`text-[9px] font-bold truncate ${purchaseVerified ? 'text-green-600' : 'text-slate-500'}`}>
+                        <span className={`text-[10px] font-bold truncate ${purchaseVerified ? 'text-green-600' : 'text-slate-500'}`}>
                           Buy
                         </span>
                       </div>
@@ -1385,7 +1385,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                             }`}>
                               {reviewVerified ? <Check size={12} strokeWidth={3} /> : '2'}
                             </div>
-                            <span className={`text-[9px] font-bold truncate ${
+                            <span className={`text-[10px] font-bold truncate ${
                               reviewVerified ? 'text-green-600' : purchaseVerified ? 'text-slate-700' : 'text-slate-400'
                             }`}>
                               Review
@@ -1411,7 +1411,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                             }`}>
                               {ratingVerified ? <Check size={12} strokeWidth={3} /> : requiredSteps.includes('review') ? '3' : '2'}
                             </div>
-                            <span className={`text-[9px] font-bold truncate ${
+                            <span className={`text-[10px] font-bold truncate ${
                               ratingVerified ? 'text-green-600' : purchaseVerified ? 'text-slate-700' : 'text-slate-400'
                             }`}>
                               Rate
@@ -1441,7 +1441,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                                  requiredSteps.includes('review') || requiredSteps.includes('rating') ? '3' : '2')
                               }
                             </div>
-                            <span className={`text-[9px] font-bold truncate ${
+                            <span className={`text-[10px] font-bold truncate ${
                               returnWindowVerified ? 'text-green-600' : purchaseVerified ? 'text-slate-700' : 'text-slate-400'
                             }`}>
                               Return
@@ -1462,7 +1462,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                             ? <Check size={12} strokeWidth={3} />
                             : <Zap size={10} />}
                         </div>
-                        <span className={`text-[9px] font-bold truncate ${
+                        <span className={`text-[10px] font-bold truncate ${
                           order.affiliateStatus === 'Pending_Cooling' || order.paymentStatus === 'Paid'
                             ? 'text-green-600'
                             : 'text-slate-400'
@@ -1475,17 +1475,17 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                     {/* Context message under the step bar */}
                     {!purchaseVerified && !rejectionReason && (
                       <p className="text-[10px] text-slate-400 mt-2 font-medium">
-                        Waiting for your mediator to verify purchase proof…
+                        Waiting for your mediator to verify purchase proofâ€¦
                       </p>
                     )}
                     {purchaseVerified && missingProofs.length > 0 && !rejectionReason && (
                       <p className="text-[10px] text-yellow-700 mt-2 font-bold">
-                        ↓ Upload your {(missingProofs as string[]).map(p => p === 'returnWindow' ? 'return window' : p).join(' & ')} proof below to continue.
+                        â†“ Upload your {(missingProofs as string[]).map(p => p === 'returnWindow' ? 'return window' : p).join(' & ')} proof below to continue.
                       </p>
                     )}
                     {purchaseVerified && missingProofs.length === 0 && missingVerifications.length > 0 && !rejectionReason && (
                       <p className="text-[10px] text-purple-600 mt-2 font-medium">
-                        All proofs uploaded! Waiting for mediator approval…
+                        All proofs uploaded! Waiting for mediator approvalâ€¦
                       </p>
                     )}
                   </div>
@@ -1514,7 +1514,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           setSelectedOrder(order);
                           setUploadType('order');
                         }}
-                        className="text-[10px] font-bold uppercase text-blue-600"
+                        className="text-[10px] font-bold uppercase text-blue-600 bg-blue-50 border border-blue-200 px-3 py-2 rounded-lg hover:bg-blue-100 transition-colors active:scale-95"
                       >
                         {rejectionType === 'order' ? 'Reupload Purchase' : 'Upload Purchase Proof'}
                       </button>
@@ -1527,7 +1527,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           setUploadType('review');
                           setReviewerNameInput(order.reviewerName || '');
                         }}
-                        className="text-[10px] font-bold uppercase text-purple-600"
+                        className="text-[10px] font-bold uppercase text-purple-600 bg-purple-50 border border-purple-200 px-3 py-2 rounded-lg hover:bg-purple-100 transition-colors active:scale-95"
                       >
                         {rejectionType === 'review' ? 'Reupload Review' : 'Add Review'}
                       </button>
@@ -1540,7 +1540,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           setUploadType('rating');
                           setReviewerNameInput(order.reviewerName || '');
                         }}
-                        className="text-[10px] font-bold uppercase text-purple-600"
+                        className="text-[10px] font-bold uppercase text-purple-600 bg-purple-50 border border-purple-200 px-3 py-2 rounded-lg hover:bg-purple-100 transition-colors active:scale-95"
                       >
                         {rejectionType === 'rating' ? 'Reupload Rating' : 'Add Rating'}
                       </button>
@@ -1556,7 +1556,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           setUploadType('returnWindow');
                           setReviewerNameInput(order.reviewerName || '');
                         }}
-                        className="text-[10px] font-bold uppercase text-teal-600"
+                        className="text-[10px] font-bold uppercase text-teal-600 bg-teal-50 border border-teal-200 px-3 py-2 rounded-lg hover:bg-teal-100 transition-colors active:scale-95"
                       >
                         {rejectionType === 'returnWindow' ? 'Reupload Return Window' : 'Upload Return Window'}
                       </button>
@@ -1564,7 +1564,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                     {/* Raise Ticket for this specific order */}
                     <button
                       onClick={() => { setTicketOrderId(order.externalOrderId || order.id); setTicketModalOpen(true); }}
-                      className="text-[10px] font-bold uppercase text-red-500 hover:text-red-700"
+                      className="text-[10px] font-bold uppercase text-red-500 bg-red-50 border border-red-200 px-3 py-2 rounded-lg hover:bg-red-100 transition-colors active:scale-95"
                     >
                       Raise Ticket
                     </button>
@@ -1576,7 +1576,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
           })
         )}
 
-        {/* ─── My Tickets Section ──────────────────────────── */}
+        {/* â”€â”€â”€ My Tickets Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="mt-6">
           <button
             type="button"
@@ -1587,7 +1587,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
               <TicketCheck size={16} className="text-red-500" />
               <span className="text-sm font-bold text-slate-800">My Tickets</span>
               {myTickets.filter(t => t.status === 'Open').length > 0 && (
-                <span className="px-1.5 py-0.5 text-[9px] font-bold bg-red-100 text-red-600 rounded-full">
+                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-red-100 text-red-600 rounded-full">
                   {myTickets.filter(t => t.status === 'Open').length} open
                 </span>
               )}
@@ -1654,7 +1654,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                   <div key={t.id} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTicket(t); } }} className="bg-white rounded-xl border border-zinc-200 p-3 space-y-1.5 cursor-pointer hover:border-zinc-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setSelectedTicket(t)}>
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-800">{t.issueType}</span>
-                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                         t.status === 'Resolved' ? 'bg-green-100 text-green-700' :
                         t.status === 'Rejected' ? 'bg-red-100 text-red-700' :
                         'bg-amber-100 text-amber-700'
@@ -1672,14 +1672,14 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       </p>
                     )}
                     {(t.status === 'Resolved' || t.status === 'Rejected') && (t.resolvedByName || t.resolvedAt) && (
-                      <p className="text-[9px] text-slate-500">
+                      <p className="text-[10px] text-slate-500">
                         {t.status === 'Resolved' ? 'Resolved' : 'Rejected'}
                         {t.resolvedByName ? ` by ${t.resolvedByName}` : ''}
                         {t.resolvedAt ? ` on ${new Date(t.resolvedAt).toLocaleDateString('en-GB')}` : ''}
                       </p>
                     )}
                     <div className="flex items-center justify-between">
-                      <span className="text-[9px] text-slate-400">
+                      <span className="text-[10px] text-slate-400">
                         {new Date(t.createdAt).toLocaleDateString('en-GB')}
                       </span>
                       <div className="flex items-center gap-1.5">
@@ -1695,7 +1695,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                                 toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
                               }
                             }}
-                            className="px-2 py-0.5 rounded-lg text-[9px] font-bold bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100"
+                            className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100"
                           >
                             Reopen
                           </button>
@@ -1847,7 +1847,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           setMatchStatus({ id: 'none', amount: 'none', productName: 'none', reviewerName: 'none' });
                           setOrderIdLocked(false);
                           setSelectedProduct(p);
-                          // Don't auto-fill reviewer name — buyer must explicitly enter the
+                          // Don't auto-fill reviewer name â€” buyer must explicitly enter the
                           // marketplace account name used for this order.  They may have ordered
                           // from someone else's account (e.g. brother's Amazon).
                           setReviewerNameInput('');
@@ -1940,7 +1940,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           <span className="text-xs font-bold text-lime-600 animate-pulse motion-reduce:animate-none">
                             AI Extracting Order Details...
                           </span>
-                          <span className="text-[9px] text-slate-400 font-medium">
+                          <span className="text-[10px] text-slate-400 font-medium">
                             Detecting Order ID, Amount, Product &amp; Seller
                           </span>
                         </div>
@@ -2013,7 +2013,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       {matchStatus.productName === 'mismatch' && (
                         <div className="bg-red-50 border-2 border-red-300 p-3 rounded-lg animate-enter">
                           <p className="text-[11px] text-red-700 font-bold flex items-center gap-1.5">
-                            <AlertTriangle size={14} /> WRONG PRODUCT — The product in this screenshot does not match the selected deal.
+                            <AlertTriangle size={14} /> WRONG PRODUCT â€” The product in this screenshot does not match the selected deal.
                           </p>
                           <p className="text-[10px] text-red-600 mt-1">Please upload a screenshot of the correct order.</p>
                         </div>
@@ -2036,17 +2036,17 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           <p className="text-[10px] text-amber-700 font-bold flex items-center gap-1.5 mb-1">
                             <AlertTriangle size={12} /> Could not auto-detect details from this screenshot.
                           </p>
-                          <p className="text-[9px] text-amber-600 leading-relaxed mb-1.5">
+                          <p className="text-[10px] text-amber-600 leading-relaxed mb-1.5">
                             Please type your <strong>Order ID</strong> and <strong>Paid Amount</strong> manually in the fields above.
                           </p>
-                          <details className="text-[9px] text-amber-600">
+                          <details className="text-[10px] text-amber-600">
                             <summary className="font-bold cursor-pointer hover:text-amber-700">Tips for better detection</summary>
                             <ul className="list-disc pl-3 mt-1 space-y-0.5 leading-relaxed">
                               <li>Take a <strong>clear, full-screen screenshot</strong> of the order details page</li>
                               <li>Ensure <strong>Order ID</strong> and <strong>Total Amount</strong> are both visible</li>
-                              <li><strong>Amazon:</strong> Go to Your Orders → View Order Details</li>
-                              <li><strong>Flipkart:</strong> Go to My Orders → tap the order</li>
-                              <li><strong>Myntra/Ajio:</strong> Go to Orders → Order Details</li>
+                              <li><strong>Amazon:</strong> Go to Your Orders â†’ View Order Details</li>
+                              <li><strong>Flipkart:</strong> Go to My Orders â†’ tap the order</li>
+                              <li><strong>Myntra/Ajio:</strong> Go to Orders â†’ Order Details</li>
                               <li>Avoid screenshots of delivery tracking or payment pages</li>
                               <li>Use good lighting and avoid dark mode if possible</li>
                             </ul>
@@ -2055,14 +2055,14 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       )}
                       {/* Guidance when only one field is extracted */}
                       {!isAnalyzing && (!!extractedDetails.orderId !== !!extractedDetails.amount) && (
-                        <p className="text-[9px] text-blue-600 font-medium bg-blue-50 p-2 rounded-lg flex items-center gap-1.5">
-                          <AlertTriangle size={10} /> {extractedDetails.orderId ? 'Amount not detected — please enter the Paid Amount manually.' : 'Order ID not detected — please enter the Order ID manually.'}
+                        <p className="text-[10px] text-blue-600 font-medium bg-blue-50 p-2 rounded-lg flex items-center gap-1.5">
+                          <AlertTriangle size={10} /> {extractedDetails.orderId ? 'Amount not detected â€” please enter the Paid Amount manually.' : 'Order ID not detected â€” please enter the Order ID manually.'}
                         </p>
                       )}
                     </div>
                   )}
 
-                  {/* Show AI-extracted metadata — editable so users can correct AI mistakes */}
+                  {/* Show AI-extracted metadata â€” editable so users can correct AI mistakes */}
                   {/* Always show after extraction completes so users can manually fill missing fields */}
                   {formScreenshot && !isAnalyzing && (extractedDetails.orderId || extractedDetails.amount) && (
                     <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 space-y-2 animate-enter">
@@ -2070,7 +2070,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                         <ScanLine size={10} /> AI Extracted Details
                       </p>
                       <div className="space-y-0.5">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase ml-0.5">Product Name</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase ml-0.5">Product Name</label>
                         <input
                           type="text"
                           value={extractedDetails.productName || ''}
@@ -2079,13 +2079,13 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           placeholder="Product name"
                         />
                         {selectedProduct && matchStatus.productName === 'mismatch' && (
-                          <p className="text-[9px] text-red-500 mt-0.5 ml-0.5">
+                          <p className="text-[10px] text-red-500 mt-0.5 ml-0.5">
                             <strong>Expected:</strong> {selectedProduct.title}
                           </p>
                         )}
                       </div>
                       <div className="space-y-0.5">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase ml-0.5">Sold By</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase ml-0.5">Sold By</label>
                         <input
                           type="text"
                           value={extractedDetails.soldBy || ''}
@@ -2095,7 +2095,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                         />
                       </div>
                       <div className="space-y-0.5">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase ml-0.5">Order Date</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase ml-0.5">Order Date</label>
                         <input
                           type="text"
                           value={extractedDetails.orderDate || ''}
@@ -2107,7 +2107,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                     </div>
                   )}
 
-                  {/* Reviewer name — only for Rating/Review deals (Discount deals don't need it) */}
+                  {/* Reviewer name â€” only for Rating/Review deals (Discount deals don't need it) */}
                   {formScreenshot && (selectedProduct?.dealType === 'Rating' || selectedProduct?.dealType === 'Review') && (
                     <div className="space-y-1 animate-enter">
                       <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">
@@ -2139,21 +2139,21 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       {matchStatus.reviewerName === 'mismatch' && (
                         <div className="flex items-center gap-1.5 mt-1">
                           <AlertTriangle size={11} className="text-red-500 flex-shrink-0" />
-                          <p className="text-[9px] font-bold text-red-600">
-                            Account name mismatch — screenshot shows &quot;{extractedDetails.accountName}&quot;
+                          <p className="text-[10px] font-bold text-red-600">
+                            Account name mismatch â€” screenshot shows &quot;{extractedDetails.accountName}&quot;
                           </p>
                         </div>
                       )}
                       {matchStatus.reviewerName === 'match' && (
                         <div className="flex items-center gap-1.5 mt-1">
                           <CheckCircle2 size={11} className="text-green-500 flex-shrink-0" />
-                          <p className="text-[9px] font-bold text-green-600">
+                          <p className="text-[10px] font-bold text-green-600">
                             Account name matches screenshot
                           </p>
                         </div>
                       )}
-                      <p className="text-[9px] text-zinc-400 ml-1">
-                        Enter the name shown on the marketplace account used for this order. If you ordered from someone else's account (e.g. brother, friend), enter their name — your rating/review screenshots will be verified against this name.
+                      <p className="text-[10px] text-zinc-400 ml-1">
+                        Enter the name shown on the marketplace account used for this order. If you ordered from someone else's account (e.g. brother, friend), enter their name â€” your rating/review screenshots will be verified against this name.
                       </p>
                     </div>
                   )}
@@ -2372,14 +2372,14 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
 
             {uploadType === 'review' ? (
               <div className="space-y-3">
-                {/* Reviewer Name — display for identity consistency */}
+                {/* Reviewer Name â€” display for identity consistency */}
                 {selectedOrder?.reviewerName && (
                   <div className="bg-green-50 border border-green-200 rounded-xl p-3">
                     <p className="text-[10px] font-bold text-green-700 flex items-center gap-1.5">
                       <CheckCircle2 size={12} />
                       Reviewer name: <span className="text-green-800">"{selectedOrder.reviewerName}"</span>
                     </p>
-                    <p className="text-[9px] text-green-600 mt-1">
+                    <p className="text-[10px] text-green-600 mt-1">
                       Your review link must be from this marketplace account.
                     </p>
                   </div>
@@ -2404,14 +2404,14 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
             ) : uploadType === 'rating' ? (
               /* Enhanced rating upload with AI pre-validation */
               <div className="space-y-4">
-                {/* Reviewer Name — display only, set during order creation */}
+                {/* Reviewer Name â€” display only, set during order creation */}
                 {selectedOrder?.reviewerName && (
                   <div className="bg-green-50 border border-green-200 rounded-xl p-3">
                     <p className="text-[10px] font-bold text-green-700 flex items-center gap-1.5">
                       <CheckCircle2 size={12} />
                       Reviewer name: <span className="text-green-800">"{selectedOrder.reviewerName}"</span>
                     </p>
-                    <p className="text-[9px] text-green-600 mt-1">
+                    <p className="text-[10px] text-green-600 mt-1">
                       Your rating screenshot must show this reviewer name to be accepted.
                     </p>
                   </div>
@@ -2461,7 +2461,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           {selectedOrder?.reviewerName ? 'Reviewer Name' : 'Account Name'}
                         </div>
                         <div className={`text-xs font-bold ${ratingVerification.accountNameMatch ? 'text-green-600' : 'text-red-600'}`}>
-                          {ratingVerification.accountNameMatch ? '✓ Match' : '✗ Mismatch'}
+                          {ratingVerification.accountNameMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
                         </div>
                         {ratingVerification.detectedAccountName && (
                           <ExpandableText text={ratingVerification.detectedAccountName} clampClass="truncate" className="text-[10px] text-slate-500 mt-0.5" as="div">
@@ -2472,7 +2472,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       <div className={`p-2.5 rounded-xl text-center ${ratingVerification.productNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Product Name</div>
                         <div className={`text-xs font-bold ${ratingVerification.productNameMatch ? 'text-green-600' : 'text-red-600'}`}>
-                          {ratingVerification.productNameMatch ? '✓ Match' : '✗ Mismatch'}
+                          {ratingVerification.productNameMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
                         </div>
                         {ratingVerification.detectedProductName && (
                           <ExpandableText text={ratingVerification.detectedProductName} clampClass="truncate" className="text-[10px] text-slate-500 mt-0.5" as="div">
@@ -2506,7 +2506,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                         <AlertTriangle size={12} />
                         {selectedOrder?.reviewerName
                           ? `Reviewer name "${selectedOrder.reviewerName}" not found in screenshot. ${ratingVerification.detectedAccountName ? `Found "${ratingVerification.detectedAccountName}" instead.` : ''} Please upload a screenshot from the correct account.`
-                          : 'Account name mismatch — please ensure the rating was posted from the correct marketplace account.'}
+                          : 'Account name mismatch â€” please ensure the rating was posted from the correct marketplace account.'}
                       </p>
                     )}
                     {ratingVerification.accountNameMatch && !ratingVerification.productNameMatch && (
@@ -2552,14 +2552,14 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
             ) : uploadType === 'returnWindow' ? (
               /* Enhanced return window upload with AI pre-validation */
               <div className="space-y-4">
-                {/* Reviewer Name — display for identity consistency */}
+                {/* Reviewer Name â€” display for identity consistency */}
                 {selectedOrder?.reviewerName && (
                   <div className="bg-green-50 border border-green-200 rounded-xl p-3">
                     <p className="text-[10px] font-bold text-green-700 flex items-center gap-1.5">
                       <CheckCircle2 size={12} />
                       Reviewer name: <span className="text-green-800">"{selectedOrder.reviewerName}"</span>
                     </p>
-                    <p className="text-[9px] text-green-600 mt-1">
+                    <p className="text-[10px] text-green-600 mt-1">
                       Your return window screenshot must show this name to be accepted.
                     </p>
                   </div>
@@ -2607,19 +2607,19 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       <div className={`p-2.5 rounded-xl text-center ${rwVerification.orderIdMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Order ID</div>
                         <div className={`text-xs font-bold ${rwVerification.orderIdMatch ? 'text-green-600' : 'text-red-600'}`}>
-                          {rwVerification.orderIdMatch ? '✓ Match' : '✗ Mismatch'}
+                          {rwVerification.orderIdMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
                         </div>
                       </div>
                       <div className={`p-2.5 rounded-xl text-center ${rwVerification.productNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Product</div>
                         <div className={`text-xs font-bold ${rwVerification.productNameMatch ? 'text-green-600' : 'text-red-600'}`}>
-                          {rwVerification.productNameMatch ? '✓ Match' : '✗ Mismatch'}
+                          {rwVerification.productNameMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
                         </div>
                       </div>
                       <div className={`p-2.5 rounded-xl text-center ${rwVerification.returnWindowClosed ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Return Window</div>
                         <div className={`text-xs font-bold ${rwVerification.returnWindowClosed ? 'text-green-600' : 'text-red-600'}`}>
-                          {rwVerification.returnWindowClosed ? '✓ Closed' : '✗ Still Open'}
+                          {rwVerification.returnWindowClosed ? 'âœ“ Closed' : 'âœ— Still Open'}
                         </div>
                       </div>
                     </div>
@@ -2627,14 +2627,14 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       <div className={`p-2.5 rounded-xl text-center ${rwVerification.amountMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Amount</div>
                         <div className={`text-xs font-bold ${rwVerification.amountMatch ? 'text-green-600' : 'text-red-600'}`}>
-                          {rwVerification.amountMatch ? '✓ Match' : '✗ Mismatch'}
+                          {rwVerification.amountMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
                         </div>
                       </div>
                       {selectedOrder?.soldBy && (
                       <div className={`p-2.5 rounded-xl text-center ${rwVerification.soldByMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Seller</div>
                         <div className={`text-xs font-bold ${rwVerification.soldByMatch ? 'text-green-600' : 'text-red-600'}`}>
-                          {rwVerification.soldByMatch ? '✓ Match' : '✗ Mismatch'}
+                          {rwVerification.soldByMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
                         </div>
                       </div>
                       )}
@@ -2642,7 +2642,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                         <div className={`p-2.5 rounded-xl text-center ${rwVerification.reviewerNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                           <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Reviewer</div>
                           <div className={`text-xs font-bold ${rwVerification.reviewerNameMatch ? 'text-green-600' : 'text-red-600'}`}>
-                            {rwVerification.reviewerNameMatch ? '✓ Match' : '✗ Mismatch'}
+                            {rwVerification.reviewerNameMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
                           </div>
                         </div>
                       )}

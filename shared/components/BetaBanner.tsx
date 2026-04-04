@@ -32,7 +32,7 @@ export function BetaBanner() {
       {/* Fixed banner at top so it never pushes content off-screen */}
       <div className="fixed top-0 left-0 right-0 bg-yellow-50 border-b border-yellow-300 text-yellow-900 z-banner px-3 py-1.5">
         <div className="flex items-start gap-2">
-          <span className="shrink-0 mt-px font-extrabold tracking-wider text-[9px] sm:text-[10px] bg-yellow-400 text-yellow-950 px-1.5 py-0.5 rounded leading-none uppercase select-none animate-beta-pulse">
+          <span className="shrink-0 mt-px font-extrabold tracking-wider text-[10px] sm:text-[10px] bg-yellow-400 text-yellow-950 px-1.5 py-0.5 rounded leading-none uppercase select-none animate-beta-pulse">
             Beta
           </span>
           <p className="flex-1 min-w-0 text-[10px] sm:text-xs leading-snug">
@@ -45,7 +45,7 @@ export function BetaBanner() {
             className="shrink-0 mt-px text-yellow-500 hover:text-yellow-800 text-xs leading-none transition-colors"
             aria-label="Dismiss beta banner"
           >
-            ✕
+            âœ•
           </button>
         </div>
         <style>{`

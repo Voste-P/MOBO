@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useToast } from '../context/ToastContext';
 import { ProductCard } from '../components/ProductCard';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
@@ -152,7 +152,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
       <div className="px-4 pt-10 pb-2 bg-white/95 backdrop-blur-md shadow-sm z-10 border-b border-gray-100 sticky top-0">
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-1.5">
-            <span className="text-[8px] font-black tracking-widest text-lime-600 bg-lime-50 px-1 py-px rounded border border-lime-200">BUZZMA</span>
+            <span className="text-[10px] font-black tracking-widest text-lime-600 bg-lime-50 px-1 py-px rounded border border-lime-200">BUZZMA</span>
             <h1 className="text-sm font-extrabold text-slate-900">Explore Deals</h1>
           </div>
           <button
@@ -185,7 +185,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
                 type="button"
                 onClick={() => setSelectedDealType(dt)}
                 aria-pressed={selectedDealType === dt ? "true" : "false"}
-                className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap ${
+                className={`px-3.5 py-2 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap ${
                   selectedDealType === dt
                     ? 'bg-lime-500 text-white border-lime-500 shadow'
                     : 'bg-white text-slate-600 border-slate-200 hover:border-lime-300'
@@ -205,7 +205,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
               type="button"
               onClick={() => setSelectedCategory(cat)}
               aria-pressed={selectedCategory === cat ? "true" : "false"}
-              className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap ${
+              className={`px-3.5 py-2 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap ${
                 selectedCategory === cat
                   ? 'bg-lime-500 text-white border-lime-500 shadow'
                   : 'bg-white text-slate-600 border-slate-200 hover:border-lime-300'

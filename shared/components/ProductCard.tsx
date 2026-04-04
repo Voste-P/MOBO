@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+﻿import React, { useState, useRef, useCallback } from 'react';
 import { ExternalLink, Star, ShoppingBag, Camera, X, Loader2, CheckCircle, Upload, AlertCircle, UserCircle, Lock, Pencil } from 'lucide-react';
 import { Product } from '../types';
 import { ProxiedImage, placeholderImage } from './ProxiedImage';
@@ -53,7 +53,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
   const effectiveOriginal =
     product.originalPrice > product.price ? product.originalPrice : null;
 
-  // ── Inline order form state ──
+  // â”€â”€ Inline order form state â”€â”€
   const [formOpen, setFormOpen] = useState(false);
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -123,13 +123,13 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
         // Lock fields only when BOTH required fields are extracted
         if (result.orderId && result.amount) setFieldsLocked(true);
 
-        // ── Product name matching (shared strict algorithm) ──
+        // â”€â”€ Product name matching (shared strict algorithm) â”€â”€
         const nameMatchResult = checkProductNameMatch(result.productName, product.title);
         if (nameMatchResult === 'mismatch') {
           setProductNameMismatch(true);
           toast.error('Product name in screenshot does not match this deal. Please upload the correct order screenshot.');
         }
-        // ── Platform matching ──
+        // â”€â”€ Platform matching â”€â”€
         if (result.platform && product?.platform) {
           const extractedPlatform = String(result.platform).toLowerCase().trim();
           const expectedPlatform = String(product.platform).toLowerCase().trim();
@@ -138,19 +138,19 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
             toast.error(`Screenshot appears to be from ${result.platform}, but this deal is for ${product.platform}. Please upload the correct screenshot.`);
           }
         }
-        // ── Reviewer name matching against extracted account name ──
+        // â”€â”€ Reviewer name matching against extracted account name â”€â”€
         if (result.accountName && reviewerName.trim()) {
           const rnMatch = checkReviewerNameMatch(reviewerName, result.accountName);
           setReviewerNameMismatch(rnMatch === 'mismatch');
         }
       }
     } catch {
-      // Extraction is optional — notify user gracefully
+      // Extraction is optional â€” notify user gracefully
       toast.info('Could not auto-extract details. You can enter them manually.');
     } finally {
       setExtracting(false);
     }
-  }, [toast]);
+  }, [toast, reviewerName, product.title, product.platform]);
 
   const handleInlineSubmit = useCallback(async () => {
     if (!user || !screenshot || submitting) return;
@@ -171,7 +171,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
     }
     // Require reviewer name for Rating/Review deals to prevent cheating
     if ((product.dealType === 'Rating' || product.dealType === 'Review') && !reviewerName.trim()) {
-      toast.error('Please enter the reviewer name — the marketplace account name used for this order.');
+      toast.error('Please enter the reviewer name â€” the marketplace account name used for this order.');
       return;
     }
     setSubmitting(true);
@@ -224,7 +224,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
   };
 
   return (
-    <div className="flex-shrink-0 w-[300px] bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-100 snap-center flex flex-col relative overflow-hidden group transition-all duration-300 hover:shadow-xl hover:-translate-y-1 active:scale-[0.98]">
+    <div className="flex-shrink-0 w-full max-w-[300px] bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-100 snap-center flex flex-col relative overflow-hidden group transition-all duration-300 hover:shadow-xl hover:-translate-y-1 active:scale-[0.98]">
       {/* Platform Tag (Top Right) */}
       <div className="absolute top-4 right-4 bg-zinc-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm uppercase tracking-wider z-10">
         {platformLabel}
@@ -266,7 +266,8 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                   key={`star-${i}`}
                   size={12}
                   fill={i < Math.floor(product.rating || 5) ? 'currentColor' : 'none'}
-                  strokeWidth={0}
+                  strokeWidth={i < Math.floor(product.rating || 5) ? 0 : 1.5}
+                  className={i < Math.floor(product.rating || 5) ? '' : 'text-slate-200'}
                 />
               ))}
             </div>
@@ -275,7 +276,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
 
           <div>
             <p className="text-xl font-extrabold text-lime-600 leading-none">
-              ₹{product.price.toLocaleString('en-IN')}
+              â‚¹{product.price.toLocaleString('en-IN')}
             </p>
           </div>
         </div>
@@ -298,7 +299,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
             <>
               <span>Original Price:</span>
               <span className="text-slate-900 font-bold decoration-slice line-through">
-                ₹{effectiveOriginal.toLocaleString('en-IN')}
+                â‚¹{effectiveOriginal.toLocaleString('en-IN')}
               </span>
             </>
           ) : (
@@ -339,7 +340,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
             >
               <Camera size={22} className="text-gray-400" />
               <span className="text-[11px] font-bold text-gray-500">Upload order screenshot</span>
-              <span className="text-[9px] text-gray-400">JPG, PNG, WebP &bull; Max 10 MB</span>
+              <span className="text-[10px] text-gray-400">JPG, PNG, WebP &bull; Max 10 MB</span>
             </button>
           ) : (
             <div className="relative rounded-xl border border-gray-200 overflow-hidden">
@@ -362,7 +363,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
           )}
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} aria-label="Upload order screenshot" />
 
-          {/* Order Details — ALWAYS shown after screenshot upload */}
+          {/* Order Details â€” ALWAYS shown after screenshot upload */}
           {preview && !extracting && (
             <div className="space-y-2 animate-in slide-in-from-bottom-2">
               {/* AI status indicator */}
@@ -370,7 +371,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                 <div className="flex items-center justify-between px-2 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg">
                   <div className="flex items-center gap-1.5">
                     <CheckCircle size={10} className="text-emerald-600 flex-shrink-0" />
-                    <p className="text-[9px] font-bold text-emerald-700">{fieldsLocked ? 'AI extracted — tap edit to correct' : 'Editing — tap lock when done'}</p>
+                    <p className="text-[10px] font-bold text-emerald-700">{fieldsLocked ? 'AI extracted â€” tap edit to correct' : 'Editing â€” tap lock when done'}</p>
                   </div>
                   <button type="button" onClick={() => setFieldsLocked(!fieldsLocked)} className="p-1 rounded-md hover:bg-emerald-100 transition-colors" aria-label={fieldsLocked ? 'Edit fields' : 'Lock fields'}>
                     {fieldsLocked ? <Pencil size={10} className="text-emerald-600" /> : <Lock size={10} className="text-emerald-600" />}
@@ -379,16 +380,16 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
               ) : (
                 <div className="flex items-start gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
                   <AlertCircle size={11} className="text-amber-500 mt-0.5 flex-shrink-0" />
-                  <p className="text-[9px] text-amber-700">Could not auto-detect. Please fill in manually.</p>
+                  <p className="text-[10px] text-amber-700">Could not auto-detect. Please fill in manually.</p>
                 </div>
               )}
 
-              {/* All 5 editable fields — always visible */}
+              {/* All 5 editable fields â€” always visible */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-2 space-y-1.5">
-                <p className="text-[8px] font-extrabold text-slate-500 uppercase tracking-wider">Order Details</p>
+                <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Order Details</p>
                 <div className="grid grid-cols-2 gap-1.5">
                   <div>
-                    <label className="text-[8px] font-bold text-slate-500 uppercase">Order ID *</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Order ID *</label>
                     <input
                       type="text"
                       value={extractedDetails.orderId}
@@ -399,7 +400,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                     />
                   </div>
                   <div>
-                    <label className="text-[8px] font-bold text-slate-500 uppercase">Amount (₹) *</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Amount (â‚¹) *</label>
                     <input
                       type="text"
                       inputMode="decimal"
@@ -413,7 +414,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                 </div>
 
                 <div>
-                  <label className="text-[8px] font-bold text-slate-500 uppercase">Product Name</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Product Name</label>
                   <input
                     type="text"
                     readOnly
@@ -429,7 +430,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
 
                 <div className="grid grid-cols-2 gap-1.5">
                   <div>
-                    <label className="text-[8px] font-bold text-slate-500 uppercase">Seller / Sold By</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Seller / Sold By</label>
                     <input
                       type="text"
                       value={extractedDetails.soldBy || ''}
@@ -440,7 +441,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                     />
                   </div>
                   <div>
-                    <label className="text-[8px] font-bold text-slate-500 uppercase">Order Date</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Order Date</label>
                     <input
                       type="text"
                       value={extractedDetails.orderDate || ''}
@@ -455,7 +456,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
 
               {/* Reviewer Name */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-2 space-y-1">
-                <label className="text-[8px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                   <UserCircle size={10} /> Reviewer / Account Name
                   {(product.dealType === 'Rating' || product.dealType === 'Review') && <span className="text-red-400">*</span>}
                 </label>
@@ -484,12 +485,12 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                 {reviewerNameMismatch && (
                   <div className="flex items-center gap-1 mt-0.5">
                     <AlertCircle size={9} className="text-red-500 flex-shrink-0" />
-                    <p className="text-[8px] font-bold text-red-600">
-                      Account name mismatch — screenshot shows &quot;{extractedDetails.accountName}&quot;
+                    <p className="text-[10px] font-bold text-red-600">
+                      Account name mismatch â€” screenshot shows &quot;{extractedDetails.accountName}&quot;
                     </p>
                   </div>
                 )}
-                <p className="text-[8px] text-zinc-400">
+                <p className="text-[10px] text-zinc-400">
                   Enter the name shown on the marketplace account used for this order.
                   {(product.dealType === 'Rating' || product.dealType === 'Review') && <span className="text-red-400 font-bold"> Required</span>}
                 </p>
@@ -500,24 +501,24 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
           {/* Submit + Cancel */}
           <div className="space-y-1.5">
             {screenshot && !extracting && !extractedDetails.orderId && (
-              <p className="text-[9px] text-red-500 font-semibold text-center">Order ID is required to submit</p>
+              <p className="text-[10px] text-red-500 font-semibold text-center">Order ID is required to submit</p>
             )}
             {productNameMismatch && (
               <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 rounded-lg px-2 py-1.5">
                 <AlertCircle size={11} className="text-red-500 flex-shrink-0" />
-                <p className="text-[9px] font-bold text-red-600">Product name mismatch — this screenshot is for a different product.</p>
+                <p className="text-[10px] font-bold text-red-600">Product name mismatch â€” this screenshot is for a different product.</p>
               </div>
             )}
             {platformMismatch && (
               <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 rounded-lg px-2 py-1.5">
                 <AlertCircle size={11} className="text-red-500 flex-shrink-0" />
-                <p className="text-[9px] font-bold text-red-600">Platform mismatch — this screenshot is from a different platform.</p>
+                <p className="text-[10px] font-bold text-red-600">Platform mismatch â€” this screenshot is from a different platform.</p>
               </div>
             )}
             {reviewerNameMismatch && (
               <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
                 <AlertCircle size={11} className="text-amber-500 flex-shrink-0" />
-                <p className="text-[9px] font-bold text-amber-700">Reviewer name doesn&apos;t match the account in screenshot.</p>
+                <p className="text-[10px] font-bold text-amber-700">Reviewer name doesn&apos;t match the account in screenshot.</p>
               </div>
             )}
             <div className="flex gap-2">

@@ -85,7 +85,7 @@ export const AppSwitchboard: React.FC<{ onSelect: (role: string) => void }> = ({
       </div>
 
       <footer className="mt-20 text-slate-600 text-[10px] font-bold uppercase tracking-[0.3em]">
-        BUZZMAOS v1.0 • Unified Commerce Platform
+        BUZZMAOS v1.0 â€¢ Unified Commerce Platform
       </footer>
     </div>
   </div>
@@ -106,7 +106,7 @@ const SwitchCard = ({ title, desc, icon, type, color, delay = 0, onClick }: { ti
       style={{ animationDelay: `${delay * 80}ms`, animationFillMode: 'both' }}
       className={`group animate-enter bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-8 text-center flex flex-col items-center transition-all duration-500 hover:-translate-y-2 ${colors[color]}`}
     >
-      <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-slate-500 mb-6 group-hover:text-white transition-colors">
+      <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 mb-6 group-hover:text-white transition-colors">
         {type === 'Mobile' ? (
           <Smartphone size={10} />
         ) : type === 'Web' ? (

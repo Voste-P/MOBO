@@ -43,6 +43,7 @@ module.exports = {
         'scale-in': 'scaleIn 0.2s ease-out',
         'toast-in': 'toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
         'shimmer': 'shimmer 1.5s infinite',
+        'subtle-pulse': 'subtlePulse 2s ease-in-out infinite',
       },
       keyframes: {
         fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
@@ -55,6 +56,10 @@ module.exports = {
         },
         shimmer: {
           '100%': { transform: 'translateX(100%)' },
+        },
+        subtlePulse: {
+          '0%, 100%': { opacity: '0.6', transform: 'scale(1)' },
+          '50%': { opacity: '1', transform: 'scale(1.05)' },
         },
       },
     },

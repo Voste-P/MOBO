@@ -75,7 +75,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
       const resp = await api.tickets.getComments(ticket.id);
       setComments(resp.comments || []);
     } catch {
-      // Silently handle poll failures — comments stay as-is
+      // Silently handle poll failures Ã¢â‚¬â€ comments stay as-is
     } finally {
       setLoadingComments(false);
     }
@@ -95,7 +95,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
     }
   }, [open, ticket, loadComments]);
 
-  // Realtime: refresh comments on tickets.changed (no polling — SSE handles updates)
+  // Realtime: refresh comments on tickets.changed (no polling Ã¢â‚¬â€ SSE handles updates)
   useEffect(() => {
     if (!open || !ticket) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -265,16 +265,16 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
                   <div><span className="text-zinc-500">Brand:</span> <strong className="text-zinc-800">{orderDetails.brand}</strong></div>
                 )}
                 {orderDetails.unitPrice != null && (
-                  <div><span className="text-zinc-500">Unit Price:</span> <strong className="text-zinc-800">₹{orderDetails.unitPrice}</strong></div>
+                  <div><span className="text-zinc-500">Unit Price:</span> <strong className="text-zinc-800">Ã¢â€šÂ¹{orderDetails.unitPrice}</strong></div>
                 )}
                 {orderDetails.quantity != null && (
                   <div><span className="text-zinc-500">Qty:</span> <strong className="text-zinc-800">{orderDetails.quantity}</strong></div>
                 )}
                 {orderDetails.total != null && (
-                  <div><span className="text-zinc-500">Total:</span> <strong className="text-zinc-800">₹{orderDetails.total}</strong></div>
+                  <div><span className="text-zinc-500">Total:</span> <strong className="text-zinc-800">Ã¢â€šÂ¹{orderDetails.total}</strong></div>
                 )}
                 {orderDetails.commission != null && (
-                  <div><span className="text-zinc-500">Commission:</span> <strong className="text-zinc-800">₹{orderDetails.commission}</strong></div>
+                  <div><span className="text-zinc-500">Commission:</span> <strong className="text-zinc-800">Ã¢â€šÂ¹{orderDetails.commission}</strong></div>
                 )}
                 {orderDetails.dealType && (
                   <div><span className="text-zinc-500">Deal Type:</span> <strong className="text-zinc-800">{orderDetails.dealType}</strong></div>
@@ -352,15 +352,15 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
                     <div key={c.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[80%] rounded-xl px-3 py-2 ${isMe ? 'bg-slate-900 text-white' : 'bg-zinc-100 text-zinc-800'}`}>
                         <div className={`flex items-center gap-1.5 mb-0.5 ${isMe ? 'justify-end' : ''}`}>
-                          <span className={`text-[9px] font-bold ${isMe ? 'text-zinc-300' : (roleColors[c.role] || 'text-zinc-500')}`}>
+                          <span className={`text-[10px] font-bold ${isMe ? 'text-zinc-300' : (roleColors[c.role] || 'text-zinc-500')}`}>
                             {c.userName}
                           </span>
-                          <span className={`text-[8px] ${isMe ? 'text-zinc-400' : 'text-zinc-400'}`}>
+                          <span className={`text-[10px] ${isMe ? 'text-zinc-400' : 'text-zinc-400'}`}>
                             {c.role}
                           </span>
                         </div>
                         <p className="text-[11px] leading-relaxed whitespace-pre-wrap break-words">{c.message}</p>
-                        <p className={`text-[8px] mt-1 ${isMe ? 'text-zinc-400 text-right' : 'text-zinc-400'}`}>
+                        <p className={`text-[10px] mt-1 ${isMe ? 'text-zinc-400 text-right' : 'text-zinc-400'}`}>
                           {new Date(c.createdAt).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>

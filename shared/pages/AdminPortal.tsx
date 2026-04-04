@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../components/ui/ConfirmDialog';
@@ -85,15 +85,35 @@ const COLORS = Object.values(CHART_COLORS);
 
 // SidebarItem imported from shared/components/ui
 
+// Explicit Tailwind class maps — dynamic string manipulation breaks JIT purging
+const bgFromText: Record<string, string> = {
+  'text-emerald-600': 'bg-emerald-600',
+  'text-indigo-600': 'bg-indigo-600',
+  'text-amber-600': 'bg-amber-600',
+  'text-red-600': 'bg-red-600',
+  'text-violet-600': 'bg-violet-600',
+  'text-blue-600': 'bg-blue-600',
+  'text-pink-600': 'bg-pink-600',
+};
+const bgLightFromText: Record<string, string> = {
+  'text-emerald-600': 'bg-emerald-50',
+  'text-indigo-600': 'bg-indigo-50',
+  'text-amber-600': 'bg-amber-50',
+  'text-red-600': 'bg-red-50',
+  'text-violet-600': 'bg-violet-50',
+  'text-blue-600': 'bg-blue-50',
+  'text-pink-600': 'bg-pink-50',
+};
+
 const StatCard = ({ title, value, subtext, icon: Icon, colorClass }: any) => (
   <div className="bg-white p-6 rounded-[1.5rem] shadow-[0_2px_20px_-12px_rgba(0,0,0,0.1)] border border-slate-100 relative overflow-hidden flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300">
     <div
-      className={`absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-[0.08] group-hover:opacity-[0.15] transition-opacity ${colorClass.replace('text-', 'bg-')}`}
+      className={`absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-[0.08] group-hover:opacity-[0.15] transition-opacity ${bgFromText[colorClass] || 'bg-slate-600'}`}
     ></div>
 
     <div className="flex justify-between items-start z-10">
       <div
-        className={`p-3 rounded-2xl ${colorClass.replace('text-', 'bg-').replace('600', '50')} ${colorClass}`}
+        className={`p-3 rounded-2xl ${bgLightFromText[colorClass] || 'bg-slate-50'} ${colorClass}`}
       >
         <Icon size={24} />
       </div>
@@ -280,7 +300,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     }
   }, [view]);
 
-  // Fetch dashboard stats when switching to dashboard view (skip initial mount — handled above)
+  // Fetch dashboard stats when switching to dashboard view (skip initial mount â€” handled above)
   const dashboardMountedRef = useRef(false);
   useEffect(() => {
     if (!user?.id || user.role !== 'admin') return;
@@ -991,7 +1011,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     );
   }, [products, inventorySearch]);
 
-  // Campaign title map: campaignId → product title (for order table display)
+  // Campaign title map: campaignId â†’ product title (for order table display)
   const campaignTitleMap = useMemo(() => {
     const map = new Map<string, string>();
     products.forEach((p) => { if (p.campaignId && p.title) map.set(p.campaignId, p.title); });
@@ -1044,7 +1064,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
               type="password"
               value={passkey}
               onChange={(e) => setPasskey(e.target.value)}
-              placeholder="••••••••"
+              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
               leftIcon={<Key size={18} />}
               className="font-mono text-sm"
               minLength={8}
@@ -1539,7 +1559,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                             </div>
                             <div className="text-[10px]">
                               <p className="font-bold text-slate-900">{t.userName}</p>
-                              <p className="text-slate-400 font-mono capitalize">{normalizeRole(t.role)} → {normalizeRole(t.targetRole || 'admin')}</p>
+                              <p className="text-slate-400 font-mono capitalize">{normalizeRole(t.role)} â†’ {normalizeRole(t.targetRole || 'admin')}</p>
                             </div>
                           </div>
 
@@ -1557,9 +1577,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                                 className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
                               <div className="flex items-center gap-2">
                                 <button type="button" onClick={() => resolveTicket(t.id, 'Resolved', resolutionNote)}
-                                  className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✓ Resolve</button>
+                                  className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">âœ“ Resolve</button>
                                 <button type="button" onClick={() => resolveTicket(t.id, 'Rejected', resolutionNote)}
-                                  className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
+                                  className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">âœ— Reject</button>
                                 <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
                                   className="px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 hover:bg-slate-200">Cancel</button>
                               </div>
@@ -2166,7 +2186,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                               {p.sellingSpeed}/day
                             </span>
                           ) : (
-                            <span className="text-[10px] text-slate-400">—</span>
+                            <span className="text-[10px] text-slate-400">â€”</span>
                           )}
                         </td>
                         <td className="p-5 text-right">
@@ -2374,7 +2394,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       {auditLogs.length === 0 && (
                         <tr>
                           <td colSpan={5} className="p-8 text-center text-sm text-slate-400 font-bold">
-                            {auditLoading ? 'Loading audit logs…' : 'No audit logs found for the selected filters.'}
+                            {auditLoading ? 'Loading audit logsâ€¦' : 'No audit logs found for the selected filters.'}
                           </td>
                         </tr>
                       )}
@@ -2433,7 +2453,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                 {proofModal.screenshots?.order ? (
                   <>
                     <ProofImage orderId={proofModal.id} proofType="order" existingSrc={proofModal.screenshots.order !== 'exists' ? proofModal.screenshots.order : undefined} alt="Purchase Proof" className="w-full max-h-[300px] object-contain rounded-xl border border-blue-200 bg-blue-50" />
-                    {/* AI Verification — stored from buyer's proof submission */}
+                    {/* AI Verification â€” stored from buyer's proof submission */}
                     {proofModal.orderAiVerification && (
                     <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200 mt-3">
                       <div className="flex justify-between items-center mb-2">
@@ -2450,25 +2470,25 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                               <>
                                 <div className="flex gap-2">
                                   <div className={`flex-1 p-2 rounded-lg border text-center ${aiData?.orderIdMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase">Order ID</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase">Order ID</p>
                                     <p className={`text-xs font-bold ${aiData?.orderIdMatch ? 'text-green-600' : 'text-red-600'}`}>
-                                      {aiData?.orderIdMatch ? '✓ Match' : '✗ Mismatch'}
+                                      {aiData?.orderIdMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
                                     </p>
-                                    {aiData?.detectedOrderId && <p className="text-[9px] text-slate-500 font-mono mt-0.5">Detected: {aiData.detectedOrderId}</p>}
+                                    {aiData?.detectedOrderId && <p className="text-[10px] text-slate-500 font-mono mt-0.5">Detected: {aiData.detectedOrderId}</p>}
                                   </div>
                                   <div className={`flex-1 p-2 rounded-lg border text-center ${aiData?.amountMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase">Amount</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase">Amount</p>
                                     <p className={`text-xs font-bold ${aiData?.amountMatch ? 'text-green-600' : 'text-red-600'}`}>
-                                      {aiData?.amountMatch ? '✓ Match' : '✗ Mismatch'}
+                                      {aiData?.amountMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
                                     </p>
-                                    {aiData?.detectedAmount != null && <p className="text-[9px] text-slate-500 font-mono mt-0.5">Detected: {formatCurrency(aiData.detectedAmount)}</p>}
+                                    {aiData?.detectedAmount != null && <p className="text-[10px] text-slate-500 font-mono mt-0.5">Detected: {formatCurrency(aiData.detectedAmount)}</p>}
                                   </div>
                                 </div>
                                 {aiData?.discrepancyNote && (
                                   <p className="text-[10px] text-slate-500 bg-white rounded-lg p-2 border border-slate-100">{aiData.discrepancyNote}</p>
                                 )}
                                 <div className="flex justify-between items-center pt-1">
-                                  <span className="text-[9px] text-indigo-500 font-bold uppercase">Confidence</span>
+                                  <span className="text-[10px] text-indigo-500 font-bold uppercase">Confidence</span>
                                   <div className="flex items-center gap-2">
                                     <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden">
                                       <div className={`h-full rounded-full ${score > 80 ? 'bg-green-500' : score > 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${score}%` }} />

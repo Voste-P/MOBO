@@ -99,7 +99,7 @@ export const SidebarItem: React.FC<SidebarItemProps> = ({
       </div>
       {(badge ?? 0) > 0 && (
         <span
-          className={`text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm flex-shrink-0 ml-2 ${
+          className={`text-[10px] font-bold min-w-[20px] px-1.5 py-0.5 rounded-full shadow-sm flex-shrink-0 ml-2 text-center ${
             active ? t.badgeActive : t.badgeInactive
           }`}
         >

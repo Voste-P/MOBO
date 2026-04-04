@@ -109,7 +109,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
     tickets: Ticket[];
     fetchedAt: number;
   } | null>(null);
-  const CONTEXT_CACHE_TTL = 2 * 60_000; // 2 minutes — keep context fresh across tab switches
+  const CONTEXT_CACHE_TTL = 2 * 60_000; // 2 minutes Ã¢â‚¬â€ keep context fresh across tab switches
 
   // Clear context cache when user changes (prevents data leaking across accounts)
   const prevUserIdRef = useRef<string | null | undefined>(user?.id);
@@ -290,7 +290,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
       ) {
         // Use ref-tracked timeout so it's cancelled if component unmounts
         const navTimer = setTimeout(() => {
-          // Map 'tickets' → 'orders' since tickets live on the Orders tab
+          // Map 'tickets' Ã¢â€ â€™ 'orders' since tickets live on the Orders tab
           const mappedTab = response.navigateTo === 'tickets' ? 'orders' : response.navigateTo;
           onNavigate?.(mappedTab as 'home' | 'explore' | 'orders' | 'profile');
         }, 1500);
@@ -481,7 +481,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                             {n.message}
                           </div>
                           {n.createdAt && (
-                            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mt-1">
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-1">
                               {new Date(n.createdAt).toLocaleString('en-GB')}
                             </div>
                           )}

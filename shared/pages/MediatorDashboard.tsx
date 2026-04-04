@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { useToast } from '../context/ToastContext';
@@ -83,6 +83,7 @@ const formatRelativeTime = (iso?: string) => {
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return '';
   const deltaMs = Date.now() - t;
+  if (deltaMs < 0) return 'Just now';
   const minutes = Math.floor(deltaMs / 60_000);
   if (minutes < 1) return 'Just now';
   if (minutes < 60) return `${minutes}m ago`;
@@ -220,7 +221,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
           <h2 className="text-3xl font-black text-zinc-900 tracking-tighter leading-none">
             {unpublishedCount ?? 0}
           </h2>
-          <p className="text-[9px] text-lime-600 font-bold mt-1">Tap to publish →</p>
+          <p className="text-[10px] text-lime-600 font-bold mt-1">Tap to publish â†’</p>
         </div>
       </div>
 
@@ -252,7 +253,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
         <section>
           <div className="flex items-center justify-between mb-3 px-1">
             <h3 className="font-bold text-base text-zinc-900 tracking-tight">New Joiners</h3>
-            <span className="bg-orange-100 text-orange-700 text-[9px] font-bold px-2 py-0.5 rounded-full">
+            <span className="bg-orange-100 text-orange-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
               {pendingUsers.length} requests
             </span>
           </div>
@@ -340,7 +341,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
             if (!allOrders.length) { toast.error('No orders to export'); return; }
             const mediatorHeaders = [
               'External Order ID', 'Date', 'Time', 'Product', 'Platform', 'Brand', 'Deal Type',
-              'Unit Price (₹)', 'Quantity', 'Total (₹)', 'Commission (₹)', 'Settlement Date',
+              'Unit Price (â‚¹)', 'Quantity', 'Total (â‚¹)', 'Commission (â‚¹)', 'Settlement Date',
               'Agency Name', 'Buyer Name', 'Buyer Mobile', 'Reviewer Name',
               'Workflow Status', 'Affiliate Status', 'Payment Status',
               'Sold By', 'Order Date', 'Extracted Product',
@@ -472,7 +473,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                   className={`bg-white p-2 rounded-[1.5rem] border shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-300 ${isDisputed ? 'border-red-200 ring-2 ring-red-100' : 'border-zinc-100'}`}
                 >
                   {isDisputed && (
-                    <div className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-bold px-2 py-1 rounded-bl-xl z-20 flex items-center gap-1">
+                    <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-xl z-20 flex items-center gap-1">
                       <AlertTriangle size={10} /> DISPUTED
                     </div>
                   )}
@@ -490,7 +491,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                           {o.items?.[0]?.title}
                         </ExpandableText>
                         <span
-                          className={`text-[9px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap uppercase border ${getDealTypeBadge(dealType)}`}
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap uppercase border ${getDealTypeBadge(dealType)}`}
                         >
                           {dealType === 'Discount' ? 'Purchase' : dealType}
                         </span>
@@ -584,11 +585,11 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                 ]);
                 downloadCsv(`mediator-tickets-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
                 toast.success(`Exported ${supportTickets.length} tickets`);
-              }} className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100">
+              }} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100">
                 Export CSV
               </button>
             )}
-            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600">
               {Array.isArray(tickets) ? tickets.length : 0}
             </span>
           </div>
@@ -650,14 +651,14 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-bold text-zinc-900 truncate">{String(t.issueType || 'Ticket')}</span>
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                         String(t.status) === 'Resolved' ? 'bg-emerald-50 text-emerald-600' :
                         String(t.status) === 'Rejected' ? 'bg-red-50 text-red-600' :
                         'bg-amber-50 text-amber-600'
                       }`}>{String(t.status || 'Open')}</span>
                     </div>
                   </div>
-                  <span className="text-[9px] text-zinc-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''}</span>
+                  <span className="text-[10px] text-zinc-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''}</span>
                 </div>
                 {t.description && (
                   <ExpandableText text={String(t.description)} clampClass="line-clamp-3" className="text-[10px] text-zinc-600 bg-zinc-50 rounded-lg px-2 py-1.5" as="div">
@@ -665,10 +666,10 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                   </ExpandableText>
                 )}
                 {t.userName && (
-                  <div className="text-[9px] text-zinc-400">From: {String(t.userName)} ({String(t.userRole || '')})</div>
+                  <div className="text-[10px] text-zinc-400">From: {String(t.userName)} ({String(t.userRole || '')})</div>
                 )}
                 {(t.externalOrderId || t.orderId) && (
-                  <div className="text-[9px] text-zinc-400"><span className="font-bold">Order:</span> {String(t.externalOrderId || t.orderId)}</div>
+                  <div className="text-[10px] text-zinc-400"><span className="font-bold">Order:</span> {String(t.externalOrderId || t.orderId)}</div>
                 )}
                 {t.resolutionNote && (
                   <div className="text-[10px] text-green-700 bg-green-50 rounded-lg px-2 py-1.5">
@@ -676,7 +677,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                   </div>
                 )}
                 {(String(t.status) === 'Resolved' || String(t.status) === 'Rejected') && (t.resolvedByName || t.resolvedAt) && (
-                  <div className="text-[9px] text-zinc-400">
+                  <div className="text-[10px] text-zinc-400">
                     {String(t.status) === 'Resolved' ? 'Resolved' : 'Rejected'}
                     {t.resolvedByName ? ` by ${String(t.resolvedByName)}` : ''}
                     {t.resolvedAt ? ` on ${new Date(String(t.resolvedAt)).toLocaleDateString('en-GB')}` : ''}
@@ -704,7 +705,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                                 onRefresh(['tickets']);
                               } catch (err) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
                             }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
-                              ✓ Resolve
+                              âœ“ Resolve
                             </button>
                             <button type="button" onClick={async () => {
                               try {
@@ -714,7 +715,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                                 onRefresh(['tickets']);
                               } catch (err) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
                             }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-50 border border-red-200 text-red-600 hover:bg-red-100">
-                              ✗ Reject
+                              âœ— Reject
                             </button>
                             <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
                               className="px-2 py-1 rounded-lg text-[10px] font-bold text-zinc-400 hover:text-zinc-600">
@@ -726,7 +727,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                         <>
                           <button type="button" onClick={() => { setResolvingTicketId(t.id); setResolutionNote(''); }}
                             className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
-                            ✓ Resolve / Reject
+                            âœ“ Resolve / Reject
                           </button>
 
                         </>
@@ -938,10 +939,10 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                     </div>
                     <div className="flex-1 min-w-0 py-0.5">
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest border border-zinc-100 px-1.5 py-0.5 rounded-md">
+                        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border border-zinc-100 px-1.5 py-0.5 rounded-md">
                           {d.platform}
                         </span>
-                        <span className="bg-emerald-500/10 text-emerald-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide">
+                        <span className="bg-emerald-500/10 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide">
                           Published
                         </span>
                       </div>
@@ -950,7 +951,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                       </ExpandableText>
                       {d.campaignId && (
                         <span
-                          className="text-[8px] text-zinc-400 font-mono cursor-pointer hover:text-zinc-600 transition-colors mb-1 block"
+                          className="text-[10px] text-zinc-400 font-mono cursor-pointer hover:text-zinc-600 transition-colors mb-1 block"
                           title="Click to copy Campaign ID"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -974,7 +975,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                               Commission
                             </p>
                             <p className={`text-sm font-black ${d.commission < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
-                              {d.commission < 0 ? `−${formatCurrency(Math.abs(d.commission))}` : formatCurrency(d.commission)}
+                              {d.commission < 0 ? `âˆ’${formatCurrency(Math.abs(d.commission))}` : formatCurrency(d.commission)}
                             </p>
                           </div>
                         )}
@@ -1055,15 +1056,15 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                     </div>
                     <div className="flex-1 min-w-0 py-0.5">
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest border border-zinc-100 px-1.5 py-0.5 rounded-md">
+                        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border border-zinc-100 px-1.5 py-0.5 rounded-md">
                           {c.platform}
                         </span>
                         {c.openToAll ? (
-                          <span className="bg-emerald-50 text-emerald-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide border border-emerald-200">
-                            🌐 Open to All · {c.totalSlots - c.usedSlots} left
+                          <span className="bg-emerald-50 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide border border-emerald-200">
+                            ðŸŒ Open to All Â· {c.totalSlots - c.usedSlots} left
                           </span>
                         ) : (
-                          <span className="bg-mobo-accent/20 text-lime-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide">
+                          <span className="bg-mobo-accent/20 text-lime-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide">
                             {(user.mediatorCode ? c.assignments[(user.mediatorCode || '').toLowerCase()] : 0) || 0} Slots
                           </span>
                         )}
@@ -1072,7 +1073,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                         {c.title}
                       </ExpandableText>
                       <span
-                        className="text-[8px] text-zinc-400 font-mono cursor-pointer hover:text-zinc-600 transition-colors mb-1 block"
+                        className="text-[10px] text-zinc-400 font-mono cursor-pointer hover:text-zinc-600 transition-colors mb-1 block"
                         title="Click to copy Campaign ID"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1196,13 +1197,13 @@ const SquadView = ({ user, pendingUsers, verifiedUsers, loading, orders: _orders
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white p-4 rounded-[1.2rem] border border-zinc-100 shadow-sm text-center hover:shadow-md transition-shadow">
           <p className="text-2xl font-black text-zinc-900 mb-0.5">{verifiedUsers.length}</p>
-          <p className="text-[9px] text-zinc-400 font-black uppercase tracking-widest">
+          <p className="text-[10px] text-zinc-400 font-black uppercase tracking-widest">
             Active Buyers
           </p>
         </div>
         <div className="bg-white p-4 rounded-[1.2rem] border border-zinc-100 shadow-sm text-center hover:shadow-md transition-shadow">
           <p className="text-2xl font-black text-zinc-900 mb-0.5">{pendingUsers.length}</p>
-          <p className="text-[9px] text-zinc-400 font-black uppercase tracking-widest">Pending</p>
+          <p className="text-[10px] text-zinc-400 font-black uppercase tracking-widest">Pending</p>
         </div>
       </div>
 
@@ -1617,7 +1618,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-mobo-accent p-4 rounded-[1.5rem] text-black shadow-lg">
-              <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-1">
+              <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">
                 Total Payable
               </p>
               <h2 className="text-3xl font-black tracking-tighter leading-none">
@@ -1625,7 +1626,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
               </h2>
             </div>
             <div className="bg-white/5 border border-white/10 p-4 rounded-[1.5rem]">
-              <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1">
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">
                 Total Settled
               </p>
               <h2 className="text-2xl font-black tracking-tighter leading-none text-white">
@@ -1642,7 +1643,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
                 <CreditCard size={20} />
               </div>
               <div className="min-w-0">
-                <p className="text-[9px] font-bold text-zinc-400 uppercase">UPI Address</p>
+                <p className="text-[10px] font-bold text-zinc-400 uppercase">UPI Address</p>
                 <ExpandableText text={buyer.upiId || 'Not Linked'} clampClass="truncate" className="font-bold text-zinc-900 text-sm" as="p">
                   {buyer.upiId || 'Not Linked'}
                 </ExpandableText>
@@ -1737,7 +1738,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
                           <span className="text-[10px] font-mono text-zinc-400">
                             {getPrimaryOrderId(o)}
                           </span>
-                          <span className="text-[9px] font-bold uppercase bg-zinc-100 text-zinc-500 px-1.5 py-0.5 rounded">
+                          <span className="text-[10px] font-bold uppercase bg-zinc-100 text-zinc-500 px-1.5 py-0.5 rounded">
                             {o.items?.[0]?.dealType}
                           </span>
                         </div>
@@ -1748,7 +1749,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-black text-zinc-900">{formatCurrency(o.total)}</p>
-                      <p className="text-[9px] font-bold text-zinc-400">
+                      <p className="text-[10px] font-bold text-zinc-400">
                         {new Date(o.createdAt).toLocaleDateString('en-GB')}
                       </p>
                     </div>
@@ -1948,7 +1949,7 @@ export const MediatorDashboard: React.FC = () => {
     }
   }, [dealBuilder, deals]);
 
-  // AI Analysis — now reads stored data from order, no Gemini calls needed
+  // AI Analysis â€” now reads stored data from order, no Gemini calls needed
 
   const loadedRef = useRef<Set<string>>(new Set());
   const inFlightRef = useRef<Set<string>>(new Set());
@@ -2076,7 +2077,7 @@ export const MediatorDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load on tab change — only fetches keys not already cached
+  // Trigger data load on tab change â€” only fetches keys not already cached
   const prevTabRef = useRef(activeTab);
   useEffect(() => {
     const tabChanged = prevTabRef.current !== activeTab;
@@ -2189,7 +2190,7 @@ export const MediatorDashboard: React.FC = () => {
               {user?.name || 'Unknown'}
             </h1>
             <div className="mt-1 flex items-center gap-2">
-              <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1">
+              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1">
                 <span className="w-1.5 h-1.5 bg-mobo-accent rounded-full animate-pulse shadow-[0_0_6px_theme(colors.mobo.accent)]"></span>{' '}
                 {user?.mediatorCode}
               </p>
@@ -2289,8 +2290,8 @@ export const MediatorDashboard: React.FC = () => {
                             <X size={14} />
                           </button>
                         </div>
-                        <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-wide mt-1">
-                          {n.read ? 'Read' : 'New'} · {n.createdAt ? `${formatRelativeTime(n.createdAt)}` : ''}
+                        <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide mt-1">
+                          {n.read ? 'Read' : 'New'} Â· {n.createdAt ? `${formatRelativeTime(n.createdAt)}` : ''}
                         </p>
                       </div>
                     </div>
@@ -2398,7 +2399,7 @@ export const MediatorDashboard: React.FC = () => {
               </h4>
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-black/40 p-3 rounded-xl border border-white/5">
-                  <p className="text-[9px] text-zinc-500 font-bold uppercase mb-1">
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase mb-1">
                     Platform ID (User Entered)
                   </p>
                   <p className="text-sm font-mono font-bold text-white tracking-wide break-all">
@@ -2406,7 +2407,7 @@ export const MediatorDashboard: React.FC = () => {
                   </p>
                 </div>
                 <div className="bg-black/40 p-3 rounded-xl border border-white/5">
-                  <p className="text-[9px] text-zinc-500 font-bold uppercase mb-1">
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase mb-1">
                     Expected Price
                   </p>
                   <p className="text-sm font-bold text-lime-400">{formatCurrency(proofModal.total)}</p>
@@ -2418,13 +2419,13 @@ export const MediatorDashboard: React.FC = () => {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
                   {proofModal.reviewerName && (
                     <div className="bg-black/40 p-2.5 rounded-xl border border-indigo-500/20">
-                      <p className="text-[9px] text-indigo-400 font-bold uppercase mb-1">Reviewer Name</p>
+                      <p className="text-[10px] text-indigo-400 font-bold uppercase mb-1">Reviewer Name</p>
                       <p className="text-[11px] font-bold text-indigo-200">{proofModal.reviewerName}</p>
                     </div>
                   )}
                   {proofModal.extractedProductName && (
                     <div className="bg-black/40 p-2.5 rounded-xl border border-white/5">
-                      <p className="text-[9px] text-zinc-500 font-bold uppercase mb-1">Product Name</p>
+                      <p className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Product Name</p>
                       <ExpandableText text={proofModal.extractedProductName || ''} clampClass="line-clamp-2" className="text-[11px] font-bold text-zinc-200" as="p">
                         {proofModal.extractedProductName}
                       </ExpandableText>
@@ -2432,7 +2433,7 @@ export const MediatorDashboard: React.FC = () => {
                   )}
                   {proofModal.soldBy && proofModal.soldBy !== 'null' && proofModal.soldBy !== 'undefined' && (
                     <div className="bg-black/40 p-2.5 rounded-xl border border-white/5">
-                      <p className="text-[9px] text-zinc-500 font-bold uppercase mb-1">Sold By</p>
+                      <p className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Sold By</p>
                       <p className="text-[11px] font-bold text-zinc-200">{proofModal.soldBy}</p>
                     </div>
                   )}
@@ -2440,7 +2441,7 @@ export const MediatorDashboard: React.FC = () => {
                     const d = proofModal.orderDate ? new Date(proofModal.orderDate) : null;
                     return d && !isNaN(d.getTime()) && d.getFullYear() > 2020 ? (
                       <div className="bg-black/40 p-2.5 rounded-xl border border-white/5">
-                        <p className="text-[9px] text-zinc-500 font-bold uppercase mb-1">Order Date</p>
+                        <p className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Order Date</p>
                         <p className="text-[11px] font-bold text-zinc-200">{d.toLocaleDateString('en-GB')}</p>
                       </div>
                     ) : null;
@@ -2453,13 +2454,13 @@ export const MediatorDashboard: React.FC = () => {
                 <div className="grid grid-cols-2 gap-3 mt-3">
                   {proofModal.settlementRef && (
                     <div className="bg-black/40 p-2.5 rounded-xl border border-emerald-500/20">
-                      <p className="text-[9px] text-emerald-400 font-bold uppercase mb-1">UTR / Reference</p>
+                      <p className="text-[10px] text-emerald-400 font-bold uppercase mb-1">UTR / Reference</p>
                       <p className="text-[11px] font-mono font-bold text-emerald-200">{proofModal.settlementRef}</p>
                     </div>
                   )}
                   {proofModal.settlementMode && (
                     <div className="bg-black/40 p-2.5 rounded-xl border border-emerald-500/20">
-                      <p className="text-[9px] text-emerald-400 font-bold uppercase mb-1">Payment Mode</p>
+                      <p className="text-[10px] text-emerald-400 font-bold uppercase mb-1">Payment Mode</p>
                       <p className="text-[11px] font-bold text-emerald-200 uppercase">{proofModal.settlementMode}</p>
                     </div>
                   )}
@@ -2500,7 +2501,7 @@ export const MediatorDashboard: React.FC = () => {
                                   className={`flex-1 p-2 rounded-lg border ${aiData?.orderIdMatch ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}
                                 >
                                   <p
-                                    className={`text-[9px] font-bold uppercase ${aiData?.orderIdMatch ? 'text-green-400' : 'text-red-400'}`}
+                                    className={`text-[10px] font-bold uppercase ${aiData?.orderIdMatch ? 'text-green-400' : 'text-red-400'}`}
                                   >
                                     Order ID
                                   </p>
@@ -2508,7 +2509,7 @@ export const MediatorDashboard: React.FC = () => {
                                     {aiData?.orderIdMatch ? 'Matched' : 'Mismatch'}
                                   </p>
                                   {aiData?.detectedOrderId && (
-                                    <p className="text-[9px] text-zinc-400 mt-0.5 font-mono break-all">
+                                    <p className="text-[10px] text-zinc-400 mt-0.5 font-mono break-all">
                                       Detected: {aiData.detectedOrderId}
                                     </p>
                                   )}
@@ -2517,7 +2518,7 @@ export const MediatorDashboard: React.FC = () => {
                                   className={`flex-1 p-2 rounded-lg border ${aiData?.amountMatch ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}
                                 >
                                   <p
-                                    className={`text-[9px] font-bold uppercase ${aiData?.amountMatch ? 'text-green-400' : 'text-red-400'}`}
+                                    className={`text-[10px] font-bold uppercase ${aiData?.amountMatch ? 'text-green-400' : 'text-red-400'}`}
                                   >
                                     Amount
                                   </p>
@@ -2525,7 +2526,7 @@ export const MediatorDashboard: React.FC = () => {
                                     {aiData?.amountMatch ? 'Matched' : 'Mismatch'}
                                   </p>
                                   {aiData?.detectedAmount != null && (
-                                    <p className="text-[9px] text-zinc-400 mt-0.5 font-mono">
+                                    <p className="text-[10px] text-zinc-400 mt-0.5 font-mono">
                                       Detected: {formatCurrency(aiData.detectedAmount)}
                                     </p>
                                   )}
@@ -2538,7 +2539,7 @@ export const MediatorDashboard: React.FC = () => {
                                 </p>
                               </div>
                               <div className="flex justify-between items-center pt-1">
-                                <span className="text-[9px] text-indigo-300 font-bold uppercase">
+                                <span className="text-[10px] text-indigo-300 font-bold uppercase">
                                   Confidence Score
                                 </span>
                                 <div className="flex items-center gap-2">
@@ -2565,7 +2566,7 @@ export const MediatorDashboard: React.FC = () => {
               )}
             </div>
 
-            {/* STEP PROGRESS BAR — shows mediator what stage the order is at */}
+            {/* STEP PROGRESS BAR â€” shows mediator what stage the order is at */}
             {(proofModal.requirements?.required?.length ?? 0) > 0 && (
               <div className="bg-zinc-800/80 rounded-2xl border border-zinc-700/50 p-4 mt-1">
                 <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-wider mb-3">Verification Progress</h4>
@@ -2574,9 +2575,9 @@ export const MediatorDashboard: React.FC = () => {
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${
                       proofModal.verification?.orderVerified ? 'bg-green-500 text-white' : 'bg-zinc-600 text-zinc-300'
                     }`}>
-                      {proofModal.verification?.orderVerified ? '✓' : '1'}
+                      {proofModal.verification?.orderVerified ? 'âœ“' : '1'}
                     </div>
-                    <span className={`text-[9px] font-bold ${proofModal.verification?.orderVerified ? 'text-green-400' : 'text-zinc-400'}`}>Buy</span>
+                    <span className={`text-[10px] font-bold ${proofModal.verification?.orderVerified ? 'text-green-400' : 'text-zinc-400'}`}>Buy</span>
                   </div>
                   <div className={`flex-1 h-0.5 rounded ${proofModal.verification?.orderVerified ? 'bg-green-500' : 'bg-zinc-700'}`} />
                   {proofModal.requirements?.required?.includes('review') && (
@@ -2588,7 +2589,7 @@ export const MediatorDashboard: React.FC = () => {
                             : proofModal.verification?.orderVerified ? 'bg-purple-500 text-white'
                             : 'bg-zinc-600 text-zinc-400'
                         }`}>
-                          {proofModal.verification?.reviewVerified ? '✓' : '2'}
+                          {proofModal.verification?.reviewVerified ? 'âœ“' : '2'}
                         </div>
                         <span className={`text-[10px] font-bold ${
                           proofModal.verification?.reviewVerified ? 'text-green-400'
@@ -2608,7 +2609,7 @@ export const MediatorDashboard: React.FC = () => {
                             : proofModal.verification?.orderVerified ? 'bg-purple-500 text-white'
                             : 'bg-zinc-600 text-zinc-400'
                         }`}>
-                          {proofModal.verification?.ratingVerified ? '✓' : proofModal.requirements?.required?.includes('review') ? '3' : '2'}
+                          {proofModal.verification?.ratingVerified ? 'âœ“' : proofModal.requirements?.required?.includes('review') ? '3' : '2'}
                         </div>
                         <span className={`text-[10px] font-bold ${
                           proofModal.verification?.ratingVerified ? 'text-green-400'
@@ -2628,7 +2629,7 @@ export const MediatorDashboard: React.FC = () => {
                             : proofModal.verification?.orderVerified ? 'bg-purple-500 text-white'
                             : 'bg-zinc-600 text-zinc-400'
                         }`}>
-                          {proofModal.verification?.returnWindowVerified ? '✓' :
+                          {proofModal.verification?.returnWindowVerified ? 'âœ“' :
                             ((proofModal.requirements?.required?.includes('review') && proofModal.requirements?.required?.includes('rating')) ? '4' :
                              (proofModal.requirements?.required?.includes('review') || proofModal.requirements?.required?.includes('rating')) ? '3' : '2')}
                         </div>
@@ -2645,7 +2646,7 @@ export const MediatorDashboard: React.FC = () => {
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${
                       proofModal.affiliateStatus === 'Pending_Cooling' ? 'bg-green-500 text-white' : 'bg-zinc-600 text-zinc-400'
                     }`}>
-                      {proofModal.affiliateStatus === 'Pending_Cooling' ? '✓' : '⚡'}
+                      {proofModal.affiliateStatus === 'Pending_Cooling' ? 'âœ“' : 'âš¡'}
                     </div>
                     <span className={`text-[10px] font-bold ${proofModal.affiliateStatus === 'Pending_Cooling' ? 'text-green-400' : 'text-zinc-500'}`}>Done</span>
                   </div>
@@ -2834,12 +2835,12 @@ export const MediatorDashboard: React.FC = () => {
                       resp?.missingVerifications || [];
 
                     if (resp?.approved) {
-                      toast.success('Order approved! Cashback is now in cooling period. ✓');
+                      toast.success('Order approved! Cashback is now in cooling period. âœ“');
                       setProofModal(null);
                     } else if (missingProofs.length) {
-                      toast.info(`Purchase verified ✓ Buyer needs to upload: ${missingProofs.join(' + ')} proof.`);
+                      toast.info(`Purchase verified âœ“ Buyer needs to upload: ${missingProofs.join(' + ')} proof.`);
                     } else if (missingVerifications.length) {
-                      toast.info(`Purchase verified ✓ You can now verify: ${missingVerifications.join(' + ')} proof.`);
+                      toast.info(`Purchase verified âœ“ You can now verify: ${missingVerifications.join(' + ')} proof.`);
                     } else {
                       toast.success('Purchase verified.');
                     }
@@ -2861,7 +2862,7 @@ export const MediatorDashboard: React.FC = () => {
               </button>
             ) : (
               <>
-                {/* ── Primary: Verify Deal (all steps at once) ── */}
+                {/* â”€â”€ Primary: Verify Deal (all steps at once) â”€â”€ */}
                 {(proofModal?.requirements?.missingVerifications as string[] ?? []).length > 0 && (
                   <button
                     onClick={async () => {
@@ -2869,10 +2870,10 @@ export const MediatorDashboard: React.FC = () => {
                         const resp = await api.ops.verifyAllSteps(proofModal.id);
 
                         if (resp?.approved) {
-                          toast.success('Deal verified ✓ Cashback is now in cooling period!');
+                          toast.success('Deal verified âœ“ Cashback is now in cooling period!');
                           setProofModal(null);
                         } else {
-                          toast.success('Deal verified ✓');
+                          toast.success('Deal verified âœ“');
                         }
 
                         await loadData({ keys: ['orders'] });
@@ -3020,7 +3021,7 @@ export const MediatorDashboard: React.FC = () => {
                 onClick={async () => {
                   try {
                     await api.ops.forceApproveOrder(proofModal.id, actionNote || undefined);
-                    toast.success('Order approved → Pending Cooling (14 days)');
+                    toast.success('Order approved â†’ Pending Cooling (14 days)');
                     setApproveModalOpen(false);
                     setProofModal(null);
                     await loadData({ keys: ['orders'] });
@@ -3112,20 +3113,20 @@ export const MediatorDashboard: React.FC = () => {
                 <ExpandableText text={dealBuilder.title || ''} clampClass="line-clamp-2" className="text-lg font-black text-zinc-900 leading-tight mb-1" as="h3">
                   {dealBuilder.title}
                 </ExpandableText>
-                <span className="text-[9px] font-bold bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                <span className="text-[10px] font-bold bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full uppercase tracking-wider">
                   {dealBuilder.platform}
                 </span>
               </div>
-              {/* Agency commission badge — visible at top-right of deal card */}
+              {/* Agency commission badge â€” visible at top-right of deal card */}
               <div className="flex-shrink-0 bg-blue-50 border-2 border-blue-300 rounded-[1rem] px-3 py-2 flex flex-col items-center justify-center shadow-sm">
-                <p className="text-[8px] font-bold text-blue-500 uppercase tracking-wider">Agency Commission</p>
-                <p className="text-lg font-black text-blue-700">₹{dealBuilder.assignmentPayout ?? dealBuilder.payout ?? 0}</p>
+                <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Agency Commission</p>
+                <p className="text-lg font-black text-blue-700">â‚¹{dealBuilder.assignmentPayout ?? dealBuilder.payout ?? 0}</p>
                 <p className="text-[7px] text-blue-400 font-semibold">from agency</p>
               </div>
             </div>
             <div className="bg-zinc-50 p-4 rounded-[1.5rem] border border-zinc-100 mb-6 flex items-center justify-between relative overflow-hidden">
               <div className="relative z-10">
-                <p className="text-[9px] text-zinc-400 font-black uppercase tracking-widest mb-1">
+                <p className="text-[10px] text-zinc-400 font-black uppercase tracking-widest mb-1">
                   Base Price
                 </p>
                 <p className="text-2xl font-black text-zinc-900">
@@ -3136,7 +3137,7 @@ export const MediatorDashboard: React.FC = () => {
                 <ChevronRight size={24} />
               </div>
               <div className="text-right relative z-10">
-                <p className="text-[9px] text-zinc-400 font-black uppercase tracking-widest mb-1">
+                <p className="text-[10px] text-zinc-400 font-black uppercase tracking-widest mb-1">
                   Final Price
                 </p>
                 <p className="text-2xl font-black text-mobo-lime-600">
@@ -3155,25 +3156,25 @@ export const MediatorDashboard: React.FC = () => {
               // Your commission = what mediator adds to the deal price (can be negative)
               const buyerComm = parseInt(commission) || 0;
               // Net earnings = agency commission + your commission
-              // Example: agency pays ₹10, mediator adds ₹5 buyer commission → net = ₹15
-              // Example: agency pays ₹10, mediator adds -₹5 (discount) → net = ₹5
+              // Example: agency pays â‚¹10, mediator adds â‚¹5 buyer commission â†’ net = â‚¹15
+              // Example: agency pays â‚¹10, mediator adds -â‚¹5 (discount) â†’ net = â‚¹5
               const net = agencyComm + buyerComm;
               return (
                 <div className={`p-3 rounded-[1rem] border mb-4 text-center ${net < 0 ? 'bg-red-50 border-red-200' : net === 0 ? 'bg-zinc-50 border-zinc-100' : 'bg-green-50 border-green-200'}`}>
-                  <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-0.5">Your Net Earnings</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-0.5">Your Net Earnings</p>
                   <p className={`text-xl font-black ${net < 0 ? 'text-red-600' : net === 0 ? 'text-zinc-500' : 'text-green-700'}`}>
-                    {net < 0 ? `−₹${Math.abs(net)}` : formatCurrency(net)}
+                    {net < 0 ? `âˆ’â‚¹${Math.abs(net)}` : formatCurrency(net)}
                   </p>
-                  {net < 0 && <p className="text-[9px] text-red-500 mt-1">You absorb ₹{Math.abs(net)} loss on this deal</p>}
-                  <p className="text-[8px] text-zinc-400 mt-1">
-                    Agency ₹{agencyComm} {buyerComm >= 0 ? '+' : '−'} Your Commission ₹{Math.abs(buyerComm)} = ₹{net}
+                  {net < 0 && <p className="text-[10px] text-red-500 mt-1">You absorb â‚¹{Math.abs(net)} loss on this deal</p>}
+                  <p className="text-[10px] text-zinc-400 mt-1">
+                    Agency â‚¹{agencyComm} {buyerComm >= 0 ? '+' : 'âˆ’'} Your Commission â‚¹{Math.abs(buyerComm)} = â‚¹{net}
                   </p>
                 </div>
               );
             })()}
             <div className="space-y-3 mb-6">
               <label className="text-[10px] font-black text-zinc-900 uppercase ml-2 block tracking-wide">
-                Your commission (₹)
+                Your commission (â‚¹)
               </label>
               <input
                 type="number"
@@ -3192,7 +3193,7 @@ export const MediatorDashboard: React.FC = () => {
                 className="w-full bg-white border-2 border-zinc-100 rounded-[1.5rem] p-4 text-2xl font-black text-center focus:border-mobo-accent focus:ring-4 focus:ring-mobo-accent/20 outline-none transition-all placeholder:text-zinc-200"
                 placeholder="0"
               />
-              <p className="text-[9px] text-zinc-400 text-center">Use negative value to give buyers a discount from your commission</p>
+              <p className="text-[10px] text-zinc-400 text-center">Use negative value to give buyers a discount from your commission</p>
             </div>
             <button
               onClick={handlePublish}

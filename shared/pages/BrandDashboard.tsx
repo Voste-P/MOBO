@@ -98,7 +98,7 @@ type Tab = 'dashboard' | 'agencies' | 'campaigns' | 'requests' | 'orders' | 'tic
 
 const StatCard = ({ label, value, icon, trend, dark }: { label: string; value: string | number; icon: React.ReactNode; trend?: string; dark?: boolean }) => (
   <div
-    className={`p-6 rounded-[2rem] flex flex-col justify-between h-44 relative overflow-hidden group hover:-translate-y-1 transition-all duration-300 ${
+    className={`p-6 rounded-[2rem] flex flex-col justify-between min-h-44 relative overflow-hidden group hover:-translate-y-1 transition-all duration-300 ${
       dark
         ? 'bg-zinc-900 text-white shadow-2xl shadow-zinc-900/20'
         : 'bg-white border border-zinc-100 shadow-sm hover:shadow-xl hover:shadow-zinc-200/50'
@@ -233,7 +233,7 @@ const BrandProfileView = () => {
             />
           </div>
           <div className="flex-1 pb-2">
-            <h2 className="text-4xl font-black text-zinc-900 tracking-tight truncate">{user?.name}</h2>
+            <h2 className="text-4xl font-black text-zinc-900 tracking-tight truncate" title={user?.name}>{user?.name}</h2>
             <div className="flex flex-wrap items-center gap-3 mt-3">
               <span className="px-3 py-1 bg-lime-100 text-lime-700 rounded-lg text-xs font-bold border border-lime-200">
                 Verified Brand
@@ -408,15 +408,15 @@ const DashboardView = ({
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-auto lg:h-[400px]">
         {/* Revenue Chart */}
-        <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] shadow-sm border border-zinc-100 relative overflow-hidden h-[400px] lg:h-full">
-          <div className="flex justify-between items-center mb-8">
+        <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] shadow-sm border border-zinc-100 overflow-hidden flex flex-col h-[400px] lg:h-full">
+          <div className="flex justify-between items-center mb-8 flex-shrink-0">
             <h3 className="font-bold text-lg text-zinc-900">Revenue Trajectory</h3>
             <div className="flex gap-2">
               <span className="w-3 h-3 rounded-full bg-lime-500"></span>
               <span className="text-xs font-bold text-zinc-400 uppercase">Gross Sales</span>
             </div>
           </div>
-          <div className="absolute inset-x-0 bottom-0 top-20 px-4 pb-4">
+          <div className="flex-1 min-h-0 px-4 pb-4">
             {revenueData.length === 0 || revenueData.every((d: any) => !d.revenue) ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
                 <div className="p-4 rounded-full bg-zinc-50 mb-4"><TrendingUp size={32} className="text-zinc-300" /></div>
@@ -1006,7 +1006,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                       <td className="p-6 text-sm text-zinc-700">
                         <div className="text-xs font-bold text-zinc-700">{o.managerName || '-'}</div>
                         {o.mediatorCode && o.mediatorCode !== o.managerName && (
-                          <div className="text-[9px] text-zinc-400 font-mono">{o.mediatorCode}</div>
+                          <div className="text-[10px] text-zinc-400 font-mono">{o.mediatorCode}</div>
                         )}
                       </td>
                       <td className="p-6 text-right font-bold text-zinc-900">{formatCurrency(o.total)}</td>
@@ -1073,12 +1073,12 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                         <td className="p-6">
                           <div className="text-xs font-bold text-zinc-700">{o.managerName || '-'}</div>
                           {o.mediatorCode && o.mediatorCode !== o.managerName && (
-                            <div className="text-[9px] text-zinc-400 font-mono">{o.mediatorCode}</div>
+                            <div className="text-[10px] text-zinc-400 font-mono">{o.mediatorCode}</div>
                           )}
                         </td>
                         <td className="p-6">
                           <ExpandableText text={o.items?.[0]?.title || 'Product'} clampClass="line-clamp-1" className="text-sm font-bold text-zinc-900">{o.items?.[0]?.title || 'Product'}</ExpandableText>
-                          <div className="text-[9px] text-zinc-400">Qty: {o.items?.[0]?.quantity || 1}</div>
+                          <div className="text-[10px] text-zinc-400">Qty: {o.items?.[0]?.quantity || 1}</div>
                         </td>
                         <td className="p-6 text-right font-bold text-zinc-900">{formatCurrency(o.total)}</td>
                         <td className="p-6 text-right font-mono font-bold text-green-600">{formatCurrency(o.commission || 0)}</td>
@@ -1133,7 +1133,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                         <td className="p-6">
                           <div className="text-xs font-bold text-zinc-700">{o.managerName || '-'}</div>
                           {o.mediatorCode && o.mediatorCode !== o.managerName && (
-                            <div className="text-[9px] text-zinc-400 font-mono">{o.mediatorCode}</div>
+                            <div className="text-[10px] text-zinc-400 font-mono">{o.mediatorCode}</div>
                           )}
                         </td>
                         <td className="p-6">
@@ -1295,25 +1295,25 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                               <>
                                 <div className="flex gap-2">
                                   <div className={`flex-1 p-2 rounded-lg border text-center ${aiData?.orderIdMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                                    <p className="text-[9px] font-bold text-zinc-400 uppercase">Order ID</p>
+                                    <p className="text-[10px] font-bold text-zinc-400 uppercase">Order ID</p>
                                     <p className={`text-xs font-bold ${aiData?.orderIdMatch ? 'text-green-600' : 'text-red-600'}`}>
                                       {aiData?.orderIdMatch ? '✓ Match' : '✗ Mismatch'}
                                     </p>
-                                    {aiData?.detectedOrderId && <p className="text-[9px] text-zinc-500 font-mono mt-0.5">Detected: {aiData.detectedOrderId}</p>}
+                                    {aiData?.detectedOrderId && <p className="text-[10px] text-zinc-500 font-mono mt-0.5">Detected: {aiData.detectedOrderId}</p>}
                                   </div>
                                   <div className={`flex-1 p-2 rounded-lg border text-center ${aiData?.amountMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                                    <p className="text-[9px] font-bold text-zinc-400 uppercase">Amount</p>
+                                    <p className="text-[10px] font-bold text-zinc-400 uppercase">Amount</p>
                                     <p className={`text-xs font-bold ${aiData?.amountMatch ? 'text-green-600' : 'text-red-600'}`}>
                                       {aiData?.amountMatch ? '✓ Match' : '✗ Mismatch'}
                                     </p>
-                                    {aiData?.detectedAmount != null && <p className="text-[9px] text-zinc-500 font-mono mt-0.5">Detected: {formatCurrency(aiData.detectedAmount)}</p>}
+                                    {aiData?.detectedAmount != null && <p className="text-[10px] text-zinc-500 font-mono mt-0.5">Detected: {formatCurrency(aiData.detectedAmount)}</p>}
                                   </div>
                                 </div>
                                 {aiData?.discrepancyNote && (
                                   <p className="text-[10px] text-zinc-500 bg-white rounded-lg p-2 border border-zinc-100">{aiData.discrepancyNote}</p>
                                 )}
                                 <div className="flex justify-between items-center pt-1">
-                                  <span className="text-[9px] text-indigo-500 font-bold uppercase">Confidence</span>
+                                  <span className="text-[10px] text-indigo-500 font-bold uppercase">Confidence</span>
                                   <div className="flex items-center gap-2">
                                     <div className="w-20 h-1.5 bg-zinc-200 rounded-full overflow-hidden">
                                       <div className={`h-full rounded-full ${score > 80 ? 'bg-green-500' : score > 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${score}%` }} />
@@ -1344,7 +1344,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                   </div>
                   {viewProofOrder.screenshots?.rating ? (
                     <div className="rounded-2xl border-2 border-orange-100 overflow-hidden shadow-sm relative">
-                      <div className="absolute top-2 right-2 bg-orange-500 text-white text-[9px] font-bold px-2 py-1 rounded-lg">
+                      <div className="absolute top-2 right-2 bg-orange-500 text-white text-[10px] font-bold px-2 py-1 rounded-lg">
                         5 Stars
                       </div>
                       <ProofImage
@@ -2018,7 +2018,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                     {c.title}
                   </ExpandableText>
                   <span
-                    className="text-[9px] text-zinc-400 font-mono cursor-pointer hover:text-lime-600 transition-colors mb-2 block"
+                    className="text-[10px] text-zinc-400 font-mono cursor-pointer hover:text-lime-600 transition-colors mb-2 block"
                     title="Click to copy Campaign ID"
                     onClick={() => {
                       navigator.clipboard.writeText(String(c.id)).then(() => toast.success('Campaign ID copied!')).catch(() => {});
@@ -2028,17 +2028,17 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                   </span>
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col">
-                      <span className="text-[9px] font-bold text-zinc-400 uppercase">Payout</span>
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase">Payout</span>
                       <span className="text-xs font-black text-zinc-900">{c.payout}</span>
                     </div>
                     <div className="w-[1px] h-6 bg-zinc-100"></div>
                     <div className="flex flex-col">
-                      <span className="text-[9px] font-bold text-zinc-400 uppercase">Cost</span>
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase">Cost</span>
                       <span className="text-xs font-black text-zinc-900">{c.price}</span>
                     </div>
                     <div className="w-[1px] h-6 bg-zinc-100"></div>
                     <div className="flex flex-col">
-                      <span className="text-[9px] font-bold text-zinc-400 uppercase">Created</span>
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase">Created</span>
                       <span className="text-[10px] font-medium text-zinc-500">{c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB') : '—'}</span>
                     </div>
                   </div>
