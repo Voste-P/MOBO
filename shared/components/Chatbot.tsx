@@ -290,7 +290,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
       ) {
         // Use ref-tracked timeout so it's cancelled if component unmounts
         const navTimer = setTimeout(() => {
-          // Map 'tickets' Ã¢â€ â€™ 'orders' since tickets live on the Orders tab
+          // Map 'tickets' -> 'orders' since tickets live on the Orders tab
           const mappedTab = response.navigateTo === 'tickets' ? 'orders' : response.navigateTo;
           onNavigate?.(mappedTab as 'home' | 'explore' | 'orders' | 'profile');
         }, 1500);
