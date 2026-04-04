@@ -1458,7 +1458,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
   );
 };
 
-const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampaigns }: any) => {
+const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampaigns }: { campaigns: Campaign[]; agencies: User[]; user: User; loading: boolean; onRefresh: (keys?: string[]) => void; setCampaigns: React.Dispatch<React.SetStateAction<Campaign[]>> }) => {
   const { toast } = useToast();
   const { confirm, ConfirmDialogElement } = useConfirm();
   const [view, setView] = useState<'list' | 'create'>('list');
@@ -2575,7 +2575,7 @@ export const BrandDashboard: React.FC = () => {
         {activeTab === 'dashboard' && (
           <DashboardView stats={dashboardStats} revenueData={revenueChartData} campaignPerformance={inventoryFillData} />
         )}
-        {activeTab === 'campaigns' && (
+        {activeTab === 'campaigns' && user && (
           <CampaignsView
             campaigns={campaigns}
             agencies={agencies}

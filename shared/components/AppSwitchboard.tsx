@@ -91,8 +91,8 @@ export const AppSwitchboard: React.FC<{ onSelect: (role: string) => void }> = ({
   </div>
 );
 
-const SwitchCard = ({ title, desc, icon, type, color, delay = 0, onClick }: any) => {
-  const colors: any = {
+const SwitchCard = ({ title, desc, icon, type, color, delay = 0, onClick }: { title: string; desc: string; icon: React.ReactNode; type: string; color: string; delay?: number; onClick: () => void }) => {
+  const colors: Record<string, string> = {
     lime: 'hover:border-lime-500/50 hover:shadow-lime-500/20 hover:shadow-lg text-lime-400',
     indigo: 'hover:border-indigo-500/50 hover:shadow-indigo-500/20 hover:shadow-lg text-indigo-400',
     purple: 'hover:border-purple-500/50 hover:shadow-purple-500/20 hover:shadow-lg text-purple-400',

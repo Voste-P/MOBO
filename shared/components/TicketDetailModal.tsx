@@ -123,7 +123,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
       await api.tickets.addComment(ticket.id, msg);
       setNewComment('');
       await loadComments();
-    } catch (err: any) {
+    } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to add comment.'));
     } finally {
       setSubmittingComment(false);
@@ -139,7 +139,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
       setResolutionNote('');
       onRefresh();
       onClose();
-    } catch (err: any) {
+    } catch (err) {
       const msg = formatErrorMessage(err, `Unable to ${status === 'Resolved' ? 'resolve' : 'reject'} this ticket. Please try again.`);
       toast.error(msg);
     } finally {
@@ -154,7 +154,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
       toast.success(`Ticket escalated to ${ESCALATION_PATH[ticket?.targetRole || ''] || 'higher authority'} successfully.`);
       onRefresh();
       onClose();
-    } catch (err: any) {
+    } catch (err) {
       const msg = formatErrorMessage(err, 'Unable to escalate this ticket. Please try again.');
       toast.error(msg);
     } finally {
@@ -169,7 +169,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
       toast.success('Ticket reopened successfully.');
       onRefresh();
       onClose();
-    } catch (err: any) {
+    } catch (err) {
       toast.error(formatErrorMessage(err, 'Unable to reopen this ticket. Please try again.'));
     } finally {
       setActionLoading(null);
@@ -183,7 +183,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
       toast.success('Ticket deleted successfully.');
       onRefresh();
       onClose();
-    } catch (err: any) {
+    } catch (err) {
       toast.error(formatErrorMessage(err, 'Unable to delete this ticket. Please try again.'));
     } finally {
       setActionLoading(null);

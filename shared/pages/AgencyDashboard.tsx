@@ -118,7 +118,7 @@ const StatCard = ({ label, value, icon: Icon, trend, colorClass = 'bg-white' }: 
 
 // --- VIEWS ---
 
-const AgencyProfile = ({ user }: any) => {
+const AgencyProfile = ({ user }: { user: User }) => {
   const { updateUser } = useAuth();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
@@ -402,7 +402,7 @@ const AgencyProfile = ({ user }: any) => {
   );
 };
 
-const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, user }: any) => {
+const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, user }: { allOrders: Order[]; mediators: User[]; loading: boolean; onRefresh: (keys?: string[]) => void; user: User }) => {
   const { toast } = useToast();
   const [sheetsExporting, setSheetsExporting] = useState(false);
   // Flatten orders for detailed ledger view
@@ -1195,7 +1195,7 @@ const BrandsView = () => {
   );
 };
 
-const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
+const PayoutsView = ({ payouts, loading, onRefresh }: { payouts: Record<string, unknown>[]; loading: boolean; onRefresh: (keys?: string[]) => void }) => {
   const { toast } = useToast();
   const { confirm, ConfirmDialogElement } = useConfirm();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -1602,7 +1602,7 @@ const DashboardView = ({ stats, revenueTrendData, brandPerfData, onRangeChange }
   );
 };
 
-const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrders, setCampaigns }: any) => {
+const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrders, setCampaigns }: { campaigns: Campaign[]; user: User; loading: boolean; onRefresh: (keys?: string[]) => void; mediators: User[]; allOrders: Order[]; setCampaigns: React.Dispatch<React.SetStateAction<Campaign[]>> }) => {
   const { toast } = useToast();
   const { confirm, ConfirmDialogElement: InventoryConfirmDialog } = useConfirm();
   const [subTab, setSubTab] = useState<'inventory' | 'offered'>('inventory');
@@ -1686,7 +1686,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
   const activeInventory = useMemo(() => {
     const base = campaigns.filter(
       (c: Campaign) =>
-        c.allowedAgencies.includes(user.mediatorCode) &&
+        c.allowedAgencies.includes(user.mediatorCode ?? '') &&
         (
           c.status === 'Draft' ||
           String(c.brandId || '') === String(user.id || '') ||
@@ -1701,7 +1701,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
   const offeredCampaigns = useMemo(() => {
     const base = campaigns.filter(
       (c: Campaign) =>
-        c.allowedAgencies.includes(user.mediatorCode) &&
+        c.allowedAgencies.includes(user.mediatorCode ?? '') &&
         c.status !== 'Draft' &&
         String(c.brandId || '') !== String(user.id || '') &&
         !c.openToAll &&
@@ -2986,7 +2986,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
 };
 
 /* â”€â”€â”€ ORDER REVIEW TAB â”€â”€â”€ */
-const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading, onRefresh }: any) => {
+const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading, onRefresh }: { allOrders: Order[]; campaigns: Campaign[]; mediators: User[]; loading: boolean; onRefresh: (keys?: string[]) => void }) => {
   const { toast } = useToast();
   const [campaignFilter, setCampaignFilter] = useState('all');
   const [mediatorFilter, setMediatorFilter] = useState('all');
@@ -3420,7 +3420,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
   );
 };
 
-const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators }: any) => {
+const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators }: { mediators: User[]; user: User; loading: boolean; onRefresh: (keys?: string[]) => void; allOrders: Order[]; setMediators: React.Dispatch<React.SetStateAction<User[]>> }) => {
   const { toast } = useToast();
   const [subTab, setSubTab] = useState<'roster' | 'requests'>('roster');
   const [searchTerm, setSearchTerm] = useState('');
@@ -4672,7 +4672,7 @@ export const AgencyDashboard: React.FC = () => {
       }
     >
       {activeTab === 'dashboard' && <DashboardView stats={stats} revenueTrendData={revenueTrendData} brandPerfData={brandPerfData} onRangeChange={handleRevenueTrendRange} />}
-      {activeTab === 'team' && (
+      {activeTab === 'team' && user && (
         <TeamView
           mediators={mediators}
           user={user}
@@ -4682,7 +4682,7 @@ export const AgencyDashboard: React.FC = () => {
           setMediators={setMediators}
         />
       )}
-      {activeTab === 'inventory' && (
+      {activeTab === 'inventory' && user && (
         <InventoryView
           campaigns={campaigns}
           user={user}
@@ -4702,7 +4702,7 @@ export const AgencyDashboard: React.FC = () => {
           onRefresh={refreshData}
         />
       )}
-      {activeTab === 'finance' && (
+      {activeTab === 'finance' && user && (
         <FinanceView
           allOrders={orders}
           mediators={mediators}
@@ -4836,10 +4836,10 @@ export const AgencyDashboard: React.FC = () => {
                           className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
                         <div className="flex items-center gap-2">
                           <button type="button" onClick={async () => {
-                            try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
+                            try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
                           }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">âœ“ Resolve</button>
                           <button type="button" onClick={async () => {
-                            try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
+                            try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
                           }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">âœ— Reject</button>
                           <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
                             className="px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 hover:bg-slate-200">Cancel</button>
@@ -4855,7 +4855,7 @@ export const AgencyDashboard: React.FC = () => {
                               await api.tickets.update(t.id, 'Open');
                               toast.success('Ticket reopened.');
                               fetchData({ keys: ['tickets'] });
-                            } catch (err: any) {
+                            } catch (err) {
                               toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
                             }
                           }}
@@ -4870,7 +4870,7 @@ export const AgencyDashboard: React.FC = () => {
                               await api.tickets.delete(t.id);
                               toast.success('Ticket deleted.');
                               fetchData({ keys: ['tickets'] });
-                            } catch (err: any) {
+                            } catch (err) {
                               toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
                             }
                           }}
@@ -4887,7 +4887,7 @@ export const AgencyDashboard: React.FC = () => {
           )}
         </div>
       )}
-      {activeTab === 'profile' && <AgencyProfile user={user} />}
+      {activeTab === 'profile' && user && <AgencyProfile user={user} />}
       <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20"><Spinner /></div>}>
         <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />
         <TicketDetailModal
