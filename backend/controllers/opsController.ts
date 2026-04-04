@@ -166,7 +166,7 @@ export async function finalizeApprovalIfReady(order: any, actorUserId: string, e
   settleDate.setDate(settleDate.getDate() + COOLING_PERIOD_DAYS);
   const currentEvents = Array.isArray(order.events) ? (order.events as any[]) : [];
 
-  orderLog.info('All proofs verified â€” approving order', {
+  orderLog.info('All proofs verified — approving order', {
     orderId: order.mongoId,
     coolingDays: COOLING_PERIOD_DAYS,
     settlementDate: settleDate.toISOString(),
@@ -1458,7 +1458,7 @@ export function makeOpsController(env: Env) {
             userId: buyerId,
             app: 'buyer',
             payload: {
-              title: wasApproved ? 'Proof recalled â€” re-upload needed' : 'Proof rejected',
+              title: wasApproved ? 'Proof recalled — re-upload needed' : 'Proof rejected',
               body: body.reason || 'Please re-upload the required proof.',
               url: '/orders',
             },
@@ -1697,7 +1697,7 @@ export function makeOpsController(env: Env) {
 
         const agencyCode = await assertOrderAccess(order, roles, user);
 
-        // Buyer must also be active â€” order.userId is PG UUID
+        // Buyer must also be active — order.userId is PG UUID
         const orderDisplayId = order.mongoId ?? order.id;
         const campaignId = order.items?.[0]?.campaignId;
         const productId = String(order.items?.[0]?.productId || '').trim();
@@ -1811,7 +1811,7 @@ export function makeOpsController(env: Env) {
             }
           }
 
-          // Atomic settlement using Prisma transaction â€” wallet + order status in one commit
+          // Atomic settlement using Prisma transaction — wallet + order status in one commit
           // Cycle counter: count past SETTLED events to generate unique idempotency keys
           // for settle→unsettle→re-settle flows. Without this, re-settlement silently
           // no-ops because the wallet service sees a duplicate idempotency key.
@@ -2399,7 +2399,7 @@ export function makeOpsController(env: Env) {
           ? Object.keys(assignments)
           : [];
 
-        // Resolve brandUserId (PG UUID) â†’ mongoId for realtime audience
+        // Resolve brandUserId (PG UUID) → mongoId for realtime audience
         const brandUser = await db().user.findUnique({ where: { id: campaign.brandUserId }, select: { mongoId: true } });
         const brandMongoId = brandUser?.mongoId || '';
 
@@ -2449,7 +2449,7 @@ export function makeOpsController(env: Env) {
         }
         const wasDraft = campStatus === 'draft';
 
-        // Check if orders exist â€“ if so, only block term changes (price, dealType),
+        // Check if orders exist – if so, only block term changes (price, dealType),
         // but still allow adding/modifying mediator assignments.
         const hasOrders = await db().orderItem.findFirst({
           where: { campaignId: campaign.id, isDeleted: false, order: { isDeleted: false } },
@@ -2478,7 +2478,7 @@ export function makeOpsController(env: Env) {
           }
         }
 
-        // â”€â”€ "Open to All" mode: skip per-mediator allocation â”€â”€
+        // ── "Open to All" mode: skip per-mediator allocation ──
         const isOpenToAll = body.openToAll === true;
 
         const positiveEntries = Object.entries(body.assignments || {}).filter(([, assignment]) => {
@@ -2570,7 +2570,7 @@ export function makeOpsController(env: Env) {
           updateData.lockedReason = 'SLOT_ASSIGNMENT';
         }
 
-        // Optimistic concurrency via updatedAt check â€” prevents slot overwrites
+        // Optimistic concurrency via updatedAt check — prevents slot overwrites
         // when two requests try to assign simultaneously.
         try {
           const updated = await db().campaign.updateMany({
@@ -2605,7 +2605,7 @@ export function makeOpsController(env: Env) {
           ])
         ).filter(Boolean);
 
-        // Resolve brandUserId â†’ mongoId for audience
+        // Resolve brandUserId → mongoId for audience
         const brandUser = await db().user.findUnique({ where: { id: campaign.brandUserId }, select: { mongoId: true } });
         const brandMongoId = brandUser?.mongoId || '';
 
@@ -2810,7 +2810,7 @@ export function makeOpsController(env: Env) {
         const amountPaise = rupeesToPaise(body.amount);
 
         if (canAny && wallet.availablePaise < amountPaise) {
-          throw new AppError(409, 'INSUFFICIENT_FUNDS', `Wallet only has â‚¹${(wallet.availablePaise / 100).toFixed(2)} available but payout is â‚¹${body.amount}`);
+          throw new AppError(409, 'INSUFFICIENT_FUNDS', `Wallet only has ₹${(wallet.availablePaise / 100).toFixed(2)} available but payout is ₹${body.amount}`);
         }
 
         const requestId = String(

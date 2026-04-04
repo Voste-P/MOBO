@@ -118,7 +118,22 @@ function isProductNameMatch(expected: string, detected: string): boolean {
   if (!expected || !detected) return false;
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   const eNorm = norm(expected);
-  const dNorm = norm(detected);
+  let dNorm = norm(detected);
+
+  // ── Truncation detection ──
+  // Screenshots often show truncated product names ending with "..." or "…".
+  // Strip the trailing ellipsis and the last (likely partial) word so we only
+  // compare complete tokens, then relax the reverse-match threshold.
+  let wasTruncated = false;
+  const ellipsisRe = /^(.*?)\s*(?:\.{2,}|…)\s*$/;
+  const ellipsisMatch = detected.match(ellipsisRe);
+  if (ellipsisMatch) {
+    let cleaned = norm(ellipsisMatch[1]);
+    const lastSpace = cleaned.lastIndexOf(' ');
+    if (lastSpace > 0) cleaned = cleaned.substring(0, lastSpace).trim();
+    if (cleaned.length >= 3) { dNorm = cleaned; wasTruncated = true; }
+  }
+
   // Direct substring: if either fully contains the other.
   // Guard: the shorter string must be at least 40% the length of the longer
   // to prevent short generic words (e.g. "perfume") from matching long product names.
@@ -127,6 +142,10 @@ function isProductNameMatch(expected: string, detected: string): boolean {
     const longer = Math.max(eNorm.length, dNorm.length);
     if (shorter / longer >= 0.4 && (eNorm.includes(dNorm) || dNorm.includes(eNorm))) return true;
   }
+
+  // ── Also accept when the detected text is a clear prefix of the expected ──
+  // Handles cases like "Avimee Herbal Keshpalla" matching "Avimee Herbal Keshpallav Hair Oil..."
+  if (wasTruncated && dNorm.length >= 8 && eNorm.startsWith(dNorm)) return true;
 
   const tokenize = (s: string) => {
     const all = [...new Set(s.split(/\s+/).filter(t => t.length >= 2))];
@@ -137,24 +156,28 @@ function isProductNameMatch(expected: string, detected: string): boolean {
   const dTokens = tokenize(dNorm);
   if (eTokens.length === 0 || dTokens.length === 0) return false;
 
-  // Count how many expected tokens appear in the detected string (exact or fuzzy)
-  const matchedCount = eTokens.filter(et =>
-    dTokens.some(dt =>
-      dt === et ||
-      (et.length >= 4 && dt.includes(et)) ||
-      (dt.length >= 4 && et.includes(dt)) ||
-      (et.length >= 5 && dt.length >= 5 && editDistance(et, dt) <= 1)
-    )
-  ).length;
+  const tokenMatch = (a: string, b: string) =>
+    a === b ||
+    (a.length >= 4 && b.includes(a)) ||
+    (b.length >= 4 && a.includes(b)) ||
+    (a.length >= 5 && b.length >= 5 && editDistance(a, b) <= 1);
 
-  // Adaptive match policy: For names with few tokens (≤3), require 100% match
-  // to prevent collisions (e.g. brand names only). For names with 4+ tokens,
-  // require 85% match to handle OCR partial reads while still blocking different
-  // products from the same brand (e.g. "Avimee Herbal Keshpallav Hair Oil" vs
-  // "Avimee Herbal Scalptone Hair Growth Serum" still fails because only 3/5 match = 60%).
-  // Fuzzy matching (edit distance ≤1) handles minor OCR errors like "Keshpallav" → "Keshpalav".
+  // Forward: how many detected tokens appear in expected (100% required)
+  const fwdCount = dTokens.filter(dt => eTokens.some(et => tokenMatch(dt, et))).length;
+  // Reverse: how many expected tokens appear in detected
+  const revCount = eTokens.filter(et => dTokens.some(dt => tokenMatch(et, dt))).length;
+
+  // For truncated names: require ALL detected tokens match expected (forward = 100%)
+  // but relax reverse to 30% (the screenshot simply didn't show the full name).
+  if (wasTruncated && dTokens.length >= 2) {
+    const fwdOk = fwdCount === dTokens.length;
+    const revThreshold = Math.max(1, Math.ceil(eTokens.length * 0.3));
+    return fwdOk && revCount >= revThreshold;
+  }
+
+  // Standard (non-truncated) policy: 85% of expected tokens must appear in detected
   const threshold = eTokens.length <= 3 ? eTokens.length : Math.ceil(eTokens.length * 0.85);
-  return matchedCount >= threshold;
+  return revCount >= threshold;
 }
 
 // ── Confidence Score Constants ──

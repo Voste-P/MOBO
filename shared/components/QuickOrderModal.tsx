@@ -227,7 +227,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
               />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-bold text-sm text-slate-900 line-clamp-2">{product.title}</h3>
+              <h3 className="font-bold text-sm text-slate-900 line-clamp-2" title={product.title || ''}>{product.title}</h3>
               <p className="text-lg font-extrabold text-lime-600 mt-0.5">₹{product.price.toLocaleString('en-IN')}</p>
               <p className="text-[10px] text-slate-400 uppercase font-bold">{product.platform} &bull; {product.dealType === 'Discount' ? 'Order' : product.dealType} Deal</p>
             </div>

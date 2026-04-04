@@ -25,7 +25,7 @@ module.exports = {
         banner: '490',
       },
       fontFamily: {
-        sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif', "'Apple Color Emoji'", "'Segoe UI Emoji'", "'Noto Color Emoji'"],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
       },
       borderRadius: {

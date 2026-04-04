@@ -684,7 +684,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
       'Unit Price',
       'Quantity',
       'Total Value',
-      'Commission (â‚¹)',
+      'Commission (₹)',
       'Settlement Date',
       'Agency Name',
       'Mediator Name',
@@ -777,7 +777,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
 
   const handleExportToSheets = () => {
     if (!filtered.length) { toast.info('No orders to export'); return; }
-    const sheetHeaders = ['Order ID','Date','Time','Product','Platform','Deal Type','Unit Price','Quantity','Total Value','Commission (â‚¹)','Settlement Date','Agency Name','Mediator Name','Mediator Code','Buyer Name','Buyer Mobile','Reviewer Name','Workflow Status','Payment Status','Verification Status','Internal Ref','Sold By','Order Date','Extracted Product','UTR/Reference','Payment Mode'];
+    const sheetHeaders = ['Order ID','Date','Time','Product','Platform','Deal Type','Unit Price','Quantity','Total Value','Commission (₹)','Settlement Date','Agency Name','Mediator Name','Mediator Code','Buyer Name','Buyer Mobile','Reviewer Name','Workflow Status','Payment Status','Verification Status','Internal Ref','Sold By','Order Date','Extracted Product','UTR/Reference','Payment Mode'];
     const sheetRows = filtered.map((o) => {
       const dateObj = new Date(o.createdAt);
       const item = o.items?.[0];
@@ -894,7 +894,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
             >
               <option value="All">All Products</option>
               {productOptions.map((p) => (
-                <option key={p} value={p}>{p.length > 30 ? p.slice(0, 30) + 'â€¦' : p}</option>
+                <option key={p} value={p}>{p.length > 30 ? p.slice(0, 30) + '…' : p}</option>
               ))}
             </select>
             <button
@@ -993,7 +993,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                               className="w-full h-full object-contain mix-blend-multiply"
                             />
                           </div>
-                          <span className="text-sm font-bold text-zinc-900 line-clamp-1">
+                          <span className="text-sm font-bold text-zinc-900 line-clamp-1" title={o.items?.[0]?.title || ''}>
                             {o.items?.[0]?.title || 'Unknown'}
                           </span>
                         </div>
@@ -1077,7 +1077,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                           )}
                         </td>
                         <td className="p-6">
-                          <span className="text-sm font-bold text-zinc-900 line-clamp-1">{o.items?.[0]?.title || 'Product'}</span>
+                          <span className="text-sm font-bold text-zinc-900 line-clamp-1" title={o.items?.[0]?.title || ''}>{o.items?.[0]?.title || 'Product'}</span>
                           <div className="text-[9px] text-zinc-400">Qty: {o.items?.[0]?.quantity || 1}</div>
                         </td>
                         <td className="p-6 text-right font-bold text-zinc-900">{formatCurrency(o.total)}</td>
@@ -1137,7 +1137,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                           )}
                         </td>
                         <td className="p-6">
-                          <span className="text-sm font-bold text-zinc-900 line-clamp-1">{o.items?.[0]?.title || 'Product'}</span>
+                          <span className="text-sm font-bold text-zinc-900 line-clamp-1" title={o.items?.[0]?.title || ''}>{o.items?.[0]?.title || 'Product'}</span>
                         </td>
                         <td className="p-6 text-center">
                           <span className="text-xs font-bold text-zinc-600">{o.items?.[0]?.quantity || 1}</span>
@@ -1230,7 +1230,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                   className="w-14 h-14 object-contain mix-blend-multiply rounded-xl bg-white border border-zinc-100 p-1"
                 />
                 <div>
-                  <p className="text-sm font-bold text-zinc-900 line-clamp-1">
+                  <p className="text-sm font-bold text-zinc-900 line-clamp-1" title={viewProofOrder.items?.[0]?.title || ''}>
                     {viewProofOrder.items?.[0]?.title}
                   </p>
                   <p className="text-xs text-zinc-500 mt-1">
@@ -1278,7 +1278,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                         className="w-full h-auto block"
                       />
                     </div>
-                    {/* AI Verification â€” stored from buyer's proof submission */}
+                    {/* AI Verification — stored from buyer's proof submission */}
                     {viewProofOrder.orderAiVerification && (
                     <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-200 mt-2">
                       <div className="flex justify-between items-center mb-2">
@@ -1297,14 +1297,14 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                                   <div className={`flex-1 p-2 rounded-lg border text-center ${aiData?.orderIdMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                                     <p className="text-[9px] font-bold text-zinc-400 uppercase">Order ID</p>
                                     <p className={`text-xs font-bold ${aiData?.orderIdMatch ? 'text-green-600' : 'text-red-600'}`}>
-                                      {aiData?.orderIdMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
+                                      {aiData?.orderIdMatch ? '✓ Match' : '✗ Mismatch'}
                                     </p>
                                     {aiData?.detectedOrderId && <p className="text-[9px] text-zinc-500 font-mono mt-0.5">Detected: {aiData.detectedOrderId}</p>}
                                   </div>
                                   <div className={`flex-1 p-2 rounded-lg border text-center ${aiData?.amountMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                                     <p className="text-[9px] font-bold text-zinc-400 uppercase">Amount</p>
                                     <p className={`text-xs font-bold ${aiData?.amountMatch ? 'text-green-600' : 'text-red-600'}`}>
-                                      {aiData?.amountMatch ? 'âœ“ Match' : 'âœ— Mismatch'}
+                                      {aiData?.amountMatch ? '✓ Match' : '✗ Mismatch'}
                                     </p>
                                     {aiData?.detectedAmount != null && <p className="text-[9px] text-zinc-500 font-mono mt-0.5">Detected: {formatCurrency(aiData.detectedAmount)}</p>}
                                   </div>
@@ -1724,7 +1724,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <div>
                     <label className="text-xs font-bold text-zinc-400 uppercase ml-1 mb-2 block">
-                      Product Price (â‚¹)
+                      Product Price (₹)
                     </label>
                     <input
                       type="number"
@@ -1737,7 +1737,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                   </div>
                   <div>
                     <label className="text-xs font-bold text-zinc-400 uppercase ml-1 mb-2 block">
-                      Deal Price (â‚¹)
+                      Deal Price (₹)
                     </label>
                     <input
                       type="number"
@@ -1750,7 +1750,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                   </div>
                   <div>
                     <label className="text-xs font-bold text-zinc-400 uppercase ml-1 mb-2 block whitespace-nowrap">
-                      Agency Commission (â‚¹)
+                      Agency Commission (₹)
                     </label>
                     <input
                       type="number"
@@ -2014,7 +2014,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                       {c.platform}
                     </span>
                   </div>
-                  <h3 className="font-bold text-zinc-900 text-sm line-clamp-1 leading-tight mb-1">
+                  <h3 className="font-bold text-zinc-900 text-sm line-clamp-1 leading-tight mb-1" title={c.title || ''}>
                     {c.title}
                   </h3>
                   <span
@@ -2039,7 +2039,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                     <div className="w-[1px] h-6 bg-zinc-100"></div>
                     <div className="flex flex-col">
                       <span className="text-[9px] font-bold text-zinc-400 uppercase">Created</span>
-                      <span className="text-[10px] font-medium text-zinc-500">{c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB') : 'â€”'}</span>
+                      <span className="text-[10px] font-medium text-zinc-500">{c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB') : '—'}</span>
                     </div>
                   </div>
                 </div>
@@ -2106,7 +2106,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                       setCopyingId(c.id);
                       try {
                         await api.brand.copyCampaign(c.id);
-                        toast.success('Campaign copied as Draft â€” you can now edit it');
+                        toast.success('Campaign copied as Draft — you can now edit it');
                         onRefresh(['campaigns']);
                       } catch (err) {
                         toast.error(formatErrorMessage(err, 'Copy failed'));
@@ -2266,7 +2266,7 @@ export const BrandDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
-  // Trigger data load on tab change â€” only fetches keys not already cached
+  // Trigger data load on tab change — only fetches keys not already cached
   const prevTabRef = useRef(activeTab);
   useEffect(() => {
     const tabChanged = prevTabRef.current !== activeTab;
@@ -2696,7 +2696,7 @@ export const BrandDashboard: React.FC = () => {
                         <>
                           <button type="button" onClick={() => { setResolvingTicketId(t.id); setResolutionNote(''); }}
                             className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
-                            âœ“ Resolve / Reject
+                            ✓ Resolve / Reject
                           </button>
                           <button
                             type="button"
@@ -2711,7 +2711,7 @@ export const BrandDashboard: React.FC = () => {
                             }}
                             className="px-3 py-1.5 rounded-lg text-xs font-bold bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100"
                           >
-                            â†‘ Escalate
+                            ↑ Escalate
                           </button>
                         </>
                       )}
@@ -2722,10 +2722,10 @@ export const BrandDashboard: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <button type="button" onClick={async () => {
                               try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
-                            }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">âœ“ Resolve</button>
+                            }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✓ Resolve</button>
                             <button type="button" onClick={async () => {
                               try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
-                            }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">âœ— Reject</button>
+                            }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
                             <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
                               className="px-3 py-1 rounded-lg text-xs font-bold bg-zinc-100 text-zinc-500 hover:bg-zinc-200">Cancel</button>
                           </div>
@@ -2923,7 +2923,7 @@ export const BrandDashboard: React.FC = () => {
                               </div>
                             </td>
                             <td className="p-6 font-mono text-xs font-bold text-zinc-500">
-                              {tx.ref || 'â€”'}
+                              {tx.ref || '—'}
                             </td>
                             <td className="p-6 text-right font-mono font-bold text-zinc-900">
                               {tx.amount}

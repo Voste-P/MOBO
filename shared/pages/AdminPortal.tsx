@@ -2137,7 +2137,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         <td className="p-5">
                           <div className="flex items-center gap-3">
                             <ProxiedImage src={p.image} alt={p.title ? String(p.title) : 'Product image'} className="w-8 h-8 rounded-lg object-contain bg-white border border-slate-100 p-1" />
-                            <span className="truncate max-w-[200px] text-slate-900 font-bold">
+                            <span className="truncate max-w-[200px] text-slate-900 font-bold" title={p.title ? String(p.title) : ''}>
                               {p.title}
                             </span>
                           </div>

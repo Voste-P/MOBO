@@ -484,7 +484,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                     </div>
                     <div className="min-w-0 flex-1 py-0.5">
                       <div className="flex justify-between items-start">
-                        <h4 className="font-bold text-zinc-900 text-sm line-clamp-1 pr-2">
+                        <h4 className="font-bold text-zinc-900 text-sm line-clamp-1 pr-2" title={o.items?.[0]?.title || ''}>
                           {o.items?.[0]?.title}
                         </h4>
                         <span
@@ -943,7 +943,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                           Published
                         </span>
                       </div>
-                      <h4 className="font-bold text-zinc-900 text-base leading-tight line-clamp-1 mb-1">
+                      <h4 className="font-bold text-zinc-900 text-base leading-tight line-clamp-1 mb-1" title={d.title || ''}>
                         {d.title}
                       </h4>
                       {d.campaignId && (
@@ -1066,7 +1066,7 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                           </span>
                         )}
                       </div>
-                      <h4 className="font-bold text-zinc-900 text-base leading-tight line-clamp-1 mb-1">
+                      <h4 className="font-bold text-zinc-900 text-base leading-tight line-clamp-1 mb-1" title={c.title || ''}>
                         {c.title}
                       </h4>
                       <span
