@@ -37,7 +37,7 @@ function parseVerification(v: any): Record<string, any> {
  * Get cached AI extraction for a proof type, or extract if not cached.
  */
 export async function getOrExtractProof(params: {
-  orderId: string; // mongoId
+  orderId: string;
   proofType: ProofType;
   imageBase64: string;
   expectedOrderId?: string;
@@ -66,7 +66,7 @@ export async function getOrExtractProof(params: {
   // Check cache first (unless forced)
   if (!forceReExtract) {
     const order = await prisma().order.findFirst({
-      where: { mongoId: orderId },
+      where: { id: orderId },
       select: { verification: true },
     });
 
@@ -154,14 +154,14 @@ export async function getOrExtractProof(params: {
 
   // Merge into existing verification JSONB
   const existing = await prisma().order.findFirst({
-    where: { mongoId: orderId },
+    where: { id: orderId },
     select: { verification: true },
   });
   const veri = parseVerification(existing?.verification);
   veri[cacheKey] = { ...extraction, extractedAt: now };
 
   await prisma().order.update({
-    where: { mongoId: orderId },
+    where: { id: orderId },
     data: { verification: veri as any },
   });
 
@@ -181,14 +181,14 @@ export async function clearProofCache(orderId: string, proofType: ProofType): Pr
   const cacheKey = `${proofType}AiExtraction`;
 
   const existing = await prisma().order.findFirst({
-    where: { mongoId: orderId },
+    where: { id: orderId },
     select: { verification: true },
   });
   const veri = parseVerification(existing?.verification);
   delete veri[cacheKey];
 
   await prisma().order.update({
-    where: { mongoId: orderId },
+    where: { id: orderId },
     data: { verification: veri as any },
   });
 
@@ -206,7 +206,7 @@ export async function getExtractionStatus(orderId: string): Promise<{
   returnWindow: { extracted: boolean; at: string | null };
 }> {
   const row = await prisma().order.findFirst({
-    where: { mongoId: orderId },
+    where: { id: orderId },
     select: { verification: true },
   });
 
@@ -291,7 +291,7 @@ export async function preWarmCache(params: {
       try {
         const screenshotKey = `screenshot${proofType.charAt(0).toUpperCase() + proofType.slice(1)}` as any;
         const order = await prisma().order.findFirst({
-          where: { mongoId: orderId },
+          where: { id: orderId },
           select: { [screenshotKey]: true, verification: true } as any,
         });
 

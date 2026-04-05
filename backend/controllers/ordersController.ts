@@ -1,6 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
 import type { Env } from '../config/env.js';
-import { randomUUID } from 'node:crypto';
 import { AppError } from '../middleware/errors.js';
 import { prisma as db } from '../database/prisma.js';
 import { Prisma as _Prisma } from '../generated/prisma/client.js';
@@ -53,10 +52,10 @@ export function makeOrdersController(env: Env) {
   };
   const findOrderForProof = async (orderId: string) => {
     const isUuid = UUID_RE.test(orderId);
-    // Single query with OR to cover id, mongoId, AND externalOrderId
+    // Single query with OR to cover id AND externalOrderId
     const where = isUuid
-      ? { OR: [{ id: orderId }, { mongoId: orderId }, { externalOrderId: orderId }] as any, isDeleted: false }
-      : { OR: [{ mongoId: orderId }, { externalOrderId: orderId }] as any, isDeleted: false };
+      ? { OR: [{ id: orderId }, { externalOrderId: orderId }] as any, isDeleted: false }
+      : { OR: [{ id: orderId }, { externalOrderId: orderId }] as any, isDeleted: false };
     const found = await db().order.findFirst({
       where: where as any,
       select: orderProofSelect,
@@ -167,7 +166,7 @@ export function makeOrdersController(env: Env) {
 
     const finalize = await finalizeApprovalIfReady(updated!, 'SYSTEM_AI', envRef);
     orderLog.info('Auto-verified step by AI confidence', {
-      orderId: freshOrder.mongoId,
+      orderId: freshOrder.id,
       step: vKey,
       aiConfidenceScore: aiConfidence,
       threshold,
@@ -277,7 +276,7 @@ export function makeOrdersController(env: Env) {
 
     const finalize = await finalizeApprovalIfReady(updated, 'SYSTEM_AI', envRef);
     orderLog.info('Bulk auto-verified all steps — direct to cooling period', {
-      orderId: order.mongoId,
+      orderId: order.id,
       steps: stepsToVerify.map(s => s.key),
       confidences: stepsToVerify.map(s => s.confidence),
       approved: (finalize as any).approved,
@@ -512,7 +511,7 @@ export function makeOrdersController(env: Env) {
         // Fetch all orders in one query — lightweight select (no base64 blobs)
         const orders = await db().order.findMany({
           where: {
-            OR: orderIds.map(id => UUID_RE.test(id) ? { id } : { mongoId: id }),
+            OR: orderIds.map(id => UUID_RE.test(id) ? { id } : { id: id }),
             isDeleted: false,
           },
           select: orderProofExistsSelect,
@@ -526,7 +525,7 @@ export function makeOrdersController(env: Env) {
         const proofExistenceMap = new Map<string, Record<string, boolean>>();
         if (idsForSql.length > 0) {
           const existenceRows: any[] = await db().$queryRaw`
-            SELECT id, mongo_id,
+            SELECT id,
               (screenshot_order IS NOT NULL) AS has_order,
               (screenshot_payment IS NOT NULL) AS has_payment,
               (screenshot_review IS NOT NULL) AS has_review,
@@ -545,11 +544,10 @@ export function makeOrdersController(env: Env) {
           }
         }
 
-        // Map by both id and mongoId for quick lookup
+        // Map orders by id for quick lookup
         const orderMap = new Map<string, any>();
         for (const o of orders) {
           orderMap.set(String(o.id), o);
-          if (o.mongoId) orderMap.set(String(o.mongoId), o);
         }
 
         // Authorization: only privileged roles (admin/ops) can batch across all orders.
@@ -630,16 +628,15 @@ export function makeOrdersController(env: Env) {
         const requesterId = req.auth?.userId;
         const requesterRoles = req.auth?.roles ?? [];
         const privileged = requesterRoles.includes('admin') || requesterRoles.includes('ops');
-        // userId may be a mongoId (public API id) while auth.userId is the PG UUID.
-        const requesterMongoId = (req.auth as any)?.mongoId ?? '';
-        if (!privileged && requesterId !== userId && (req.auth?.pgUserId ?? '') !== userId && requesterMongoId !== userId) {
+        // userId check against auth context
+        if (!privileged && requesterId !== userId && (req.auth?.pgUserId ?? '') !== userId) {
           throw new AppError(403, 'FORBIDDEN', 'Cannot access other user orders');
         }
 
-        // Resolve mongoId/UUID → PG UUID for FK query
+        // Resolve UUID for FK query
         const userWhere = UUID_RE.test(userId)
-          ? { OR: [{ id: userId }, { mongoId: userId }] as any, isDeleted: false }
-          : { mongoId: userId, isDeleted: false };
+          ? { id: userId as any, isDeleted: false }
+          : { id: userId, isDeleted: false };
         const targetUser = await db().user.findFirst({ where: userWhere as any, select: { id: true } });
         if (!targetUser) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
@@ -714,25 +711,22 @@ export function makeOrdersController(env: Env) {
           throw new AppError(403, 'FORBIDDEN', 'Only buyers can create orders');
         }
 
-        // Ownership check: body.userId may be a mongoId (public API id) while
-        // req.auth.userId is always the PG UUID.  Compare against both to avoid
-        // a false-positive 403 when the client sends the mongoId.
+        // Ownership check: body.userId must match the authenticated user.
         const bodyUserId = String(body.userId);
-        const requesterMongoId = (req.auth as any)?.mongoId ?? '';
-        if (bodyUserId !== String(requesterId) && bodyUserId !== String(_pgUserId) && bodyUserId !== requesterMongoId) {
+        if (bodyUserId !== String(requesterId) && bodyUserId !== String(_pgUserId)) {
           throw new AppError(403, 'FORBIDDEN', 'Cannot create orders for another user');
         }
 
         const userLookupWhere = UUID_RE.test(body.userId)
-          ? { OR: [{ id: body.userId }, { mongoId: body.userId }] as any, isDeleted: false }
-          : { mongoId: body.userId, isDeleted: false };
-        const user = await db().user.findFirst({ where: userLookupWhere as any, select: { id: true, mongoId: true, name: true, mobile: true, status: true, parentCode: true } });
+          ? { id: body.userId as any, isDeleted: false }
+          : { id: body.userId, isDeleted: false };
+        const user = await db().user.findFirst({ where: userLookupWhere as any, select: { id: true, name: true, mobile: true, status: true, parentCode: true } });
         if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
         if (user.status !== 'active') {
           throw new AppError(403, 'USER_NOT_ACTIVE', 'Your account is not active. Please contact support.');
         }
         const userPgId = user.id;
-        const userMongoId = user.mongoId!;
+        const userDisplayId = user.id!;
 
         // Abuse prevention: basic velocity limits (per buyer).
         const now = new Date();
@@ -865,8 +859,8 @@ export function makeOrdersController(env: Env) {
           aiUnavailable = true;
         }
         const campaignWhere = UUID_RE.test(item.campaignId)
-          ? { OR: [{ id: item.campaignId }, { mongoId: item.campaignId }], isDeleted: false }
-          : { mongoId: item.campaignId, isDeleted: false };
+          ? { id: item.campaignId, isDeleted: false }
+          : { id: item.campaignId, isDeleted: false };
 
         // [PERF] Parallel fetch: campaign + mediatorUser are independent
         const [campaign, mediatorUser] = await Promise.all([
@@ -938,8 +932,8 @@ export function makeOrdersController(env: Env) {
         // Commission snapshot: prefer published Deal record if productId is a Deal id.
         let commissionPaise = rupeesToPaise(item.commission);
         const dealWhere = UUID_RE.test(item.productId)
-          ? { OR: [{ id: item.productId }, { mongoId: item.productId }] as any, isDeleted: false }
-          : { mongoId: item.productId, isDeleted: false };
+          ? { id: item.productId as any, isDeleted: false }
+          : { id: item.productId, isDeleted: false };
 
         // [PERF] Parallel fetch: mediatorSales + maybeDeal are independent
         const [mediatorSales, maybeDeal] = await Promise.all([
@@ -985,8 +979,8 @@ export function makeOrdersController(env: Env) {
           // If this is an upgrade from a redirect-tracked pre-order, update that order instead of creating a new one.
           if (body.preOrderId) {
             const preOrderWhere = UUID_RE.test(body.preOrderId)
-              ? { OR: [{ id: body.preOrderId }, { mongoId: body.preOrderId }] as any, userId: userPgId, isDeleted: false }
-              : { mongoId: body.preOrderId, userId: userPgId, isDeleted: false };
+              ? { id: body.preOrderId as any, userId: userPgId, isDeleted: false }
+              : { id: body.preOrderId, userId: userPgId, isDeleted: false };
             const existing = await tx.order.findFirst({
               where: preOrderWhere as any,
               include: { items: { where: { isDeleted: false } } },
@@ -1049,8 +1043,8 @@ export function makeOrdersController(env: Env) {
                 events: pushOrderEvent(existingEvents, {
                   type: 'ORDERED',
                   at: new Date(),
-                  actorUserId: userMongoId,
-                  metadata: { campaignId: String(campaign.mongoId ?? campaign.id), mediatorCode: upstreamMediatorCode },
+                  actorUserId: userDisplayId,
+                  metadata: { campaignId: String(campaign.id ?? campaign.id), mediatorCode: upstreamMediatorCode },
                 }) as any,
                 updatedBy: userPgId,
               },
@@ -1059,10 +1053,10 @@ export function makeOrdersController(env: Env) {
 
             // State machine: REDIRECTED -> ORDERED
             const transitioned = await transitionOrderWorkflow({
-              orderId: existing.mongoId!,
+              orderId: existing.id!,
               from: 'REDIRECTED' as any,
               to: 'ORDERED' as any,
-              actorUserId: userMongoId,
+              actorUserId: userDisplayId,
               metadata: { source: 'createOrder(preOrderId)' },
               tx,
               env,
@@ -1075,7 +1069,6 @@ export function makeOrdersController(env: Env) {
 
           const order = await tx.order.create({
             data: {
-              mongoId: randomUUID(),
               userId: userPgId,
               brandUserId: campaign.brandUserId,
               items: {
@@ -1119,8 +1112,8 @@ export function makeOrdersController(env: Env) {
               events: pushOrderEvent([], {
                 type: 'ORDERED',
                 at: new Date(),
-                actorUserId: userMongoId,
-                metadata: { campaignId: String(campaign.mongoId ?? campaign.id), mediatorCode: upstreamMediatorCode },
+                actorUserId: userDisplayId,
+                metadata: { campaignId: String(campaign.id ?? campaign.id), mediatorCode: upstreamMediatorCode },
               }) as any,
               createdBy: userPgId,
             },
@@ -1133,7 +1126,7 @@ export function makeOrdersController(env: Env) {
         // UI often submits the initial order screenshot at creation time.
         // If proof is already present, progress the strict workflow so Ops can verify.
         let finalOrder: any = created;
-        const orderMongoId = created?.mongoId ?? '';
+        const orderId = created?.id ?? '';
         const initialProofTypes: Array<'order' | 'rating' | 'review'> = [];
         if (body.screenshots?.order) initialProofTypes.push('order');
         if (body.screenshots?.rating) initialProofTypes.push('rating');
@@ -1154,7 +1147,7 @@ export function makeOrdersController(env: Env) {
           });
 
           const _afterProof = await transitionOrderWorkflow({
-            orderId: orderMongoId,
+            orderId: orderId,
             from: (created?.workflowStatus ?? 'ORDERED') as any,
             to: 'PROOF_SUBMITTED' as any,
             actorUserId: String(requesterId || ''),
@@ -1163,7 +1156,7 @@ export function makeOrdersController(env: Env) {
           });
 
           finalOrder = await transitionOrderWorkflow({
-            orderId: orderMongoId,
+            orderId: orderId,
             from: 'PROOF_SUBMITTED' as any,
             to: 'UNDER_REVIEW' as any,
             actorUserId: undefined,
@@ -1178,7 +1171,7 @@ export function makeOrdersController(env: Env) {
           const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 80;
           if (aiOrderConfidence > 0) {
             const freshOrder = await db().order.findFirst({
-              where: { mongoId: orderMongoId, isDeleted: false },
+              where: { id: orderId, isDeleted: false },
               include: { items: { where: { isDeleted: false } } },
             });
             if (freshOrder) {
@@ -1189,7 +1182,7 @@ export function makeOrdersController(env: Env) {
           // Mark order verification data when AI was unavailable so reviewers know
           if (aiUnavailable) {
             const aiUnavailableOrder = await db().order.findFirst({
-              where: { mongoId: orderMongoId, isDeleted: false },
+              where: { id: orderId, isDeleted: false },
               select: { id: true, verification: true },
             });
             if (aiUnavailableOrder) {
@@ -1211,38 +1204,38 @@ export function makeOrdersController(env: Env) {
           req,
           action: 'ORDER_CREATED',
           entityType: 'Order',
-          entityId: orderMongoId,
+          entityId: orderId,
           metadata: {
-            campaignId: String(campaign.mongoId ?? campaign.id),
+            campaignId: String(campaign.id ?? campaign.id),
             total: body.items.reduce((a: number, it: any) => a + (Number(it.priceAtPurchase) || 0) * (Number(it.quantity) || 1), 0),
             externalOrderId: resolvedExternalOrderId,
           },
         }).catch((err: unknown) => { orderLog.warn('Audit log failed', { error: err instanceof Error ? err.message : String(err) }); });
 
-        orderLog.info('Order created', { orderId: orderMongoId, userId: req.auth?.userId, campaignId: String(campaign.mongoId ?? campaign.id), externalOrderId: resolvedExternalOrderId, itemCount: body.items.length, ip: req.ip });
+        orderLog.info('Order created', { orderId: orderId, userId: req.auth?.userId, campaignId: String(campaign.id ?? campaign.id), externalOrderId: resolvedExternalOrderId, itemCount: body.items.length, ip: req.ip });
         logChangeEvent({
           actorUserId: req.auth?.userId,
           actorRoles: req.auth?.roles,
           actorIp: req.ip,
           entityType: 'Order',
-          entityId: orderMongoId,
+          entityId: orderId,
           action: 'ORDER_CREATED',
           requestId: String((res as any).locals?.requestId || ''),
           metadata: {
-            campaignId: String(campaign.mongoId ?? campaign.id),
+            campaignId: String(campaign.id ?? campaign.id),
             itemCount: body.items.length,
             externalOrderId: resolvedExternalOrderId,
           },
         });
 
-        businessLog.info('Order created', { orderId: orderMongoId, userId: req.auth?.userId, campaignId: String(campaign.mongoId ?? campaign.id), itemCount: body.items.length, ip: req.ip });
+        businessLog.info('Order created', { orderId: orderId, userId: req.auth?.userId, campaignId: String(campaign.id ?? campaign.id), itemCount: body.items.length, ip: req.ip });
         logAccessEvent('RESOURCE_ACCESS', {
           userId: req.auth?.userId,
           roles: req.auth?.roles,
           ip: req.ip,
           resource: 'Order',
           requestId: String((res as any).locals?.requestId || ''),
-          metadata: { action: 'ORDER_CREATED', orderId: orderMongoId, externalOrderId: resolvedExternalOrderId },
+          metadata: { action: 'ORDER_CREATED', orderId: orderId, externalOrderId: resolvedExternalOrderId },
         });
 
         res
@@ -1252,14 +1245,14 @@ export function makeOrdersController(env: Env) {
         // Post-response: notify UIs (wrapped in try/catch since response already sent)
         try {
           const privilegedRoles: Role[] = ['admin', 'ops'];
-          let brandMongoId = '';
+          let brandUserId = '';
           if (campaign.brandUserId) {
-            const brandUser = await db().user.findUnique({ where: { id: campaign.brandUserId }, select: { mongoId: true } });
-            brandMongoId = brandUser?.mongoId ?? '';
+            const brandUser = await db().user.findUnique({ where: { id: campaign.brandUserId }, select: { id: true } });
+            brandUserId = brandUser?.id ?? '';
           }
           const audience = {
           roles: privilegedRoles,
-          userIds: [userMongoId, brandMongoId].filter(Boolean),
+          userIds: [userDisplayId, brandUserId].filter(Boolean),
           mediatorCodes: upstreamMediatorCode ? [upstreamMediatorCode] : undefined,
           agencyCodes: upstreamAgencyCode ? [upstreamAgencyCode] : undefined,
         };
@@ -1287,8 +1280,8 @@ export function makeOrdersController(env: Env) {
       try {
         const body = submitClaimSchema.parse(req.body);
         const claimOrderWhere = UUID_RE.test(body.orderId)
-          ? { OR: [{ id: body.orderId }, { mongoId: body.orderId }] as any, isDeleted: false }
-          : { mongoId: body.orderId, isDeleted: false };
+          ? { id: body.orderId as any, isDeleted: false }
+          : { id: body.orderId, isDeleted: false };
         const order = await db().order.findFirst({
           where: claimOrderWhere as any,
           include: { items: { where: { isDeleted: false } } },
@@ -1474,14 +1467,14 @@ export function makeOrdersController(env: Env) {
                 claimAiConfidence = Math.max(80, (env.AI_REVIEW_LINK_CONFIDENCE ?? 95) - 10);
               } else {
                 orderLog.warn('Review link HEAD returned non-OK status', {
-                  orderId: order.mongoId, status: headResp.status, url: reviewUrl,
+                  orderId: order.id, status: headResp.status, url: reviewUrl,
                 });
                 // Domain-validated link from known platform — moderate confidence
                 claimAiConfidence = 70;
               }
             } catch {
               // Network error / timeout — domain was validated, assign moderate confidence
-              orderLog.warn('Review link HEAD request failed', { orderId: order.mongoId, url: reviewUrl });
+              orderLog.warn('Review link HEAD request failed', { orderId: order.id, url: reviewUrl });
               claimAiConfidence = 70;
             }
           }
@@ -1519,7 +1512,7 @@ export function makeOrdersController(env: Env) {
               logPerformance({
                 operation: 'AI_RATING_VERIFICATION',
                 durationMs: Date.now() - aiStart,
-                metadata: { orderId: order.mongoId, confidenceScore: ratingAiResult?.confidenceScore },
+                metadata: { orderId: order.id, confidenceScore: ratingAiResult?.confidenceScore },
               });
               // Block submission if reviewer name is set and doesn't match (strict enforcement)
               if (ratingAiResult && reviewerName && !ratingAiResult.accountNameMatch
@@ -1551,7 +1544,7 @@ export function makeOrdersController(env: Env) {
                 // Infrastructure failure (OCR capacity, Gemini down, timeout) — accept proof
                 // for manual mediator review instead of blocking the buyer
                 orderLog.warn('[submitClaim] Rating AI verification unavailable, proceeding for manual review', {
-                  error: aiErr?.message, orderId: order.mongoId,
+                  error: aiErr?.message, orderId: order.id,
                 });
               }
             }
@@ -1575,7 +1568,7 @@ export function makeOrdersController(env: Env) {
               req,
               action: 'AI_RATING_VERIFICATION',
               entityType: 'Order',
-              entityId: order.mongoId!,
+              entityId: order.id!,
               metadata: {
                 accountNameMatch: ratingAiResult.accountNameMatch,
                 productNameMatch: ratingAiResult.productNameMatch,
@@ -1623,7 +1616,7 @@ export function makeOrdersController(env: Env) {
               logPerformance({
                 operation: 'AI_RETURN_WINDOW_VERIFICATION',
                 durationMs: Date.now() - aiStart,
-                metadata: { orderId: order.mongoId, confidenceScore: returnWindowResult?.confidenceScore },
+                metadata: { orderId: order.id, confidenceScore: returnWindowResult?.confidenceScore },
               });
               // Hard-block 1: Order ID must match
               if (returnWindowResult && !returnWindowResult.orderIdMatch
@@ -1692,7 +1685,7 @@ export function makeOrdersController(env: Env) {
                 // Infrastructure failure (OCR capacity, Gemini down, timeout) — accept proof
                 // for manual mediator review instead of blocking the buyer
                 orderLog.warn('[submitClaim] Return window AI verification unavailable, proceeding for manual review', {
-                  error: aiErr?.message, orderId: order.mongoId,
+                  error: aiErr?.message, orderId: order.id,
                 });
               }
             }
@@ -1707,7 +1700,7 @@ export function makeOrdersController(env: Env) {
               req,
               action: 'AI_RETURN_WINDOW_VERIFICATION',
               entityType: 'Order',
-              entityId: order.mongoId!,
+              entityId: order.id!,
               metadata: {
                 orderIdMatch: returnWindowResult.orderIdMatch,
                 productNameMatch: returnWindowResult.productNameMatch,
@@ -1739,7 +1732,7 @@ export function makeOrdersController(env: Env) {
             const expectedPlatform = String((order.items?.[0] as any)?.platform || '').trim();
             // Guard against NaN/Infinity from corrupted order data
             if (!Number.isFinite(expectedAmount) || expectedAmount <= 0) {
-              orderLog.warn(`[ordersController] Skipping AI re-upload verification: invalid expectedAmount=${expectedAmount} for order=${order.mongoId}`);
+              orderLog.warn(`[ordersController] Skipping AI re-upload verification: invalid expectedAmount=${expectedAmount} for order=${order.id}`);
             } else {
               try {
               const aiStart = Date.now();
@@ -1753,7 +1746,7 @@ export function makeOrdersController(env: Env) {
               logPerformance({
                 operation: 'AI_ORDER_REUPLOAD_VERIFICATION',
                 durationMs: Date.now() - aiStart,
-                metadata: { orderId: order.mongoId, confidenceScore: aiOrderVerification?.confidenceScore },
+                metadata: { orderId: order.id, confidenceScore: aiOrderVerification?.confidenceScore },
               });
               // Block re-upload if order ID clearly doesn't match (fraud prevention)
               if (aiOrderVerification && !aiOrderVerification.orderIdMatch
@@ -1792,7 +1785,7 @@ export function makeOrdersController(env: Env) {
                 // Infrastructure failure (OCR capacity, Gemini down, timeout) — accept proof
                 // for manual mediator review instead of blocking the buyer
                 orderLog.warn('[submitClaim] Order re-upload AI verification unavailable, proceeding for manual review', {
-                  error: aiErr?.message, orderId: order.mongoId,
+                  error: aiErr?.message, orderId: order.id,
                 });
               }
             }
@@ -1830,7 +1823,7 @@ export function makeOrdersController(env: Env) {
               req,
               action: 'AI_PURCHASE_PROOF_VERIFICATION',
               entityType: 'Order',
-              entityId: order.mongoId!,
+              entityId: order.id!,
               metadata: {
                 orderIdMatch: aiOrderVerification.orderIdMatch,
                 amountMatch: aiOrderVerification.amountMatch,
@@ -1873,7 +1866,7 @@ export function makeOrdersController(env: Env) {
             // Don't set updateData.reviewerName — already persisted atomically above
           } else if (body.reviewerName.trim().toLowerCase() !== String(order.reviewerName).trim().toLowerCase()) {
             orderLog.warn('Reviewer name change attempt blocked', {
-              orderId: order.mongoId,
+              orderId: order.id,
               existingName: order.reviewerName,
               attemptedName: body.reviewerName,
             });
@@ -1941,21 +1934,21 @@ export function makeOrdersController(env: Env) {
                   select: { parentCode: true },
                 })
                 : null,
-              db().user.findUnique({ where: { id: order.userId }, select: { mongoId: true } }),
+              db().user.findUnique({ where: { id: order.userId }, select: { id: true } }),
               order.brandUserId
-                ? db().user.findUnique({ where: { id: order.brandUserId }, select: { mongoId: true } })
+                ? db().user.findUnique({ where: { id: order.brandUserId }, select: { id: true } })
                 : null,
             ]);
             const upstreamAgencyCode = String(mediatorUser?.parentCode || '').trim();
             const audience = {
               roles: privilegedRoles,
-              userIds: [orderUser?.mongoId ?? '', brandUser?.mongoId ?? ''].filter(Boolean),
+              userIds: [orderUser?.id ?? '', brandUser?.id ?? ''].filter(Boolean),
               mediatorCodes: managerCode ? [managerCode] : undefined,
               agencyCodes: upstreamAgencyCode ? [upstreamAgencyCode] : undefined,
             };
             publishRealtime({ type: 'orders.changed', ts: new Date().toISOString(), audience });
-            await writeAuditLog({ req, action: 'PROOF_SUBMITTED', entityType: 'Order', entityId: order.mongoId!, metadata: { proofType: body.type, approvedLateUpload: true } });
-            logChangeEvent({ actorUserId: req.auth?.userId, actorRoles: req.auth?.roles, actorIp: req.ip, entityType: 'Order', entityId: order.mongoId!, action: 'STATUS_CHANGE', requestId: String((res as any).locals?.requestId || ''), metadata: { proofType: body.type, action: 'PROOF_SUBMITTED_AFTER_APPROVAL' } });
+            await writeAuditLog({ req, action: 'PROOF_SUBMITTED', entityType: 'Order', entityId: order.id!, metadata: { proofType: body.type, approvedLateUpload: true } });
+            logChangeEvent({ actorUserId: req.auth?.userId, actorRoles: req.auth?.roles, actorIp: req.ip, entityType: 'Order', entityId: order.id!, action: 'STATUS_CHANGE', requestId: String((res as any).locals?.requestId || ''), metadata: { proofType: body.type, action: 'PROOF_SUBMITTED_AFTER_APPROVAL' } });
           } catch (postErr) {
             orderLog.warn('Post-response notification failed (approved late upload)', { error: postErr instanceof Error ? postErr.message : String(postErr) });
           }
@@ -1990,21 +1983,21 @@ export function makeOrdersController(env: Env) {
                   select: { parentCode: true },
                 })
                 : null,
-              db().user.findUnique({ where: { id: order.userId }, select: { mongoId: true } }),
+              db().user.findUnique({ where: { id: order.userId }, select: { id: true } }),
               order.brandUserId
-                ? db().user.findUnique({ where: { id: order.brandUserId }, select: { mongoId: true } })
+                ? db().user.findUnique({ where: { id: order.brandUserId }, select: { id: true } })
                 : null,
             ]);
             const upstreamAgencyCode = String(mediatorUser?.parentCode || '').trim();
             const audience = {
               roles: privilegedRoles,
-              userIds: [orderUser?.mongoId ?? '', brandUser?.mongoId ?? ''].filter(Boolean),
+              userIds: [orderUser?.id ?? '', brandUser?.id ?? ''].filter(Boolean),
               mediatorCodes: managerCode ? [managerCode] : undefined,
               agencyCodes: upstreamAgencyCode ? [upstreamAgencyCode] : undefined,
             };
             publishRealtime({ type: 'orders.changed', ts: new Date().toISOString(), audience });
-            await writeAuditLog({ req, action: 'PROOF_SUBMITTED', entityType: 'Order', entityId: order.mongoId!, metadata: { proofType: body.type, reUpload: true } });
-            logChangeEvent({ actorUserId: req.auth?.userId, actorRoles: req.auth?.roles, actorIp: req.ip, entityType: 'Order', entityId: order.mongoId!, action: 'STATUS_CHANGE', requestId: String((res as any).locals?.requestId || ''), metadata: { proofType: body.type, action: 'PROOF_RESUBMITTED' } });
+            await writeAuditLog({ req, action: 'PROOF_SUBMITTED', entityType: 'Order', entityId: order.id!, metadata: { proofType: body.type, reUpload: true } });
+            logChangeEvent({ actorUserId: req.auth?.userId, actorRoles: req.auth?.roles, actorIp: req.ip, entityType: 'Order', entityId: order.id!, action: 'STATUS_CHANGE', requestId: String((res as any).locals?.requestId || ''), metadata: { proofType: body.type, action: 'PROOF_RESUBMITTED' } });
           } catch (postErr) {
             orderLog.warn('Post-response notification failed (re-upload)', { error: postErr instanceof Error ? postErr.message : String(postErr) });
           }
@@ -2012,7 +2005,7 @@ export function makeOrdersController(env: Env) {
         }
 
         const _afterProof = await transitionOrderWorkflow({
-          orderId: order.mongoId!,
+          orderId: order.id!,
           from: order.workflowStatus as any,
           to: 'PROOF_SUBMITTED' as any,
           actorUserId: String(requesterId || ''),
@@ -2021,7 +2014,7 @@ export function makeOrdersController(env: Env) {
         });
 
         const afterReview = await transitionOrderWorkflow({
-          orderId: order.mongoId!,
+          orderId: order.id!,
           from: 'PROOF_SUBMITTED' as any,
           to: 'UNDER_REVIEW' as any,
           actorUserId: undefined,
@@ -2058,16 +2051,16 @@ export function makeOrdersController(env: Env) {
               select: { parentCode: true },
             })
             : null,
-          db().user.findUnique({ where: { id: order.userId }, select: { mongoId: true } }),
+          db().user.findUnique({ where: { id: order.userId }, select: { id: true } }),
           order.brandUserId
-            ? db().user.findUnique({ where: { id: order.brandUserId }, select: { mongoId: true } })
+            ? db().user.findUnique({ where: { id: order.brandUserId }, select: { id: true } })
             : null,
         ]);
         const upstreamAgencyCode = String(mediatorUser?.parentCode || '').trim();
 
         const audience = {
           roles: privilegedRoles,
-          userIds: [orderUser?.mongoId ?? '', brandUser?.mongoId ?? ''].filter(Boolean),
+          userIds: [orderUser?.id ?? '', brandUser?.id ?? ''].filter(Boolean),
           mediatorCodes: managerCode ? [managerCode] : undefined,
           agencyCodes: upstreamAgencyCode ? [upstreamAgencyCode] : undefined,
         };
@@ -2078,18 +2071,18 @@ export function makeOrdersController(env: Env) {
         // Audit log: proof submission
         await writeAuditLog({
           req, action: 'PROOF_SUBMITTED', entityType: 'Order',
-          entityId: order.mongoId!,
+          entityId: order.id!,
           metadata: { proofType: body.type },
         }).catch((err: unknown) => { orderLog.warn('Audit log failed', { error: err instanceof Error ? err.message : String(err) }); });
 
-        businessLog.info('Proof submitted', { orderId: order.mongoId, proofType: body.type, userId: req.auth?.userId, ip: req.ip });
+        businessLog.info('Proof submitted', { orderId: order.id, proofType: body.type, userId: req.auth?.userId, ip: req.ip });
         logAccessEvent('RESOURCE_ACCESS', {
           userId: req.auth?.userId,
           roles: req.auth?.roles,
           ip: req.ip,
           resource: 'Order',
           requestId: String((res as any).locals?.requestId || ''),
-          metadata: { action: 'PROOF_SUBMITTED', orderId: order.mongoId, proofType: body.type },
+          metadata: { action: 'PROOF_SUBMITTED', orderId: order.id, proofType: body.type },
         });
 
         logChangeEvent({
@@ -2097,7 +2090,7 @@ export function makeOrdersController(env: Env) {
           actorRoles: req.auth?.roles,
           actorIp: req.ip,
           entityType: 'Order',
-          entityId: order.mongoId!,
+          entityId: order.id!,
           action: 'STATUS_CHANGE',
           requestId: String((res as any).locals?.requestId || ''),
           metadata: { proofType: body.type, action: 'PROOF_SUBMITTED' },
@@ -2136,16 +2129,16 @@ export function makeOrdersController(env: Env) {
 
         // Look up the order
         const orderWhere = UUID_RE.test(orderId)
-          ? { OR: [{ id: orderId }, { mongoId: orderId }] as any, isDeleted: false }
-          : { mongoId: orderId, isDeleted: false };
+          ? { id: orderId as any, isDeleted: false }
+          : { id: orderId, isDeleted: false };
         const order = await db().order.findFirst({
           where: orderWhere as any,
-          select: { id: true, mongoId: true, userId: true, reviewerName: true },
+          select: { id: true, userId: true, reviewerName: true },
         });
         if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
 
         // Only the order owner can set the reviewer name.
-        // order.userId is the PG UUID; requesterId may be either PG UUID or mongoId.
+        // order.userId is the PG UUID.
         const ownerPgId = String(order.userId);
         const requesterPgId = String(req.auth?.pgUserId ?? requesterId);
         if (ownerPgId !== requesterPgId && ownerPgId !== String(requesterId)) {
@@ -2171,12 +2164,12 @@ export function makeOrdersController(env: Env) {
           req,
           action: 'order.set_reviewer_name',
           entityType: 'Order',
-          entityId: order.mongoId ?? order.id,
+          entityId: order.id ?? order.id,
           metadata: { reviewerName: rawName },
         });
 
-        businessLog.info(`[Order] Reviewer name set for order ${order.mongoId}: "${rawName}"`, {
-          actorUserId: requesterId, orderId: order.mongoId, reviewerName: rawName,
+        businessLog.info(`[Order] Reviewer name set for order ${order.id}: "${rawName}"`, {
+          actorUserId: requesterId, orderId: order.id, reviewerName: rawName,
         });
 
         res.json({ success: true, reviewerName: rawName });

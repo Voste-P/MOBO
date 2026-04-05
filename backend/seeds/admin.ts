@@ -69,7 +69,6 @@ export async function seedAdminOnly(args: SeedAdminArgs = {}) {
     const passwordHash = await hashPassword(password);
     user = await db.user.create({
       data: {
-        mongoId: randomUUID(),
         name,
         username,
         mobile,

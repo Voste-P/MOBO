@@ -73,7 +73,7 @@ export async function sendPushToUser(params: {
   let subscriptions: Array<{ endpoint: string; keysP256dh: string | null; keysAuth: string | null; expirationTime: Date | number | null }> = [];
   if (isPrismaAvailable()) {
     const db = prisma();
-    // Resolve userId (UUID or legacy mongoId)
+    // Resolve userId (UUID)
     const pgUser = await db.user.findFirst({
       where: idWhere(params.userId),
       select: { id: true },
@@ -181,9 +181,9 @@ export async function notifyOrderWorkflowPush(params: {
           const db = prisma();
           const pgMediators = await db.user.findMany({
             where: { mediatorCode, roles: { has: 'mediator' }, isDeleted: false },
-            select: { id: true, mongoId: true },
+            select: { id: true },
           });
-          mediatorIds = pgMediators.map(m => m.mongoId || m.id);
+          mediatorIds = pgMediators.map(m => m.id || m.id);
         }
         const payload: PushPayload = {
           title: 'New order to review',

@@ -145,10 +145,6 @@ Append-only: `actorUserId`, `actorRoles[]`, `action`, `entityType`, `entityId`, 
 
 System key-value config. Unique key (default `"system"`). Fields: `adminContactEmail`.
 
-### MigrationSync (table: `migration_sync`)
-
-Mongo→PG migration tracking. Unique on `collection`. Fields: `status`, `syncedCount`, `errorCount`.
-
 ## Relationship Diagram
 
 ```

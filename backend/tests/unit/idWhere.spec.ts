@@ -27,14 +27,14 @@ describe('idWhere', () => {
       expect(result).toEqual({ id: '550e8400-e29b-41d4-a716-446655440000' });
     });
 
-    it('returns { mongoId } for non-UUID values', () => {
+    it('returns { id } for non-UUID values', () => {
       const result = idWhere('507f1f77bcf86cd799439011');
-      expect(result).toEqual({ mongoId: '507f1f77bcf86cd799439011' });
+      expect(result).toEqual({ id: '507f1f77bcf86cd799439011' });
     });
 
-    it('returns { mongoId } for arbitrary strings', () => {
+    it('returns { id } for arbitrary strings', () => {
       const result = idWhere('some-legacy-id');
-      expect(result).toEqual({ mongoId: 'some-legacy-id' });
+      expect(result).toEqual({ id: 'some-legacy-id' });
     });
   });
 });

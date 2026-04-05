@@ -2,15 +2,10 @@
 import { prisma } from '../database/prisma.js';
 import { AppError } from '../middleware/errors.js';
 
-// UUID v4 regex — 8-4-4-4-12 hex with dashes.
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-async function ensureActiveUserByMongoId(idOrUuid: string) {
+async function ensureActiveUserById(idOrUuid: string) {
   const db = prisma();
-  // If the value looks like a UUID, look up by PG id; otherwise by mongoId.
-  const where = UUID_RE.test(idOrUuid)
-    ? { id: idOrUuid, isDeleted: false }
-    : { mongoId: idOrUuid, isDeleted: false };
+  // Look up by PG id.
+  const where = { id: idOrUuid, isDeleted: false };
   const user = await db.user.findFirst({ where: where as any });
   if (!user) throw new AppError(400, 'INVITE_ISSUER_NOT_FOUND', 'Invite issuer not found');
   if (user.status !== 'active') {
@@ -35,11 +30,11 @@ async function ensureActiveUserByCode(params: { code: string; role: string }) {
 
 async function enforceInviteIssuerAndUpstreamActive(invite: any) {
   if (invite.createdBy) {
-    await ensureActiveUserByMongoId(invite.createdBy);
+    await ensureActiveUserById(invite.createdBy);
   }
 
   if (invite.parentUserId) {
-    const parent = await ensureActiveUserByMongoId(invite.parentUserId);
+    const parent = await ensureActiveUserById(invite.parentUserId);
 
     if (invite.role === 'shopper') {
       if (!parent.roles?.includes('mediator' as any) || !parent.mediatorCode) {
@@ -125,8 +120,8 @@ export async function consumeInvite(params: {
   const result = await db.invite.findFirst({ where: { code: params.code } });
   if (!result) throw new AppError(400, 'INVALID_INVITE', 'Invalid or inactive invite code');
 
-  // Return with _id = mongoId for backward compat
-  return { ...result, _id: result.mongoId };
+  // Return with _id = id for backward compat
+  return { ...result, _id: result.id };
 }
 
 export async function revokeInvite(params: { code: string; revokedByUserId: string; reason?: string }) {
@@ -144,5 +139,5 @@ export async function revokeInvite(params: { code: string; revokedByUserId: stri
     },
   });
 
-  return { ...updated, _id: updated.mongoId };
+  return { ...updated, _id: updated.id };
 }

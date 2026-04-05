@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { prisma } from '../database/prisma.js';
 import { AppError } from '../middleware/errors.js';
 import { writeAuditLog } from './audit.js';
@@ -43,7 +42,6 @@ export async function ensureWallet(ownerUserId: string) {
       where: { ownerUserId },
       update: {},
       create: {
-        mongoId: randomUUID(),
         ownerUserId,
         currency: 'INR',
         availablePaise: 0,
@@ -99,7 +97,6 @@ export async function applyWalletCredit(input: WalletMutationInput) {
       where: { ownerUserId: input.ownerUserId },
       update: {},
       create: {
-        mongoId: randomUUID(),
         ownerUserId: input.ownerUserId,
         currency: 'INR',
         availablePaise: 0,
@@ -141,7 +138,6 @@ export async function applyWalletCredit(input: WalletMutationInput) {
 
     const txn = await tx.transaction.create({
       data: {
-        mongoId: randomUUID(),
         idempotencyKey: input.idempotencyKey,
         type: input.type as any,
         status: 'completed',
@@ -237,7 +233,6 @@ export async function applyWalletDebit(input: WalletMutationInput) {
 
     const txn = await tx.transaction.create({
       data: {
-        mongoId: randomUUID(),
         idempotencyKey: input.idempotencyKey,
         type: input.type as any,
         status: 'completed',

@@ -235,7 +235,6 @@ enum MediatorStatus {
 /// Core user account — all roles share a single User row.
 model User {
   id      String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mongoId String? @unique @map("mongo_id") /// Original MongoDB _id for cross-referencing during migration
 
   name         String  @db.VarChar(120)
   username     String? @unique @db.VarChar(64)
@@ -329,7 +328,7 @@ model User {
   @@map("users")
 }
 
-/// Pending brand-agency connection requests (embedded array in Mongo -> join table in PG)
+/// Pending brand-agency connection requests (join table).
 model PendingConnection {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId     String    @map("user_id") @db.Uuid
@@ -348,7 +347,6 @@ model PendingConnection {
 /// Brand entity (mirrors Brand.ts)
 model Brand {
   id                   String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mongoId              String?     @unique @map("mongo_id")
   name                 String      @db.VarChar(200)
   brandCode            String      @unique @map("brand_code")
   ownerUserId          String      @map("owner_user_id") @db.Uuid
@@ -370,7 +368,6 @@ model Brand {
 /// Agency entity (mirrors Agency.ts)
 model Agency {
   id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mongoId     String?      @unique @map("mongo_id")
   name        String       @db.VarChar(200)
   agencyCode  String       @unique @map("agency_code")
   ownerUserId String       @map("owner_user_id") @db.Uuid
@@ -391,7 +388,6 @@ model Agency {
 /// Mediator profile (mirrors MediatorProfile.ts)
 model MediatorProfile {
   id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mongoId          String?        @unique @map("mongo_id")
   userId           String         @unique @map("user_id") @db.Uuid
   mediatorCode     String         @unique @map("mediator_code")
   parentAgencyCode String?        @map("parent_agency_code")
@@ -412,7 +408,6 @@ model MediatorProfile {
 /// Shopper profile (mirrors ShopperProfile.ts)
 model ShopperProfile {
   id                  String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mongoId             String? @unique @map("mongo_id")
   userId              String  @unique @map("user_id") @db.Uuid
   defaultMediatorCode String? @map("default_mediator_code")
 
@@ -431,7 +426,6 @@ model ShopperProfile {
 /// Campaign created by a brand (mirrors Campaign.ts)
 model Campaign {
   id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mongoId     String? @unique @map("mongo_id")
   title       String  @db.VarChar(200)
   brandUserId String  @map("brand_user_id") @db.Uuid
   brandName   String  @map("brand_name") @db.VarChar(200)
@@ -483,7 +477,6 @@ model Campaign {
 /// Deal = campaign snapshot for a mediator (mirrors Deal.ts)
 model Deal {
   id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mongoId      String? @unique @map("mongo_id")
   campaignId   String  @map("campaign_id") @db.Uuid
   mediatorCode String  @map("mediator_code")
 
@@ -525,7 +518,6 @@ model Deal {
 /// Order (mirrors Order.ts)
 model Order {
   id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mongoId     String? @unique @map("mongo_id")
   userId      String  @map("user_id") @db.Uuid
   brandUserId String? @map("brand_user_id") @db.Uuid
 
@@ -630,7 +622,7 @@ model Order {
   @@map("orders")
 }
 
-/// Order item (embedded array in Mongo -> join table in PG)
+/// Order line item (join table).
 model OrderItem {
   id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   orderId              String    @map("order_id") @db.Uuid
@@ -658,7 +650,6 @@ model OrderItem {
 /// Wallet (mirrors Wallet.ts)
 model Wallet {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mongoId        String?  @unique @map("mongo_id")
   ownerUserId    String   @unique @map("owner_user_id") @db.Uuid
   currency       Currency @default(INR)
   availablePaise Int      @default(0) @map("available_paise")
@@ -684,7 +675,6 @@ model Wallet {
 /// Financial transaction (mirrors Transaction.ts)
 model Transaction {
   id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mongoId        String?           @unique @map("mongo_id")
   idempotencyKey String            @unique @map("idempotency_key")
   type           TransactionType
   status         TransactionStatus @default(pending)
@@ -724,7 +714,6 @@ model Transaction {
 /// Payout request (mirrors Payout.ts)
 model Payout {
   id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mongoId           String?      @unique @map("mongo_id")
   beneficiaryUserId String       @map("beneficiary_user_id") @db.Uuid
   walletId          String       @map("wallet_id") @db.Uuid
   amountPaise       Int          @map("amount_paise")
@@ -761,7 +750,6 @@ model Payout {
 /// Invite code (mirrors Invite.ts)
 model Invite {
   id      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mongoId String?  @unique @map("mongo_id")
   code    String   @unique
   role    UserRole
   label   String?
@@ -801,7 +789,6 @@ model Invite {
 /// Support ticket (mirrors Ticket.ts)
 model Ticket {
   id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mongoId     String?      @unique @map("mongo_id")
   userId      String       @map("user_id") @db.Uuid
   userName    String       @map("user_name")
   role        String
@@ -861,7 +848,6 @@ model TicketComment {
 /// Push notification subscription (mirrors PushSubscription.ts)
 model PushSubscription {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mongoId        String?   @unique @map("mongo_id")
   userId         String    @map("user_id") @db.Uuid
   app            PushApp
   endpoint       String    @unique
@@ -883,7 +869,6 @@ model PushSubscription {
 /// Admin suspension / unsuspension record (mirrors Suspension.ts)
 model Suspension {
   id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mongoId      String?          @unique @map("mongo_id")
   targetUserId String           @map("target_user_id") @db.Uuid
   action       SuspensionAction
   reason       String?
@@ -901,7 +886,6 @@ model Suspension {
 /// Audit log (mirrors AuditLog.ts)
 model AuditLog {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mongoId     String?  @unique @map("mongo_id")
   actorUserId String?  @map("actor_user_id") @db.Uuid
   actorRoles  String[] @default([]) @map("actor_roles")
   action      String
@@ -941,7 +925,6 @@ model SecurityQuestion {
 /// System configuration key-value (mirrors SystemConfig.ts)
 model SystemConfig {
   id                String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  mongoId           String? @unique @map("mongo_id")
   key               String  @unique @default("system")
   adminContactEmail String? @map("admin_contact_email")
 
@@ -951,17 +934,4 @@ model SystemConfig {
   @@map("system_configs")
 }
 
-/// Migration sync tracking for backfilling Mongo data to PG (per-collection).
-model MigrationSync {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  collection  String    @unique
-  status      String    @default("pending")
-  syncedCount Int       @default(0) @map("synced_count")
-  errorCount  Int       @default(0) @map("error_count")
-  lastSyncAt  DateTime? @map("last_sync_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  @@index([status])
-  @@map("migration_sync")
-}

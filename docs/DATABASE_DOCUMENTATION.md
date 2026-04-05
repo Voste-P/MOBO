@@ -1,7 +1,7 @@
 # MOBO (BUZZMA) — Complete Database Documentation
 
 > **Production-level database documentation for the MOBO multi-stakeholder commerce platform.**
-> Last updated: April 2026 | Schema version: PostgreSQL via Prisma ORM | 20 models, 22 enums.
+> Last updated: April 2026 | Schema version: PostgreSQL via Prisma ORM | 19 models, 22 enums.
 
 ---
 
@@ -117,7 +117,6 @@ Additionally, **Admin** and **Ops** roles govern the entire platform (user manag
 | **AuditLog** | System-wide audit entry | `audit_logs` | Append-only: actor, action, entity, IP, metadata |
 | **SecurityQuestion** | Password recovery Q&A | `security_questions` | Bcrypt-hashed answers, 7 predefined questions |
 | **SystemConfig** | Platform-level settings | `system_configs` | Key-value configuration (admin contact, etc.) |
-| **MigrationSync** | Mongo→PG migration tracker | `migration_sync` | Per-collection sync status |
 
 ### 2.2 Entity Hierarchy (Operational Chain)
 
@@ -151,8 +150,6 @@ PostgreSQL was chosen over NoSQL for:
 | Full-text search potential | Built-in `tsvector`/`tsquery` for future product search |
 | Array columns | Native `text[]` for `connectedAgencies`, `allowedAgencyCodes`, `actorRoles` |
 | GIN indexes | Index on JSONB `assignments` and array `allowedAgencyCodes` for fast containment queries |
-
-The system migrated from MongoDB to PostgreSQL. The `mongoId` field on many tables preserves cross-referencing from the migration era.
 
 ### 3.2 Naming Conventions
 
@@ -189,7 +186,7 @@ Prisma Migrate manages schema changes. The migrations directory contains:
 
 | Migration | Date | Purpose |
 |---|---|---|
-| `0_baseline` | Initial | Full schema baseline from MongoDB→PostgreSQL migration |
+| `0_baseline` | Initial | Full schema baseline for PostgreSQL database |
 | `add_order_ai_verification` | 2026-02-26 | Added JSONB columns for AI proof verification results |
 | `add_missing_indexes` | 2026-02-27 | Performance indexes for listing queries |
 | `add_ops_dashboard_composite_index` | 2026-02-28 | Composite index for ops dashboard queries |
@@ -265,7 +262,6 @@ Prisma Migrate manages schema changes. The migrations directory contains:
 | Column | Type | Constraints | Description | Example |
 |---|---|---|---|---|
 | `id` | `UUID` | PK, default `gen_random_uuid()` | Primary key | `a1b2c3d4-...` |
-| `mongo_id` | `String?` | Unique | Original MongoDB `_id` for migration cross-reference | `507f1f77bcf86cd799439011` |
 | `name` | `VarChar(120)` | NOT NULL | User's display name | `"Rahul Sharma"` |
 | `username` | `VarChar(64)?` | Unique | Optional username for admin/ops login | `"admin_rahul"` |
 | `mobile` | `VarChar(10)` | NOT NULL, Unique | 10-digit Indian mobile number (primary login for non-admin) | `"9876543210"` |
@@ -328,7 +324,6 @@ Prisma Migrate manages schema changes. The migrations directory contains:
 | Column | Type | Constraints | Description | Example |
 |---|---|---|---|---|
 | `id` | `UUID` | PK | Primary key | `uuid...` |
-| `mongo_id` | `String?` | Unique | Migration cross-reference | `"507f..."` |
 | `name` | `VarChar(200)` | NOT NULL | Brand display name | `"Nike India"` |
 | `brand_code` | `String` | Unique, NOT NULL | Unique brand identifier | `"BRD-NIKE01"` |
 | `owner_user_id` | `UUID` | NOT NULL | FK to `users.id` (brand-role) | `uuid...` |
@@ -351,7 +346,6 @@ Prisma Migrate manages schema changes. The migrations directory contains:
 | Column | Type | Constraints | Description | Example |
 |---|---|---|---|---|
 | `id` | `UUID` | PK | Primary key | `uuid...` |
-| `mongo_id` | `String?` | Unique | Migration cross-reference | — |
 | `name` | `VarChar(200)` | NOT NULL | Agency display name | `"Delhi Sales Corp"` |
 | `agency_code` | `String` | Unique, NOT NULL | Unique agency identifier | `"AGN-X7Y8Z9"` |
 | `owner_user_id` | `UUID` | NOT NULL | FK to `users.id` (agency-role) | `uuid...` |
@@ -373,7 +367,6 @@ Prisma Migrate manages schema changes. The migrations directory contains:
 | Column | Type | Constraints | Description | Example |
 |---|---|---|---|---|
 | `id` | `UUID` | PK | Primary key | `uuid...` |
-| `mongo_id` | `String?` | Unique | Migration cross-reference | — |
 | `user_id` | `UUID` | Unique, NOT NULL, FK→`users.id` | Linked user (1:1) | `uuid...` |
 | `mediator_code` | `String` | Unique, NOT NULL | Unique mediator identifier | `"MED-A1B2C3"` |
 | `parent_agency_code` | `String?` | — | Agency code of parent agency | `"AGN-X7Y8Z9"` |
@@ -396,7 +389,6 @@ Prisma Migrate manages schema changes. The migrations directory contains:
 | Column | Type | Constraints | Description | Example |
 |---|---|---|---|---|
 | `id` | `UUID` | PK | Primary key | `uuid...` |
-| `mongo_id` | `String?` | Unique | Migration cross-reference | — |
 | `user_id` | `UUID` | Unique, NOT NULL, FK→`users.id` | Linked user (1:1) | `uuid...` |
 | `default_mediator_code` | `String?` | — | Assigned mediator's code | `"MED-A1B2C3"` |
 | `created_by` | `UUID?` | — | Creator | — |
@@ -417,7 +409,6 @@ Prisma Migrate manages schema changes. The migrations directory contains:
 | Column | Type | Constraints | Description | Example |
 |---|---|---|---|---|
 | `id` | `UUID` | PK | Primary key | `uuid...` |
-| `mongo_id` | `String?` | Unique | Migration cross-reference | — |
 | `title` | `VarChar(200)` | NOT NULL | Campaign title | `"Nike Air Max Sale"` |
 | `brand_user_id` | `UUID` | NOT NULL | FK to brand user who created it | `uuid...` |
 | `brand_name` | `VarChar(200)` | NOT NULL | Brand display name (denormalized) | `"Nike India"` |
@@ -461,7 +452,6 @@ Prisma Migrate manages schema changes. The migrations directory contains:
 | Column | Type | Constraints | Description | Example |
 |---|---|---|---|---|
 | `id` | `UUID` | PK | Primary key | `uuid...` |
-| `mongo_id` | `String?` | Unique | Migration cross-reference | — |
 | `campaign_id` | `UUID` | NOT NULL, FK→`campaigns.id` | Parent campaign | `uuid...` |
 | `mediator_code` | `String` | NOT NULL | Mediator who published this deal | `"MED-A1B2C3"` |
 | `title` | `String` | NOT NULL | Snapshot of campaign title | `"Nike Air Max Sale"` |
@@ -496,7 +486,6 @@ Prisma Migrate manages schema changes. The migrations directory contains:
 | Column | Type | Constraints | Description | Example |
 |---|---|---|---|---|
 | `id` | `UUID` | PK | Primary key | `uuid...` |
-| `mongo_id` | `String?` | Unique | Migration cross-reference | — |
 | `user_id` | `UUID` | NOT NULL, FK→`users.id` | Buyer user | `uuid...` |
 | `brand_user_id` | `UUID?` | FK→`users.id` | Brand user (for brand dashboard) | `uuid...` |
 | `total_paise` | `Int` | NOT NULL | Order total in paise | `799900` |
@@ -599,7 +588,6 @@ Prisma Migrate manages schema changes. The migrations directory contains:
 | Column | Type | Constraints | Description | Example |
 |---|---|---|---|---|
 | `id` | `UUID` | PK | Primary key | `uuid...` |
-| `mongo_id` | `String?` | Unique | Migration cross-reference | — |
 | `owner_user_id` | `UUID` | Unique, NOT NULL, FK→`users.id` | Wallet owner | `uuid...` |
 | `currency` | `currency` | Default: `INR` | Currency type | `INR` |
 | `available_paise` | `Int` | Default: `0` | Spendable balance | `150000` (₹1,500) |
@@ -624,7 +612,6 @@ Prisma Migrate manages schema changes. The migrations directory contains:
 | Column | Type | Constraints | Description | Example |
 |---|---|---|---|---|
 | `id` | `UUID` | PK | Primary key | `uuid...` |
-| `mongo_id` | `String?` | Unique | Migration cross-reference | — |
 | `idempotency_key` | `String` | Unique, NOT NULL | Prevents duplicate transactions | `"order-commission-<orderId>"` |
 | `type` | `transaction_type` | NOT NULL | Transaction classification | `commission_settle` |
 | `status` | `transaction_status` | Default: `pending` | Transaction lifecycle | `completed` |
@@ -660,7 +647,6 @@ Prisma Migrate manages schema changes. The migrations directory contains:
 | Column | Type | Constraints | Description | Example |
 |---|---|---|---|---|
 | `id` | `UUID` | PK | Primary key | `uuid...` |
-| `mongo_id` | `String?` | Unique | Migration cross-reference | — |
 | `beneficiary_user_id` | `UUID` | NOT NULL, FK→`users.id` | Who receives the payout | `uuid...` |
 | `wallet_id` | `UUID` | NOT NULL, FK→`wallets.id` | Source wallet | `uuid...` |
 | `amount_paise` | `Int` | NOT NULL | Payout amount in paise | `100000` (₹1,000) |
@@ -690,7 +676,6 @@ Prisma Migrate manages schema changes. The migrations directory contains:
 | Column | Type | Constraints | Description | Example |
 |---|---|---|---|---|
 | `id` | `UUID` | PK | Primary key | `uuid...` |
-| `mongo_id` | `String?` | Unique | Migration cross-reference | — |
 | `code` | `String` | Unique, NOT NULL | Invite code for registration | `"INV-A1B2C3D4"` |
 | `role` | `user_role` | NOT NULL | Role this invite creates | `mediator` |
 | `label` | `String?` | — | Human-readable label | `"Delhi team batch 3"` |
@@ -720,7 +705,6 @@ Prisma Migrate manages schema changes. The migrations directory contains:
 | Column | Type | Constraints | Description | Example |
 |---|---|---|---|---|
 | `id` | `UUID` | PK | Primary key | `uuid...` |
-| `mongo_id` | `String?` | Unique | Migration cross-reference | — |
 | `user_id` | `UUID` | NOT NULL, FK→`users.id` | Ticket creator | `uuid...` |
 | `user_name` | `String` | NOT NULL | Creator's display name (denormalized) | `"Rahul Sharma"` |
 | `role` | `String` | NOT NULL | Creator's role | `"shopper"` |
@@ -796,7 +780,6 @@ Prisma Migrate manages schema changes. The migrations directory contains:
 | Column | Type | Constraints | Description | Example |
 |---|---|---|---|---|
 | `id` | `UUID` | PK | Primary key | `uuid...` |
-| `mongo_id` | `String?` | Unique | Migration cross-reference | — |
 | `user_id` | `UUID` | NOT NULL, FK→`users.id` | Subscription owner | `uuid...` |
 | `app` | `push_app` | NOT NULL | Which app (buyer/mediator) | `buyer` |
 | `endpoint` | `String` | Unique, NOT NULL | Push service endpoint URL | `"https://fcm.googleapis.com/..."` |
@@ -820,7 +803,6 @@ Prisma Migrate manages schema changes. The migrations directory contains:
 | Column | Type | Constraints | Description | Example |
 |---|---|---|---|---|
 | `id` | `UUID` | PK | Primary key | `uuid...` |
-| `mongo_id` | `String?` | Unique | Migration cross-reference | — |
 | `target_user_id` | `UUID` | NOT NULL, FK→`users.id` | User who was suspended/unsuspended | `uuid...` |
 | `action` | `suspension_action` | NOT NULL | Action taken | `suspend` |
 | `reason` | `String?` | — | Reason for action | `"Fraudulent activity"` |
@@ -839,7 +821,6 @@ Prisma Migrate manages schema changes. The migrations directory contains:
 | Column | Type | Constraints | Description | Example |
 |---|---|---|---|---|
 | `id` | `UUID` | PK | Primary key | `uuid...` |
-| `mongo_id` | `String?` | Unique | Migration cross-reference | — |
 | `actor_user_id` | `UUID?` | FK→`users.id` | Who performed the action | `uuid...` |
 | `actor_roles` | `String[]` | Default: `[]` | Actor's roles at time of action | `["admin"]` |
 | `action` | `String` | NOT NULL | Action name | `"USER_SUSPENDED"` |
@@ -879,30 +860,10 @@ Prisma Migrate manages schema changes. The migrations directory contains:
 | Column | Type | Constraints | Description | Example |
 |---|---|---|---|---|
 | `id` | `UUID` | PK | Primary key | `uuid...` |
-| `mongo_id` | `String?` | Unique | Migration cross-reference | — |
 | `key` | `String` | Unique, Default: `"system"` | Config key | `"system"` |
 | `admin_contact_email` | `String?` | — | Admin contact email | `"admin@mobo.com"` |
 | `created_at` | `DateTime` | Default: `now()` | Created | — |
 | `updated_at` | `DateTime` | Auto-updated | Updated | — |
-
----
-
-### 4.23 Table: `migration_sync`
-
-**Purpose:** Tracks per-collection status of MongoDB→PostgreSQL data migration.
-
-| Column | Type | Constraints | Description | Example |
-|---|---|---|---|---|
-| `id` | `UUID` | PK | Primary key | `uuid...` |
-| `collection` | `String` | Unique, NOT NULL | MongoDB collection name | `"users"` |
-| `status` | `String` | Default: `"pending"` | Migration status | `"completed"` |
-| `synced_count` | `Int` | Default: `0` | Rows synced successfully | `15234` |
-| `error_count` | `Int` | Default: `0` | Rows that failed | `3` |
-| `last_sync_at` | `DateTime?` | — | Last sync timestamp | — |
-| `created_at` | `DateTime` | Default: `now()` | Created | — |
-| `updated_at` | `DateTime` | Auto-updated | Updated | — |
-
-**Indexes:** `(status)`
 
 ---
 
@@ -1038,14 +999,14 @@ These relationships are enforced via application code rather than foreign keys:
 │ action       │  │ metadata     │  │ (UNIQUE)     │  │              │
 └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘
 
-┌──────────────┐  ┌──────────────┐  ┌──────────────────┐
-│ pending_     │  │ system_      │  │ migration_sync   │
-│ connections  │  │ configs      │  │──────────────────│
-│──────────────│  │──────────────│  │ collection       │
-│ user_id (FK) │  │ key (UNIQUE) │  │ (UNIQUE)         │
-│ agency_code  │  │ admin_       │  │ status           │
-│              │  │ contact_email│  │ synced_count     │
-└──────────────┘  └──────────────┘  └──────────────────┘
+┌──────────────┐  ┌──────────────┐
+│ pending_     │  │ system_      │
+│ connections  │  │ configs      │
+│──────────────│  │──────────────│
+│ user_id (FK) │  │ key (UNIQUE) │
+│ agency_code  │  │ admin_       │
+│              │  │ contact_email│
+└──────────────┘  └──────────────┘
 ```
 
 ### 6.2 Mermaid ER Diagram
@@ -1468,7 +1429,7 @@ The schema uses **63+ indexes** across all tables, designed for 100k+ scale:
 | **Password hashing** | bcrypt with cost factor; stored as `password_hash` |
 | **JWT tokens** | HS256 signed; access token (15min default) + refresh token (30 days default) |
 | **Zero-trust tokens** | Every request re-validates user from DB — role/status changes take effect immediately |
-| **Token validation** | JWT `sub` must be valid UUID or MongoDB ObjectId format |
+| **Token validation** | JWT `sub` must be valid UUID format |
 | **Account lockout** | `failed_login_attempts` counter; `lockout_until` timestamp for temporary lockout |
 | **Security questions** | bcrypt-hashed answers for password recovery (7 predefined questions) |
 | **Google OAuth** | OAuth 2.0 for Sheets export integration (refresh token stored per user) |
@@ -1490,7 +1451,6 @@ The schema uses **63+ indexes** across all tables, designed for 100k+ scale:
 |---|---|
 | **Input validation** | Zod schemas on all request bodies |
 | **SQL injection** | Prisma parameterized queries (no raw SQL) |
-| **NoSQL injection** | Pattern detection middleware (`$where`, `$gt`, `$regex`, etc.) |
 | **XSS prevention** | React auto-escaping + CSP headers via Helmet |
 | **Path traversal** | Pattern detection + blocking (`../../`) |
 | **Null byte injection** | Blocked in security middleware |
@@ -1768,7 +1728,7 @@ ORDER BY s.created_at DESC;
 
 | # | Name | Date | Changes |
 |---|---|---|---|
-| 1 | `0_baseline` | 2026-02 | Initial full schema (20 models, all enums, indexes, FKs) |
+| 1 | `0_baseline` | 2026-02 | Initial full schema (19 models, all enums, indexes, FKs) |
 | 2 | `add_order_ai_verification` | 2026-02-26 | JSONB columns for AI verification on orders |
 | 3 | `add_missing_indexes` | 2026-02-27 | Performance indexes for listing queries |
 | 4 | `add_ops_dashboard_composite_index` | 2026-02-28 | Ops dashboard query indexes |
@@ -1865,7 +1825,6 @@ A redaction engine masks the following in all log output:
 | **Medium** | Indexing | Partial indexes on `is_deleted = false` | Many queries always filter on `is_deleted`; partial indexes are smaller and faster |
 | **Low** | Schema | Normalize `Order.managerName` to FK | Currently a string match; FK would enable referential integrity |
 | **Low** | Schema | Remove legacy `User.walletBalancePaise` | Wallet table is authoritative; remove denormalized field |
-| **Low** | Clean up | Remove `mongoId` columns | Post-migration; no longer needed once migration is complete |
 | **Low** | Monitoring | Table size and index bloat monitoring | Proactive capacity planning |
 
 ### 16.2 Future Features Requiring Schema Changes
@@ -1972,7 +1931,7 @@ await db.wallet.update({
 
 | Metric | Value |
 |---|---|
-| **Total models** | 20 (Prisma models) |
+| **Total models** | 19 (Prisma models) |
 | **Total enums** | 22 |
 | **Total database indexes** | 63+ |
 | **Total API endpoints** | 83+ |

@@ -16,8 +16,8 @@ const SYSTEM_ACTOR = 'system:cooling-settler';
 interface SettlePrefetch {
   disputeOrderIds: Set<string | null>;
   campaignMap: Map<string, { id: string; assignments: any; brandUserId: string }>;
-  dealMap: Map<string, { id: string; mongoId: string | null; payoutPaise: number }>;
-  userMap: Map<string, { id: string; mongoId: string | null; status: string; isDeleted: boolean }>;
+  dealMap: Map<string, { id: string; payoutPaise: number }>;
+  userMap: Map<string, { id: string; status: string; isDeleted: boolean }>;
   mediatorMap: Map<string, { id: string; mediatorCode: string | null }>;
   /** Batch cap counts: "mediatorCode::campaignId" -> count of already settled orders */
   capCountMap: Map<string, number>;
@@ -29,7 +29,7 @@ interface SettlePrefetch {
  * Returns true if settled, false if skipped (disputed/frozen/already settled).
  */
 async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promise<boolean> {
-  const orderDisplayId = order.mongoId ?? order.id;
+  const orderDisplayId = order.id ?? order.id;
 
   // Skip frozen orders
   if (order.frozen) {
@@ -195,13 +195,13 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
     await db().$transaction(
       async (tx: any) => {
         await applyWalletDebit({
-          idempotencyKey: `order-settlement-debit-${order.mongoId}`,
+          idempotencyKey: `order-settlement-debit-${order.id}`,
           type: 'order_settlement_debit',
           ownerUserId: brandId,
           fromUserId: brandId,
           toUserId: buyerUserId,
           amountPaise: payoutPaise,
-          orderId: order.mongoId!,
+          orderId: order.id!,
           campaignId: campaignId ? String(campaignId) : undefined,
           metadata: { reason: 'ORDER_PAYOUT', dealId: productId, mediatorCode, source: 'cooling-settler' },
           tx,
@@ -209,11 +209,11 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
 
         if (buyerCommissionPaise > 0) {
           await applyWalletCredit({
-            idempotencyKey: `order-commission-${order.mongoId}`,
+            idempotencyKey: `order-commission-${order.id}`,
             type: 'commission_settle',
             ownerUserId: buyerUserId,
             amountPaise: buyerCommissionPaise,
-            orderId: order.mongoId!,
+            orderId: order.id!,
             campaignId: campaignId ? String(campaignId) : undefined,
             metadata: { reason: 'ORDER_COMMISSION', dealId: productId, source: 'cooling-settler' },
             tx,
@@ -222,11 +222,11 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
 
         if (mediatorUserId && mediatorMarginPaise > 0) {
           await applyWalletCredit({
-            idempotencyKey: `order-margin-${order.mongoId}`,
+            idempotencyKey: `order-margin-${order.id}`,
             type: 'commission_settle',
             ownerUserId: mediatorUserId,
             amountPaise: mediatorMarginPaise,
-            orderId: order.mongoId!,
+            orderId: order.id!,
             campaignId: campaignId ? String(campaignId) : undefined,
             metadata: {
               reason: 'ORDER_MARGIN',
@@ -276,7 +276,7 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
 
   // Workflow transitions: APPROVED → REWARD_PENDING → COMPLETED/FAILED
   await transitionOrderWorkflow({
-    orderId: order.mongoId!,
+    orderId: order.id!,
     from: 'APPROVED',
     to: 'REWARD_PENDING',
     actorUserId: SYSTEM_ACTOR,
@@ -285,7 +285,7 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
   });
 
   await transitionOrderWorkflow({
-    orderId: order.mongoId!,
+    orderId: order.id!,
     from: 'REWARD_PENDING',
     to: isOverLimit ? 'FAILED' : 'COMPLETED',
     actorUserId: SYSTEM_ACTOR,
@@ -301,12 +301,12 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
   const audience: { roles?: Role[]; userIds?: string[] } = { roles: privilegedRoles, userIds: [] };
   const buyerUser = prefetch
     ? (prefetch.userMap.get(order.userId) ?? null)
-    : order.userId ? await db().user.findUnique({ where: { id: order.userId }, select: { mongoId: true } }) : null;
+    : order.userId ? await db().user.findUnique({ where: { id: order.userId }, select: { id: true } }) : null;
   const brandUser = prefetch
     ? (order.brandUserId ? (prefetch.userMap.get(order.brandUserId) ?? null) : null)
-    : order.brandUserId ? await db().user.findUnique({ where: { id: order.brandUserId }, select: { mongoId: true } }) : null;
-  if (buyerUser?.mongoId) audience.userIds!.push(buyerUser.mongoId);
-  if (brandUser?.mongoId) audience.userIds!.push(brandUser.mongoId);
+    : order.brandUserId ? await db().user.findUnique({ where: { id: order.brandUserId }, select: { id: true } }) : null;
+  if (buyerUser?.id) audience.userIds!.push(buyerUser.id);
+  if (brandUser?.id) audience.userIds!.push(brandUser.id);
 
   publishRealtime({ type: 'orders.changed', ts: new Date().toISOString(), audience });
   publishRealtime({ type: 'notifications.changed', ts: new Date().toISOString(), audience });
@@ -370,7 +370,7 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
   orderLog.info(`[cooling-settler] Found ${orders.length} orders ready for settlement`);
 
   // ── Batch prefetch: load all related data in parallel to eliminate N+1 queries ──
-  const orderIds = orders.map(o => o.mongoId ?? o.id);
+  const orderIds = orders.map(o => o.id ?? o.id);
   const campaignIds = [...new Set(orders.map(o => o.items?.[0]?.campaignId).filter(Boolean))] as string[];
   const productIds = [...new Set(orders.map(o => String(o.items?.[0]?.productId || '').trim()).filter(Boolean))];
   const userIds = [...new Set(orders.flatMap(o => [o.userId, o.brandUserId].filter(Boolean)))] as string[];
@@ -392,25 +392,17 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
     // Batch deal lookup
     productIds.length > 0
       ? db().deal.findMany({
-          where: { mongoId: { in: productIds }, isDeleted: false },
-          select: { id: true, mongoId: true, payoutPaise: true },
-        }).then(async (byMongo) => {
-          // Also try by UUID for non-mongo product IDs
-          const foundMongoIds = new Set(byMongo.map(d => d.mongoId));
-          const remaining = productIds.filter(pid => !foundMongoIds.has(pid) && pid.includes('-'));
-          if (remaining.length === 0) return byMongo;
-          const byUuid = await db().deal.findMany({
-            where: { id: { in: remaining }, isDeleted: false },
-            select: { id: true, mongoId: true, payoutPaise: true },
-          });
-          return [...byMongo, ...byUuid];
+          where: { id: { in: productIds }, isDeleted: false },
+          select: { id: true, payoutPaise: true },
+        }).then(async (byId) => {
+          return byId;
         })
       : [],
     // Batch user lookup (buyers + brands)
     userIds.length > 0
       ? db().user.findMany({
           where: { id: { in: userIds } },
-          select: { id: true, mongoId: true, status: true, isDeleted: true },
+          select: { id: true, status: true, isDeleted: true },
         })
       : [],
     // Batch mediator lookup
@@ -425,7 +417,7 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
   // Build lookup maps for O(1) access during settlement
   const disputeOrderIds = new Set(disputes.map(t => t.orderId));
   const campaignMap = new Map(campaignsArr.map(c => [c.id, c]));
-  const dealMap = new Map(dealsArr.map(d => [d.mongoId ?? d.id, d]));
+  const dealMap = new Map(dealsArr.map(d => [d.id ?? d.id, d]));
   const userMap = new Map(usersArr.map(u => [u.id, u]));
   const mediatorMap = new Map(mediatorsArr.map(m => [m.mediatorCode!, m]));
 
@@ -460,7 +452,7 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
   const prefetch = { disputeOrderIds, campaignMap, dealMap, userMap, mediatorMap, capCountMap };
 
   for (const order of orders) {
-    const orderId = order.mongoId ?? order.id;
+    const orderId = order.id ?? order.id;
     // Retry up to 2 times on transient DB errors (connection, timeout, deadlock)
     for (let attempt = 0; attempt < 3; attempt++) {
       try {

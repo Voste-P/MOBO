@@ -67,7 +67,6 @@ export async function seedE2E(): Promise<SeededE2E> {
   const admin = await db.user.upsert({
     where: { mobile: E2E_ACCOUNTS.admin.mobile },
     create: {
-      mongoId: randomUUID(),
       name: E2E_ACCOUNTS.admin.name,
       mobile: E2E_ACCOUNTS.admin.mobile,
       username: E2E_ACCOUNTS.admin.username,
@@ -90,7 +89,6 @@ export async function seedE2E(): Promise<SeededE2E> {
   const agency = await db.user.upsert({
     where: { mobile: E2E_ACCOUNTS.agency.mobile },
     create: {
-      mongoId: randomUUID(),
       name: E2E_ACCOUNTS.agency.name,
       mobile: E2E_ACCOUNTS.agency.mobile,
       passwordHash: agencyPasswordHash,
@@ -114,7 +112,6 @@ export async function seedE2E(): Promise<SeededE2E> {
   const mediator = await db.user.upsert({
     where: { mobile: E2E_ACCOUNTS.mediator.mobile },
     create: {
-      mongoId: randomUUID(),
       name: E2E_ACCOUNTS.mediator.name,
       mobile: E2E_ACCOUNTS.mediator.mobile,
       passwordHash: mediatorPasswordHash,
@@ -140,7 +137,6 @@ export async function seedE2E(): Promise<SeededE2E> {
   const brand = await db.user.upsert({
     where: { mobile: E2E_ACCOUNTS.brand.mobile },
     create: {
-      mongoId: randomUUID(),
       name: E2E_ACCOUNTS.brand.name,
       mobile: E2E_ACCOUNTS.brand.mobile,
       passwordHash: brandPasswordHash,
@@ -164,7 +160,6 @@ export async function seedE2E(): Promise<SeededE2E> {
   const shopper = await db.user.upsert({
     where: { mobile: E2E_ACCOUNTS.shopper.mobile },
     create: {
-      mongoId: randomUUID(),
       name: E2E_ACCOUNTS.shopper.name,
       mobile: E2E_ACCOUNTS.shopper.mobile,
       passwordHash: shopperPasswordHash,
@@ -190,7 +185,6 @@ export async function seedE2E(): Promise<SeededE2E> {
   const shopper2 = await db.user.upsert({
     where: { mobile: E2E_ACCOUNTS.shopper2.mobile },
     create: {
-      mongoId: randomUUID(),
       name: E2E_ACCOUNTS.shopper2.name,
       mobile: E2E_ACCOUNTS.shopper2.mobile,
       passwordHash: shopper2PasswordHash,
@@ -222,7 +216,6 @@ export async function seedE2E(): Promise<SeededE2E> {
   await db.wallet.upsert({
     where: { ownerUserId: brand.id },
     create: {
-      mongoId: randomUUID(),
       ownerUserId: brand.id,
       currency: 'INR' as any,
       availablePaise: 50_000_00,
@@ -242,7 +235,6 @@ export async function seedE2E(): Promise<SeededE2E> {
   if (!campaign) {
     campaign = await db.campaign.create({
       data: {
-        mongoId: randomUUID(),
         title: 'E2E Campaign',
         brandUserId: brand.id,
         brandName: E2E_ACCOUNTS.brand.name,
@@ -295,7 +287,6 @@ export async function seedE2E(): Promise<SeededE2E> {
   if (!existingDeal) {
     await db.deal.create({
       data: {
-        mongoId: randomUUID(),
         campaignId: campaign.id,
         mediatorCode: E2E_ACCOUNTS.mediator.mediatorCode,
         ...dealDefaults,

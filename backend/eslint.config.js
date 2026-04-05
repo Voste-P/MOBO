@@ -14,7 +14,7 @@ export default tseslint.config(
       // TypeScript handles undefined globals/types at build-time.
       'no-undef': 'off',
 
-      // This repo intentionally uses `any` in a few boundary layers (env parsing, Mongoose, JSON).
+      // This repo intentionally uses `any` in a few boundary layers (env parsing, Prisma raw queries, JSON).
       // Treat it as a non-blocking concern for now.
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': [

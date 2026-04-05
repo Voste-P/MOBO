@@ -27,8 +27,6 @@ export type AuthContext = {
   userId: string;
   /** PG UUID – use for foreign-key references in Prisma queries. */
   pgUserId: string;
-  /** Mongo-era ID surfaced as the public user ID in API responses. */
-  mongoId?: string;
   roles: Role[];
   user?: AuthUser;
 };
@@ -48,10 +46,9 @@ function validateJwtPayload(decoded: unknown): { sub: string; role?: string } {
   const payload = decoded as Record<string, unknown>;
   const sub = typeof payload.sub === 'string' ? payload.sub : typeof payload.sub === 'number' ? String(payload.sub) : '';
   if (!sub) throw new AppError(401, 'UNAUTHENTICATED', 'Invalid token: missing subject');
-  // Require valid UUID v4 or MongoDB ObjectId format
+  // Require valid UUID v4 format
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const MONGO_ID_RE = /^[0-9a-fA-F]{24}$/;
-  if (!UUID_RE.test(sub) && !MONGO_ID_RE.test(sub)) {
+  if (!UUID_RE.test(sub)) {
     throw new AppError(401, 'UNAUTHENTICATED', 'Invalid token subject format');
   }
   const role = typeof payload.role === 'string' ? payload.role : undefined;
@@ -77,7 +74,7 @@ async function resolveAuthFromToken(token: string, env: Env): Promise<AuthContex
   const user = await withDbRetry(() => db.user.findFirst({
     where: { ...idWhere(userId), isDeleted: false },
     select: {
-      id: true, mongoId: true, status: true, roles: true, role: true,
+      id: true, status: true, roles: true, role: true,
       parentCode: true, mediatorCode: true, brandCode: true,
       isDeleted: true, mobile: true, name: true,
     },
@@ -164,7 +161,7 @@ async function resolveAuthFromToken(token: string, env: Env): Promise<AuthContex
     name: user.name,
   };
 
-  const result: AuthContext = { userId, pgUserId: user.id, mongoId: user.mongoId ?? undefined, roles, user: authUser };
+  const result: AuthContext = { userId, pgUserId: user.id, roles, user: authUser };
   authCacheSet(userId, result);
   return result;
 }

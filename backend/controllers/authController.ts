@@ -1,6 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { randomUUID } from 'node:crypto';
 import { prisma, withDbRetry } from '../database/prisma.js';
 import { AppError } from '../middleware/errors.js';
 import { idWhere } from '../utils/idWhere.js';
@@ -137,10 +136,8 @@ export function makeAuthController(env: Env) {
             throw new AppError(400, 'INVALID_INVITE_PARENT', 'The mediator associated with this invite is no longer active. Please contact support.');
           }
 
-          const mongoId = randomUUID();
           const newUser = await tx.user.create({
             data: {
-              mongoId,
               name: body.name,
               mobile: body.mobile,
               email: body.email,
@@ -173,7 +170,7 @@ export function makeAuthController(env: Env) {
             action: 'INVITE_USED',
             entityType: 'Invite',
             entityId: String(consumed._id),
-            metadata: { code: consumed.code, role: consumed.role, usedBy: user.mongoId },
+            metadata: { code: consumed.code, role: consumed.role, usedBy: user.id },
           });
 
           publishRealtime({
@@ -222,7 +219,7 @@ export function makeAuthController(env: Env) {
           publishRealtime({
             type: 'users.changed',
             ts,
-            payload: { userId: user.mongoId, kind: 'buyer', mediatorCode: upstreamMediatorCode },
+            payload: { userId: user.id, kind: 'buyer', mediatorCode: upstreamMediatorCode },
             audience: {
               mediatorCodes: [upstreamMediatorCode],
               ...(agencyCode ? { agencyCodes: [agencyCode] } : {}),
@@ -232,7 +229,7 @@ export function makeAuthController(env: Env) {
           publishRealtime({
             type: 'notifications.changed',
             ts,
-            payload: { source: 'buyer.registered', userId: user.mongoId },
+            payload: { source: 'buyer.registered', userId: user.id },
             audience: {
               mediatorCodes: [upstreamMediatorCode],
               ...(agencyCode ? { agencyCodes: [agencyCode] } : {}),
@@ -425,7 +422,7 @@ export function makeAuthController(env: Env) {
           db().user.findFirst({
             where: { id: authUser.id, isDeleted: false },
             select: {
-              id: true, mongoId: true, name: true, mobile: true, email: true,
+              id: true, name: true, mobile: true, email: true,
               avatar: true, role: true, roles: true, status: true,
               parentCode: true, mediatorCode: true, brandCode: true,
               isVerifiedByMediator: true, username: true,
@@ -499,7 +496,7 @@ export function makeAuthController(env: Env) {
         const user = await db().user.findFirst({
           where: { ...idWhere(userId), isDeleted: false },
           select: {
-            id: true, mongoId: true, name: true, email: true, mobile: true,
+            id: true, name: true, email: true, mobile: true,
             role: true, roles: true, status: true, mediatorCode: true,
             parentCode: true, avatar: true, createdAt: true, updatedAt: true,
             isDeleted: true,
@@ -645,10 +642,8 @@ export function makeAuthController(env: Env) {
             throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique code; please retry');
           }
 
-          const mongoId = randomUUID();
           const newUser = await tx.user.create({
             data: {
-              mongoId,
               name: body.name,
               mobile: body.mobile,
               passwordHash,
@@ -682,7 +677,7 @@ export function makeAuthController(env: Env) {
             action: 'INVITE_USED',
             entityType: 'Invite',
             entityId: String(consumed._id),
-            metadata: { code: consumed.code, role: consumed.role, usedBy: user.mongoId },
+            metadata: { code: consumed.code, role: consumed.role, usedBy: user.id },
           });
 
           publishRealtime({
@@ -696,7 +691,7 @@ export function makeAuthController(env: Env) {
           req,
           action: 'USER_REGISTERED',
           entityType: 'User',
-          entityId: user.mongoId!,
+          entityId: user.id!,
           metadata: { role: user.role, mobile: user.mobile, pendingApproval },
         }).catch((err) => { businessLog.warn('Failed to audit registration', { error: err?.message }); });
 
@@ -728,13 +723,13 @@ export function makeAuthController(env: Env) {
             publishRealtime({
               type: 'users.changed',
               ts,
-              payload: { userId: user.mongoId, kind: 'mediator', status: 'pending', agencyCode },
+              payload: { userId: user.id, kind: 'mediator', status: 'pending', agencyCode },
               audience: { agencyCodes: [agencyCode], roles: ['admin', 'ops'] },
             });
             publishRealtime({
               type: 'notifications.changed',
               ts,
-              payload: { source: 'mediator.join.requested', userId: user.mongoId, agencyCode },
+              payload: { source: 'mediator.join.requested', userId: user.id, agencyCode },
               audience: { agencyCodes: [agencyCode], roles: ['admin', 'ops'] },
             });
           }
@@ -817,10 +812,8 @@ export function makeAuthController(env: Env) {
             throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique brand code; please retry');
           }
 
-          const mongoId = randomUUID();
           const newUser = await tx.user.create({
             data: {
-              mongoId,
               name: body.name,
               mobile: body.mobile,
               passwordHash,
@@ -848,14 +841,14 @@ export function makeAuthController(env: Env) {
           action: 'INVITE_USED',
           entityType: 'Invite',
           entityId: String(consumed._id),
-          metadata: { code: consumed.code, role: consumed.role, usedBy: user.mongoId },
+          metadata: { code: consumed.code, role: consumed.role, usedBy: user.id },
         });
 
         writeAuditLog({
           req,
           action: 'USER_REGISTERED',
           entityType: 'User',
-          entityId: user.mongoId!,
+          entityId: user.id!,
           metadata: { role: 'brand', mobile: user.mobile },
         }).catch((err) => { businessLog.warn('Failed to audit registration', { error: err?.message }); });
 
@@ -928,14 +921,14 @@ export function makeAuthController(env: Env) {
           throw new AppError(401, 'UNAUTHENTICATED', 'Missing auth context');
         }
 
-        const targetMongoId = body.userId ?? requesterId;
+        const targetUserId = body.userId ?? requesterId;
         const requester = await db().user.findFirst({ where: { ...idWhere(requesterId), isDeleted: false } });
         if (!requester) throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
 
-        // targetMongoId may be a mongoId while requesterId is PG UUID — check both.
-        const isSelf = String(targetMongoId) === String(requesterId)
-          || String(targetMongoId) === String(requester.id)
-          || String(targetMongoId) === String(requester.mongoId ?? '');
+        // Check both UUID formats for identity comparison.
+        const isSelf = String(targetUserId) === String(requesterId)
+          || String(targetUserId) === String(requester.id)
+          || String(targetUserId) === String(requester.id ?? '');
         const isAdmin = requester.roles?.includes('admin' as any) || requester.roles?.includes('ops' as any);
         if (!isSelf && !isAdmin) {
           throw new AppError(403, 'FORBIDDEN', 'Cannot update other user profile');
@@ -943,7 +936,7 @@ export function makeAuthController(env: Env) {
 
         const targetUser = isSelf
           ? requester
-          : await db().user.findFirst({ where: { ...idWhere(targetMongoId), isDeleted: false } });
+          : await db().user.findFirst({ where: { ...idWhere(targetUserId), isDeleted: false } });
         if (!targetUser) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
         const update: any = {};
@@ -993,7 +986,7 @@ export function makeAuthController(env: Env) {
           req,
           action: 'PROFILE_UPDATED',
           entityType: 'User',
-          entityId: user.mongoId!,
+          entityId: user.id!,
           metadata: {
             updatedFields: Object.keys(update).filter(k => k !== 'avatar' && k !== 'qrCode'),
             updatedBy: isSelf ? 'self' : 'admin',
@@ -1027,8 +1020,8 @@ export function makeAuthController(env: Env) {
         publishRealtime({
           type: 'users.changed',
           ts: new Date().toISOString(),
-          payload: { userId: user.mongoId },
-          audience: { roles: ['admin', 'ops'], userIds: [user.mongoId!] },
+          payload: { userId: user.id },
+          audience: { roles: ['admin', 'ops'], userIds: [user.id!] },
         });
         const wallet = await ensureWallet(user.id);
         res.json({ user: toUiUser(pgUser(user), pgWallet(wallet)) });

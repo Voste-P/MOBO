@@ -31,7 +31,6 @@ describe('api smoke', () => {
     if (!existingDeal) {
       await prisma().deal.create({
         data: {
-          mongoId: randomUUID(),
           campaignId: campaign!.id,
           mediatorCode: 'MED_TEST',
           title: 'E2E Deal',

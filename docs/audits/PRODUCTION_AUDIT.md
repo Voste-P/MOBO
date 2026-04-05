@@ -173,12 +173,12 @@ Implement refresh token rotation: store a token family identifier in the DB, and
 **File:** `backend/controllers/opsController.ts` L1855-1895 (unsettleOrderPayment)
 
 **What's wrong:**  
-Unsettlement idempotency keys use patterns like `order-unsettle-credit-brand-${order.mongoId}`. If an order is settled, unsettled, settled again, and then unsettled again, the second unsettlement will hit the idempotency guard and silently succeed without actually moving funds (the `existingTx` short-circuit in `applyWalletCredit`).
+Unsettlement idempotency keys use patterns like `order-unsettle-credit-brand-${order.id}`. If an order is settled, unsettled, settled again, and then unsettled again, the second unsettlement will hit the idempotency guard and silently succeed without actually moving funds (the `existingTx` short-circuit in `applyWalletCredit`).
 
 **Fix:**  
 Include a monotonically increasing version or timestamp in the idempotency key:
 ```ts
-`order-unsettle-credit-brand-${order.mongoId}-v${Date.now()}`
+`order-unsettle-credit-brand-${order.id}-v${Date.now()}`
 ```
 Or better: include the wallet `version` field in the key so each cycle generates a unique key.
 

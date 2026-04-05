@@ -50,11 +50,11 @@ export async function transitionOrderWorkflow(params: {
 
   // Read current order (need events array for append)
   const orderWhere = UUID_RE.test(params.orderId)
-    ? { OR: [{ id: params.orderId }, { mongoId: params.orderId }], isDeleted: false }
-    : { mongoId: params.orderId, isDeleted: false };
+    ? { id: params.orderId, isDeleted: false }
+    : { id: params.orderId, isDeleted: false };
   const current = await client.order.findFirst({
     where: orderWhere as any,
-    select: { id: true, mongoId: true, events: true, frozen: true, workflowStatus: true, isDeleted: true },
+    select: { id: true, events: true, frozen: true, workflowStatus: true, isDeleted: true },
   });
 
   if (!current || current.isDeleted) {
@@ -116,13 +116,13 @@ export async function transitionOrderWorkflow(params: {
   const order = await client.order.findUnique({ where: { id: current.id }, include: { items: { where: { isDeleted: false } } } });
   if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order disappeared after transition');
 
-  orderLog.info(`Order workflow: ${params.from} → ${params.to}`, { orderId: current.id, mongoId: current.mongoId, from: params.from, to: params.to, actorUserId: params.actorUserId });
-  logChangeEvent({ actorUserId: params.actorUserId, entityType: 'Order', entityId: current.id, action: 'STATUS_CHANGE', changedFields: ['workflowStatus'], before: { workflowStatus: params.from }, after: { workflowStatus: params.to }, metadata: { orderId: params.orderId, mongoId: current.mongoId } });
+  orderLog.info(`Order workflow: ${params.from} → ${params.to}`, { orderId: current.id, from: params.from, to: params.to, actorUserId: params.actorUserId });
+  logChangeEvent({ actorUserId: params.actorUserId, entityType: 'Order', entityId: current.id, action: 'STATUS_CHANGE', changedFields: ['workflowStatus'], before: { workflowStatus: params.from }, after: { workflowStatus: params.to }, metadata: { orderId: params.orderId} });
 
   if (params.env && order) {
     notifyOrderWorkflowPush({
       env: params.env,
-      order: { ...order, _id: order.mongoId } as any,
+      order: { ...order, _id: order.id } as any,
       from: params.from,
       to: params.to,
     }).catch((err) => orderLog.warn('[orderWorkflow] push notification failed', { error: err?.message || err }));
@@ -181,7 +181,7 @@ export async function reactivateOrder(params: { orderId: string; actorUserId: st
   // Read current order to append event
   const current = await client.order.findFirst({
     where: {
-      mongoId: params.orderId,
+      id: params.orderId,
       isDeleted: false,
       frozen: true,
       workflowStatus: { notIn: Array.from(TERMINAL) as any },

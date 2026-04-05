@@ -37,7 +37,6 @@ async function createInvite(
   const db = prisma();
   return db.invite.create({
     data: {
-      mongoId: randomUUID(),
       code: fields.code,
       role: fields.role as any,
       status: (fields.status ?? 'active') as any,
