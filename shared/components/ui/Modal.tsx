@@ -35,10 +35,27 @@ export function Modal({
   title,
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') { onClose(); return; }
+      // Focus trap — keep Tab cycling inside the modal panel
+      if (e.key === 'Tab' && panelRef.current) {
+        const focusable = panelRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     },
     [onClose],
   );
@@ -73,7 +90,7 @@ export function Modal({
 
           {/* Panel */}
           <motion.div
-            ref={(el) => el?.focus()}
+            ref={(el) => { panelRef.current = el; el?.focus(); }}
             tabIndex={-1}
             className={cn(
               'relative w-full bg-white rounded-[2rem] shadow-2xl overflow-hidden outline-none',

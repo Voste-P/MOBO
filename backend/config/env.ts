@@ -85,6 +85,10 @@ const envSchema = z.object({
   // Maximum number of times a rejected order can be re-submitted for proof.
   MAX_REPROOF_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),
 
+  // Cooling-period settler tuning
+  SETTLER_INTERVAL_MS: z.coerce.number().int().min(60_000).default(900_000), // 15 min
+  SETTLER_TX_TIMEOUT_MS: z.coerce.number().int().min(5000).default(15_000),  // Prisma $transaction timeout
+
   // Wallet safety limits
   WALLET_MAX_BALANCE_PAISE: z.coerce.number().int().positive().default(1_00_00_000), // ₹1,00,000
 

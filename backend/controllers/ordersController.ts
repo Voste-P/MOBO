@@ -1508,6 +1508,7 @@ export function makeOrdersController(env: Env) {
             // marketplace reviewer name as expectedReviewerName (PRIMARY match target).
             // The AI service matches PRIMARILY against expectedReviewerName when provided.
             if ((reviewerName || buyerName) && productName) {
+              try {
               const aiStart = Date.now();
               ratingAiResult = await verifyRatingScreenshotWithAi(env, {
                 imageBase64: body.data,
@@ -1543,6 +1544,15 @@ export function makeOrdersController(env: Env) {
                   'Your rating screenshot appears to be cropped or incomplete. ' +
                   'Please upload a FULL screenshot showing the complete review page including the page header and account name. ' +
                   (ratingAiResult.discrepancyNote || ''));
+              }
+              } catch (aiErr: any) {
+                // Re-throw user-facing validation errors (422s)
+                if (aiErr instanceof AppError) throw aiErr;
+                // Infrastructure failure (OCR capacity, Gemini down, timeout) — accept proof
+                // for manual mediator review instead of blocking the buyer
+                orderLog.warn('[submitClaim] Rating AI verification unavailable, proceeding for manual review', {
+                  error: aiErr?.message, orderId: order.mongoId,
+                });
               }
             }
           }
@@ -1600,6 +1610,7 @@ export function makeOrdersController(env: Env) {
             // else's account, pass the reviewer name so AI can verify that name in the screenshot.
             const rwReviewerName = String(body.reviewerName || order.reviewerName || '').trim();
             if (expectedOrderId) {
+              try {
               const aiStart = Date.now();
               returnWindowResult = await verifyReturnWindowWithAi(env, {
                 imageBase64: body.data,
@@ -1675,6 +1686,15 @@ export function makeOrdersController(env: Env) {
                     ` [Server: Return window should not be closed yet — ${daysRemaining} day(s) remaining per order records.]`;
                 }
               }
+              } catch (aiErr: any) {
+                // Re-throw user-facing validation errors (422s)
+                if (aiErr instanceof AppError) throw aiErr;
+                // Infrastructure failure (OCR capacity, Gemini down, timeout) — accept proof
+                // for manual mediator review instead of blocking the buyer
+                orderLog.warn('[submitClaim] Return window AI verification unavailable, proceeding for manual review', {
+                  error: aiErr?.message, orderId: order.mongoId,
+                });
+              }
             }
           }
 
@@ -1721,6 +1741,7 @@ export function makeOrdersController(env: Env) {
             if (!Number.isFinite(expectedAmount) || expectedAmount <= 0) {
               orderLog.warn(`[ordersController] Skipping AI re-upload verification: invalid expectedAmount=${expectedAmount} for order=${order.mongoId}`);
             } else {
+              try {
               const aiStart = Date.now();
               aiOrderVerification = await verifyProofWithAi(env, {
                 imageBase64: body.data,
@@ -1764,6 +1785,15 @@ export function makeOrdersController(env: Env) {
                   'Your order screenshot appears to be cropped or incomplete. ' +
                   'Please upload a FULL screenshot showing the complete order page including the page header. ' +
                   (aiOrderVerification.discrepancyNote || ''));
+              }
+              } catch (aiErr: any) {
+                // Re-throw user-facing validation errors (422s)
+                if (aiErr instanceof AppError) throw aiErr;
+                // Infrastructure failure (OCR capacity, Gemini down, timeout) — accept proof
+                // for manual mediator review instead of blocking the buyer
+                orderLog.warn('[submitClaim] Order re-upload AI verification unavailable, proceeding for manual review', {
+                  error: aiErr?.message, orderId: order.mongoId,
+                });
               }
             }
           }

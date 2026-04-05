@@ -150,6 +150,8 @@ erDiagram
 
 - Wallet updates are done via idempotent transactions (`Transaction.idempotencyKey` has a unique index for non-deleted rows).
 - Brand→Agency payouts debit the brand wallet and credit the agency wallet with replay-safe idempotency keys.
+- Cooling-period settlement uses an **atomic claim guard** (`updateMany` with WHERE on `affiliateStatus: 'Pending_Cooling'`) to prevent double-settlement from concurrent cron invocations.
+- Settler interval and transaction timeout are configurable via `SETTLER_INTERVAL_MS` and `SETTLER_TX_TIMEOUT_MS` env vars.
 
 ## Order workflow
 
@@ -164,6 +166,7 @@ Orders have a strict state machine (`workflowStatus`), with anti-fraud constrain
 - Google Gemini Vision API with **circuit breaker** (3-failure threshold, 5 min cooldown, HALF_OPEN requires 3 consecutive successes before closing).
 - AI extraction uses **exponential backoff retry** (3 attempts, 200/400/800ms) for transient failures; validation errors are thrown immediately.
 - **Overall timeout** (50 s) on all three verification functions (`verifyProofWithAi`, `verifyRatingScreenshotWithAi`, `verifyReturnWindowWithAi`) prevents the Gemini multi-model loop from exceeding the frontend 60 s request timeout.
+- **Graceful degradation**: Infrastructure failures (OCR capacity, Gemini downtime, timeouts) in all proof submission paths (order creation, rating, return-window, re-upload) fall through to manual mediator review instead of returning 500. User-facing validation errors (422 `AppError`) are still thrown.
 - Confidence thresholds: 80% for individual proofs, 70% for bulk — configurable via `AI_PROOF_CONFIDENCE_THRESHOLD`.
 - Confidence values are sanitised with `Number.isFinite()` and clamped to 0–100 before comparison.
 - Fallback to Tesseract OCR when Gemini circuit is open.
@@ -185,3 +188,4 @@ Orders have a strict state machine (`workflowStatus`), with anti-fraud constrain
 - All interactive elements meet a 44 × 44 px minimum touch target (WCAG 2.5.5 AAA).
 - Confirmation dialogs focus the cancel button by default (safe action first for destructive dialogs).
 - Notification items expose `role="status"` and `aria-label` for screen readers.
+- Modal component implements a focus trap (Tab/Shift+Tab cycles within the dialog panel).

@@ -712,6 +712,7 @@ model Transaction {
   @@index([isDeleted, createdAt(sort: Desc)])
   @@index([walletId, createdAt(sort: Desc)])
   @@index([walletId, type, createdAt(sort: Desc)])     // ledger queries with type filter
+  @@index([walletId, status, type, createdAt(sort: Desc)]) // wallet ledger filtered by status (settlement reconciliation)
   @@index([orderId])
   @@index([campaignId])
   @@index([payoutId])
@@ -751,6 +752,7 @@ model Payout {
   @@unique([provider, providerRef])
   @@index([status, requestedAt(sort: Desc)])
   @@index([beneficiaryUserId, requestedAt(sort: Desc)])
+  @@index([status, beneficiaryUserId, requestedAt(sort: Desc)]) // admin payout listing by user + status
   @@index([walletId])
   @@index([isDeleted, requestedAt(sort: Desc)])
   @@map("payouts")
@@ -832,6 +834,7 @@ model Ticket {
   @@index([isDeleted, createdAt(sort: Desc)])          // admin ticket listing
   @@index([orderId])                                   // settlement dispute lookups
   @@index([targetRole, isDeleted, createdAt(sort: Desc)]) // cascade routing lookups
+  @@index([targetRole, status, isDeleted, createdAt(sort: Desc)]) // cascade routing with status filter
   @@index([userId, orderId, isDeleted])                // ticket permission checks
   @@index([role, status, isDeleted])                   // role-scoped ticket queries
   @@map("tickets")

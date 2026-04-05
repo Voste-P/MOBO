@@ -46,6 +46,23 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
     return false;
   }
 
+  // ── Atomic claim: prevent double-settlement from concurrent cron invocations ──
+  // Only one settler can claim this order; the updateMany WHERE guarantees atomicity.
+  const claimed = await db().order.updateMany({
+    where: {
+      id: order.id,
+      workflowStatus: 'APPROVED',
+      affiliateStatus: 'Pending_Cooling',
+      frozen: false,
+      isDeleted: false,
+    },
+    data: { affiliateStatus: 'Pending_Cooling', updatedBy: null }, // no-op update to "claim" with WHERE guard
+  });
+  if (claimed.count === 0) {
+    orderLog.info('[cooling-settler] Order already claimed by another settler', { orderId: orderDisplayId });
+    return false;
+  }
+
   // Skip if there's an open dispute ticket (use prefetch if available)
   const hasOpenDispute = prefetch
     ? prefetch.disputeOrderIds.has(orderDisplayId)
@@ -237,7 +254,7 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
           },
         });
       },
-      { timeout: 15000 },
+      { timeout: env.SETTLER_TX_TIMEOUT_MS },
     );
   } else {
     // Cap-exceeded or missing product: update status without wallet movement
@@ -470,7 +487,8 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
 
 /** Start the cooling period settlement loop. Call once at server startup. */
-export function startCoolingPeriodSettler(env: Env, intervalMs = 15 * 60 * 1000): void {
+export function startCoolingPeriodSettler(env: Env, intervalMs?: number): void {
+  const interval = intervalMs ?? env.SETTLER_INTERVAL_MS;
   if (intervalHandle) return; // already started
 
   // Run once immediately after a short delay (let server fully start)
@@ -482,9 +500,9 @@ export function startCoolingPeriodSettler(env: Env, intervalMs = 15 * 60 * 1000)
   // Then run periodically (default: every 15 minutes for faster settlements)
   intervalHandle = setInterval(() => {
     void processCoolingPeriodSettlements(env);
-  }, intervalMs);
+  }, interval);
   intervalHandle.unref(); // don't prevent graceful shutdown
-  orderLog.info(`[cooling-settler] Scheduled every ${Math.round(intervalMs / 60000)}min`);
+  orderLog.info(`[cooling-settler] Scheduled every ${Math.round(interval / 60000)}min`);
 }
 
 /** Stop the settlement loop (call during graceful shutdown). */
