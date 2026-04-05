@@ -1223,6 +1223,9 @@ async function verifyProofWithOcr(
 }
 
 export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promise<ProofVerificationResult> {
+  // Overall timeout: prevents the entire verification chain (Gemini fallbacks + OCR) from exceeding 50s.
+  // This leaves a ~10s buffer before typical frontend timeouts (60s).
+  const OVERALL_TIMEOUT_MS = 50_000;
   const _aiStart = Date.now();
   const geminiAvailable = isGeminiConfigured(env);
 
@@ -1263,6 +1266,11 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
     let lastError: unknown = null;
 
     for (const model of PROOF_MODEL_FALLBACKS) {
+      // Check overall timeout before attempting next model
+      if (Date.now() - _aiStart > OVERALL_TIMEOUT_MS) {
+        aiLog.warn('[Proof] Overall timeout exceeded before trying next model', { model, elapsedMs: Date.now() - _aiStart });
+        break;
+      }
       try {
         // eslint-disable-next-line no-await-in-loop
         const response = await withModelTimeout(ai.models.generateContent({
@@ -1769,6 +1777,7 @@ export async function verifyRatingScreenshotWithAi(
   env: Env,
   payload: RatingVerificationPayload,
 ): Promise<RatingVerificationResult> {
+  const OVERALL_TIMEOUT_MS = 50_000;
   const _aiStart = Date.now();
   if (payload.imageBase64.length > env.AI_MAX_IMAGE_CHARS) {
     return { accountNameMatch: false, productNameMatch: false, confidenceScore: 0,
@@ -1786,6 +1795,10 @@ export async function verifyRatingScreenshotWithAi(
   try {
     let lastError: unknown = null;
     for (const model of PROOF_MODEL_FALLBACKS) {
+      if (Date.now() - _aiStart > OVERALL_TIMEOUT_MS) {
+        aiLog.warn('[Rating] Overall timeout exceeded before trying next model', { model, elapsedMs: Date.now() - _aiStart });
+        break;
+      }
       try {
         const response = await withModelTimeout(ai.models.generateContent({
           model,
@@ -2255,6 +2268,7 @@ export async function verifyReturnWindowWithAi(
   env: Env,
   payload: ReturnWindowVerificationPayload,
 ): Promise<ReturnWindowVerificationResult> {
+  const OVERALL_TIMEOUT_MS = 50_000;
   const _aiStart = Date.now();
   if (payload.imageBase64.length > env.AI_MAX_IMAGE_CHARS) {
     return { orderIdMatch: false, productNameMatch: false, amountMatch: false, soldByMatch: false,
@@ -2273,6 +2287,10 @@ export async function verifyReturnWindowWithAi(
   try {
     let lastError: unknown = null;
     for (const model of PROOF_MODEL_FALLBACKS) {
+      if (Date.now() - _aiStart > OVERALL_TIMEOUT_MS) {
+        aiLog.warn('[ReturnWindow] Overall timeout exceeded before trying next model', { model, elapsedMs: Date.now() - _aiStart });
+        break;
+      }
       try {
         const response = await withModelTimeout(ai.models.generateContent({
           model,

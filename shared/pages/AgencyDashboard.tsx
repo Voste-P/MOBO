@@ -185,6 +185,7 @@ const AgencyProfile = ({ user }: { user: User }) => {
       if (!isEditing) setIsEditing(true);
       const reader = new FileReader();
       reader.onload = () => setAvatar(reader.result as string);
+      reader.onerror = () => toast.error('Failed to read image. Please try again.');
       reader.readAsDataURL(file);
     }
   };

@@ -535,6 +535,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       const raw = reader.result as string;
       setFormScreenshot(raw);
     };
+    reader.onerror = () => toast.error('Failed to read image. Please try again.');
     reader.readAsDataURL(file);
 
     setIsAnalyzing(true);
@@ -656,6 +657,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
     // Show preview immediately
     const reader = new FileReader();
     reader.onload = () => setRatingPreview(reader.result as string);
+    reader.onerror = () => toast.error('Failed to read image. Please try again.');
     reader.readAsDataURL(file);
 
     setRatingFile(file);
@@ -797,6 +799,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
     // Show preview immediately
     const reader = new FileReader();
     reader.onload = () => setRwPreview(reader.result as string);
+    reader.onerror = () => toast.error('Failed to read image. Please try again.');
     reader.readAsDataURL(file);
 
     setRwFile(file);

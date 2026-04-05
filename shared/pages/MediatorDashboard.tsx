@@ -1358,6 +1358,7 @@ const MediatorProfileView = () => {
         if (type === 'avatar') setAvatar(reader.result as string);
         else setQrCode(reader.result as string);
       };
+      reader.onerror = () => toast.error('Failed to read image. Please try again.');
       reader.readAsDataURL(file);
     }
   };

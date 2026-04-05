@@ -192,6 +192,7 @@ const BrandProfileView = () => {
       if (file.size > 2 * 1024 * 1024) { toast.error('Avatar must be under 2 MB'); return; }
       const reader = new FileReader();
       reader.onload = () => setAvatar(reader.result as string);
+      reader.onerror = () => toast.error('Failed to read image. Please try again.');
       reader.readAsDataURL(file);
     }
   };

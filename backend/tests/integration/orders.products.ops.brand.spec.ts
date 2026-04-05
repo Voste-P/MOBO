@@ -119,6 +119,10 @@ describe('core flows: products -> redirect -> order -> claim -> ops verify/settl
         `order-settlement-debit-${mid}`,
         `order-commission-${mid}`,
         `order-margin-${mid}`,
+        // Also clean keys with cycle suffix (settle/unsettle/re-settle)
+        ...Array.from({ length: 4 }, (_, i) => `order-settlement-debit-${mid}-c${i}`),
+        ...Array.from({ length: 4 }, (_, i) => `order-commission-${mid}-c${i}`),
+        ...Array.from({ length: 4 }, (_, i) => `order-margin-${mid}-c${i}`),
       ]);
       try { await db.transaction.deleteMany({ where: { idempotencyKey: { in: allStaleKeys } } }); } catch { /* ignore */ }
     }
@@ -215,7 +219,12 @@ describe('core flows: products -> redirect -> order -> claim -> ops verify/settl
     // (in case a previous full-suite run left them behind)
     const thisOrderMongoId = (await db.order.findFirst({ where: { id: orderId }, select: { mongoId: true } }))?.mongoId;
     if (thisOrderMongoId) {
-      try { await db.transaction.deleteMany({ where: { idempotencyKey: { in: [`order-settlement-debit-${thisOrderMongoId}`, `order-commission-${thisOrderMongoId}`, `order-margin-${thisOrderMongoId}`] } } }); } catch { /* ignore */ }
+      const cycleKeys = Array.from({ length: 4 }, (_, i) => [
+        `order-settlement-debit-${thisOrderMongoId}-c${i}`,
+        `order-commission-${thisOrderMongoId}-c${i}`,
+        `order-margin-${thisOrderMongoId}-c${i}`,
+      ]).flat();
+      try { await db.transaction.deleteMany({ where: { idempotencyKey: { in: [`order-settlement-debit-${thisOrderMongoId}`, `order-commission-${thisOrderMongoId}`, `order-margin-${thisOrderMongoId}`, ...cycleKeys] } } }); } catch { /* ignore */ }
     }
 
     // Snapshot wallet balance immediately BEFORE settling
