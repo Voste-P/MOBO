@@ -460,19 +460,34 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
   const prefetch = { disputeOrderIds, campaignMap, dealMap, userMap, mediatorMap, capCountMap };
 
   for (const order of orders) {
-    try {
-      const didSettle = await settleOne(order, env, prefetch);
-      if (didSettle) settled++;
-      else skipped++;
-    } catch (err) {
-      errors++;
-      logErrorEvent({
-        error: err instanceof Error ? err : new Error(String(err)),
-        message: `[cooling-settler] Failed to settle order ${order.mongoId ?? order.id}`,
-        category: 'BUSINESS_LOGIC',
-        severity: 'high',
-        metadata: { orderId: order.mongoId ?? order.id, handler: 'coolingPeriodSettler' },
-      });
+    const orderId = order.mongoId ?? order.id;
+    // Retry up to 2 times on transient DB errors (connection, timeout, deadlock)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const didSettle = await settleOne(order, env, prefetch);
+        if (didSettle) settled++;
+        else skipped++;
+        break;
+      } catch (err: any) {
+        const code = err?.code ?? '';
+        const isTransient = code === 'P1017' || code === 'P1001' || code === 'P1008' || code === 'P2034'
+          || (err?.message && /deadlock|timeout|connection/i.test(err.message));
+        if (isTransient && attempt < 2) {
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+          continue;
+        }
+        errors++;
+        logErrorEvent({
+          error: err instanceof Error ? err : new Error(String(err)),
+          message: `[cooling-settler] Failed to settle order ${orderId}` + (attempt > 0 ? ` (after ${attempt + 1} attempts)` : ''),
+          category: 'BUSINESS_LOGIC',
+          severity: 'high',
+          metadata: { orderId, handler: 'coolingPeriodSettler', attempts: attempt + 1 },
+        });
+        break;
+      }
     }
   }
 

@@ -624,7 +624,7 @@ export function makeBrandController() {
               entityType: 'User',
               entityId: brand.mongoId || brand.id,
               metadata: { agencyCode, campaignsAffected: affectedCount },
-            }).catch(() => { });
+            }).catch((err) => { businessLog.warn('Audit log failed (cascade)', { error: err instanceof Error ? err.message : String(err) }); });
           }
         }
         const ts = new Date().toISOString();

@@ -1899,7 +1899,13 @@ export function makeOrdersController(env: Env) {
           },
         });
 
-        await db().order.update({ where: { id: order.id }, data: updateData });
+        // Ownership guard: non-privileged users require userId match to prevent TOCTOU race
+        if (privileged) {
+          await db().order.update({ where: { id: order.id }, data: updateData });
+        } else {
+          const result = await db().order.updateMany({ where: { id: order.id, userId: requesterPgId }, data: updateData });
+          if (result.count === 0) throw new AppError(403, 'FORBIDDEN', 'Order ownership changed');
+        }
 
         // If order is already APPROVED (e.g. during cooling period), save the proof
         // without rewinding the workflow. This handles orders approved before
@@ -1917,8 +1923,8 @@ export function makeOrdersController(env: Env) {
               v[vKey].verifiedBy = 'SYSTEM_AI';
               v[vKey].autoVerified = true;
               v[vKey].aiConfidenceScore = claimAiConfidence;
-              await db().order.update({
-                where: { id: order.id },
+              await db().order.updateMany({
+                where: { id: order.id, ...(!privileged && { userId: requesterPgId }) },
                 data: { verification: v },
               });
             }

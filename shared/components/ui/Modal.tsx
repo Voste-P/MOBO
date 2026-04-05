@@ -43,7 +43,7 @@ export function Modal({
       // Focus trap — keep Tab cycling inside the modal panel
       if (e.key === 'Tab' && panelRef.current) {
         const focusable = panelRef.current.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          'a[href]:not([hidden]):not([aria-hidden="true"]), button:not([disabled]):not([hidden]):not([aria-hidden="true"]), textarea:not([disabled]):not([hidden]):not([aria-hidden="true"]), input:not([disabled]):not([hidden]):not([aria-hidden="true"]), select:not([disabled]):not([hidden]):not([aria-hidden="true"]), [tabindex]:not([tabindex="-1"]):not([hidden]):not([aria-hidden="true"])',
         );
         if (focusable.length === 0) return;
         const first = focusable[0];

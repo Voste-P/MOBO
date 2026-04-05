@@ -25,18 +25,6 @@ export function makeInviteController() {
         const ttlSeconds = body.ttlSeconds ?? 60 * 60 * 24 * 7;
         const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
 
-        let code = generateHumanCode('INV');
-        let invCodeUnique = false;
-        for (let i = 0; i < 10; i += 1) {
-          // eslint-disable-next-line no-await-in-loop
-          const exists = await db().invite.findFirst({ where: { code }, select: { id: true } });
-          if (!exists) { invCodeUnique = true; break; }
-          code = generateHumanCode('INV');
-        }
-        if (!invCodeUnique) {
-          throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique invite code; please retry');
-        }
-
         // Resolve createdBy: need PG UUID, not mongoId
         let createdByUuid: string | undefined;
         if (req.auth?.userId) {
@@ -44,19 +32,35 @@ export function makeInviteController() {
           createdByUuid = actor?.id;
         }
 
-        const invite = await db().invite.create({
-          data: {
-            mongoId: randomUUID(),
-            code,
-            role: body.role as any,
-            label: body.label,
-            parentUserId: body.parentUserId ? undefined : undefined,
-            parentCode: body.parentCode,
-            maxUses: body.maxUses ?? 1,
-            expiresAt,
-            createdBy: createdByUuid,
-          },
-        });
+        // Create invite with retry on unique-code collision (P2002)
+        let invite: Awaited<ReturnType<ReturnType<typeof db>['invite']['create']>> | undefined;
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+          const code = generateHumanCode('INV');
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            invite = await db().invite.create({
+              data: {
+                mongoId: randomUUID(),
+                code,
+                role: body.role as any,
+                label: body.label,
+                parentUserId: body.parentUserId ? undefined : undefined,
+                parentCode: body.parentCode,
+                maxUses: body.maxUses ?? 1,
+                expiresAt,
+                createdBy: createdByUuid,
+              },
+            });
+            break; // success
+          } catch (err: any) {
+            // P2002 = unique-constraint violation → code collision, retry
+            const isUniqueViolation = err?.code === 'P2002' || err?.meta?.target?.includes('code');
+            if (!isUniqueViolation) throw err;
+            // last attempt → surface the error
+            if (attempt === 9) throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique invite code; please retry');
+          }
+        }
+        if (!invite) throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique invite code; please retry');
 
         await writeAuditLog({
           req,

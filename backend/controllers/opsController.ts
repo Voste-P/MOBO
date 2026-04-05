@@ -1443,7 +1443,7 @@ export function makeOpsController(env: Env) {
               entityType: 'Campaign',
               entityId: String(campaignId),
               metadata: { orderId: order.mongoId ?? order.id, reason: 'proof_rejected' },
-            }).catch(() => { });
+            }).catch((err) => { orderLog.warn('Audit log failed (slot release)', { error: err instanceof Error ? err.message : String(err) }); });
           }
         }
 
@@ -3289,7 +3289,7 @@ export function makeOpsController(env: Env) {
 
         await writeAuditLog({ req, action: 'ORDER_CANCELLED', entityType: 'Order', entityId: order.mongoId!, metadata: { reason: body.reason } });
         if (campaignId) {
-          writeAuditLog({ req, action: 'CAMPAIGN_SLOT_RELEASED', entityType: 'Campaign', entityId: String(campaignId), metadata: { orderId: order.mongoId ?? order.id, reason: 'order_cancelled' } }).catch(() => {});
+          writeAuditLog({ req, action: 'CAMPAIGN_SLOT_RELEASED', entityType: 'Campaign', entityId: String(campaignId), metadata: { orderId: order.mongoId ?? order.id, reason: 'order_cancelled' } }).catch((err) => { orderLog.warn('Audit log failed (slot release on cancel)', { error: err instanceof Error ? err.message : String(err) }); });
         }
         orderLog.info('Order cancelled', { orderId: order.mongoId, reason: body.reason });
         businessLog.info('Order cancelled', { orderId: order.mongoId, cancelledBy: req.auth?.userId, ip: req.ip });
