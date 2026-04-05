@@ -1245,7 +1245,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                     const validDate = d && !isNaN(d.getTime()) && d.getFullYear() > 2020 ? d : null;
                     return (viewProofOrder.extractedProductName || seller || validDate || viewProofOrder.reviewerName) ? (
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[10px] text-zinc-400">
-                        {viewProofOrder.reviewerName && <span className="text-indigo-500 font-bold">Reviewer: {viewProofOrder.reviewerName}</span>}
+                        {viewProofOrder.reviewerName && <span className="text-zinc-500 font-bold">Reviewer: {viewProofOrder.reviewerName}</span>}
                         {viewProofOrder.extractedProductName && <span>Product: {viewProofOrder.extractedProductName}</span>}
                         {seller && <span>Seller: {seller}</span>}
                         {validDate && <span>Ordered: {validDate.toLocaleDateString('en-GB')}</span>}
@@ -1280,10 +1280,10 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                     </div>
                     {/* AI Verification — stored from buyer's proof submission */}
                     {viewProofOrder.orderAiVerification && (
-                    <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-200 mt-2">
+                    <div className="bg-lime-50 p-3 rounded-xl border border-lime-200 mt-2">
                       <div className="flex justify-between items-center mb-2">
-                        <h5 className="font-bold text-indigo-600 flex items-center gap-1.5 text-[10px] uppercase tracking-widest">
-                          <Sparkles size={12} className="text-indigo-500" /> AI Verification
+                        <h5 className="font-bold text-lime-600 flex items-center gap-1.5 text-[10px] uppercase tracking-widest">
+                          <Sparkles size={12} className="text-lime-500" /> AI Verification
                         </h5>
                       </div>
                         <div className="space-y-2">
@@ -1313,7 +1313,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                                   <p className="text-[10px] text-zinc-500 bg-white rounded-lg p-2 border border-zinc-100">{aiData.discrepancyNote}</p>
                                 )}
                                 <div className="flex justify-between items-center pt-1">
-                                  <span className="text-[10px] text-indigo-500 font-bold uppercase">Confidence</span>
+                                  <span className="text-[10px] text-lime-600 font-bold uppercase">Confidence</span>
                                   <div className="flex items-center gap-2">
                                     <div className="w-20 h-1.5 bg-zinc-200 rounded-full overflow-hidden">
                                       <div className={`h-full rounded-full ${score > 80 ? 'bg-green-500' : score > 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${score}%` }} />
@@ -1861,7 +1861,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
 
               <div className="bg-zinc-50 rounded-xl p-3 mb-3 border border-zinc-100 relative font-mono text-[10px] text-zinc-500 leading-relaxed">
                 <div className="mb-1">
-                  <span className="text-indigo-600 font-bold">"{user.name}"</span> Direct Deal.
+                  <span className="text-zinc-700 font-bold">"{user.name}"</span> Direct Deal.
                 </div>
                 <div className="pt-2 border-t border-zinc-200 border-dashed flex justify-between items-center">
                   <span>Product Price:</span>
@@ -2615,7 +2615,7 @@ export const BrandDashboard: React.FC = () => {
               <>
               <div className="mb-2">
                 <input type="text" placeholder="Search tickets..." value={ticketSearch} onChange={e => setTicketSearch(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs rounded-lg border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+                  className="w-full px-3 py-1.5 text-xs rounded-lg border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-lime-300" />
               </div>
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 {(['All', 'Open', 'Resolved', 'Rejected'] as const).map(f => {
@@ -2624,8 +2624,8 @@ export const BrandDashboard: React.FC = () => {
                     <button key={f} type="button" onClick={() => setTicketFilter(f)}
                       className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
                         ticketFilter === f
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                          : 'bg-white text-zinc-600 border-zinc-200 hover:border-indigo-300'
+                          ? 'bg-zinc-900 text-white border-zinc-900 shadow-sm'
+                          : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400'
                       }`}>
                       {f} ({count})
                     </button>
@@ -2654,7 +2654,7 @@ export const BrandDashboard: React.FC = () => {
                   }
                   return true;
                 }).map((t: Ticket) => (
-                  <div key={t.id} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTicket(t); } }} className="rounded-xl border border-zinc-100 bg-white px-3 py-3 shadow-sm space-y-2 cursor-pointer hover:border-zinc-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setSelectedTicket(t)}>
+                  <div key={t.id} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTicket(t); } }} className="rounded-xl border border-zinc-100 bg-white px-3 py-3 shadow-sm space-y-2 cursor-pointer hover:border-zinc-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400" onClick={() => setSelectedTicket(t)}>
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
@@ -2718,7 +2718,7 @@ export const BrandDashboard: React.FC = () => {
                       {String(t.status || '').toLowerCase() === 'open' && resolvingTicketId === t.id && (
                         <div className="w-full mt-1 space-y-1.5">
                           <textarea placeholder="Resolution / rejection note (optional)..." value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} rows={2}
-                            className="w-full px-2 py-1.5 text-xs rounded-lg border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
+                            className="w-full px-2 py-1.5 text-xs rounded-lg border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-lime-300 resize-none" />
                           <div className="flex items-center gap-2">
                             <button type="button" onClick={async () => {
                               try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }

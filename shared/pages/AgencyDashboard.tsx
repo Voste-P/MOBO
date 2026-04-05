@@ -192,7 +192,7 @@ const AgencyProfile = ({ user }: { user: User }) => {
     <div className="max-w-5xl mx-auto animate-enter pb-12">
       {/* Header */}
       <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden relative mb-8 group">
-        <div className="h-28 sm:h-32 bg-gradient-to-r from-purple-600 to-indigo-600 relative">
+        <div className="h-28 sm:h-32 bg-gradient-to-r from-zinc-800 to-zinc-900 relative">
           <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.7\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\'/%3E%3C/svg%3E")' }} />
         </div>
         <div className="px-4 sm:px-8 pb-6 sm:pb-8 flex flex-col md:flex-row items-end -mt-10 sm:-mt-12 gap-4 sm:gap-6">
@@ -2130,14 +2130,14 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                             </span>
                           </div>
                           {String(c.brandId || '') === String(user.id || '') && (
-                            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                            <span className="text-[10px] font-bold text-zinc-600 bg-zinc-50 px-2 py-0.5 rounded-full border border-zinc-200">
                               Agency Campaign
                             </span>
                           )}
                         </div>
                       </td>
                       <td className="p-5">
-                        <ExpandableText text={c.brand || '—'} clampClass="truncate" className="text-xs font-bold text-indigo-700 max-w-[120px] block" as="span">
+                        <ExpandableText text={c.brand || '—'} clampClass="truncate" className="text-xs font-bold text-zinc-700 max-w-[120px] block" as="span">
                           {c.brand || '—'}
                         </ExpandableText>
                       </td>
@@ -2330,7 +2330,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                           {c.title}
                         </ExpandableText>
                         <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                          Offered by <span className="text-indigo-600">"{c.brand}"</span>
+                          Offered by <span className="text-zinc-700 font-semibold">"{c.brand}"</span>
                         </p>
                       </div>
                     </div>
@@ -2604,7 +2604,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                     ID: {String(assignModal.id).slice(-8)}
                   </span>
                   {isAgencyCampaign && (
-                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                    <span className="text-[10px] font-bold text-zinc-600 bg-zinc-50 px-2 py-0.5 rounded-full border border-zinc-200">
                       Agency Campaign
                     </span>
                   )}
@@ -3311,7 +3311,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
                   <ExpandableText text={proofOrder.items?.[0]?.title || ''} clampClass="line-clamp-1" className="text-sm font-bold text-slate-900" as="p">{proofOrder.items?.[0]?.title}</ExpandableText>
                   <p className="text-xs text-slate-500 mt-0.5">Total: <span className="font-mono font-bold text-zinc-900">{formatCurrency(proofOrder.total)}</span></p>
                   <p className="text-[10px] text-slate-400 mt-0.5">Mediator: {proofOrder.managerName} · Buyer: {proofOrder.buyerName}</p>
-                  {proofOrder.reviewerName && <p className="text-[10px] text-indigo-500 font-bold mt-0.5">Reviewer: {proofOrder.reviewerName}</p>}
+                  {proofOrder.reviewerName && <p className="text-[10px] text-zinc-500 font-bold mt-0.5">Reviewer: {proofOrder.reviewerName}</p>}
                   {proofOrder.items?.[0]?.platform && <p className="text-[10px] text-slate-400 mt-0.5">Platform: {proofOrder.items[0].platform}</p>}
                 </div>
               </div>
@@ -3333,8 +3333,8 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
                   <div className="p-6 border-2 border-dashed border-red-200 bg-red-50 rounded-2xl text-center"><AlertCircle size={20} className="mx-auto text-red-400 mb-1" /><p className="text-xs font-bold text-red-500">Missing</p></div>
                 )}
                 {proofOrder.orderAiVerification && (
-                  <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
-                    <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-2"><Sparkles size={12} className="inline mr-1" />AI Verification</p>
+                  <div className="bg-lime-50 p-3 rounded-xl border border-lime-100">
+                    <p className="text-[10px] font-bold text-lime-600 uppercase tracking-wider mb-2"><Sparkles size={12} className="inline mr-1" />AI Verification</p>
                     <div className="flex gap-2">
                       <div className={`flex-1 p-2 rounded-lg border text-center ${proofOrder.orderAiVerification.orderIdMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                         <p className="text-[10px] font-bold uppercase text-slate-500">Order ID</p>
@@ -3888,7 +3888,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators
                   </h3>
 
                   <div className="bg-white p-5 rounded-2xl border border-slate-200 mb-6 shadow-md relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-bl-full -mr-10 -mt-10 z-0 opacity-50 group-hover:opacity-100 transition-opacity"></div>
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-purple-50 to-zinc-50 rounded-bl-full -mr-10 -mt-10 z-0 opacity-50 group-hover:opacity-100 transition-opacity"></div>
                     <div className="flex justify-between items-center mb-5 relative z-10">
                       <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">
                         Beneficiary Details
@@ -4098,10 +4098,10 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators
                     </div>
                     {/* AI Verification — stored from buyer's proof submission */}
                     {proofOrder.orderAiVerification && (
-                    <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mt-3 relative overflow-hidden">
+                    <div className="bg-lime-50 p-4 rounded-xl border border-lime-100 mt-3 relative overflow-hidden">
                       <div className="flex justify-between items-center mb-3">
-                        <h4 className="font-bold text-indigo-600 flex items-center gap-2 text-xs uppercase tracking-widest">
-                          <Sparkles size={14} className="text-indigo-500" /> AI Verification
+                        <h4 className="font-bold text-lime-600 flex items-center gap-2 text-xs uppercase tracking-widest">
+                          <Sparkles size={14} className="text-lime-500" /> AI Verification
                         </h4>
                       </div>
                         <div className="space-y-3 animate-fade-in">
@@ -4131,7 +4131,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators
                                   <p className="text-[10px] text-slate-600 leading-relaxed">{aiData?.discrepancyNote || 'Verified. Details match expected values.'}</p>
                                 </div>
                                 <div className="flex justify-between items-center pt-1">
-                                  <span className="text-[10px] text-indigo-500 font-bold uppercase">Confidence Score</span>
+                                  <span className="text-[10px] text-lime-600 font-bold uppercase">Confidence Score</span>
                                   <div className="flex items-center gap-2">
                                     <div className="w-24 h-1.5 bg-slate-200 rounded-full overflow-hidden">
                                       <div
@@ -4751,7 +4751,7 @@ export const AgencyDashboard: React.FC = () => {
             <>
             <div className="mb-2">
               <input type="text" placeholder="Search tickets..." value={ticketSearch} onChange={e => setTicketSearch(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+                className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-lime-300" />
             </div>
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               {(['All', 'Open', 'Resolved', 'Rejected'] as const).map(f => {
@@ -4760,8 +4760,8 @@ export const AgencyDashboard: React.FC = () => {
                   <button key={f} type="button" onClick={() => setTicketFilter(f)}
                     className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
                       ticketFilter === f
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                        : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+                        ? 'bg-zinc-900 text-white border-zinc-900 shadow-sm'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-zinc-400'
                     }`}>
                     {f} ({count})
                   </button>
@@ -4790,7 +4790,7 @@ export const AgencyDashboard: React.FC = () => {
                 }
                 return true;
               }).map((t: Ticket) => (
-                <div key={t.id} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTicket(t); } }} className="rounded-xl border border-slate-100 bg-white px-3 py-3 shadow-sm space-y-2 cursor-pointer hover:border-slate-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setSelectedTicket(t)}>
+                <div key={t.id} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTicket(t); } }} className="rounded-xl border border-slate-100 bg-white px-3 py-3 shadow-sm space-y-2 cursor-pointer hover:border-slate-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400" onClick={() => setSelectedTicket(t)}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
@@ -4837,7 +4837,7 @@ export const AgencyDashboard: React.FC = () => {
                     {String(t.status || '').toLowerCase() === 'open' && resolvingTicketId === t.id && (
                       <div className="w-full mt-1 space-y-1.5">
                         <textarea placeholder="Resolution / rejection note (optional)..." value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} rows={2}
-                          className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
+                          className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-lime-300 resize-none" />
                         <div className="flex items-center gap-2">
                           <button type="button" onClick={async () => {
                             try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }

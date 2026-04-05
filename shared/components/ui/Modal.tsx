@@ -94,10 +94,10 @@ export function Modal({
                 {showClose && (
                   <button
                     onClick={onClose}
-                    className="ml-auto w-8 h-8 flex items-center justify-center rounded-full bg-zinc-100 hover:bg-zinc-200 transition-colors text-zinc-500 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-400/60"
-                    aria-label="Close"
+                    className="ml-auto w-11 h-11 flex items-center justify-center rounded-full bg-zinc-100 hover:bg-zinc-200 active:bg-zinc-300 transition-colors text-zinc-500 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-400/60"
+                    aria-label={`Close ${title || 'dialog'}`}
                   >
-                    <X size={16} />
+                    <X size={18} />
                   </button>
                 )}
               </div>

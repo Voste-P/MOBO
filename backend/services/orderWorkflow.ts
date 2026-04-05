@@ -73,7 +73,7 @@ export async function transitionOrderWorkflow(params: {
   if (params.from === 'REJECTED' && params.to === 'PROOF_SUBMITTED') {
     const maxReproof = (params.env as any)?.MAX_REPROOF_ATTEMPTS ?? DEFAULT_MAX_REPROOF_ATTEMPTS;
     const rejectionCount = currentEvents.filter(
-      (e: any) => e?.metadata?.to === 'REJECTED' || e?.type === 'REJECTED'
+      (e: any) => e?.type === 'WORKFLOW_TRANSITION' && e?.metadata?.to === 'REJECTED'
     ).length;
     if (rejectionCount >= maxReproof) {
       throw new AppError(429, 'REPROOF_LIMIT_EXCEEDED', `Maximum re-proof attempts (${maxReproof}) exceeded`);

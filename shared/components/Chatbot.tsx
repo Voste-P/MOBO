@@ -453,6 +453,8 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                   notifications.map((n) => (
                     <div
                       key={n.id}
+                      role="status"
+                      aria-label={`${n.type} notification: ${n.title}`}
                       className="bg-slate-50 p-3 rounded-[1.2rem] relative group border border-slate-100"
                     >
                       <div className="flex gap-3">

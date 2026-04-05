@@ -285,7 +285,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
       {/* Description Box (Technical / Monospace Style) */}
       <div className="bg-slate-50 rounded-xl p-3 mb-3 border border-slate-100 relative font-mono text-[10px] text-slate-500 leading-relaxed break-words">
         <div className="mb-1">
-          <span className="text-indigo-600 font-bold">"{brandLabel}"</span> - {platformLabel} Deal.
+          <span className="text-zinc-700 font-bold">"{brandLabel}"</span> - {platformLabel} Deal.
         </div>
         <div className="mb-2">
           Exclusive Offer via{' '}
@@ -373,7 +373,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                     <CheckCircle size={10} className="text-emerald-600 flex-shrink-0" />
                     <p className="text-[10px] font-bold text-emerald-700">{fieldsLocked ? 'AI extracted — tap edit to correct' : 'Editing — tap lock when done'}</p>
                   </div>
-                  <button type="button" onClick={() => setFieldsLocked(!fieldsLocked)} className="p-1 rounded-md hover:bg-emerald-100 transition-colors" aria-label={fieldsLocked ? 'Edit fields' : 'Lock fields'}>
+                  <button type="button" onClick={() => setFieldsLocked(!fieldsLocked)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md hover:bg-emerald-100 transition-colors" aria-label={fieldsLocked ? 'Edit fields' : 'Lock fields'}>
                     {fieldsLocked ? <Pencil size={10} className="text-emerald-600" /> : <Lock size={10} className="text-emerald-600" />}
                   </button>
                 </div>

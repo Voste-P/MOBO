@@ -600,7 +600,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
           {/* Search */}
           <div className="mb-2">
             <input type="text" placeholder="Search tickets..." value={ticketSearch} onChange={e => setTicketSearch(e.target.value)}
-              className="w-full px-3 py-1.5 text-[11px] rounded-lg border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+              className="w-full px-3 py-1.5 text-[11px] rounded-lg border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-lime-300" />
           </div>
           <div className="flex items-center gap-1.5 mb-2 flex-wrap">
             {(['All', 'Open', 'Resolved', 'Rejected'] as const).map(f => {
@@ -609,8 +609,8 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                 <button key={f} type="button" onClick={() => setTicketFilter(f)}
                   className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all ${
                     ticketFilter === f
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                      : 'bg-white text-zinc-600 border-zinc-200 hover:border-indigo-300'
+                      ? 'bg-zinc-900 text-white border-zinc-900 shadow-sm'
+                      : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400'
                   }`}>
                   {f} ({count})
                 </button>
@@ -644,7 +644,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTicket(t); } }}
-                className="rounded-xl border border-zinc-100 bg-white px-3 py-3 shadow-sm space-y-2 cursor-pointer hover:border-zinc-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                className="rounded-xl border border-zinc-100 bg-white px-3 py-3 shadow-sm space-y-2 cursor-pointer hover:border-zinc-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
                 onClick={() => setSelectedTicket(t)}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -692,7 +692,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                             value={resolutionNote}
                             onChange={e => setResolutionNote(e.target.value)}
                             placeholder="Add a resolution/rejection note (optional)..."
-                            className="w-full px-2 py-1.5 text-[10px] rounded-lg border border-zinc-200 bg-zinc-50 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none"
+                            className="w-full px-2 py-1.5 text-[10px] rounded-lg border border-zinc-200 bg-zinc-50 focus:outline-none focus:ring-1 focus:ring-lime-300 resize-none"
                             rows={2}
                             maxLength={2000}
                           />
@@ -1174,7 +1174,7 @@ const SquadView = ({ user, pendingUsers, verifiedUsers, loading, orders: _orders
   return (
     <div className="space-y-5 animate-enter">
       <div
-        className="bg-indigo-600 p-5 rounded-[1.5rem] shadow-xl shadow-indigo-500/20 text-white relative overflow-hidden group active:scale-[0.98] transition-transform cursor-pointer"
+        className="bg-zinc-900 p-5 rounded-[1.5rem] shadow-xl shadow-zinc-800/20 text-white relative overflow-hidden group active:scale-[0.98] transition-transform cursor-pointer"
         onClick={() => {
           navigator.clipboard.writeText(user.mediatorCode!);
           toast.success('Code copied');
@@ -1182,7 +1182,7 @@ const SquadView = ({ user, pendingUsers, verifiedUsers, loading, orders: _orders
       >
         <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white rounded-full blur-[60px] opacity-20 group-hover:opacity-30 transition-opacity"></div>
         <div className="relative z-10 flex flex-col items-center text-center">
-          <p className="text-indigo-200 text-[10px] font-black uppercase tracking-widest mb-1">
+          <p className="text-[#CCF381] text-[10px] font-black uppercase tracking-widest mb-1">
             Your Invite Code
           </p>
           <h2 className="text-3xl font-black tracking-widest font-mono mb-3">
@@ -1639,7 +1639,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
         <div className="flex-none px-5 -mt-6 relative z-10">
           <div className="bg-white p-4 rounded-[1.5rem] shadow-lg border border-zinc-100 flex items-center justify-between">
             <div className="flex items-center gap-3 overflow-hidden">
-              <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 bg-lime-50 text-lime-600 rounded-xl flex items-center justify-center flex-shrink-0">
                 <CreditCard size={20} />
               </div>
               <div className="min-w-0">
@@ -1655,7 +1655,7 @@ const LedgerModal = ({ buyer, orders, loading, onClose, onRefresh }: any) => {
                   type="button"
                   aria-label="Show payment QR"
                   onClick={() => setShowQr(true)}
-                  className="p-2 hover:bg-indigo-50 text-indigo-400 hover:text-indigo-600 rounded-lg transition-colors"
+                  className="p-2 hover:bg-lime-50 text-zinc-400 hover:text-zinc-600 rounded-lg transition-colors"
                 >
                   <QrCode size={18} />
                 </button>
@@ -2418,9 +2418,9 @@ export const MediatorDashboard: React.FC = () => {
               {(proofModal.soldBy || proofModal.orderDate || proofModal.extractedProductName || proofModal.reviewerName) && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
                   {proofModal.reviewerName && (
-                    <div className="bg-black/40 p-2.5 rounded-xl border border-indigo-500/20">
-                      <p className="text-[10px] text-indigo-400 font-bold uppercase mb-1">Reviewer Name</p>
-                      <p className="text-[11px] font-bold text-indigo-200">{proofModal.reviewerName}</p>
+                    <div className="bg-black/40 p-2.5 rounded-xl border border-lime-500/20">
+                      <p className="text-[10px] text-lime-400 font-bold uppercase mb-1">Reviewer Name</p>
+                      <p className="text-[11px] font-bold text-lime-200">{proofModal.reviewerName}</p>
                     </div>
                   )}
                   {proofModal.extractedProductName && (
@@ -2482,10 +2482,10 @@ export const MediatorDashboard: React.FC = () => {
 
                   {/* AI VERIFICATION RESULTS (stored from buyer's proof submission) */}
                   {proofModal.orderAiVerification && (
-                  <div className="bg-indigo-500/10 p-4 rounded-xl border border-indigo-500/20 mt-4 relative overflow-hidden">
+                  <div className="bg-lime-500/10 p-4 rounded-xl border border-lime-500/20 mt-4 relative overflow-hidden">
                     <div className="flex justify-between items-center mb-3 relative z-10">
-                      <h4 className="font-bold text-indigo-300 flex items-center gap-2 text-xs uppercase tracking-widest">
-                        <Sparkles size={14} className="text-indigo-400" /> AI Verification
+                      <h4 className="font-bold text-lime-300 flex items-center gap-2 text-xs uppercase tracking-widest">
+                        <Sparkles size={14} className="text-lime-400" /> AI Verification
                       </h4>
                     </div>
 
@@ -2539,7 +2539,7 @@ export const MediatorDashboard: React.FC = () => {
                                 </p>
                               </div>
                               <div className="flex justify-between items-center pt-1">
-                                <span className="text-[10px] text-indigo-300 font-bold uppercase">
+                                <span className="text-[10px] text-lime-300 font-bold uppercase">
                                   Confidence Score
                                 </span>
                                 <div className="flex items-center gap-2">

@@ -174,34 +174,43 @@ async function refreshTokens(): Promise<TokenPair | null> {
 
   if (!refreshPromise) {
     refreshPromise = (async () => {
-      try {
-        const res = await fetch(
-          `${API_URL}/auth/refresh`,
-          withRequestId({
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refreshToken }),
-          })
-        );
-        const payload = await readPayloadSafe(res);
-        if (!res.ok) throw toErrorFromPayload(payload, `Refresh failed: ${res.status}`);
+      const MAX_REFRESH_RETRIES = 3;
+      const REFRESH_BASE_DELAY = 300;
 
-        const tokens = payload?.tokens;
-        if (tokens?.accessToken) {
-          writeTokens({
-            accessToken: String(tokens.accessToken),
-            refreshToken: tokens.refreshToken ? String(tokens.refreshToken) : refreshToken,
-          });
+      for (let attempt = 1; attempt <= MAX_REFRESH_RETRIES; attempt++) {
+        try {
+          const res = await fetch(
+            `${API_URL}/auth/refresh`,
+            withRequestId({
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ refreshToken }),
+            })
+          );
+          const payload = await readPayloadSafe(res);
+          if (!res.ok) throw toErrorFromPayload(payload, `Refresh failed: ${res.status}`);
+
+          const tokens = payload?.tokens;
+          if (tokens?.accessToken) {
+            writeTokens({
+              accessToken: String(tokens.accessToken),
+              refreshToken: tokens.refreshToken ? String(tokens.refreshToken) : refreshToken,
+            });
+          }
+          return readTokens();
+        } catch (_err) {
+          if (attempt < MAX_REFRESH_RETRIES) {
+            const delay = REFRESH_BASE_DELAY * Math.pow(2, attempt - 1);
+            await new Promise(r => setTimeout(r, delay));
+            continue;
+          }
+          clearTokens();
+          notifyAuthExpired();
+          return null;
         }
-        return readTokens();
-      } catch {
-        clearTokens();
-        notifyAuthExpired();
-        return null;
-      } finally {
-        refreshPromise = null;
       }
-    })();
+      return null;
+    })().finally(() => { refreshPromise = null; });
   }
 
   return refreshPromise;

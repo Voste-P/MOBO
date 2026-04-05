@@ -23,14 +23,14 @@ const themes: Record<SidebarTheme, {
   badgeInactive: string;
 }> = {
   admin: {
-    ring: 'focus-visible:ring-indigo-400 focus-visible:ring-offset-slate-950',
+    ring: 'focus-visible:ring-zinc-400 focus-visible:ring-offset-slate-950',
     active: 'bg-white/10 text-white shadow-lg backdrop-blur-sm border border-white/5',
     inactive: 'text-slate-400 hover:bg-white/5 hover:text-slate-200',
-    indicator: 'bg-indigo-500',
-    iconActive: 'text-indigo-400',
+    indicator: 'bg-lime-500',
+    iconActive: 'text-lime-400',
     iconInactive: 'text-slate-500 group-hover:text-slate-300',
-    badgeActive: 'bg-indigo-600 text-white',
-    badgeInactive: 'bg-indigo-600 text-white',
+    badgeActive: 'bg-zinc-700 text-white',
+    badgeInactive: 'bg-zinc-700 text-white',
   },
   agency: {
     ring: 'focus-visible:ring-purple-300 focus-visible:ring-offset-white',

@@ -37,6 +37,11 @@ export function makeOrdersController(env: Env) {
   };
 
   const assertProofImageSize = (raw: string, label: string) => {
+    // Validate MIME type — only accept actual image formats
+    const mimeMatch = raw.match(/^data:(image\/(?:jpeg|jpg|png|gif|webp|bmp|heic|heif));base64,/i);
+    if (!mimeMatch) {
+      throw new AppError(400, 'INVALID_PROOF_FORMAT', `${label} must be a valid image (JPEG, PNG, GIF, or WebP).`);
+    }
     const size = getDataUrlByteSize(raw);
     if (!size || size < MIN_PROOF_BYTES) {
       throw new AppError(400, 'INVALID_PROOF_IMAGE', `${label} is too small or invalid.`);
@@ -79,7 +84,7 @@ export function makeOrdersController(env: Env) {
 
     const dataMatch = raw.match(/^data:([^;]+);base64,(.+)$/i);
     if (dataMatch) {
-      const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+      const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp'];
       const mime = ALLOWED_MIME.includes(dataMatch[1]?.toLowerCase() || '') ? dataMatch[1] : 'image/jpeg';
       const payload = dataMatch[2] || '';
       const buffer = Buffer.from(payload, 'base64');
@@ -116,8 +121,10 @@ export function makeOrdersController(env: Env) {
     threshold: number,
     envRef: Env,
   ): Promise<any> => {
+    // Sanitize AI confidence to valid 0-100 range
+    const safeConfidence = Number.isFinite(aiConfidence) ? Math.max(0, Math.min(100, aiConfidence)) : 0;
     if (String(freshOrder.workflowStatus) !== 'UNDER_REVIEW') return freshOrder;
-    if (aiConfidence < threshold) {
+    if (safeConfidence < threshold) {
       // Even below auto-verify threshold, attempt bulk auto-verify:
       // If ALL proofs are uploaded and ALL have AI confidence >= the baseline
       // confidence threshold, auto-verify everything and go to cooling period.
@@ -135,7 +142,7 @@ export function makeOrdersController(env: Env) {
     v[vKey].verifiedAt = new Date().toISOString();
     v[vKey].verifiedBy = 'SYSTEM_AI';
     v[vKey].autoVerified = true;
-    v[vKey].aiConfidenceScore = aiConfidence;
+    v[vKey].aiConfidenceScore = safeConfidence;
 
     const evts = pushOrderEvent(
       Array.isArray(freshOrder.events) ? (freshOrder.events as any[]) : [],
@@ -143,7 +150,7 @@ export function makeOrdersController(env: Env) {
         type: 'VERIFIED',
         at: new Date(),
         actorUserId: 'SYSTEM_AI',
-        metadata: { step: vKey, autoVerified: true, aiConfidenceScore: aiConfidence },
+        metadata: { step: vKey, autoVerified: true, aiConfidenceScore: safeConfidence },
       },
     );
     // Guard: only update if order is still UNDER_REVIEW (prevents race conditions)
@@ -195,7 +202,8 @@ export function makeOrdersController(env: Env) {
     if (!v.order?.verifiedAt) {
       // Check if purchase proof has AI confidence data
       const orderAi = order.orderAiVerification as any;
-      const orderConfidence = Number(orderAi?.confidenceScore) || 0;
+      const rawConfidence = Number(orderAi?.confidenceScore) || 0;
+      const orderConfidence = Number.isFinite(rawConfidence) ? Math.max(0, Math.min(100, rawConfidence)) : 0;
       const baselineThreshold = envRef.AI_PROOF_CONFIDENCE_THRESHOLD ?? 75;
       if (orderConfidence < baselineThreshold) return order;
     }
@@ -386,9 +394,52 @@ export function makeOrdersController(env: Env) {
         const order = await findOrderForProof(orderId);
         if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
 
+        // Authorization: same checks as getOrderProof — prevent cross-user proof access
+        const { roles, user, pgUserId } = getRequester(req);
+        if (!isPrivileged(roles)) {
+          let allowed = false;
+
+          if (roles.includes('brand')) {
+            const sameBrand = String(order.brandUserId || '') === pgUserId;
+            const brandName = String(order.brandName || '').trim();
+            const sameBrandName = !!brandName && brandName === String(user?.name || '').trim();
+            allowed = sameBrand || sameBrandName;
+          }
+
+          if (!allowed && roles.includes('agency')) {
+            const agencyCode = String(user?.mediatorCode || '').trim();
+            const agencyName = String(user?.name || '').trim();
+            if (agencyName && String(order.agencyName || '').trim() === agencyName) {
+              allowed = true;
+            } else if (agencyCode && String(order.managerName || '').trim()) {
+              const mediator = await db().user.findFirst({
+                where: {
+                  roles: { has: 'mediator' as any },
+                  mediatorCode: String(order.managerName || '').trim(),
+                  parentCode: agencyCode,
+                  isDeleted: false,
+                },
+                select: { id: true },
+              });
+              allowed = !!mediator;
+            }
+          }
+
+          if (!allowed && roles.includes('mediator')) {
+            const mediatorCode = String(user?.mediatorCode || '').trim();
+            allowed = !!mediatorCode && String(order.managerName || '').trim() === mediatorCode;
+          }
+
+          if (!allowed && roles.includes('shopper')) {
+            allowed = String(order.userId || '') === pgUserId;
+          }
+
+          if (!allowed) throw new AppError(403, 'FORBIDDEN', 'Not allowed to access proof');
+        }
+
         const proofValue = resolveProofValue(order, proofType);
 
-        businessLog.info('Order proof viewed (public)', { orderId, proofType });
+        businessLog.info('Order proof viewed (public)', { orderId, proofType, viewerId: requesterId });
         logAccessEvent('RESOURCE_ACCESS', {
           userId: req.auth?.userId,
           roles: req.auth?.roles,
@@ -1121,10 +1172,10 @@ export function makeOrdersController(env: Env) {
           });
 
           // ── Auto-verify by AI confidence ──────────────────────────────
-          // Invoke for any positive confidence: individual step needs 90%,
-          // but attemptBulkAutoVerify (inside autoVerifyStep) uses 75% baseline
-          // so orders where ALL proofs are uploaded with >=75% can auto-approve.
-          const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
+          // Invoke for any positive confidence: individual step needs 80%,
+          // but attemptBulkAutoVerify (inside autoVerifyStep) uses 70% baseline
+          // so orders where ALL proofs are uploaded with >=70% can auto-approve.
+          const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 80;
           if (aiOrderConfidence > 0) {
             const freshOrder = await db().order.findFirst({
               where: { mongoId: orderMongoId, isDeleted: false },
@@ -1882,10 +1933,10 @@ export function makeOrdersController(env: Env) {
           let refreshed = await db().order.findFirst({ where: { id: order.id, isDeleted: false }, include: { items: { where: { isDeleted: false } } } });
 
           // ── Auto-verify by AI confidence (submitClaim, already UNDER_REVIEW) ──
-          // Individual step auto-verify triggers at AI_AUTO_VERIFY_THRESHOLD (90%).
-          // Below that, attemptBulkAutoVerify still runs (threshold 75%) — so orders
-          // where ALL proofs score 75-89% can auto-approve without mediator review.
-          const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
+          // Individual step auto-verify triggers at AI_AUTO_VERIFY_THRESHOLD (80%).
+          // Below that, attemptBulkAutoVerify still runs (threshold 70%) — so orders
+          // where ALL proofs score 70-79% can auto-approve without mediator review.
+          const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 80;
           if (claimAiConfidence > 0 && refreshed) {
             refreshed = await autoVerifyStep(refreshed, body.type, claimAiConfidence, autoThreshold, env);
           }
@@ -1943,10 +1994,10 @@ export function makeOrdersController(env: Env) {
         });
 
         // ── Auto-verify by AI confidence (submitClaim, new UNDER_REVIEW) ──
-        // Invoke for any positive confidence: individual step needs 90%, but
-        // attemptBulkAutoVerify (inside autoVerifyStep) uses 75% baseline.
+        // Invoke for any positive confidence: individual step needs 80%, but
+        // attemptBulkAutoVerify (inside autoVerifyStep) uses 70% baseline.
         let claimFinalOrder: any = afterReview;
-        const autoThreshold2 = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
+        const autoThreshold2 = env.AI_AUTO_VERIFY_THRESHOLD ?? 80;
         if (claimAiConfidence > 0 && afterReview) {
           const freshOrder = await db().order.findFirst({
             where: { id: order.id, isDeleted: false },

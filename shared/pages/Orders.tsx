@@ -1651,7 +1651,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                 return (
                 <div className="max-h-[50dvh] overflow-y-auto scrollbar-styled space-y-2">
                 {filtered.map((t) => (
-                  <div key={t.id} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTicket(t); } }} className="bg-white rounded-xl border border-zinc-200 p-3 space-y-1.5 cursor-pointer hover:border-zinc-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setSelectedTicket(t)}>
+                  <div key={t.id} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTicket(t); } }} className="bg-white rounded-xl border border-zinc-200 p-3 space-y-1.5 cursor-pointer hover:border-zinc-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400" onClick={() => setSelectedTicket(t)}>
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-800">{t.issueType}</span>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -2235,7 +2235,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                 Order {getPrimaryOrderId(proofToView)}
               </p>
               {proofToView.reviewerName && (
-                <p className="text-[10px] mt-1 text-indigo-600 font-bold flex items-center gap-1">
+                <p className="text-[10px] mt-1 text-zinc-600 font-bold flex items-center gap-1">
                   Reviewer Name: {proofToView.reviewerName}
                 </p>
               )}

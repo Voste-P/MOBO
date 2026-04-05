@@ -412,7 +412,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
                 value={resolutionNote}
                 onChange={(e) => setResolutionNote(e.target.value)}
                 placeholder="Add a resolution/rejection note (optional)..."
-                className="w-full px-3 py-2 text-xs rounded-lg border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none"
+                className="w-full px-3 py-2 text-xs rounded-lg border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-lime-300 resize-none"
                 rows={2}
                 maxLength={2000}
               />

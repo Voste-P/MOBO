@@ -157,3 +157,25 @@ Orders have a strict state machine (`workflowStatus`), with anti-fraud constrain
 
 - A buyer cannot have more than one active order per deal.
 - Some workflows can be frozen (e.g., suspensions) and require explicit reactivation.
+- Re-proof submissions are capped at `DEFAULT_MAX_REPROOF_ATTEMPTS` (5) per order, tracked via `WORKFLOW_TRANSITION` events with `metadata.to === 'REJECTED'`.
+
+## AI verification
+
+- Google Gemini Vision API with **circuit breaker** (3-failure threshold, 5 min cooldown, HALF_OPEN requires 3 consecutive successes before closing).
+- AI extraction uses **exponential backoff retry** (3 attempts, 200/400/800ms) for transient failures; validation errors are thrown immediately.
+- Confidence thresholds: 80% for individual proofs, 70% for bulk — configurable via `AI_PROOF_CONFIDENCE_THRESHOLD`.
+- Confidence values are sanitised with `Number.isFinite()` and clamped to 0–100 before comparison.
+- Fallback to Tesseract OCR when Gemini circuit is open.
+
+## Security hardening
+
+- All proof-download endpoints enforce role-based authorization (brand owner, assigned agency, mediator, or buyer ownership).
+- Proof upload accepts JPEG, PNG, and WebP only (GIF excluded).
+- Token refresh uses retry with exponential backoff (3 attempts, 300/600/1200ms) before expiring the session.
+- All deletion is soft-delete via `deletedAt`/`is_deleted`; no hard deletes in application code.
+
+## Accessibility
+
+- All interactive elements meet a 44 × 44 px minimum touch target (WCAG 2.5.5 AAA).
+- Confirmation dialogs focus the cancel button by default (safe action first for destructive dialogs).
+- Notification items expose `role="status"` and `aria-label` for screen readers.

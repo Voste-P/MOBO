@@ -80,7 +80,13 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
       return;
     }
 
-    const dataUrl = await readFileAsDataUrl(file);
+    let dataUrl: string;
+    try {
+      dataUrl = await readFileAsDataUrl(file);
+    } catch {
+      toast.error('Failed to read file. Please try another image.');
+      return;
+    }
     setScreenshot(dataUrl);
     setPreview(dataUrl);
 

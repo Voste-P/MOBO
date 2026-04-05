@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useId } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from './cn';
 
@@ -19,6 +19,7 @@ interface TabsProps {
 }
 
 export function Tabs({ tabs, activeTab, onTabChange, className, variant = 'pill' }: TabsProps) {
+  const instanceId = useId();
   const handleKeyDown = (e: React.KeyboardEvent, idx: number) => {
     let targetIdx = -1;
     if (e.key === 'ArrowRight') {
@@ -72,14 +73,14 @@ export function Tabs({ tabs, activeTab, onTabChange, className, variant = 'pill'
           >
             {variant === 'pill' && active && (
               <motion.span
-                layoutId="tab-pill"
+                layoutId={`tab-pill-${instanceId}`}
                 className="absolute inset-0 bg-white rounded-xl shadow-sm"
                 transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
               />
             )}
             {variant === 'underline' && active && (
               <motion.span
-                layoutId="tab-underline"
+                layoutId={`tab-underline-${instanceId}`}
                 className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900 rounded-full"
                 transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
               />

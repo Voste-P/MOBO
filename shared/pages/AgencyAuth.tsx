@@ -136,7 +136,7 @@ export const AgencyAuthScreen: React.FC<AgencyAuthProps> = ({ onBack }) => {
             </button>
           )}
 
-          <div className="w-24 h-24 bg-gradient-to-tr from-purple-400 to-indigo-500 rounded-3xl flex items-center justify-center shadow-2xl shadow-purple-500/20 mb-10 rotate-3 border-t border-white/20">
+          <div className="w-24 h-24 bg-gradient-to-tr from-purple-400 to-zinc-700 rounded-3xl flex items-center justify-center shadow-2xl shadow-purple-500/20 mb-10 rotate-3 border-t border-white/20">
             <Building2 size={40} className="text-white" />
           </div>
 

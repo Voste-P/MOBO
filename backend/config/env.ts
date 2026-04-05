@@ -71,8 +71,8 @@ const envSchema = z.object({
 
   // AI confidence score (0-100) at or above which a proof step is auto-verified
   // without manual mediator review.  Set to 101 to disable auto-verification.
-  // 85 balances speed and fraud safety; more proofs auto-verify without mediator.
-  AI_AUTO_VERIFY_THRESHOLD: z.coerce.number().int().min(0).max(101).default(85),
+  // 80 balances speed and fraud safety; more proofs auto-verify without mediator.
+  AI_AUTO_VERIFY_THRESHOLD: z.coerce.number().int().min(0).max(101).default(80),
 
   // Confidence score assigned to review links from recognized marketplace domains.
   // URL validation acts as the "AI" for review proofs — no screenshot analysis needed.

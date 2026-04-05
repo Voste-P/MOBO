@@ -122,7 +122,7 @@ export function FullPageNotFound({
           <div className="mt-6">
             <Link
               href={homeHref}
-              className="inline-flex items-center justify-center h-12 px-5 rounded-2xl text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-400/60 focus-visible:ring-offset-white"
+              className="inline-flex items-center justify-center h-12 px-5 rounded-2xl text-sm font-bold bg-zinc-900 text-white hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-zinc-400/60 focus-visible:ring-offset-white"
             >
               {homeLabel}
             </Link>

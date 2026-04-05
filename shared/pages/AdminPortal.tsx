@@ -1027,8 +1027,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
 
         <div className="bg-slate-800 p-10 rounded-[2rem] w-full max-w-md border border-slate-700 shadow-2xl relative z-10">
           <div className="flex justify-center mb-8">
-            <div className="w-20 h-20 bg-indigo-500/10 rounded-3xl flex items-center justify-center border border-indigo-500/20 shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)]">
-              <ShieldAlert size={40} className="text-indigo-400" />
+            <div className="w-20 h-20 bg-lime-500/10 rounded-3xl flex items-center justify-center border border-lime-500/20 shadow-[0_0_40px_-10px_rgba(163,230,53,0.5)]">
+              <ShieldAlert size={40} className="text-lime-400" />
             </div>
           </div>
 
@@ -1076,7 +1076,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
               type="submit"
               size="lg"
               disabled={isAuthLoading}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20"
+              className="w-full bg-zinc-800 hover:bg-zinc-700 text-white shadow-lg shadow-zinc-800/20"
               rightIcon={isAuthLoading ? <Spinner className="w-5 h-5 text-current" /> : null}
             >
               Authenticate Session
@@ -1105,12 +1105,12 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
           <div className="p-6 pb-2">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-600/20">
+                <div className="w-10 h-10 bg-zinc-700 rounded-xl flex items-center justify-center text-white shadow-lg shadow-zinc-800/20">
                   <Database size={20} />
                 </div>
                 <div>
                   <h1 className="text-white font-black text-lg tracking-tight">
-                    BUZZMA<span className="text-indigo-500">Admin</span>
+                    BUZZMA<span className="text-lime-400">Admin</span>
                   </h1>
                   <div className="flex items-center gap-2">
                     <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">
@@ -1123,7 +1123,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                 type="button"
                 onClick={() => setIsSidebarOpen(false)}
                 aria-label="Close sidebar"
-                className="md:hidden p-2 text-slate-400 hover:text-white rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+                className="md:hidden p-2 text-slate-400 hover:text-white rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
               >
                 <XCircle size={22} />
               </button>
@@ -1224,7 +1224,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
               onClick={() => setIsSidebarOpen(true)}
               aria-label="Open sidebar"
               title="Menu"
-              className="md:hidden text-slate-400 hover:text-indigo-600 hover:border-indigo-200"
+              className="md:hidden text-slate-400 hover:text-zinc-700 hover:border-zinc-200"
             >
               <Menu size={20} />
             </IconButton>
@@ -1241,7 +1241,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   Online
                 </p>
               </div>
-              <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold border-2 border-white shadow-sm">
+              <div className="w-10 h-10 bg-zinc-100 rounded-full flex items-center justify-center text-zinc-700 font-bold border-2 border-white shadow-sm">
                 AD
               </div>
             </div>
@@ -1295,7 +1295,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         </p>
                       </div>
                       <div className="flex gap-2">
-                        <span className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-bold uppercase tracking-wide border border-indigo-100">
+                        <span className="px-3 py-1 bg-zinc-50 text-zinc-700 rounded-lg text-[10px] font-bold uppercase tracking-wide border border-zinc-200">
                           Weekly
                         </span>
                       </div>
@@ -1378,14 +1378,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       </div>
                     </div>
 
-                    <div className="bg-indigo-900 p-6 rounded-[2rem] shadow-xl text-white relative overflow-hidden">
+                    <div className="bg-zinc-900 p-6 rounded-[2rem] shadow-xl text-white relative overflow-hidden">
                       <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full blur-3xl -mr-10 -mt-10"></div>
                       <h3 className="font-bold text-lg relative z-10">System Status</h3>
                       <div className="flex items-center gap-2 mt-4 text-emerald-400 font-bold text-sm">
                         <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>{' '}
                         All Systems Operational
                       </div>
-                      <p className="text-indigo-200 text-xs mt-2 font-medium">
+                      <p className="text-zinc-400 text-xs mt-2 font-medium">
                         Last check: Just now
                       </p>
                     </div>
@@ -1426,7 +1426,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
               <div className="space-y-6 animate-enter">
                 <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+                    <div className="p-3 bg-zinc-50 text-zinc-600 rounded-2xl">
                       <HeadphonesIcon size={24} />
                     </div>
                     <div>
@@ -1437,7 +1437,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-xl text-xs font-bold">
+                    <div className="bg-zinc-50 text-zinc-700 px-4 py-2 rounded-xl text-xs font-bold">
                       {filteredTickets.filter((t) => t.status === 'Open').length} Pending
                     </div>
                     <button type="button" onClick={exportTicketsCsv} className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-all">
@@ -1452,7 +1452,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   value={ticketSearch}
                   onChange={(e) => setTicketSearch(e.target.value)}
                   placeholder="Search tickets by name, issue, description, order ID..."
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 transition-all"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-lime-400 focus:ring-1 focus:ring-lime-200 transition-all"
                 />
 
                 {/* Role Filter Tabs */}
@@ -1464,8 +1464,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       onClick={() => setTicketRoleFilter(role)}
                       className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                         ticketRoleFilter === role
-                          ? 'bg-indigo-600 text-white shadow-sm'
-                          : 'bg-white text-slate-500 border border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+                          ? 'bg-zinc-900 text-white shadow-sm'
+                          : 'bg-white text-slate-500 border border-slate-200 hover:border-zinc-400 hover:text-zinc-700'
                       }`}
                     >
                       {role} {roleCounts[role] > 0 ? `(${roleCounts[role]})` : ''}
@@ -1517,7 +1517,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTicket(t); } }}
-                        className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col hover:shadow-md transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                        className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col hover:shadow-md transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
                         onClick={() => setSelectedTicket(t)}
                       >
                         <div className="flex justify-between items-start mb-4">
@@ -1574,7 +1574,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                           {t.status === 'Open' && resolvingTicketId === t.id && (
                             <div className="w-full mt-1 space-y-1.5">
                               <textarea placeholder="Resolution / rejection note (optional)..." value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} rows={2}
-                                className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
+                                className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-lime-300 resize-none" />
                               <div className="flex items-center gap-2">
                                 <button type="button" onClick={() => resolveTicket(t.id, 'Resolved', resolutionNote)}
                                   className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✔ Resolve</button>
@@ -1767,7 +1767,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       placeholder="Search by name, mobile, email, or code..."
                       value={userSearch}
                       onChange={(e) => handleUserSearchChange(e.target.value)}
-                      className="w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all bg-white placeholder:text-slate-400"
+                      className="w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border border-slate-200 focus:border-lime-400 focus:ring-2 focus:ring-lime-100 outline-none transition-all bg-white placeholder:text-slate-400"
                     />
                     {userSearch && (
                       <button
@@ -1799,7 +1799,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         <tr key={u.id} className="hover:bg-slate-50/50 transition-colors group">
                           <td className="p-5">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-500 text-sm shadow-inner group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors overflow-hidden">
+                              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-500 text-sm shadow-inner group-hover:bg-zinc-100 group-hover:text-zinc-700 transition-colors overflow-hidden">
                                 {u.avatar ? (
                                   <ProxiedImage
                                     src={u.avatar}
@@ -1913,7 +1913,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         value={inviteRole}
                         onChange={(e) => setInviteRole(e.target.value as typeof inviteRole)}
                         aria-label="Invite role"
-                        className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-lime-500/20 focus:border-lime-500"
                       >
                         <option value="agency">Agency Partner</option>
                         <option value="brand">Brand Account</option>
@@ -1923,7 +1923,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         placeholder="Assignee Label (e.g. Nike)"
                         value={inviteLabel}
                         onChange={(e) => setInviteLabel(e.target.value)}
-                        className="flex-1 bg-slate-50 border border-slate-200 text-slate-900 text-sm font-bold rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400"
+                        className="flex-1 bg-slate-50 border border-slate-200 text-slate-900 text-sm font-bold rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-lime-500/20 focus:border-lime-500 placeholder:text-slate-400"
                       />
                     </div>
                   </div>
@@ -1931,7 +1931,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     type="button"
                     onClick={handleGenerateInvite}
                     disabled={isLoading}
-                    className="px-8 py-3.5 bg-slate-900 text-white rounded-xl font-bold text-sm shadow-lg hover:bg-indigo-600 transition-all active:scale-95 flex items-center gap-2 whitespace-nowrap"
+                    className="px-8 py-3.5 bg-slate-900 text-white rounded-xl font-bold text-sm shadow-lg hover:bg-zinc-700 transition-all active:scale-95 flex items-center gap-2 whitespace-nowrap"
                   >
                     <Plus size={18} />
                     Generate Code
@@ -1971,7 +1971,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                                   toast.success('Copied');
                                 }}
                                 aria-label="Copy access code"
-                                className="text-slate-400 hover:text-indigo-600 transition-colors"
+                                className="text-slate-400 hover:text-zinc-700 transition-colors"
                               >
                                 <Copy size={18} />
                               </button>
@@ -2016,7 +2016,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     <button
                       type="button"
                       onClick={() => handleExport(view === 'finance' ? 'finance' : 'orders')}
-                      className="flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl hover:bg-indigo-100 transition-colors"
+                      className="flex items-center gap-2 text-xs font-bold text-zinc-700 bg-zinc-100 px-4 py-2 rounded-xl hover:bg-zinc-200 transition-colors"
                     >
                       <Download size={14} /> CSV
                     </button>
@@ -2089,7 +2089,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                             <button
                               type="button"
                               onClick={() => setProofModal(o)}
-                              className="text-xs font-bold text-indigo-600 hover:text-indigo-800 underline"
+                              className="text-xs font-bold text-zinc-700 hover:text-zinc-900 underline"
                             >
                               View
                             </button>
@@ -2256,14 +2256,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       value={configEmail}
                       onChange={(e) => setConfigEmail(e.target.value)}
                       aria-label="Admin Contact"
-                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-900 focus:outline-none focus:border-lime-500"
                     />
                   </div>
                   <div className="pt-4 border-t border-slate-100">
                     <button
                       type="button"
                       onClick={handleSaveConfig}
-                      className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all active:scale-95 flex items-center justify-center gap-2"
+                      className="w-full py-4 bg-zinc-900 text-white rounded-xl font-bold shadow-lg hover:bg-zinc-800 transition-all active:scale-95 flex items-center justify-center gap-2"
                     >
                       <Save size={18} /> Save Configuration
                     </button>
@@ -2435,7 +2435,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div><span className="text-slate-400 font-bold text-xs uppercase">Buyer</span><p className="font-bold text-slate-900">{proofModal.buyerName}</p></div>
                 <div><span className="text-slate-400 font-bold text-xs uppercase">Amount</span><p className="font-bold text-slate-900">{formatCurrency(proofModal.total)}</p></div>
-                {proofModal.reviewerName && <div><span className="text-indigo-400 font-bold text-xs uppercase">Reviewer Name</span><p className="font-bold text-indigo-700">{proofModal.reviewerName}</p></div>}
+                {proofModal.reviewerName && <div><span className="text-zinc-400 font-bold text-xs uppercase">Reviewer Name</span><p className="font-bold text-zinc-700">{proofModal.reviewerName}</p></div>}
                 <div><span className="text-slate-400 font-bold text-xs uppercase">Status</span><p><StatusBadge status={proofModal.affiliateStatus === 'Unchecked' ? proofModal.paymentStatus : proofModal.affiliateStatus} /></p></div>
                 <div><span className="text-slate-400 font-bold text-xs uppercase">Payment</span><p className="font-bold text-slate-900">{proofModal.paymentStatus}</p></div>
                 {proofModal.soldBy && <div><span className="text-slate-400 font-bold text-xs uppercase">Sold By</span><p className="font-bold text-slate-900">{proofModal.soldBy}</p></div>}
@@ -2455,10 +2455,10 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     <ProofImage orderId={proofModal.id} proofType="order" existingSrc={proofModal.screenshots.order !== 'exists' ? proofModal.screenshots.order : undefined} alt="Purchase Proof" className="w-full max-h-[300px] object-contain rounded-xl border border-blue-200 bg-blue-50" />
                     {/* AI Verification — stored from buyer's proof submission */}
                     {proofModal.orderAiVerification && (
-                    <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200 mt-3">
+                    <div className="bg-lime-50 p-4 rounded-xl border border-lime-200 mt-3">
                       <div className="flex justify-between items-center mb-2">
-                        <h5 className="font-bold text-indigo-600 flex items-center gap-2 text-[10px] uppercase tracking-widest">
-                          <Sparkles size={12} className="text-indigo-500" /> AI Verification
+                        <h5 className="font-bold text-lime-600 flex items-center gap-2 text-[10px] uppercase tracking-widest">
+                          <Sparkles size={12} className="text-lime-500" /> AI Verification
                         </h5>
                       </div>
                         <div className="space-y-2">
@@ -2488,7 +2488,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                                   <p className="text-[10px] text-slate-500 bg-white rounded-lg p-2 border border-slate-100">{aiData.discrepancyNote}</p>
                                 )}
                                 <div className="flex justify-between items-center pt-1">
-                                  <span className="text-[10px] text-indigo-500 font-bold uppercase">Confidence</span>
+                                  <span className="text-[10px] text-lime-600 font-bold uppercase">Confidence</span>
                                   <div className="flex items-center gap-2">
                                     <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden">
                                       <div className={`h-full rounded-full ${score > 80 ? 'bg-green-500' : score > 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${score}%` }} />
