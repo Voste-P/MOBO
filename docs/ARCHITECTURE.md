@@ -163,6 +163,7 @@ Orders have a strict state machine (`workflowStatus`), with anti-fraud constrain
 
 - Google Gemini Vision API with **circuit breaker** (3-failure threshold, 5 min cooldown, HALF_OPEN requires 3 consecutive successes before closing).
 - AI extraction uses **exponential backoff retry** (3 attempts, 200/400/800ms) for transient failures; validation errors are thrown immediately.
+- **Overall timeout** (50 s) on all three verification functions (`verifyProofWithAi`, `verifyRatingScreenshotWithAi`, `verifyReturnWindowWithAi`) prevents the Gemini multi-model loop from exceeding the frontend 60 s request timeout.
 - Confidence thresholds: 80% for individual proofs, 70% for bulk — configurable via `AI_PROOF_CONFIDENCE_THRESHOLD`.
 - Confidence values are sanitised with `Number.isFinite()` and clamped to 0–100 before comparison.
 - Fallback to Tesseract OCR when Gemini circuit is open.
@@ -173,6 +174,11 @@ Orders have a strict state machine (`workflowStatus`), with anti-fraud constrain
 - Proof upload accepts JPEG, PNG, and WebP only (GIF excluded).
 - Token refresh uses retry with exponential backoff (3 attempts, 300/600/1200ms) before expiring the session.
 - All deletion is soft-delete via `deletedAt`/`is_deleted`; no hard deletes in application code.
+
+## Error handling
+
+- Every `FileReader` in the frontend has an `onerror` handler — either rejecting a wrapping Promise or showing a user-facing toast (15 instances audited).
+- `shared/utils/imageHelpers.ts` provides `readFileAsDataUrl()` with a configurable timeout (default 30 s) and abort support.
 
 ## Accessibility
 
