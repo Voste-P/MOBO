@@ -7,12 +7,11 @@ import { getApiBaseUrl } from './apiBaseUrl';
 export function readFileAsDataUrl(file: File | Blob, timeoutMs = 30_000): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timer = setTimeout(() => { reader.abort(); reject(new Error('File read timed out')); }, timeoutMs);
     const cleanup = () => { clearTimeout(timer); };
     reader.onloadend = () => { cleanup(); resolve(reader.result as string); };
     reader.onerror = () => { cleanup(); reject(new Error('Failed to read file')); };
     reader.onabort = () => { cleanup(); reject(new Error('File read aborted')); };
-    timer = setTimeout(() => { reader.abort(); reject(new Error('File read timed out')); }, timeoutMs);
     reader.readAsDataURL(file);
   });
 }

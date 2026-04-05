@@ -204,12 +204,12 @@ export function makeOrdersController(env: Env) {
       const orderAi = order.orderAiVerification as any;
       const rawConfidence = Number(orderAi?.confidenceScore) || 0;
       const orderConfidence = Number.isFinite(rawConfidence) ? Math.max(0, Math.min(100, rawConfidence)) : 0;
-      const baselineThreshold = envRef.AI_PROOF_CONFIDENCE_THRESHOLD ?? 75;
+      const baselineThreshold = envRef.AI_PROOF_CONFIDENCE_THRESHOLD ?? 70;
       if (orderConfidence < baselineThreshold) return order;
     }
 
     // Check all required steps have proofs uploaded with sufficient AI confidence
-    const baselineThreshold = envRef.AI_PROOF_CONFIDENCE_THRESHOLD ?? 75;
+    const baselineThreshold = envRef.AI_PROOF_CONFIDENCE_THRESHOLD ?? 70;
     const stepsToVerify: Array<{ key: string; confidence: number }> = [];
 
     for (const step of required) {
@@ -815,7 +815,7 @@ export function makeOrdersController(env: Env) {
               metadata: { orderId: resolvedExternalOrderId, confidenceScore: verification?.confidenceScore },
             });
 
-            const confidenceThreshold = env.AI_PROOF_CONFIDENCE_THRESHOLD ?? 75;
+            const confidenceThreshold = env.AI_PROOF_CONFIDENCE_THRESHOLD ?? 70;
             // Amount mismatch is expected (shipping, discounts, taxes) — don't hard-block.
             // Only require orderIdMatch + confidence threshold.
             if (!verification?.orderIdMatch || (verification?.confidenceScore ?? 0) < confidenceThreshold) {
