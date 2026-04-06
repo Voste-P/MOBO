@@ -1,7 +1,7 @@
 # MOBO (BUZZMA) â€” Complete Database Documentation
 
 > **Production-level database documentation for the MOBO multi-stakeholder commerce platform.**
-> Last updated: April 2026 | Schema version: PostgreSQL via Prisma ORM | 19 models, 22 enums.
+> Last updated: June 2025 | Schema version: PostgreSQL via Prisma ORM | 21 models, 23 enums.
 
 ---
 

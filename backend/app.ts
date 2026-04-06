@@ -249,7 +249,7 @@ export function createApp(env: Env) {
   // ── Request timeout ────────────────────────────────────────────────
   // Prevents hung handlers from holding connections indefinitely.
   // This is a safety net — individual routes can set shorter timeouts.
-  const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS) || 30_000;
+  const REQUEST_TIMEOUT_MS = env.REQUEST_TIMEOUT_MS;
   app.use((req, res, next) => {
     // Skip SSE streams — they're intentionally long-lived.
     if (req.path.startsWith('/api/realtime/')) return next();

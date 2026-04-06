@@ -1,6 +1,6 @@
 ﻿# API Surface (UI Contract)
 
-> **121 endpoints** across 14 route files. Last updated: April 2026.
+> **121 endpoints** across 14 route files. Last updated: June 2025.
 
 All endpoints are rooted at `/api`.
 

@@ -103,8 +103,6 @@ export function healthRoutes(env: Env): Router {
       uptime: uptimeSec,
       memoryMB: memMB,
       heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
-      pid: process.pid,
-      nodeVersion: process.version,
       database: {
         status: pgOk ? 'connected' : 'disconnected',
         pool: getPoolMetrics(),

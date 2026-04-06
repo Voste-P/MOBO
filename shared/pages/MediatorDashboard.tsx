@@ -113,6 +113,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
   // Verification queue is workflow-driven.
   // Orders can remain UNDER_REVIEW even after purchase verification if review/rating is still pending.
   const { toast } = useToast();
+  const { confirm, ConfirmDialogElement: InboxConfirmDialog } = useConfirm();
   const [searchQuery, setSearchQuery] = useState('');
   const [ticketFilter, setTicketFilter] = useState<'All' | 'Open' | 'Resolved' | 'Rejected'>('All');
   const [ticketSearch, setTicketSearch] = useState('');
@@ -754,6 +755,8 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                       <button
                         type="button"
                         onClick={async () => {
+                          const ok = await confirm({ message: 'Delete this ticket? This action cannot be undone.', confirmLabel: 'Delete', variant: 'destructive' });
+                          if (!ok) return;
                           try {
                             await api.tickets.delete(t.id);
                             toast.success('Ticket deleted.');
@@ -783,6 +786,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
           onRefresh={onRefresh}
         />
       </Suspense>
+      {InboxConfirmDialog}
     </div>
   );
 };

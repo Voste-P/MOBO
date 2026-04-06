@@ -1,6 +1,6 @@
 # Domain Model (Current Implementation)
 
-> **21 Prisma models, 23 enums** — PostgreSQL via Prisma ORM. Last updated: April 2026.
+> **21 Prisma models, 23 enums** — PostgreSQL via Prisma ORM. Last updated: June 2025.
 
 Source: [backend/prisma/schema.prisma](../backend/prisma/schema.prisma)
 

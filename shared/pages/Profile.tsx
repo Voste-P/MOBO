@@ -1,6 +1,7 @@
 ﻿import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../components/ui/ConfirmDialog';
 import { formatErrorMessage } from '../utils/errors';
 import { maskMobile } from '../utils/mobiles';
 import { ProxiedImage } from '../components/ProxiedImage';
@@ -27,6 +28,7 @@ import { Order } from '../types';
 export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) => {
   const { user, updateUser, logout } = useAuth();
   const { toast } = useToast();
+  const { confirm, ConfirmDialogElement } = useConfirm();
 
   // Form State
   const [name, setName] = useState(user?.name || '');
@@ -529,8 +531,9 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-zinc-100 animate-slide-up">
           <button
             type="button"
-            onClick={() => {
-              if (window.confirm('Are you sure you want to sign out?')) logout();
+            onClick={async () => {
+              const ok = await confirm({ message: 'Are you sure you want to sign out?', confirmLabel: 'Sign Out', variant: 'destructive' });
+              if (ok) logout();
             }}
             className="w-full py-4 border-2 border-red-50 text-red-500 font-bold rounded-2xl text-sm hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
           >
@@ -538,6 +541,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
           </button>
         </div>
       </div>
+      {ConfirmDialogElement}
     </div>
   );
 };

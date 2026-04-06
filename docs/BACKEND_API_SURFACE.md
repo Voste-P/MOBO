@@ -1,6 +1,6 @@
 # Backend API Surface (Inventory)
 
-> **121 endpoints** across 14 route files. Last updated: April 2026.
+> **121 endpoints** across 14 route files · **21 Prisma models** · **23 enums** · Last updated: June 2025.
 
 Base URL: `/api`
 

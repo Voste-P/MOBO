@@ -730,7 +730,7 @@ export function makeOrdersController(env: Env) {
           throw new AppError(429, 'VELOCITY_LIMIT', 'Too many orders created. Please try later.');
         }
 
-        const allowE2eBypass = env.NODE_ENV !== 'production';
+        const allowE2eBypass = env.NODE_ENV === 'test';
         const resolvedExternalOrderId = body.externalOrderId || (allowE2eBypass ? `E2E-${Date.now()}` : undefined);
 
         if (resolvedExternalOrderId) {

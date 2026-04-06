@@ -9,8 +9,8 @@
  */
 import crypto from 'node:crypto';
 
-/** Token validity: 7 days (Excel reports may be opened days later) */
-const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/** Token validity: 48 hours (sufficient for Excel/Sheets report access) */
+const TOKEN_TTL_MS = 48 * 60 * 60 * 1000;
 
 function getSigningKey(env: { JWT_ACCESS_SECRET: string }): string {
   return env.JWT_ACCESS_SECRET;
