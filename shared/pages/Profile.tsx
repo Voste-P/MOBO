@@ -47,6 +47,11 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
   const [totalSpent, setTotalSpent] = useState(0);
   const [isStatsLoading, setIsStatsLoading] = useState(false);
   const statsLoadingRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const qrInputRef = useRef<HTMLInputElement>(null);
@@ -164,11 +169,13 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
       }
       const reader = new FileReader();
       reader.onloadend = () => {
+        if (!mountedRef.current) return;
         const base64 = reader.result as string;
         if (type === 'avatar') setAvatar(base64);
         else setQrCode(base64);
       };
       reader.onerror = () => {
+        if (!mountedRef.current) return;
         toast.error('Failed to read image. Please try again.');
       };
       reader.readAsDataURL(file);

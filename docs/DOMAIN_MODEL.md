@@ -19,9 +19,9 @@ This document summarizes the current backend domain entities and how they relate
 | `OrderWorkflowStatus` | CREATED → REDIRECTED → ORDERED → PROOF_SUBMITTED → UNDER_REVIEW → APPROVED → REWARD_PENDING → COMPLETED / REJECTED / FAILED                                                                            |
 | `OrderStatus`         | Ordered, Shipped, Delivered, Cancelled, Returned                                                                                                                                                       |
 | `PaymentStatus`       | Pending, Paid, Refunded, Failed                                                                                                                                                                        |
-| `AffiliateStatus`     | Unchecked, Pending_Cooling, Approved_Settled, Rejected, Cap_Exceeded, Frozen_Disputed                                                                                                                    |
+| `AffiliateStatus`     | Unchecked, Pending_Cooling, Approved_Settled, Rejected, Cap_Exceeded, Frozen_Disputed                                                                                                                  |
 | `SettlementMode`      | wallet, external                                                                                                                                                                                       |
-| `DealType`            | Discount, Review*, Rating — *Review is kept in the schema but hidden from all campaign-creation UI dropdowns (will be re-enabled later)                                                                |
+| `DealType`            | Discount, Review (hidden), Rating — Review is kept in the schema but hidden from all campaign-creation UI dropdowns (will be re-enabled later)                                                         |
 | `CampaignStatus`      | draft, active, paused, completed                                                                                                                                                                       |
 | `TransactionType`     | brand_deposit, platform_fee, commission_lock/settle, cashback_lock/settle, order_settlement_debit, commission_reversal, margin_reversal, agency_payout/receipt, payout_request/complete/failed, refund |
 | `TransactionStatus`   | pending, completed, failed, reversed                                                                                                                                                                   |
@@ -147,7 +147,7 @@ System key-value config. Unique key (default `"system"`). Fields: `adminContactE
 
 ## Relationship Diagram
 
-```
+```text
 Brand ──────────── Campaign ───── Deal
   │                   │              │
   │ connectedAgencies │ assignments  │ mediatorCode

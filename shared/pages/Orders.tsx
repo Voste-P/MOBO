@@ -206,6 +206,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
     'Discount'
   );
   const [formSearch, setFormSearch] = useState('');
+  const [debouncedFormSearch, setDebouncedFormSearch] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   const [formScreenshot, setFormScreenshot] = useState<string | null>(null);
@@ -281,7 +282,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
   useEffect(() => {
     return () => {
       ratingAbortRef.current?.abort();
+      ratingAbortRef.current = null;
       rwAbortRef.current?.abort();
+      rwAbortRef.current = null;
     };
   }, []);
 
@@ -307,16 +310,22 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
     return result;
   }, [orders, orderListSearch, orderListStatus]);
 
+  // Debounce product search for performance
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedFormSearch(formSearch), 300);
+    return () => clearTimeout(timer);
+  }, [formSearch]);
+
   // Fixed: Defined filteredProducts logic for the New Order Modal
   const filteredProducts = useMemo(() => {
     return availableProducts.filter((p) => {
       const matchesType = p.dealType === dealTypeFilter;
       const matchesSearch =
-        p.title.toLowerCase().includes(formSearch.toLowerCase()) ||
-        p.brandName.toLowerCase().includes(formSearch.toLowerCase());
+        p.title.toLowerCase().includes(debouncedFormSearch.toLowerCase()) ||
+        p.brandName.toLowerCase().includes(debouncedFormSearch.toLowerCase());
       return matchesType && matchesSearch;
     });
-  }, [availableProducts, dealTypeFilter, formSearch]);
+  }, [availableProducts, dealTypeFilter, debouncedFormSearch]);
 
   const loadedOnceRef = useRef(false);
 

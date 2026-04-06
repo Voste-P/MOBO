@@ -439,7 +439,7 @@ async function canManageTicketByRole(params: {
               const allMedU = await db.user.findMany({
                 where: { parentCode: { in: connectedCodes }, roles: { has: 'mediator' as any }, isDeleted: false },
                 select: { mediatorCode: true },
-                take: 5000,
+                take: 1000,
               });
               const allMediatorCodes: string[] = allMedU.map(u => u.mediatorCode).filter(Boolean) as string[];
               if (allMediatorCodes.includes(creatorParent) || allMediatorCodes.includes(creatorMediator)) return true;

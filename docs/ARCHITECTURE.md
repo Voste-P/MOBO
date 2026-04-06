@@ -51,7 +51,7 @@ All tables implement soft delete:
 
 ## Core data model (conceptual)
 
-> 20 Prisma models. Full details: `docs/DOMAIN_MODEL.md`
+> 21 Prisma models. Full details: `docs/DOMAIN_MODEL.md`
 
 ```mermaid
 erDiagram

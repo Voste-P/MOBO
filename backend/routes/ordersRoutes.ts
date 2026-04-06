@@ -59,7 +59,7 @@ export function ordersRoutes(env: Env): Router {
 
   // Signed proof URL generation (authenticated — used by CSV/Excel export)
   router.get('/orders/:orderId/proof-urls', requireAuth(env), orders.getSignedProofUrls);
-  router.post('/orders/proof-urls/batch', requireAuth(env), orders.batchSignedProofUrls);
+  router.post('/orders/proof-urls/batch', requireAuth(env), orderWriteLimiter, orders.batchSignedProofUrls);
 
   // Public signed proof endpoint — validates HMAC token, no auth needed.
   // Used by Excel/Google Sheets HYPERLINK formulas.

@@ -1,6 +1,6 @@
 ﻿# API Surface (UI Contract)
 
-> **121 endpoints** across 14 route files. Last updated: June 2025.
+> **120 endpoints** across 14 route files. Last updated: July 2025.
 
 All endpoints are rooted at `/api`.
 
@@ -39,14 +39,15 @@ Statuses: `400` validation, `401` unauthenticated, `403` forbidden, `404` not fo
 
 ---
 
-## Health (4 endpoints)
+## Health (5 endpoints)
 
-| Method | Path                | Auth | Description                                       |
-| ------ | ------------------- | ---- | ------------------------------------------------- |
-| GET    | `/api/health/live`  | No   | Liveness probe (always 200)                       |
-| GET    | `/api/health/ready` | No   | Readiness probe (DB connected)                    |
-| GET    | `/api/health`       | No   | Full health check — 200 if PG connected, else 503 |
-| GET    | `/api/health/e2e`   | No   | E2E test readiness check                          |
+| Method | Path                       | Auth | Description                                       |
+| ------ | -------------------------- | ---- | ------------------------------------------------- |
+| GET    | `/api/health/live`         | No   | Liveness probe (always 200)                       |
+| GET    | `/api/health/ready`        | No   | Readiness probe (DB connected)                    |
+| GET    | `/api/health`              | No   | Full health check — 200 if PG connected, else 503 |
+| GET    | `/api/health/e2e`          | No   | E2E test readiness check                          |
+| POST   | `/api/health/client-error` | No   | Report client-side error                          |
 
 ## Realtime (2 endpoints)
 
@@ -57,17 +58,20 @@ Statuses: `400` validation, `401` unauthenticated, `403` forbidden, `404` not fo
 
 Events: `ready`, `ping`, `deals.changed`, `users.changed`, `orders.changed`, `wallets.changed`, `tickets.changed`, `notifications.changed`. See `docs/REALTIME.md`.
 
-## Auth — `/api/auth` (7 endpoints)
+## Auth — `/api/auth` (10 endpoints)
 
-| Method | Path                       | Auth | Description                                          |
-| ------ | -------------------------- | ---- | ---------------------------------------------------- |
-| POST   | `/api/auth/register`       | No   | Buyer registration (invite-based via `mediatorCode`) |
-| POST   | `/api/auth/login`          | No   | Login → `{ user, tokens }`                           |
-| POST   | `/api/auth/refresh`        | No   | Refresh access token                                 |
-| GET    | `/api/auth/me`             | Yes  | Current user profile                                 |
-| POST   | `/api/auth/register-ops`   | No   | Agency/mediator registration (invite-based)          |
-| POST   | `/api/auth/register-brand` | No   | Brand registration (invite-based)                    |
-| PATCH  | `/api/auth/profile`        | Yes  | Update profile (RBAC/ownership enforced)             |
+| Method | Path                              | Auth | Description                                          |
+| ------ | --------------------------------- | ---- | ---------------------------------------------------- |
+| POST   | `/api/auth/register`              | No   | Buyer registration (invite-based via `mediatorCode`) |
+| POST   | `/api/auth/login`                 | No   | Login → `{ user, tokens }`                           |
+| POST   | `/api/auth/refresh`               | No   | Refresh access token                                 |
+| GET    | `/api/auth/me`                    | Yes  | Current user profile                                 |
+| POST   | `/api/auth/register-ops`          | No   | Agency/mediator registration (invite-based)          |
+| POST   | `/api/auth/register-brand`        | No   | Brand registration (invite-based)                    |
+| PATCH  | `/api/auth/profile`               | Yes  | Update profile (RBAC/ownership enforced)             |
+| POST   | `/api/auth/security-questions`    | Yes  | Set security questions                               |
+| POST   | `/api/auth/forgot-password/lookup`| No   | Look up account for password reset                   |
+| POST   | `/api/auth/forgot-password/reset` | No   | Reset password via security questions                |
 
 **AuthResponse**: `{ user: { id, role, name, ... }, tokens: { accessToken, refreshToken } }`
 
@@ -93,7 +97,15 @@ Events: `ready`, `ping`, `deals.changed`, `users.changed`, `orders.changed`, `wa
 | POST   | `/api/admin/orders/reactivate` | Reactivate order                                                            |
 | GET    | `/api/admin/audit-logs`        | Audit logs (filters: `action`, `entityType`, `limit`, `page`, `from`, `to`) |
 
-## Ops — `/api/ops` (29 endpoints) — roles: `agency|mediator|ops|admin`
+## Ops — `/api/ops` (36 endpoints) — roles: `agency|mediator|ops|admin`
+
+### Dashboard
+
+| Method | Path                          | Description          |
+| ------ | ----------------------------- | -------------------- |
+| GET    | `/api/ops/dashboard-stats`    | Dashboard statistics |
+| GET    | `/api/ops/revenue-trend`      | Revenue trend data   |
+| GET    | `/api/ops/brand-performance`  | Brand performance    |
 
 ### Invites
 
@@ -133,6 +145,9 @@ Events: `ready`, `ping`, `deals.changed`, `users.changed`, `orders.changed`, `wa
 | POST   | `/api/ops/orders/verify-all`         | Verify all proof steps    |
 | POST   | `/api/ops/orders/reject-proof`       | Reject proof              |
 | POST   | `/api/ops/orders/request-proof`      | Request missing proof     |
+| POST   | `/api/ops/orders/cancel-proofs`      | Cancel all proofs         |
+| POST   | `/api/ops/orders/force-approve`      | Force-approve order       |
+| POST   | `/api/ops/orders/cancel`             | Cancel order              |
 | POST   | `/api/ops/orders/settle`             | Settle order payment      |
 | POST   | `/api/ops/orders/unsettle`           | Reverse settlement        |
 
@@ -155,10 +170,13 @@ Events: `ready`, `ping`, `deals.changed`, `users.changed`, `orders.changed`, `wa
 | POST   | `/api/ops/payouts`           | Payout mediator |
 | DELETE | `/api/ops/payouts/:payoutId` | Cancel payout   |
 
-## Brand — `/api/brand` (11 endpoints) — roles: `brand|admin|ops`
+## Brand — `/api/brand` (14 endpoints) — roles: `brand|admin|ops`
 
 | Method | Path                               | Description                                |
 | ------ | ---------------------------------- | ------------------------------------------ |
+| GET    | `/api/brand/dashboard-stats`       | Dashboard statistics                       |
+| GET    | `/api/brand/revenue-trend`         | Revenue trend data                         |
+| GET    | `/api/brand/inventory-fill`        | Inventory fill rate                        |
 | GET    | `/api/brand/agencies`              | Connected agencies                         |
 | GET    | `/api/brand/campaigns`             | Brand campaigns                            |
 | GET    | `/api/brand/orders`                | Brand orders                               |
@@ -178,24 +196,32 @@ Events: `ready`, `ping`, `deals.changed`, `users.changed`, `orders.changed`, `wa
 | GET    | `/api/products`               | Yes (buyer) | List available products/deals          |
 | POST   | `/api/deals/:dealId/redirect` | Yes (buyer) | Track redirect → `{ preOrderId, url }` |
 
-## Orders (5 endpoints)
+## Orders (9 endpoints)
 
-| Method | Path                               | Auth        | Description                                  |
-| ------ | ---------------------------------- | ----------- | -------------------------------------------- |
-| GET    | `/api/orders/user/:userId`         | Yes         | User orders (self or privileged)             |
-| POST   | `/api/orders`                      | Yes (buyer) | Create/update order                          |
-| POST   | `/api/orders/claim`                | Yes (buyer) | Submit proof                                 |
-| GET    | `/api/orders/:orderId/proof/:type` | Yes         | Get order proof (review/rating/returnWindow) |
-| GET    | `/api/orders/:orderId/audit`       | Yes         | Order audit trail                            |
+| Method | Path                                | Auth        | Description                                  |
+| ------ | ----------------------------------- | ----------- | -------------------------------------------- |
+| GET    | `/api/orders/user/:userId`          | Yes         | User orders (self or privileged)             |
+| POST   | `/api/orders`                       | Yes (buyer) | Create/update order                          |
+| POST   | `/api/orders/claim`                 | Yes (buyer) | Submit proof                                 |
+| PATCH  | `/api/orders/:orderId/reviewer-name`| Yes         | Update reviewer name                         |
+| GET    | `/api/orders/:orderId/proof/:type`  | Yes         | Get order proof (review/rating/returnWindow) |
+| GET    | `/api/orders/:orderId/proof-urls`   | Yes         | Get proof upload URLs                        |
+| POST   | `/api/orders/proof-urls/batch`      | Yes         | Batch signed proof URLs                      |
+| GET    | `/api/orders/proof/signed/:token`   | No          | Access signed proof by token                 |
+| GET    | `/api/orders/:orderId/audit`        | Yes         | Order audit trail                            |
 
-## Tickets (4 endpoints)
+## Tickets (8 endpoints)
 
-| Method | Path               | Auth | Description                   |
-| ------ | ------------------ | ---- | ----------------------------- |
-| GET    | `/api/tickets`     | Yes  | List tickets (scoped by role) |
-| POST   | `/api/tickets`     | Yes  | Create ticket                 |
-| PATCH  | `/api/tickets/:id` | Yes  | Update ticket status          |
-| DELETE | `/api/tickets/:id` | Yes  | Soft-delete ticket            |
+| Method | Path                          | Auth | Description                   |
+| ------ | ----------------------------- | ---- | ----------------------------- |
+| GET    | `/api/tickets/issue-types`    | Yes  | List available issue types    |
+| GET    | `/api/tickets`                | Yes  | List tickets (scoped by role) |
+| POST   | `/api/tickets`                | Yes  | Create ticket                 |
+| GET    | `/api/tickets/:id`            | Yes  | Get ticket details            |
+| PATCH  | `/api/tickets/:id`            | Yes  | Update ticket status          |
+| DELETE | `/api/tickets/:id`            | Yes  | Soft-delete ticket            |
+| GET    | `/api/tickets/:id/comments`   | Yes  | List ticket comments          |
+| POST   | `/api/tickets/:id/comments`   | Yes  | Add ticket comment            |
 
 ## Notifications — `/api/notifications` (4 endpoints)
 
@@ -212,16 +238,17 @@ Events: `ready`, `ping`, `deals.changed`, `users.changed`, `orders.changed`, `wa
 | ------ | ------------------ | ---- | -------------------------- |
 | GET    | `/api/media/image` | No   | Image proxy (query: `url`) |
 
-## AI — `/api/ai` (6 endpoints)
+## AI — `/api/ai` (7 endpoints)
 
-| Method | Path                    | Auth            | Description                           |
-| ------ | ----------------------- | --------------- | ------------------------------------- |
-| POST   | `/api/ai/chat`          | Optional        | AI chat (rate-limited, 10MB body cap) |
-| GET    | `/api/ai/status`        | No              | AI service status                     |
-| POST   | `/api/ai/check-key`     | Yes (admin/ops) | Validate Gemini API key               |
-| POST   | `/api/ai/verify-proof`  | Optional        | Verify order proof screenshot         |
-| POST   | `/api/ai/verify-rating` | Optional        | Verify rating screenshot              |
-| POST   | `/api/ai/extract-order` | Optional        | Extract order details from screenshot |
+| Method | Path                           | Auth            | Description                           |
+| ------ | ------------------------------ | --------------- | ------------------------------------- |
+| POST   | `/api/ai/chat`                 | Optional        | AI chat (rate-limited, 10MB body cap) |
+| GET    | `/api/ai/status`               | No              | AI service status                     |
+| POST   | `/api/ai/check-key`            | Yes (admin/ops) | Validate Gemini API key               |
+| POST   | `/api/ai/verify-proof`         | Optional        | Verify order proof screenshot         |
+| POST   | `/api/ai/verify-rating`        | Optional        | Verify rating screenshot              |
+| POST   | `/api/ai/verify-return-window` | Optional        | Verify return window screenshot       |
+| POST   | `/api/ai/extract-order`        | Optional        | Extract order details from screenshot |
 
 ## Google Sheets — `/api/sheets` (1 endpoint)
 

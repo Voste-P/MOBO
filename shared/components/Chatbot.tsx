@@ -161,16 +161,18 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
     if (!isVisible) return;
     // Preserve expected chat behavior: auto-scroll only when already near the bottom.
     if (!isAtBottom) return;
-    requestAnimationFrame(() => {
+    const id = requestAnimationFrame(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     });
+    return () => cancelAnimationFrame(id);
   }, [messages.length, isTyping, isVisible, isAtBottom]);
 
   useEffect(() => {
     if (!isVisible) return;
-    requestAnimationFrame(() => {
+    const id = requestAnimationFrame(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
     });
+    return () => cancelAnimationFrame(id);
   }, [isVisible]);
 
   const handleSendMessage = async (e?: React.FormEvent, overrideText?: string) => {

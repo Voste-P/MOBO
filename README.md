@@ -4,17 +4,17 @@
 
 Multi-portal commerce + operations platform — monorepo with 5 Next.js portals, Express API, and automated E2E testing.
 
-### Tech Stack
+## Tech Stack
 
-| Layer      | Technology                                           |
-| ---------- | ---------------------------------------------------- |
-| Backend    | Express 5 · TypeScript · PostgreSQL · Prisma ORM     |
-| Frontend   | Next.js 15 · React 19 · Tailwind CSS                |
-| Auth       | JWT (access + refresh tokens) · RBAC                 |
-| AI         | Google Gemini (proof verification, OCR via Tesseract)|
-| Testing    | Vitest (unit) · Playwright (E2E)                     |
-| CI/CD      | GitHub Actions · Render (backend) · Vercel (portals) |
-| Realtime   | Server-Sent Events (SSE)                             |
+| Layer | Technology |
+| --- | --- |
+| Backend | Express 5 · TypeScript · PostgreSQL · Prisma ORM |
+| Frontend | Next.js 15 · React 19 · Tailwind CSS |
+| Auth | JWT (access + refresh tokens) · RBAC |
+| AI | Google Gemini (proof verification, OCR via Tesseract) |
+| Testing | Vitest (unit) · Playwright (E2E) |
+| CI/CD | GitHub Actions · Render (backend) · Vercel (portals) |
+| Realtime | Server-Sent Events (SSE) |
 
 ## System diagram
 
@@ -62,7 +62,7 @@ erDiagram
 
 ## Repo layout
 
-```
+```text
 ├── backend/         Express API, Prisma schema, services, seeds, tests
 ├── apps/
 │   ├── buyer-app/   Buyer portal (dev port 3001)
@@ -88,31 +88,31 @@ erDiagram
 
 ## Docs
 
-**Architecture & Design**
+### Architecture & Design
 
-| Document                        | Description                               |
-| ------------------------------- | ----------------------------------------- |
-| `docs/ARCHITECTURE.md`         | System diagram, auth model, ER diagram    |
-| `docs/API.md`                  | Complete API surface — 121 endpoints      |
-| `docs/BACKEND_API_SURFACE.md`  | Detailed endpoint behavior notes          |
-| `docs/DOMAIN_MODEL.md`        | 21 Prisma models, 23 enums, relationships |
-| `docs/RBAC_MATRIX.md`         | Role-based access matrix                  |
-| `docs/MONEY_FLOW.md`          | Wallet, transaction, payout flows         |
-| `docs/REALTIME.md`            | SSE contract and event types              |
-| `docs/SYSTEM_FLOW.md`         | End-to-end system workflows               |
+| Document | Description |
+| --- | --- |
+| `docs/ARCHITECTURE.md` | System diagram, auth model, ER diagram |
+| `docs/API.md` | Complete API surface — 121 endpoints |
+| `docs/BACKEND_API_SURFACE.md` | Detailed endpoint behavior notes |
+| `docs/DOMAIN_MODEL.md` | 21 Prisma models, 23 enums, relationships |
+| `docs/RBAC_MATRIX.md` | Role-based access matrix |
+| `docs/MONEY_FLOW.md` | Wallet, transaction, payout flows |
+| `docs/REALTIME.md` | SSE contract and event types |
+| `docs/SYSTEM_FLOW.md` | End-to-end system workflows |
 
-**Operations & Deployment** (`docs/operations/`)
+### Operations & Deployment
 
-| Document                                                | Description              |
-| ------------------------------------------------------- | ------------------------ |
-| `docs/operations/DEPLOYMENT.md`                         | Quick deployment guide   |
-| `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`     | Pre-launch checklist     |
+| Document | Description |
+| --- | --- |
+| `docs/operations/DEPLOYMENT.md` | Quick deployment guide |
+| `docs/operations/PRODUCTION_READINESS_CHECKLIST.md` | Pre-launch checklist |
 
-**Audits** (`docs/audits/`)
+### Audits
 
-| Document                                | Description                   |
-| --------------------------------------- | ----------------------------- |
-| `docs/audits/CLEANUP.md`               | Safe deletion rules           |
+| Document | Description |
+| --- | --- |
+| `docs/audits/CLEANUP.md` | Safe deletion rules |
 
 ## Prerequisites
 
@@ -127,12 +127,12 @@ erDiagram
 npm install
 ```
 
-2. Configure backend env
+1. Configure backend env
 
 - Copy `backend/.env.example` → `backend/.env`
 - Set `DATABASE_URL` to your PostgreSQL connection string.
 
-3. Start everything
+1. Start everything
 
 ```bash
 npm run dev:all
@@ -140,12 +140,12 @@ npm run dev:all
 
 Ports:
 
-- API: http://localhost:8080
-- Buyer: http://localhost:3001
-- Mediator: http://localhost:3002
-- Agency: http://localhost:3003
-- Brand: http://localhost:3004
-- Admin: http://localhost:3005
+- API: `http://localhost:8080`
+- Buyer: `http://localhost:3001`
+- Mediator: `http://localhost:3002`
+- Agency: `http://localhost:3003`
+- Brand: `http://localhost:3004`
+- Admin: `http://localhost:3005`
 
 ## Reset DB (admin only)
 
@@ -158,12 +158,12 @@ This truncates all tables and seeds only a single admin user.
 - `ADMIN_SEED_MOBILE` (required by the User model; not used for admin login)
 - `ADMIN_SEED_NAME`
 
-2. Confirm the wipe (required safeguards):
+1. Confirm the wipe (required safeguards):
 
 - `WIPE_DB=true`
 - `WIPE_DB_CONFIRM=WIPE`
 
-3. Run:
+1. Run:
 
 ```bash
 npm run db:reset-admin
