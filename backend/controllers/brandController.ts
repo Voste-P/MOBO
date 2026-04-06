@@ -20,8 +20,6 @@ import { publishRealtime } from '../services/realtimeHub.js';
 
 function db() { return prisma(); }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 async function recordManualPayoutLedger(args: {
   idempotencyKey: string;
   brandPgId: string;
@@ -342,10 +340,7 @@ export function makeBrandController() {
         let brandUserId: string;
         let brandUser: any;
         if (isPrivileged(roles) && body.brandId) {
-          const brandWhere = UUID_RE.test(body.brandId)
-            ? { id: body.brandId, isDeleted: false }
-            : { id: String(body.brandId), isDeleted: false };
-          brandUser = await db().user.findFirst({ where: brandWhere as any, select: { id: true, roles: true, status: true, connectedAgencies: true } });
+          brandUser = await db().user.findFirst({ where: { ...idWhere(body.brandId), isDeleted: false } as any, select: { id: true, roles: true, status: true, connectedAgencies: true } });
           if (!brandUser) throw new AppError(404, 'NOT_FOUND', 'Brand not found');
           brandPgId = brandUser.id;
           brandUserId = brandUser.id || brandUser.id;
@@ -365,11 +360,8 @@ export function makeBrandController() {
         }
 
         // Resolve agency
-        const agencyWhere = UUID_RE.test(body.agencyId)
-          ? { id: body.agencyId, isDeleted: false }
-          : { id: body.agencyId, isDeleted: false };
         const agency = await db().user.findFirst({
-          where: agencyWhere as any,
+          where: { ...idWhere(body.agencyId), isDeleted: false } as any,
           select: { id: true, roles: true, mediatorCode: true, name: true, status: true },
         });
         if (!agency) throw new AppError(404, 'AGENCY_NOT_FOUND', 'Agency not found');

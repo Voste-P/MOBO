@@ -1,5 +1,4 @@
 // Admin seeding — PG-only via Prisma.
-import { randomUUID } from 'node:crypto';
 import { hashPassword } from '../services/passwords.js';
 import { prisma } from '../database/prisma.js';
 

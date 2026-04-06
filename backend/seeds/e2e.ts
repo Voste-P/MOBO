@@ -1,7 +1,5 @@
 // E2E seeding — PG-only via Prisma.
 // NO deleteMany, NO truncate, NO wipe — safe upserts only.
-import { randomUUID } from 'node:crypto';
-
 import { hashPassword } from '../services/passwords.js';
 import { ensureRoleDocumentsForUser } from '../services/roleDocuments.js';
 import { connectPrisma, prisma } from '../database/prisma.js';

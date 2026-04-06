@@ -6,6 +6,7 @@ import { Prisma as _Prisma } from '../generated/prisma/client.js';
 import { orderLog, businessLog } from '../config/logger.js';
 import { logChangeEvent, logAccessEvent, logPerformance, logErrorEvent } from '../config/appLogs.js';
 import { pgOrder } from '../utils/pgMappers.js';
+import { idWhere } from '../utils/idWhere.js';
 import { createOrderSchema, submitClaimSchema } from '../validations/orders.js';
 import { rupeesToPaise } from '../utils/money.js';
 import { toUiOrder, toUiOrderSummary } from '../utils/uiMappers.js';
@@ -20,8 +21,6 @@ import { isGeminiConfigured, verifyProofWithAi, verifyRatingScreenshotWithAi, ve
 import { finalizeApprovalIfReady, getRequiredStepsForOrder, hasProofForRequirement } from './opsController.js';
 import { createProofToken, verifyProofToken } from '../utils/signedProofUrl.js';
 
-// UUID v4 regex — 8-4-4-4-12 hex with dashes.
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import { writeAuditLog } from '../services/audit.js';
 
 export function makeOrdersController(env: Env) {
@@ -51,11 +50,8 @@ export function makeOrdersController(env: Env) {
     }
   };
   const findOrderForProof = async (orderId: string) => {
-    const isUuid = UUID_RE.test(orderId);
     // Single query with OR to cover id AND externalOrderId
-    const where = isUuid
-      ? { OR: [{ id: orderId }, { externalOrderId: orderId }] as any, isDeleted: false }
-      : { OR: [{ id: orderId }, { externalOrderId: orderId }] as any, isDeleted: false };
+    const where = { OR: [idWhere(orderId), { externalOrderId: orderId }] as any, isDeleted: false };
     const found = await db().order.findFirst({
       where: where as any,
       select: orderProofSelect,
@@ -511,7 +507,7 @@ export function makeOrdersController(env: Env) {
         // Fetch all orders in one query — lightweight select (no base64 blobs)
         const orders = await db().order.findMany({
           where: {
-            OR: orderIds.map(id => UUID_RE.test(id) ? { id } : { id: id }),
+            OR: orderIds.map(id => idWhere(id)),
             isDeleted: false,
           },
           select: orderProofExistsSelect,
@@ -634,10 +630,7 @@ export function makeOrdersController(env: Env) {
         }
 
         // Resolve UUID for FK query
-        const userWhere = UUID_RE.test(userId)
-          ? { id: userId as any, isDeleted: false }
-          : { id: userId, isDeleted: false };
-        const targetUser = await db().user.findFirst({ where: userWhere as any, select: { id: true } });
+        const targetUser = await db().user.findFirst({ where: { ...idWhere(userId), isDeleted: false } as any, select: { id: true } });
         if (!targetUser) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
         const { page, limit, skip, isPaginated } = parsePagination(req.query as Record<string, unknown>, { limit: 50 });
@@ -717,10 +710,7 @@ export function makeOrdersController(env: Env) {
           throw new AppError(403, 'FORBIDDEN', 'Cannot create orders for another user');
         }
 
-        const userLookupWhere = UUID_RE.test(body.userId)
-          ? { id: body.userId as any, isDeleted: false }
-          : { id: body.userId, isDeleted: false };
-        const user = await db().user.findFirst({ where: userLookupWhere as any, select: { id: true, name: true, mobile: true, status: true, parentCode: true } });
+        const user = await db().user.findFirst({ where: { ...idWhere(body.userId), isDeleted: false } as any, select: { id: true, name: true, mobile: true, status: true, parentCode: true } });
         if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
         if (user.status !== 'active') {
           throw new AppError(403, 'USER_NOT_ACTIVE', 'Your account is not active. Please contact support.');
@@ -858,13 +848,9 @@ export function makeOrdersController(env: Env) {
           orderLog.warn('[createOrder] AI not configured, order will require manual review');
           aiUnavailable = true;
         }
-        const campaignWhere = UUID_RE.test(item.campaignId)
-          ? { id: item.campaignId, isDeleted: false }
-          : { id: item.campaignId, isDeleted: false };
-
         // [PERF] Parallel fetch: campaign + mediatorUser are independent
         const [campaign, mediatorUser] = await Promise.all([
-          db().campaign.findFirst({ where: campaignWhere as any }),
+          db().campaign.findFirst({ where: { ...idWhere(item.campaignId), isDeleted: false } as any }),
           db().user.findFirst({
             where: { roles: { has: 'mediator' as any }, mediatorCode: upstreamMediatorCode, isDeleted: false },
             select: { parentCode: true },
@@ -931,10 +917,6 @@ export function makeOrdersController(env: Env) {
 
         // Commission snapshot: prefer published Deal record if productId is a Deal id.
         let commissionPaise = rupeesToPaise(item.commission);
-        const dealWhere = UUID_RE.test(item.productId)
-          ? { id: item.productId as any, isDeleted: false }
-          : { id: item.productId, isDeleted: false };
-
         // [PERF] Parallel fetch: mediatorSales + maybeDeal are independent
         const [mediatorSales, maybeDeal] = await Promise.all([
           // For "Open to All" campaigns, skip per-mediator limit check — only global slot limit applies
@@ -948,7 +930,7 @@ export function makeOrdersController(env: Env) {
                 },
               })
             : Promise.resolve(0),
-          db().deal.findFirst({ where: dealWhere as any }),
+          db().deal.findFirst({ where: { ...idWhere(item.productId), isDeleted: false } as any }),
         ]);
 
         if (!campaignIsOpenToAll && upstreamMediatorCode && assigned > 0 && mediatorSales >= assigned) {
@@ -978,11 +960,8 @@ export function makeOrdersController(env: Env) {
         const created = await db().$transaction(async (tx) => {
           // If this is an upgrade from a redirect-tracked pre-order, update that order instead of creating a new one.
           if (body.preOrderId) {
-            const preOrderWhere = UUID_RE.test(body.preOrderId)
-              ? { id: body.preOrderId as any, userId: userPgId, isDeleted: false }
-              : { id: body.preOrderId, userId: userPgId, isDeleted: false };
             const existing = await tx.order.findFirst({
-              where: preOrderWhere as any,
+              where: { ...idWhere(body.preOrderId), userId: userPgId, isDeleted: false } as any,
               include: { items: { where: { isDeleted: false } } },
             });
             if (!existing) throw new AppError(404, 'ORDER_NOT_FOUND', 'Pre-order not found');
@@ -1279,11 +1258,8 @@ export function makeOrdersController(env: Env) {
     submitClaim: async (req: Request, res: Response, next: NextFunction) => {
       try {
         const body = submitClaimSchema.parse(req.body);
-        const claimOrderWhere = UUID_RE.test(body.orderId)
-          ? { id: body.orderId as any, isDeleted: false }
-          : { id: body.orderId, isDeleted: false };
         const order = await db().order.findFirst({
-          where: claimOrderWhere as any,
+          where: { ...idWhere(body.orderId), isDeleted: false } as any,
           include: { items: { where: { isDeleted: false } } },
         });
         if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
@@ -2128,11 +2104,8 @@ export function makeOrdersController(env: Env) {
         if (!requesterId) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
 
         // Look up the order
-        const orderWhere = UUID_RE.test(orderId)
-          ? { id: orderId as any, isDeleted: false }
-          : { id: orderId, isDeleted: false };
         const order = await db().order.findFirst({
-          where: orderWhere as any,
+          where: { ...idWhere(orderId), isDeleted: false } as any,
           select: { id: true, userId: true, reviewerName: true },
         });
         if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');

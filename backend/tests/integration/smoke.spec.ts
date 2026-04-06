@@ -1,5 +1,4 @@
 import request from 'supertest';
-import { randomUUID } from 'node:crypto';
 
 import { createApp } from '../../app.js';
 import { loadEnv } from '../../config/env.js';
