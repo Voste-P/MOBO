@@ -12,7 +12,7 @@ class ChatbotErrorBoundary extends Component<
   state = { hasError: false, retryKey: 0 };
   static getDerivedStateFromError() { return { hasError: true }; }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('[ChatbotErrorBoundary]', error, info.componentStack);
+    if (process.env.NODE_ENV !== 'production') console.error('[ChatbotErrorBoundary]', error, info.componentStack);
   }
   render() {
     if (this.state.hasError) {

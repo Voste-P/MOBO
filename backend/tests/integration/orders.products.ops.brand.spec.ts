@@ -1,4 +1,3 @@
-import crypto from 'node:crypto';
 import request from 'supertest';
 
 import { createApp } from '../../app.js';

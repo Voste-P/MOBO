@@ -9,12 +9,13 @@ Complete brand-color alignment across all 5 MOBO apps, performance optimizations
 ## Brand Color Migration
 
 ### Problem
+
 Pervasive use of Tailwind `indigo-*` classes across all shared components and pages, conflicting with the MOBO design system (mobo.lime/mobo.dark/accent `#CCF381`).
 
 ### Color Mapping Applied
 
 | Context | Before (indigo) | After (brand) |
-|---------|-----------------|---------------|
+| --------- | --------------- | ------------- |
 | Primary buttons/tabs | `bg-indigo-600` | `bg-zinc-900` |
 | AI verification sections | `indigo-*` | `lime-*` (bg-lime-50, border-lime-100, text-lime-600) |
 | Focus rings on inputs | `ring-indigo-300` | `ring-lime-300` |
@@ -27,6 +28,7 @@ Pervasive use of Tailwind `indigo-*` classes across all shared components and pa
 ### Files Modified
 
 #### Shared UI Components
+
 - **Button.tsx** — Added `accent` and `success` variants; primary `bg-indigo-600` → `bg-zinc-900`
 - **Modal.tsx** — Close button enlarged to 40px (44px mobile touch target)
 - **Input.tsx** — Focus rings `indigo-400` → `lime-400` (dark/light modes)
@@ -36,6 +38,7 @@ Pervasive use of Tailwind `indigo-*` classes across all shared components and pa
 - **SidebarItem.tsx** — Admin theme: ring, indicator, badge colors → lime/zinc
 
 #### Shared Layout Components
+
 - **Navbar.tsx** — Added `notificationCount`, `onNotificationClick`, `actions` slot; brand colors
 - **MobileTabBar.tsx** — Focus rings, active tab, CTA → lime/zinc
 - **ProductCard.tsx** — Brand label `text-indigo-600` → `text-zinc-700`
@@ -43,6 +46,7 @@ Pervasive use of Tailwind `indigo-*` classes across all shared components and pa
 - **TicketDetailModal.tsx** — Textarea focus ring → lime-300
 
 #### Page Components
+
 - **Auth.tsx** — Splash background blob → lime
 - **BrandAuth.tsx** — Splash blob → lime
 - **AgencyAuth.tsx** — Logo gradient → purple-to-zinc
@@ -54,6 +58,7 @@ Pervasive use of Tailwind `indigo-*` classes across all shared components and pa
 - **AdminPortal.tsx** — ~25 fixes: login, sidebar, mobile, avatar, cards, badges, tickets, invite, finance, proof modal AI section
 
 ### Intentionally Preserved
+
 - `CHART_COLORS.indigo` (line 81) — chart visualization constant
 - `bgFromText['text-indigo-600']` (line 91) — JIT safelist mapping
 - `bgLightFromText['text-indigo-600']` (line 100) — JIT safelist mapping
@@ -72,10 +77,12 @@ Pervasive use of Tailwind `indigo-*` classes across all shared components and pa
 ## Performance Optimizations
 
 ### Bundle Size
+
 - Added `framer-motion` to `optimizePackageImports` in all 5 `next.config.js` files
 - Estimated savings: ~30-50 KB gzip per app
 
 ### Already Well-Optimized
+
 - All 5 apps use `lazyRetry()` (React.lazy + chunk retry) with Suspense boundaries
 - `ProxiedImage` has `loading="lazy"` + `decoding="async"` on all images
 - `optimizePackageImports` already covered `lucide-react` and `recharts`
