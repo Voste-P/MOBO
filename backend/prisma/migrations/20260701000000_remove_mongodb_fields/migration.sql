@@ -1,3 +1,4 @@
+-- @approved-destructive: MongoDB migration complete — all code paths use PG UUID ids only; mongo_id columns and migration_sync table are dead data.
 -- Remove all mongo_id columns and related indexes from every table.
 -- Also drop the migration_sync table that tracked Mongo→PG migration state.
 
