@@ -874,7 +874,6 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
               <option value="All">All Deal Types</option>
               <option value="Discount">Order Deal</option>
               <option value="Rating">Rating Deal</option>
-              <option value="Review">Review Deal</option>
             </select>
             <select
               value={mediatorFilter}
@@ -1774,7 +1773,6 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
                     >
                       <option value="">Flexible (Agency Decide)</option>
                       <option value="Discount">Discount Only</option>
-                      <option value="Review">Review Required</option>
                       <option value="Rating">Rating Required</option>
                     </select>
                     <p className="text-[10px] text-zinc-400 mt-2 ml-1 font-medium italic">
@@ -1935,7 +1933,6 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
         >
           <option value="All">All Deal Types</option>
           <option value="Discount">Discount</option>
-          <option value="Review">Review</option>
           <option value="Rating">Rating</option>
         </select>
         <input

@@ -782,7 +782,6 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
             <option value="All">All Types</option>
             <option value="Discount">Order Deal</option>
             <option value="Rating">Rating Deal</option>
-            <option value="Review">Review Deal</option>
           </select>
           <select
             value={financeMediatorFilter}
@@ -2029,7 +2028,6 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
         >
           <option value="All">All Types</option>
           <option value="Discount">Discount</option>
-          <option value="Review">Review</option>
           <option value="Rating">Rating</option>
         </select>
         <select
@@ -2474,7 +2472,6 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                     aria-label="Deal type"
                   >
                     <option value="Discount">Order Deal</option>
-                    <option value="Review">Review Deal</option>
                     <option value="Rating">Rating Deal</option>
                     
                   </select>

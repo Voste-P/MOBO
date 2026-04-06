@@ -482,16 +482,33 @@ export function makeAdminController() {
         }
 
         const pgUserId = (req.auth as any)?.pgUserId as string | undefined;
-        if (wallet) {
-          await db().wallet.update({
-            where: { id: wallet.id },
-            data: { isDeleted: true, updatedBy: pgUserId},
-          });
-        }
 
-        await db().user.update({
-          where: { id: user.id },
-          data: { isDeleted: true, updatedBy: pgUserId},
+        // Wrap wallet + user soft-delete in a transaction to prevent race
+        // condition where a concurrent request credits the wallet between
+        // balance check and soft-delete.
+        await db().$transaction(async (tx) => {
+          if (wallet) {
+            // Re-check wallet balance inside the transaction
+            const freshWallet = await tx.wallet.findUnique({
+              where: { id: wallet.id },
+              select: { availablePaise: true, pendingPaise: true, lockedPaise: true },
+            });
+            const fAvail = Number(freshWallet?.availablePaise ?? 0);
+            const fPend = Number(freshWallet?.pendingPaise ?? 0);
+            const fLock = Number(freshWallet?.lockedPaise ?? 0);
+            if (fAvail > 0 || fPend > 0 || fLock > 0) {
+              throw new AppError(409, 'WALLET_NOT_EMPTY', 'This user still has funds in their wallet. Please settle the balance before deleting.');
+            }
+            await tx.wallet.update({
+              where: { id: wallet.id },
+              data: { isDeleted: true, updatedBy: pgUserId },
+            });
+          }
+
+          await tx.user.update({
+            where: { id: user.id },
+            data: { isDeleted: true, updatedBy: pgUserId },
+          });
         });
 
         await writeAuditLog({
