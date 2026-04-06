@@ -659,19 +659,23 @@ export function makeOpsController(env: Env) {
           ];
         }
 
-        const { limit: puLimit, skip: puSkip } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
-        const users = await db().user.findMany({
-          where,
-          orderBy: { createdAt: 'desc' },
-          skip: puSkip,
-          take: puLimit,
-          select: { ...userListSelect, wallets: { where: { isDeleted: false }, take: 1, select: { id: true, availablePaise: true, pendingPaise: true } } },
-        });
+        const { limit: puLimit, skip: puSkip, page: puPage, isPaginated: puIsPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
+        const [users, puTotal] = await Promise.all([
+          db().user.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            skip: puSkip,
+            take: puLimit,
+            select: { ...userListSelect, wallets: { where: { isDeleted: false }, take: 1, select: { id: true, availablePaise: true, pendingPaise: true } } },
+          }),
+          db().user.count({ where }),
+        ]);
 
-        res.json(users.map((u: any) => {
+        const mapped = users.map((u: any) => {
           const wallet = u.wallets?.[0];
           return toUiUser(pgUser(u), wallet ? pgWallet(wallet) : undefined);
-        }));
+        });
+        res.json(paginatedResponse(mapped, puTotal, puPage, puLimit, puIsPaginated));
         businessLog.info('Pending users listed', { userId: req.auth?.userId, resultCount: users.length, code, ip: req.ip });
         logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'PendingUsers', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'PENDING_USERS_LISTED', resultCount: users.length } });
       } catch (err) {
@@ -702,19 +706,23 @@ export function makeOpsController(env: Env) {
           ];
         }
 
-        const { limit: vuLimit, skip: vuSkip } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
-        const users = await db().user.findMany({
-          where,
-          orderBy: { createdAt: 'desc' },
-          skip: vuSkip,
-          take: vuLimit,
-          select: { ...userListSelect, wallets: { where: { isDeleted: false }, take: 1, select: { id: true, availablePaise: true, pendingPaise: true } } },
-        });
+        const { limit: vuLimit, skip: vuSkip, page: vuPage, isPaginated: vuIsPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
+        const [users, vuTotal] = await Promise.all([
+          db().user.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            skip: vuSkip,
+            take: vuLimit,
+            select: { ...userListSelect, wallets: { where: { isDeleted: false }, take: 1, select: { id: true, availablePaise: true, pendingPaise: true } } },
+          }),
+          db().user.count({ where }),
+        ]);
 
-        res.json(users.map((u: any) => {
+        const mapped = users.map((u: any) => {
           const wallet = u.wallets?.[0];
           return toUiUser(pgUser(u), wallet ? pgWallet(wallet) : undefined);
-        }));
+        });
+        res.json(paginatedResponse(mapped, vuTotal, vuPage, vuLimit, vuIsPaginated));
 
         businessLog.info('Verified users listed', { userId: req.auth?.userId, resultCount: users.length, code, ip: req.ip });
         logAccessEvent('RESOURCE_ACCESS', {
@@ -1392,14 +1400,6 @@ export function makeOpsController(env: Env) {
         }
         updateData.verification = v;
 
-        // Release campaign slot when order proof (purchase) is rejected
-        if (body.type === 'order') {
-          const campaignId = order.items?.[0]?.campaignId;
-          if (campaignId) {
-            await db().$executeRaw`UPDATE "campaigns" SET "used_slots" = GREATEST("used_slots" - 1, 0) WHERE id = ${campaignId}::uuid AND "is_deleted" = false`;
-          }
-        }
-
         const newEvents = pushOrderEvent(order.events as any, {
           type: 'REJECTED',
           at: new Date(),
@@ -1408,7 +1408,15 @@ export function makeOpsController(env: Env) {
         });
         updateData.events = newEvents;
 
-        await db().order.update({ where: { id: order.id }, data: updateData });
+        // Atomically update order + release campaign slot inside a transaction
+        // to prevent inconsistent state if one operation fails.
+        const campaignId = (body.type === 'order') ? order.items?.[0]?.campaignId : null;
+        await db().$transaction(async (tx: any) => {
+          await tx.order.update({ where: { id: order.id }, data: updateData });
+          if (campaignId) {
+            await tx.$executeRaw`UPDATE "campaigns" SET "used_slots" = GREATEST("used_slots" - 1, 0) WHERE id = ${campaignId}::uuid AND "is_deleted" = false`;
+          }
+        });
 
         // When rejecting from APPROVED, transition back to ORDERED so buyer can re-upload
         if (wasApproved) {

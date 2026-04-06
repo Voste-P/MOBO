@@ -1,6 +1,6 @@
 # Backend API Surface (Inventory)
 
-> **83 endpoints** across 14 route files. Last updated: June 2025.
+> **121 endpoints** across 14 route files. Last updated: April 2026.
 
 Base URL: `/api`
 

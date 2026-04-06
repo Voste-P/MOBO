@@ -64,10 +64,12 @@ const envSchema = z.object({
   AI_CIRCUIT_BREAKER_THRESHOLD: z.coerce.number().int().min(1).default(3),
   AI_CIRCUIT_BREAKER_COOLDOWN_MS: z.coerce.number().int().min(1000).default(300_000),
 
-  // Minimum AI confidence score (0-100) required for proof verification to pass.
-  // Scores below this threshold will reject the proof. 70 is recommended for production
-  // anti-fraud gating; lower values increase false-positive risk.
-  AI_PROOF_CONFIDENCE_THRESHOLD: z.coerce.number().int().min(0).max(100).default(70),
+  // Minimum AI confidence score (0-100) required for bulk auto-verification.
+  // ALL required proofs must meet this threshold for the order to skip mediator
+  // review entirely. 80 balances throughput with fraud safety; was 70 prior to
+  // April 2026 hardening (raised to reduce the gap between individual 80% auto-verify
+  // and bulk auto-verify thresholds that previously allowed 70-79% proofs through).
+  AI_PROOF_CONFIDENCE_THRESHOLD: z.coerce.number().int().min(0).max(100).default(80),
 
   // AI confidence score (0-100) at or above which a proof step is auto-verified
   // without manual mediator review.  Set to 101 to disable auto-verification.

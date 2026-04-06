@@ -93,9 +93,9 @@ erDiagram
 | Document                        | Description                               |
 | ------------------------------- | ----------------------------------------- |
 | `docs/ARCHITECTURE.md`         | System diagram, auth model, ER diagram    |
-| `docs/API.md`                  | Complete API surface — 83 endpoints       |
+| `docs/API.md`                  | Complete API surface — 121 endpoints      |
 | `docs/BACKEND_API_SURFACE.md`  | Detailed endpoint behavior notes          |
-| `docs/DOMAIN_MODEL.md`        | 20 Prisma models, 22 enums, relationships |
+| `docs/DOMAIN_MODEL.md`        | 21 Prisma models, 23 enums, relationships |
 | `docs/RBAC_MATRIX.md`         | Role-based access matrix                  |
 | `docs/MONEY_FLOW.md`          | Wallet, transaction, payout flows         |
 | `docs/REALTIME.md`            | SSE contract and event types              |
@@ -106,16 +106,12 @@ erDiagram
 | Document                                                | Description              |
 | ------------------------------------------------------- | ------------------------ |
 | `docs/operations/DEPLOYMENT.md`                         | Quick deployment guide   |
-| `docs/operations/DEPLOYMENT_RENDER_VERCEL_NO_DOMAIN.md` | Full Render + Vercel setup |
 | `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`     | Pre-launch checklist     |
 
 **Audits** (`docs/audits/`)
 
 | Document                                | Description                   |
 | --------------------------------------- | ----------------------------- |
-| `docs/audits/PRODUCTION_AUDIT.md`       | Security and production audit |
-| `docs/audits/LOGGING_AUDIT.md`          | Controller logging coverage   |
-| `docs/audits/SHARED_DIRECTORY_AUDIT.md` | Shared package audit          |
 | `docs/audits/CLEANUP.md`               | Safe deletion rules           |
 
 ## Prerequisites
