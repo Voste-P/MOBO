@@ -1,8 +1,24 @@
 # MOBO Production-Readiness Audit
 
 **Generated:** 2025-01-XX  
+**Last reviewed:** April 2026  
 **Scope:** Express backend, Prisma ORM / PostgreSQL, 5 Next.js frontends, shared UI layer  
 **Focus areas:** Security, performance, data integrity, error handling, scalability
+
+---
+
+## April 2026 — Status Update
+
+The following items from this audit have been addressed since the original audit:
+
+| ID | Issue | Status | Notes |
+|----|-------|--------|-------|
+| C-2 | Admin 10k pagination defaults | ✅ FIXED | All endpoints now use `limit: 50, maxLimit: 200` via `parsePagination` |
+| M-9 | Admin `deleteUser` lacks transaction safety | ✅ FIXED | Wallet balance re-check + soft-delete now wrapped in `$transaction` (commit `f62d056`) |
+| — | Ticket resolver enrichment truncation | ✅ FIXED | Removed `.slice(0,500)` + `take: 500` to prevent silent data loss (commit `f62d056`) |
+| — | Review DealType UI removal | ✅ DONE | `Review` option hidden from all 6 campaign-creation dropdowns; enum kept in schema for backward compat |
+
+Items **not yet addressed** (still valid): C-1 (base64 blob over-fetch), C-3 (in-memory rate limiter scaling), H-1 through H-8, M-1 through M-8/M-10/M-11, L-1 through L-6. See original descriptions below.
 
 ---
 

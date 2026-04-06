@@ -242,7 +242,9 @@ Prisma Migrate manages schema changes. The migrations directory contains:
 
 | Enum | SQL Name | Values | Used By |
 | --- | --- | --- | --- |
-| `DealType` | `deal_type` | `Discount`, `Review`, `Rating` | `Campaign.dealType`, `Deal.dealType` |
+| `DealType` | `deal_type` | `Discount`, `Review`*, `Rating` | `Campaign.dealType`, `Deal.dealType` |
+
+> \* **Review** is retained in the schema for backward compatibility but hidden from all campaign-creation dropdowns in the UI (Apr 2026). Will be re-enabled in a future release.
 | `CampaignStatus` | `campaign_status` | `draft`, `active`, `paused`, `completed` | `Campaign.status` |
 
 #### Other Enums
