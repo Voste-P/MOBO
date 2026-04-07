@@ -1,4 +1,4 @@
-﻿import 'dotenv/config';
+import 'dotenv/config';
 
 // E2E must never use a developer's real API keys.
 process.env.GEMINI_API_KEY = '';
@@ -22,30 +22,54 @@ async function tryRunE2ESeed() {
 }
 
 async function main() {
-  const env = loadEnv();
+  startupLog.info('E2E backend starting', {
+    nodeVersion: process.version,
+    cwd: process.cwd(),
+    hasDbUrl: !!process.env.DATABASE_URL,
+    nodeEnv: process.env.NODE_ENV,
+    ci: !!process.env.CI,
+  });
 
-  // Connect PostgreSQL — primary and only database.
+  const env = loadEnv();
+  startupLog.info('Environment loaded', { port: env.PORT });
+
+  // Connect PostgreSQL -- primary and only database.
   await connectPrisma();
+  startupLog.info('PostgreSQL connected');
 
   // Safe, idempotent upsert of E2E test accounts (no deletes).
-  await tryRunE2ESeed();
-  startupLog.info('E2E seed completed successfully');
+  // Non-fatal: if seed fails, the server starts anyway so tests get
+  // meaningful assertion errors instead of a 180-second timeout.
+  let seedOk = false;
+  try {
+    await tryRunE2ESeed();
+    seedOk = true;
+    startupLog.info('E2E seed completed successfully');
+  } catch (seedErr) {
+    startupLog.error('E2E seed failed, server will start without seed data', {
+      error: seedErr instanceof Error ? seedErr.message : String(seedErr),
+      stack: seedErr instanceof Error ? seedErr.stack : undefined,
+    });
+  }
 
   const app = createApp(env);
 
   const server = app.listen(env.PORT, () => {
     setReady(true);
-    startupLog.info(`E2E backend listening on :${env.PORT}`);
+    startupLog.info(`E2E backend listening on :${env.PORT}`, { seedOk });
   });
 
-  // Surface bind errors immediately so Playwright doesn’t wait 120s on a dead server.
+  // Surface bind errors immediately so Playwright does not wait on a dead server.
   server.on('error', (err) => {
     startupLog.error('E2E server bind error', { error: err });
-    process.exitCode = 1;
+    process.exit(1);
   });
 }
 
 main().catch((err) => {
-  startupLog.error('Fatal startup error', { error: err });
-  process.exitCode = 1;
+  startupLog.error('Fatal startup error', {
+    error: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : undefined,
+  });
+  process.exit(1);
 });

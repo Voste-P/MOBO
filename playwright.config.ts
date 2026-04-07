@@ -26,7 +26,7 @@ export default defineConfig({
     ? {
         // CI: start only backend — portals are too heavy for 2-core runners.
         // API-only tests talk directly to backend at :8080.
-        command: 'npm --prefix backend run dev:e2e',
+        command: 'npm --prefix backend run ci:e2e',
         url: 'http://localhost:8080/api/health/ready',
         reuseExistingServer: false,
         timeout: 180_000, // 3 min — backend cold start on 2-core CI runners
