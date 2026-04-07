@@ -26,9 +26,11 @@ const MAX_ORDER_EVENTS = 500;
 
 export function pushOrderEvent(events: any[] | undefined, event: OrderEvent) {
   const arr = Array.isArray(events) ? events : [];
-  // If at capacity, drop the oldest non-terminal events to make room
+  // If at capacity, drop oldest entries keeping last (MAX - 1) items
   if (arr.length >= MAX_ORDER_EVENTS) {
-    arr.splice(0, arr.length - MAX_ORDER_EVENTS + 1);
+    const keep = arr.slice(-(MAX_ORDER_EVENTS - 1));
+    arr.length = 0;
+    arr.push(...keep);
   }
   arr.push({
     type: event.type,

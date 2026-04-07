@@ -10,6 +10,11 @@ export function parsePagination(query: Record<string, unknown>, defaults?: { pag
   const page = Math.max(1, Number(query.page) || defaults?.page || 1);
   const limit = Math.min(maxCap, Math.max(1, Number(query.limit) || defaults?.limit || 50));
   const skip = (page - 1) * limit;
+  // Cap offset to prevent expensive full-table scans
+  if (skip > 100_000) {
+    const cappedPage = Math.floor(100_000 / limit) + 1;
+    return { page: cappedPage, limit, skip: (cappedPage - 1) * limit, isPaginated: true };
+  }
   const isPaginated = query.page !== undefined || query.limit !== undefined;
   return { page, limit, skip, isPaginated };
 }

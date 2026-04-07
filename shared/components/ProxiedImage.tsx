@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { getApiBaseAbsolute } from '../utils/apiBaseUrl';
 
 /* ─────────────────────────────────────────────────────────
@@ -40,6 +40,8 @@ export interface ProxiedImageProps
 export const ProxiedImage = React.memo<ProxiedImageProps>(
   ({ src, alt = 'Product image', className, ...rest }) => {
     const [errored, setErrored] = useState(false);
+    // Reset error state when src changes so new URLs get a fresh attempt
+    useEffect(() => { setErrored(false); }, [src]);
     const resolved = errored ? PLACEHOLDER : proxyImageUrl(src);
 
     const onError = useCallback(() => setErrored(true), []);

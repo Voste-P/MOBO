@@ -283,6 +283,11 @@ jobs:
         timeout-minutes: 5
         run: npx playwright install-deps
 
+      - name: Seed E2E test data
+        run: npm -w @mobo/backend run seed:e2e
+        env:
+          NODE_OPTIONS: '--no-deprecation'
+
       # ⛔  NO continue-on-error — E2E failures BLOCK the pipeline
       # CI runs API-only tests (no portals) for speed & reliability.
       # Full smoke/UI tests run locally with all 6 dev servers.

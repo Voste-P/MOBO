@@ -249,6 +249,7 @@ export function makeAuthController(env: Env) {
           );
           await db().securityQuestion.createMany({ data: sqRecords }).catch((sqErr) => {
             businessLog.warn('Failed to save security questions during registration', { userId: user.id, error: sqErr?.message });
+            // Non-critical: log but continue — user can re-set questions later
           });
         }
         res.status(201).json({
@@ -745,6 +746,7 @@ export function makeAuthController(env: Env) {
             );
             await db().securityQuestion.createMany({ data: sqOpsRecords }).catch((sqErr) => {
               businessLog.warn('Failed to save security questions during ops registration', { userId: user.id, error: sqErr?.message });
+              // Non-critical: log but continue — user can re-set questions later
             });
           }
           res.status(202).json({
@@ -894,6 +896,7 @@ export function makeAuthController(env: Env) {
           );
           await db().securityQuestion.createMany({ data: sqBrandRecords }).catch((sqErr) => {
             businessLog.warn('Failed to save security questions during brand registration', { userId: user.id, error: sqErr?.message });
+            // Non-critical: log but continue — user can re-set questions later
           });
         }
 

@@ -291,6 +291,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
         VALID_NAV_TARGETS.includes(response.navigateTo as AiNavigateTo)
       ) {
         // Use ref-tracked timeout so it's cancelled if component unmounts
+        if (navTimerRef.current) clearTimeout(navTimerRef.current);
         const navTimer = setTimeout(() => {
           // Map 'tickets' -> 'orders' since tickets live on the Orders tab
           const mappedTab = response.navigateTo === 'tickets' ? 'orders' : response.navigateTo;

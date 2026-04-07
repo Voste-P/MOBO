@@ -47,7 +47,7 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
   }
 
   // ── Atomic claim: prevent double-settlement from concurrent cron invocations ──
-  // Only one settler can claim this order; the updateMany WHERE guarantees atomicity.
+  // Set updatedBy to claim this order; concurrent settlers will see the claim and skip.
   const claimed = await db().order.updateMany({
     where: {
       id: order.id,
@@ -55,8 +55,9 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
       affiliateStatus: 'Pending_Cooling',
       frozen: false,
       isDeleted: false,
+      updatedBy: { not: SYSTEM_ACTOR },
     },
-    data: { affiliateStatus: 'Pending_Cooling', updatedBy: null }, // no-op update to "claim" with WHERE guard
+    data: { updatedBy: SYSTEM_ACTOR },
   });
   if (claimed.count === 0) {
     orderLog.info('[cooling-settler] Order already claimed by another settler', { orderId: orderDisplayId });
