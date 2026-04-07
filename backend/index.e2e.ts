@@ -28,15 +28,8 @@ async function main() {
   await connectPrisma();
 
   // Safe, idempotent upsert of E2E test accounts (no deletes).
-  // Non-fatal: CI seeds separately; if this fails, tests will report specific errors.
-  try {
-    await tryRunE2ESeed();
-    startupLog.info('E2E seed completed successfully');
-  } catch (err) {
-    startupLog.warn('E2E seed failed (non-fatal — CI seeds separately)', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
+  await tryRunE2ESeed();
+  startupLog.info('E2E seed completed successfully');
 
   const app = createApp(env);
 
