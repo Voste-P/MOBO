@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { prisma } from '../database/prisma.js';
 import { AppError } from '../middleware/errors.js';
 import { writeAuditLog } from './audit.js';
@@ -43,7 +42,6 @@ export async function ensureWallet(ownerUserId: string) {
       where: { ownerUserId },
       update: {},
       create: {
-        mongoId: randomUUID(),
         ownerUserId,
         currency: 'INR',
         availablePaise: 0,
@@ -88,18 +86,14 @@ export async function applyWalletCredit(input: WalletMutationInput) {
     }
 
     // Safety limit: prevent runaway balances (default 1 crore paise = ₹1,00,000).
-    // Uses validated env config (WALLET_MAX_BALANCE_PAISE in env.ts schema).
+    // WALLET_MAX_BALANCE_PAISE is validated at startup by loadEnv() in config/env.ts.
     const MAX_BALANCE_PAISE = Number(process.env.WALLET_MAX_BALANCE_PAISE) || 1_00_00_000;
-    if (!Number.isFinite(MAX_BALANCE_PAISE) || MAX_BALANCE_PAISE <= 0) {
-      throw new AppError(500, 'INVALID_CONFIG', 'WALLET_MAX_BALANCE_PAISE must be a positive integer');
-    }
 
     // Ensure wallet exists first
     await tx.wallet.upsert({
       where: { ownerUserId: input.ownerUserId },
       update: {},
       create: {
-        mongoId: randomUUID(),
         ownerUserId: input.ownerUserId,
         currency: 'INR',
         availablePaise: 0,
@@ -141,7 +135,6 @@ export async function applyWalletCredit(input: WalletMutationInput) {
 
     const txn = await tx.transaction.create({
       data: {
-        mongoId: randomUUID(),
         idempotencyKey: input.idempotencyKey,
         type: input.type as any,
         status: 'completed',
@@ -237,7 +230,6 @@ export async function applyWalletDebit(input: WalletMutationInput) {
 
     const txn = await tx.transaction.create({
       data: {
-        mongoId: randomUUID(),
         idempotencyKey: input.idempotencyKey,
         type: input.type as any,
         status: 'completed',

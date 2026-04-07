@@ -1,5 +1,4 @@
-﻿import type { NextFunction, Request, Response } from 'express';
-import { randomUUID } from 'node:crypto';
+import type { NextFunction, Request, Response } from 'express';
 import { AppError } from '../middleware/errors.js';
 import { idWhere } from '../utils/idWhere.js';
 import { prisma } from '../database/prisma.js';
@@ -380,7 +379,7 @@ export function makeAdminController() {
         const dealId = String(req.params.dealId || '').trim();
         if (!dealId) throw new AppError(400, 'INVALID_DEAL_ID', 'dealId required');
 
-        const deal = await db().deal.findFirst({ where: { ...idWhere(dealId), isDeleted: false }, select: { id: true, mongoId: true, mediatorCode: true, title: true } });
+        const deal = await db().deal.findFirst({ where: { ...idWhere(dealId), isDeleted: false }, select: { id: true, mediatorCode: true, title: true } });
         if (!deal) throw new AppError(404, 'DEAL_NOT_FOUND', 'Deal not found');
 
         // Check for orders referencing this deal via order items
@@ -400,18 +399,18 @@ export function makeAdminController() {
           req,
           action: 'DEAL_DELETED',
           entityType: 'Deal',
-          entityId: deal.mongoId!,
+          entityId: deal.id!,
           metadata: { mediatorCode: deal.mediatorCode },
         });
-        businessLog.info('Deal deleted by admin', { dealId: deal.mongoId, mediatorCode: deal.mediatorCode, title: deal.title });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Deal', entityId: deal.mongoId!, action: 'DEAL_DELETED', changedFields: ['isDeleted', 'active'], before: { active: true }, after: { active: false, isDeleted: new Date().toISOString() } });
+        businessLog.info('Deal deleted by admin', { dealId: deal.id, mediatorCode: deal.mediatorCode, title: deal.title });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Deal', entityId: deal.id!, action: 'DEAL_DELETED', changedFields: ['isDeleted', 'active'], before: { active: true }, after: { active: false, isDeleted: new Date().toISOString() } });
         logAccessEvent('ADMIN_ACTION', {
           userId: req.auth?.userId,
           roles: req.auth?.roles as string[],
           ip: req.ip,
           method: req.method,
           route: req.originalUrl,
-          resource: `Deal#${deal.mongoId}`,
+          resource: `Deal#${deal.id}`,
           requestId: String(res.locals.requestId || ''),
           metadata: { action: 'DEAL_DELETED', mediatorCode: deal.mediatorCode },
         });
@@ -420,7 +419,7 @@ export function makeAdminController() {
         publishRealtime({
           type: 'deals.changed',
           ts: new Date().toISOString(),
-          payload: { dealId: deal.mongoId! },
+          payload: { dealId: deal.id! },
           audience: {
             roles: ['admin', 'ops'],
             ...(mediatorCode ? { mediatorCodes: [mediatorCode] } : {}),
@@ -439,7 +438,7 @@ export function makeAdminController() {
         const userId = String(req.params.userId || '').trim();
         if (!userId) throw new AppError(400, 'INVALID_USER_ID', 'userId required');
 
-        const user = await db().user.findFirst({ where: { ...idWhere(userId), isDeleted: false }, select: { id: true, mongoId: true, roles: true, mediatorCode: true, status: true, name: true } });
+        const user = await db().user.findFirst({ where: { ...idWhere(userId), isDeleted: false }, select: { id: true, roles: true, mediatorCode: true, status: true, name: true } });
         if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
         const roles = Array.isArray(user.roles) ? (user.roles as string[]) : [];
@@ -483,35 +482,52 @@ export function makeAdminController() {
         }
 
         const pgUserId = (req.auth as any)?.pgUserId as string | undefined;
-        if (wallet) {
-          await db().wallet.update({
-            where: { id: wallet.id },
-            data: { isDeleted: true, updatedBy: pgUserId},
-          });
-        }
 
-        await db().user.update({
-          where: { id: user.id },
-          data: { isDeleted: true, updatedBy: pgUserId},
+        // Wrap wallet + user soft-delete in a transaction to prevent race
+        // condition where a concurrent request credits the wallet between
+        // balance check and soft-delete.
+        await db().$transaction(async (tx) => {
+          if (wallet) {
+            // Re-check wallet balance inside the transaction
+            const freshWallet = await tx.wallet.findUnique({
+              where: { id: wallet.id },
+              select: { availablePaise: true, pendingPaise: true, lockedPaise: true },
+            });
+            const fAvail = Number(freshWallet?.availablePaise ?? 0);
+            const fPend = Number(freshWallet?.pendingPaise ?? 0);
+            const fLock = Number(freshWallet?.lockedPaise ?? 0);
+            if (fAvail > 0 || fPend > 0 || fLock > 0) {
+              throw new AppError(409, 'WALLET_NOT_EMPTY', 'This user still has funds in their wallet. Please settle the balance before deleting.');
+            }
+            await tx.wallet.update({
+              where: { id: wallet.id },
+              data: { isDeleted: true, updatedBy: pgUserId },
+            });
+          }
+
+          await tx.user.update({
+            where: { id: user.id },
+            data: { isDeleted: true, updatedBy: pgUserId },
+          });
         });
 
         await writeAuditLog({
           req,
           action: 'USER_DELETED',
           entityType: 'User',
-          entityId: user.mongoId!,
+          entityId: user.id!,
           metadata: { role: roles.join(','), mediatorCode },
         });
-        securityLog.info('User deleted by admin', { userId: user.mongoId, roles: roles.join(','), mediatorCode });
-        businessLog.info('User deleted by admin', { userId: user.mongoId, targetRole: roles.join(','), mediatorCode, updatedBy: req.auth?.userId, ip: req.ip });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'User', entityId: user.mongoId!, action: 'USER_DELETED', changedFields: ['isDeleted'], before: { status: user.status }, after: { isDeleted: new Date().toISOString() } });
+        securityLog.info('User deleted by admin', { userId: user.id, roles: roles.join(','), mediatorCode });
+        businessLog.info('User deleted by admin', { userId: user.id, targetRole: roles.join(','), mediatorCode, updatedBy: req.auth?.userId, ip: req.ip });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'User', entityId: user.id!, action: 'USER_DELETED', changedFields: ['isDeleted'], before: { status: user.status }, after: { isDeleted: new Date().toISOString() } });
         logAccessEvent('ADMIN_ACTION', {
           userId: req.auth?.userId,
           roles: req.auth?.roles as string[],
           ip: req.ip,
           method: req.method,
           route: req.originalUrl,
-          resource: `User#${user.mongoId}`,
+          resource: `User#${user.id}`,
           requestId: String(res.locals.requestId || ''),
           metadata: { action: 'USER_DELETED', targetRoles: roles, mediatorCode },
         });
@@ -519,13 +535,13 @@ export function makeAdminController() {
         publishRealtime({
           type: 'users.changed',
           ts: new Date().toISOString(),
-          payload: { userId: user.mongoId! },
+          payload: { userId: user.id! },
           audience: { roles: ['admin'] },
         });
         publishRealtime({
           type: 'wallets.changed',
           ts: new Date().toISOString(),
-          audience: { roles: ['admin'], userIds: [user.mongoId!] },
+          audience: { roles: ['admin'], userIds: [user.id!] },
         });
 
         res.json({ ok: true });
@@ -541,12 +557,12 @@ export function makeAdminController() {
         if (!userId) throw new AppError(400, 'INVALID_USER_ID', 'userId required');
 
         // Resolve PG UUID for the user
-        const user = await db().user.findFirst({ where: { ...idWhere(userId), isDeleted: false }, select: { id: true, mongoId: true } });
+        const user = await db().user.findFirst({ where: { ...idWhere(userId), isDeleted: false }, select: { id: true } });
         if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
-        // Wallet + payout checks are independent — run in parallel
+        // Wallet + payout checks are independent � run in parallel
         const [wallet, hasPendingPayout] = await Promise.all([
-          db().wallet.findFirst({ where: { ownerUserId: user.id, isDeleted: false }, select: { id: true, mongoId: true, availablePaise: true, pendingPaise: true, lockedPaise: true } }),
+          db().wallet.findFirst({ where: { ownerUserId: user.id, isDeleted: false }, select: { id: true, availablePaise: true, pendingPaise: true, lockedPaise: true } }),
           db().payout.findFirst({
             where: { beneficiaryUserId: user.id, status: { in: ['requested', 'processing'] as any }, isDeleted: false },
             select: { id: true },
@@ -574,18 +590,18 @@ export function makeAdminController() {
           req,
           action: 'WALLET_DELETED',
           entityType: 'Wallet',
-          entityId: wallet.mongoId || wallet.id,
+          entityId: wallet.id || wallet.id,
           metadata: { ownerUserId: userId },
         });
-        businessLog.info('Wallet deleted by admin', { walletId: wallet.mongoId || wallet.id, ownerUserId: userId });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Wallet', entityId: wallet.mongoId || wallet.id, action: 'WALLET_DELETED', changedFields: ['isDeleted'], before: { isDeleted: false }, after: { isDeleted: new Date().toISOString() } });
+        businessLog.info('Wallet deleted by admin', { walletId: wallet.id || wallet.id, ownerUserId: userId });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Wallet', entityId: wallet.id || wallet.id, action: 'WALLET_DELETED', changedFields: ['isDeleted'], before: { isDeleted: false }, after: { isDeleted: new Date().toISOString() } });
         logAccessEvent('ADMIN_ACTION', {
           userId: req.auth?.userId,
           roles: req.auth?.roles as string[],
           ip: req.ip,
           method: req.method,
           route: req.originalUrl,
-          resource: `Wallet#${wallet.mongoId || wallet.id}`,
+          resource: `Wallet#${wallet.id || wallet.id}`,
           requestId: String(res.locals.requestId || ''),
           metadata: { action: 'WALLET_DELETED', ownerUserId: userId },
         });
@@ -608,14 +624,13 @@ export function makeAdminController() {
         const body = updateUserStatusSchema.parse(req.body);
 
         // Guard: prevent admin from suspending themselves (could cause unrecoverable lockout).
-        // body.userId may be a mongoId while auth.userId is PG UUID — check both.
         const selfCheck = String(body.userId);
-        const isSelfSuspend = (selfCheck === String(req.auth?.userId) || selfCheck === String(req.auth?.pgUserId) || selfCheck === String((req.auth as any)?.mongoId ?? ''));
+        const isSelfSuspend = (selfCheck === String(req.auth?.userId) || selfCheck === String(req.auth?.pgUserId));
         if (isSelfSuspend && body.status === 'suspended') {
           throw new AppError(400, 'CANNOT_SELF_SUSPEND', 'Cannot suspend your own account');
         }
 
-        const before = await db().user.findFirst({ where: { ...idWhere(body.userId), isDeleted: false }, select: { id: true, mongoId: true, status: true, roles: true, isDeleted: true, name: true, mediatorCode: true } });
+        const before = await db().user.findFirst({ where: { ...idWhere(body.userId), isDeleted: false }, select: { id: true, status: true, roles: true, isDeleted: true, name: true, mediatorCode: true } });
         if (!before) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
         if (before.isDeleted) throw new AppError(409, 'USER_DELETED', 'Cannot update status of a deleted user');
 
@@ -628,19 +643,18 @@ export function makeAdminController() {
 
         // Immediately evict auth cache so suspended users can't act on stale tokens
         if (statusChanged) {
-          authCacheInvalidate(before.mongoId!);
+          authCacheInvalidate(before.id!);
           authCacheInvalidate(before.id);
         }
-        const adminMongoId = req.auth?.userId;
+        const adminUserId = req.auth?.userId;
         const adminPgId = (req.auth as any)?.pgUserId as string | undefined;
 
-        if (adminMongoId && statusChanged) {
+        if (adminUserId && statusChanged) {
           if (user.status === 'suspended') {
             // Wrap suspension + all cascades in a single transaction for atomicity
             await db().$transaction(async (tx: any) => {
               await tx.suspension.create({
                 data: {
-                  mongoId: randomUUID(),
                   targetUserId: user.id,
                   action: 'suspend' as any,
                   reason: body.reason,
@@ -683,11 +697,11 @@ export function makeAdminController() {
             const mediatorCode = String(user.mediatorCode || '').trim();
 
             if (roles.includes('shopper')) {
-              writeAuditLog({ req, action: 'ORDERS_FROZEN_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'USER_SUSPENDED', role: 'shopper' } }).catch(() => { });
+              writeAuditLog({ req, action: 'ORDERS_FROZEN_CASCADE', entityType: 'User', entityId: user.id!, metadata: { reason: 'USER_SUSPENDED', role: 'shopper' } }).catch(e => orderLog.warn('[audit] ORDERS_FROZEN_CASCADE failed', { error: e }));
             }
             if (roles.includes('mediator') && mediatorCode) {
-              writeAuditLog({ req, action: 'DEALS_DEACTIVATED_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'MEDIATOR_SUSPENDED', mediatorCode } }).catch(() => { });
-              writeAuditLog({ req, action: 'ORDERS_FROZEN_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'MEDIATOR_SUSPENDED', mediatorCode } }).catch(() => { });
+              writeAuditLog({ req, action: 'DEALS_DEACTIVATED_CASCADE', entityType: 'User', entityId: user.id!, metadata: { reason: 'MEDIATOR_SUSPENDED', mediatorCode } }).catch(e => orderLog.warn('[audit] DEALS_DEACTIVATED_CASCADE failed', { error: e }));
+              writeAuditLog({ req, action: 'ORDERS_FROZEN_CASCADE', entityType: 'User', entityId: user.id!, metadata: { reason: 'MEDIATOR_SUSPENDED', mediatorCode } }).catch(e => orderLog.warn('[audit] ORDERS_FROZEN_CASCADE failed', { error: e }));
               const agencyCode = (await getAgencyCodeForMediatorCode(mediatorCode)) || '';
               publishRealtime({
                 type: 'deals.changed',
@@ -704,8 +718,8 @@ export function makeAdminController() {
             if (roles.includes('agency') && mediatorCode) {
               const mediatorCodes = await listMediatorCodesForAgency(mediatorCode);
               if (mediatorCodes.length) {
-                writeAuditLog({ req, action: 'DEALS_DEACTIVATED_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'AGENCY_SUSPENDED', agencyCode: mediatorCode, mediatorCount: mediatorCodes.length } }).catch(() => { });
-                writeAuditLog({ req, action: 'ORDERS_FROZEN_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'AGENCY_SUSPENDED', agencyCode: mediatorCode, mediatorCount: mediatorCodes.length } }).catch(() => { });
+                writeAuditLog({ req, action: 'DEALS_DEACTIVATED_CASCADE', entityType: 'User', entityId: user.id!, metadata: { reason: 'AGENCY_SUSPENDED', agencyCode: mediatorCode, mediatorCount: mediatorCodes.length } }).catch(e => orderLog.warn('[audit] DEALS_DEACTIVATED_CASCADE failed', { error: e }));
+                writeAuditLog({ req, action: 'ORDERS_FROZEN_CASCADE', entityType: 'User', entityId: user.id!, metadata: { reason: 'AGENCY_SUSPENDED', agencyCode: mediatorCode, mediatorCount: mediatorCodes.length } }).catch(e => orderLog.warn('[audit] ORDERS_FROZEN_CASCADE failed', { error: e }));
                 publishRealtime({
                   type: 'deals.changed',
                   ts: new Date().toISOString(),
@@ -720,15 +734,14 @@ export function makeAdminController() {
               }
             }
             if (roles.includes('brand')) {
-              writeAuditLog({ req, action: 'CAMPAIGNS_PAUSED_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'BRAND_SUSPENDED' } }).catch(() => { });
-              writeAuditLog({ req, action: 'ORDERS_FROZEN_CASCADE', entityType: 'User', entityId: user.mongoId!, metadata: { reason: 'BRAND_SUSPENDED' } }).catch(() => { });
+              writeAuditLog({ req, action: 'CAMPAIGNS_PAUSED_CASCADE', entityType: 'User', entityId: user.id!, metadata: { reason: 'BRAND_SUSPENDED' } }).catch(e => orderLog.warn('[audit] CAMPAIGNS_PAUSED_CASCADE failed', { error: e }));
+              writeAuditLog({ req, action: 'ORDERS_FROZEN_CASCADE', entityType: 'User', entityId: user.id!, metadata: { reason: 'BRAND_SUSPENDED' } }).catch(e => orderLog.warn('[audit] ORDERS_FROZEN_CASCADE failed', { error: e }));
             }
           }
 
           if (before.status === 'suspended' && user.status === 'active') {
             await db().suspension.create({
               data: {
-                mongoId: randomUUID(),
                 targetUserId: user.id,
                 action: 'unsuspend' as any,
                 reason: body.reason,
@@ -743,19 +756,19 @@ export function makeAdminController() {
           req,
           action: 'USER_STATUS_UPDATED',
           entityType: 'User',
-          entityId: user.mongoId!,
+          entityId: user.id!,
           metadata: { from: before.status, to: user.status, reason: body.reason },
         });
-        securityLog.info('User status updated by admin', { userId: user.mongoId, from: before.status, to: user.status, reason: body.reason });
-        businessLog.info('User status updated', { userId: user.mongoId, from: before.status, to: user.status, reason: body.reason, updatedBy: req.auth?.userId, ip: req.ip });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'User', entityId: user.mongoId!, action: 'STATUS_UPDATED', changedFields: ['status'], before: { status: before.status }, after: { status: user.status, reason: body.reason } });
+        securityLog.info('User status updated by admin', { userId: user.id, from: before.status, to: user.status, reason: body.reason });
+        businessLog.info('User status updated', { userId: user.id, from: before.status, to: user.status, reason: body.reason, updatedBy: req.auth?.userId, ip: req.ip });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'User', entityId: user.id!, action: 'STATUS_UPDATED', changedFields: ['status'], before: { status: before.status }, after: { status: user.status, reason: body.reason } });
         logAccessEvent('ADMIN_ACTION', {
           userId: req.auth?.userId,
           roles: req.auth?.roles as string[],
           ip: req.ip,
           method: req.method,
           route: req.originalUrl,
-          resource: `User#${user.mongoId}`,
+          resource: `User#${user.id}`,
           requestId: String(res.locals.requestId || ''),
           metadata: { action: 'STATUS_UPDATED', from: before.status, to: user.status, reason: body.reason },
         });
@@ -764,11 +777,11 @@ export function makeAdminController() {
           publishRealtime({
             type: 'users.changed',
             ts: new Date().toISOString(),
-            payload: { userId: user.mongoId!, status: user.status },
-            audience: { roles: ['admin', 'ops'], userIds: [user.mongoId!] },
+            payload: { userId: user.id!, status: user.status },
+            audience: { roles: ['admin', 'ops'], userIds: [user.id!] },
           });
           const privilegedRoles: Role[] = ['admin', 'ops'];
-          const audience = { roles: privilegedRoles, userIds: [user.mongoId!] };
+          const audience = { roles: privilegedRoles, userIds: [user.id!] };
           publishRealtime({ type: 'notifications.changed', ts: new Date().toISOString(), audience });
         }
         res.json({ ok: true });
@@ -790,19 +803,19 @@ export function makeAdminController() {
           req,
           action: 'ORDER_REACTIVATED',
           entityType: 'Order',
-          entityId: (order as any).mongoId || body.orderId,
+          entityId: (order as any).id || body.orderId,
           metadata: { reason: body.reason },
         });
-        orderLog.info('Order reactivated by admin', { orderId: (order as any).mongoId || body.orderId, reason: body.reason });
-        businessLog.info('Order reactivated by admin', { orderId: (order as any).mongoId || body.orderId, reason: body.reason, reactivatedBy: req.auth?.userId, ip: req.ip });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Order', entityId: (order as any).mongoId || body.orderId, action: 'ORDER_REACTIVATED', changedFields: ['frozen', 'workflowStatus'], before: { frozen: true }, after: { frozen: false, reason: body.reason } });
+        orderLog.info('Order reactivated by admin', { orderId: (order as any).id || body.orderId, reason: body.reason });
+        businessLog.info('Order reactivated by admin', { orderId: (order as any).id || body.orderId, reason: body.reason, reactivatedBy: req.auth?.userId, ip: req.ip });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Order', entityId: (order as any).id || body.orderId, action: 'ORDER_REACTIVATED', changedFields: ['frozen', 'workflowStatus'], before: { frozen: true }, after: { frozen: false, reason: body.reason } });
         logAccessEvent('ADMIN_ACTION', {
           userId: req.auth?.userId,
           roles: req.auth?.roles as string[],
           ip: req.ip,
           method: req.method,
           route: req.originalUrl,
-          resource: `Order#${(order as any).mongoId || body.orderId}`,
+          resource: `Order#${(order as any).id || body.orderId}`,
           requestId: String(res.locals.requestId || ''),
           metadata: { action: 'ORDER_REACTIVATED', reason: body.reason },
         });
@@ -828,7 +841,7 @@ export function makeAdminController() {
         } = adminAuditLogsQuerySchema.parse(req.query);
 
         const page = Math.max(1, parsedPage ?? 1);
-        const limit = Math.min(500, Math.max(1, parsedLimit ?? 200));
+        const limit = Math.min(200, Math.max(1, parsedLimit ?? 50));
         const skip = (page - 1) * limit;
 
         const where: any = {};
@@ -836,7 +849,7 @@ export function makeAdminController() {
         if (entityType && typeof entityType === 'string') where.entityType = entityType;
         if (entityId && typeof entityId === 'string') where.entityId = entityId;
         if (actorUserId && typeof actorUserId === 'string') {
-          // Support both mongoId and UUID for actorUserId filter
+          // Filter by actorUserId
           const isUuid = /^[0-9a-f]{8}-/.test(actorUserId);
           if (isUuid) {
             where.actorUserId = actorUserId;
@@ -861,7 +874,7 @@ export function makeAdminController() {
         }
 
         const [logs, total] = await Promise.all([
-          db().auditLog.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take: limit, select: { id: true, mongoId: true, actorUserId: true, actorRoles: true, action: true, entityType: true, entityId: true, ip: true, metadata: true, createdAt: true } }),
+          db().auditLog.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take: limit, select: { id: true, actorUserId: true, actorRoles: true, action: true, entityType: true, entityId: true, ip: true, metadata: true, createdAt: true } }),
           db().auditLog.count({ where }),
         ]);
 

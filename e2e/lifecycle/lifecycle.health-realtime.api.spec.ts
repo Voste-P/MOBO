@@ -31,13 +31,20 @@ test.describe('Health & Realtime API', () => {
     expect(res.ok()).toBeTruthy();
   });
 
-  test('health/e2e returns 200', async ({ request }) => {
-    // CI starts only the backend — portals are not running, so /health/e2e returns 503.
-    // Locally the portals may also not be running.
-    test.skip(!!process.env.CI, 'Portals not available in CI');
+  test('health/e2e returns valid response', async ({ request }) => {
     const res = await request.get('/api/health/e2e');
-    test.skip(!res.ok(), 'Portals not running');
-    expect(res.ok()).toBeTruthy();
+    const body = await res.json();
+    // CI runs backend-only (no portals) so the endpoint returns 503 with health info.
+    // Verify response structure regardless of overall status.
+    expect(body).toHaveProperty('status');
+    expect(body).toHaveProperty('database');
+    if (res.ok()) {
+      expect(body.status).toBe('ok');
+    } else {
+      // 503 in CI is expected — portals are not running
+      expect(res.status()).toBe(503);
+      expect(body.database).toBeDefined();
+    }
   });
 
   test('client-error endpoint accepts error report', async ({ request }) => {

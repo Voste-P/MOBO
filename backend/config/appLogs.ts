@@ -46,6 +46,8 @@ export type AuthEventType =
   | 'REGISTRATION_FAILURE'
   | 'PASSWORD_CHANGE'
   | 'PASSWORD_CHANGE_FAILURE'
+  | 'PASSWORD_RESET'
+  | 'FORGOT_PASSWORD_LOOKUP'
   | 'PROFILE_UPDATE'
   | 'SESSION_EXPIRED';
 
@@ -978,7 +980,9 @@ export type SecurityEventType =
   | 'CORS_VIOLATION'
   | 'INJECTION_ATTEMPT'
   | 'MALICIOUS_PAYLOAD'
-  | 'AUDIT_TRAIL_LOSS';
+  | 'AUDIT_TRAIL_LOSS'
+  | 'FORGOT_PASSWORD_INVALID_QUESTION'
+  | 'FORGOT_PASSWORD_WRONG_ANSWER';
 
 export interface SecurityEventPayload {
   severity: 'low' | 'medium' | 'high' | 'critical';

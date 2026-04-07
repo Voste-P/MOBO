@@ -26,7 +26,7 @@ export function sheetsRoutes(env: Env): Router {
   // Rate limiter: 10 exports per 15 min in production (protects Google API quota)
   const sheetsWriteLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: process.env.NODE_ENV === 'production' ? 10 : 100,
+    limit: env.NODE_ENV === 'production' ? 10 : 100,
     keyGenerator: (req) => (req as any).auth?.userId || req.ip || 'anon',
     message: { error: { code: 'RATE_LIMITED', message: 'Too many export requests. Please wait and try again.' } },
   });

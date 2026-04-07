@@ -80,7 +80,7 @@ describe('mediator pending approval flow', () => {
     );
     expect(pendingInList).toBeTruthy();
 
-    // 6. Agency approves the mediator (uses mongoId since controller looks up by mongoId)
+    // 6. Agency approves the mediator (uses id since controller looks up by id)
     const approveRes = await request(app)
       .post('/api/ops/mediators/approve')
       .set('Authorization', `Bearer ${agencyToken}`)
@@ -118,7 +118,7 @@ describe('mediator pending approval flow', () => {
     });
     expect(registerRes.status).toBe(202);
 
-    // Look up pending mediator in PG (controller uses { mongoId: body.id })
+    // Look up pending mediator in PG (controller uses { id: body.id })
     const pendingMediator = await db.user.findFirst({ where: { mobile: mediatorMobile, isDeleted: false } });
     const mediatorId = pendingMediator?.id;
 

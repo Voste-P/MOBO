@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Env } from '../config/env.js';
 import type { Role } from '../middleware/auth.js';
 import { requireAuth } from '../middleware/auth.js';
-import { subscribeRealtime, type RealtimeEvent } from '../services/realtimeHub.js';
+import { subscribeRealtime, isAtCapacity, type RealtimeEvent } from '../services/realtimeHub.js';
 import { realtimeLog } from '../config/logger.js';
 import { logAccessEvent, logPerformance, logErrorEvent } from '../config/appLogs.js';
 
@@ -52,7 +52,7 @@ export function realtimeRoutes(env: Env) {
 
   /** Per-user SSE connection tracker — prevents a single user from exhausting server resources. */
   const userConnections = new Map<string, number>();
-  const MAX_SSE_PER_USER = 5;
+  const MAX_SSE_PER_USER = 2;
 
   // Lightweight health check for the realtime subsystem.
   // Does not require auth and does not open a long-lived SSE stream.
@@ -94,6 +94,13 @@ export function realtimeRoutes(env: Env) {
     const mediatorCode = String((req.auth?.user as any)?.mediatorCode || '').trim();
     const parentCode = String((req.auth?.user as any)?.parentCode || '').trim();
     const brandCode = String((req.auth?.user as any)?.brandCode || '').trim();
+
+    // Enforce global connection cap to prevent DDoS resource exhaustion
+    if (isAtCapacity()) {
+      realtimeLog.warn('SSE global capacity reached', { userId });
+      res.status(503).json({ error: 'Server at capacity, retry later' });
+      return;
+    }
 
     // Enforce per-user connection limit to prevent resource exhaustion
     const currentCount = userConnections.get(userId) || 0;

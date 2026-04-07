@@ -1,4 +1,4 @@
-import { Prisma as _Prisma } from '../generated/prisma/client.js';
+﻿import { Prisma as _Prisma } from '../generated/prisma/client.js';
 
 /**
  * Reusable Prisma `select` configurations for list queries.
@@ -22,7 +22,7 @@ export const userExistsSelect = {
  */
 export const userStatusSelect = {
   id: true,
-  mongoId: true,
+
   status: true,
   roles: true,
   mediatorCode: true,
@@ -35,7 +35,7 @@ export const userStatusSelect = {
  */
 export const userBrandSelect = {
   id: true,
-  mongoId: true,
+
   name: true,
   status: true,
   roles: true,
@@ -49,7 +49,7 @@ export const userBrandSelect = {
  */
 export const userAdminListSelect = {
   id: true,
-  mongoId: true,
+
   name: true,
   mobile: true,
   email: true,
@@ -74,7 +74,7 @@ export const userAdminListSelect = {
   bankIfsc: true,
   bankName: true,
   bankHolderName: true,
-  // avatar included — typically 5-20KB compressed JPEG; needed for profile photos in lists
+  // avatar included â€” typically 5-20KB compressed JPEG; needed for profile photos in lists
   avatar: true,
   createdAt: true,
   // EXCLUDED: passwordHash, googleRefreshToken, fcmTokens, isDeleted
@@ -87,7 +87,7 @@ export const userAdminListSelect = {
  */
 export const userListSelect = {
   id: true,
-  mongoId: true,
+
   name: true,
   mobile: true,
   email: true,
@@ -107,7 +107,7 @@ export const userListSelect = {
   isVerifiedByMediator: true,
   upiId: true,
   // qrCode excluded from list queries (50-500KB blobs, only needed in pay/detail views)
-  // avatar included — typically 5-20KB compressed JPEG; needed for profile photos in lists
+  // avatar included â€” typically 5-20KB compressed JPEG; needed for profile photos in lists
   avatar: true,
   bankAccountNumber: true,
   bankIfsc: true,
@@ -124,7 +124,7 @@ export const userListSelect = {
  */
 export const campaignListSelect = {
   id: true,
-  mongoId: true,
+
   title: true,
   brandUserId: true,
   brandName: true,
@@ -157,7 +157,7 @@ export const campaignListSelect = {
  */
 export const dealListSelect = {
   id: true,
-  mongoId: true,
+
   campaignId: true,
   mediatorCode: true,
   title: true,
@@ -184,7 +184,7 @@ export const dealListSelect = {
  */
 export const transactionListSelect = {
   id: true,
-  mongoId: true,
+
   type: true,
   amountPaise: true,
   status: true,
@@ -208,7 +208,7 @@ export const orderExistsSelect = {
  */
 export const orderProofSelect = {
   id: true,
-  mongoId: true,
+
   userId: true,
   brandUserId: true,
   brandName: true,
@@ -223,12 +223,25 @@ export const orderProofSelect = {
 } as const;
 
 /**
+ * Lightweight select for batch proof URL generation.
+ * Only checks existence of proofs (boolean-ish), does NOT load base64 blobs.
+ * Uses raw SQL fragments to avoid reading multi-MB screenshot columns.
+ */
+export const orderProofExistsSelect = {
+  id: true,
+
+  userId: true,
+  brandUserId: true,
+  reviewLink: true,
+} as const;
+
+/**
  * Prisma `select` for notification order queries.
  * Fetches only the fields needed for notification processing.
  */
 export const orderNotificationSelect = {
   id: true,
-  mongoId: true,
+
   workflowStatus: true,
   paymentStatus: true,
   affiliateStatus: true,
@@ -267,7 +280,7 @@ export const orderListSelectLite = {
   extractedProductName: true,
   settlementRef: true,
   settlementMode: true,
-  // Screenshot columns EXCLUDED — use getProofFlags() helper instead
+  // Screenshot columns EXCLUDED â€” use getProofFlags() helper instead
   reviewLink: true,
   returnWindowDays: true,
   // Rejection flat fields
@@ -288,7 +301,7 @@ export const orderListSelectLite = {
   expectedSettlementDate: true,
   createdAt: true,
   updatedAt: true,
-  // Relations — items only need deal type / platform info for list view
+  // Relations â€” items only need deal type / platform info for list view
   items: { select: { dealType: true, platform: true, brandName: true, title: true, image: true, quantity: true, priceAtPurchasePaise: true } },
   // missingProofRequests: small JSONB array needed for "Action Required" banners
   missingProofRequests: true,

@@ -1,5 +1,4 @@
 import type { Request, Response, NextFunction } from 'express';
-import { randomUUID } from 'node:crypto';
 import { prisma } from '../database/prisma.js';
 import { createInviteSchema, opsGenerateInviteSchema, revokeInviteSchema } from '../validations/invites.js';
 import { generateHumanCode } from '../services/codes.js';
@@ -25,49 +24,52 @@ export function makeInviteController() {
         const ttlSeconds = body.ttlSeconds ?? 60 * 60 * 24 * 7;
         const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
 
-        let code = generateHumanCode('INV');
-        let invCodeUnique = false;
-        for (let i = 0; i < 10; i += 1) {
-          // eslint-disable-next-line no-await-in-loop
-          const exists = await db().invite.findFirst({ where: { code }, select: { id: true } });
-          if (!exists) { invCodeUnique = true; break; }
-          code = generateHumanCode('INV');
-        }
-        if (!invCodeUnique) {
-          throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique invite code; please retry');
-        }
-
-        // Resolve createdBy: need PG UUID, not mongoId
+        // Resolve createdBy to PG UUID
         let createdByUuid: string | undefined;
         if (req.auth?.userId) {
           const actor = await db().user.findFirst({ where: { ...idWhere(req.auth.userId), isDeleted: false }, select: { id: true } });
           createdByUuid = actor?.id;
         }
 
-        const invite = await db().invite.create({
-          data: {
-            mongoId: randomUUID(),
-            code,
-            role: body.role as any,
-            label: body.label,
-            parentUserId: body.parentUserId ? undefined : undefined,
-            parentCode: body.parentCode,
-            maxUses: body.maxUses ?? 1,
-            expiresAt,
-            createdBy: createdByUuid,
-          },
-        });
+        // Create invite with retry on unique-code collision (P2002)
+        let invite: Awaited<ReturnType<ReturnType<typeof db>['invite']['create']>> | undefined;
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+          const code = generateHumanCode('INV');
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            invite = await db().invite.create({
+              data: {
+                code,
+                role: body.role as any,
+                label: body.label,
+                parentUserId: body.parentUserId ? undefined : undefined,
+                parentCode: body.parentCode,
+                maxUses: body.maxUses ?? 1,
+                expiresAt,
+                createdBy: createdByUuid,
+              },
+            });
+            break; // success
+          } catch (err: any) {
+            // P2002 = unique-constraint violation → code collision, retry
+            const isUniqueViolation = err?.code === 'P2002' || err?.meta?.target?.includes('code');
+            if (!isUniqueViolation) throw err;
+            // last attempt → surface the error
+            if (attempt === 9) throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique invite code; please retry');
+          }
+        }
+        if (!invite) throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique invite code; please retry');
 
         await writeAuditLog({
           req,
           action: 'INVITE_CREATED',
           entityType: 'Invite',
-          entityId: invite.mongoId!,
+          entityId: invite.id!,
           metadata: { code: invite.code, role: invite.role, parentCode: invite.parentCode, parentUserId: invite.parentUserId },
         });
-        businessLog.info('Invite created (admin)', { inviteId: invite.mongoId, code: invite.code, role: invite.role, parentCode: invite.parentCode });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Invite', entityId: invite.mongoId!, action: 'INVITE_CREATED', changedFields: ['code', 'role', 'status'], before: {}, after: { code: invite.code, role: invite.role, status: 'active' } });
-        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Invite', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'INVITE_CREATED', inviteId: invite.mongoId, code: invite.code, role: invite.role } });
+        businessLog.info('Invite created (admin)', { inviteId: invite.id, code: invite.code, role: invite.role, parentCode: invite.parentCode });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Invite', entityId: invite.id!, action: 'INVITE_CREATED', changedFields: ['code', 'role', 'status'], before: {}, after: { code: invite.code, role: invite.role, status: 'active' } });
+        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Invite', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'INVITE_CREATED', inviteId: invite.id, code: invite.code, role: invite.role } });
 
         const privilegedRoles: Role[] = ['admin', 'ops'];
         publishRealtime({ type: 'invites.changed', ts: new Date().toISOString(), audience: { roles: privilegedRoles } });
@@ -123,7 +125,7 @@ export function makeInviteController() {
       try {
         const { page, limit, skip, isPaginated } = parsePagination(req.query, { limit: 50, maxLimit: 200 });
         const [invites, total] = await Promise.all([
-          db().invite.findMany({ orderBy: { createdAt: 'desc' }, take: limit, skip, select: { id: true, mongoId: true, code: true, role: true, label: true, parentCode: true, status: true, maxUses: true, useCount: true, expiresAt: true, createdBy: true, usedBy: true, usedAt: true, uses: true, revokedBy: true, revokedAt: true, createdAt: true } }),
+          db().invite.findMany({ orderBy: { createdAt: 'desc' }, take: limit, skip, select: { id: true, code: true, role: true, label: true, parentCode: true, status: true, maxUses: true, useCount: true, expiresAt: true, createdBy: true, usedBy: true, usedAt: true, uses: true, revokedBy: true, revokedAt: true, createdAt: true } }),
           db().invite.count(),
         ]);
         res.json(paginatedResponse(invites.map(pgInvite), total, page, limit, isPaginated));
@@ -171,12 +173,12 @@ export function makeInviteController() {
           req,
           action: 'INVITE_DELETED',
           entityType: 'Invite',
-          entityId: invite.mongoId!,
+          entityId: invite.id!,
           metadata: { code: invite.code, role: invite.role, parentCode: invite.parentCode, parentUserId: invite.parentUserId },
         });
-        businessLog.info('Invite deleted (soft)', { inviteId: invite.mongoId, code: invite.code, role: invite.role });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Invite', entityId: invite.mongoId!, action: 'INVITE_DELETED', changedFields: ['status'], before: { status: 'active' }, after: { status: 'revoked' } });
-        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Invite', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'INVITE_DELETED', inviteId: invite.mongoId, code: invite.code } });
+        businessLog.info('Invite deleted (soft)', { inviteId: invite.id, code: invite.code, role: invite.role });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Invite', entityId: invite.id!, action: 'INVITE_DELETED', changedFields: ['status'], before: { status: 'active' }, after: { status: 'revoked' } });
+        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Invite', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'INVITE_DELETED', inviteId: invite.id, code: invite.code } });
 
         const privilegedRoles: Role[] = ['admin', 'ops'];
         publishRealtime({ type: 'invites.changed', ts: new Date().toISOString(), audience: { roles: privilegedRoles } });
@@ -194,18 +196,18 @@ export function makeInviteController() {
         const requesterId = req.auth?.userId;
         if (!requesterId) throw new AppError(401, 'UNAUTHENTICATED', 'Missing auth context');
 
-        const requester = await db().user.findFirst({ where: { ...idWhere(requesterId), isDeleted: false }, select: { id: true, mongoId: true, roles: true } });
+        const requester = await db().user.findFirst({ where: { ...idWhere(requesterId), isDeleted: false }, select: { id: true, roles: true } });
         if (!requester) throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
 
         // Allow agencies to generate mediator invites for themselves. Admin/Ops can generate for any agency.
         const isAgencySelf =
-          (requester.roles as string[])?.includes('agency') && (requester.id === body.agencyId || requester.mongoId === body.agencyId);
+          (requester.roles as string[])?.includes('agency') && (requester.id === body.agencyId || requester.id === body.agencyId);
         const isPrivileged = (requester.roles as string[])?.includes('admin') || (requester.roles as string[])?.includes('ops');
         if (!isAgencySelf && !isPrivileged) {
           throw new AppError(403, 'FORBIDDEN', 'Cannot generate invites for this agency');
         }
 
-        const agency = await db().user.findFirst({ where: { ...idWhere(body.agencyId), isDeleted: false }, select: { id: true, mongoId: true, roles: true, mediatorCode: true } });
+        const agency = await db().user.findFirst({ where: { ...idWhere(body.agencyId), isDeleted: false }, select: { id: true, roles: true, mediatorCode: true } });
         if (!agency || !(agency.roles as string[])?.includes('agency')) {
           throw new AppError(404, 'AGENCY_NOT_FOUND', 'Agency not found');
         }
@@ -231,7 +233,6 @@ export function makeInviteController() {
 
         const invite = await db().invite.create({
           data: {
-            mongoId: randomUUID(),
             code,
             role: 'mediator' as any,
             parentUserId: agency.id,
@@ -245,12 +246,12 @@ export function makeInviteController() {
           req,
           action: 'INVITE_CREATED',
           entityType: 'Invite',
-          entityId: invite.mongoId!,
+          entityId: invite.id!,
           metadata: { code: invite.code, role: invite.role, parentCode: invite.parentCode, parentUserId: invite.parentUserId },
         });
-        businessLog.info('Mediator invite generated', { inviteId: invite.mongoId, code: invite.code, agencyCode: agency.mediatorCode });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Invite', entityId: invite.mongoId!, action: 'MEDIATOR_INVITE_CREATED', changedFields: ['code', 'role'], before: {}, after: { code: invite.code, role: 'mediator', parentCode: agency.mediatorCode } });
-        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Invite', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'MEDIATOR_INVITE_CREATED', inviteId: invite.mongoId, code: invite.code, agencyCode: agency.mediatorCode } });
+        businessLog.info('Mediator invite generated', { inviteId: invite.id, code: invite.code, agencyCode: agency.mediatorCode });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Invite', entityId: invite.id!, action: 'MEDIATOR_INVITE_CREATED', changedFields: ['code', 'role'], before: {}, after: { code: invite.code, role: 'mediator', parentCode: agency.mediatorCode } });
+        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Invite', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'MEDIATOR_INVITE_CREATED', inviteId: invite.id, code: invite.code, agencyCode: agency.mediatorCode } });
 
         const privilegedRoles: Role[] = ['admin', 'ops'];
         publishRealtime({ type: 'invites.changed', ts: new Date().toISOString(), audience: { roles: privilegedRoles } });
@@ -269,16 +270,16 @@ export function makeInviteController() {
         const requesterId = req.auth?.userId;
         if (!requesterId) throw new AppError(401, 'UNAUTHENTICATED', 'Missing auth context');
 
-        const requester = await db().user.findFirst({ where: { ...idWhere(requesterId), isDeleted: false }, select: { id: true, mongoId: true, roles: true } });
+        const requester = await db().user.findFirst({ where: { ...idWhere(requesterId), isDeleted: false }, select: { id: true, roles: true } });
         if (!requester) throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
 
-        const isMediatorSelf = (requester.roles as string[])?.includes('mediator') && requester.mongoId === mediatorId;
+        const isMediatorSelf = (requester.roles as string[])?.includes('mediator') && requester.id === mediatorId;
         const isPrivileged = (requester.roles as string[])?.includes('admin') || (requester.roles as string[])?.includes('ops');
         if (!isMediatorSelf && !isPrivileged) {
           throw new AppError(403, 'FORBIDDEN', 'Cannot generate buyer invites for this mediator');
         }
 
-        const mediator = await db().user.findFirst({ where: { ...idWhere(mediatorId), isDeleted: false }, select: { id: true, mongoId: true, roles: true, mediatorCode: true } });
+        const mediator = await db().user.findFirst({ where: { ...idWhere(mediatorId), isDeleted: false }, select: { id: true, roles: true, mediatorCode: true } });
         if (!mediator || !(mediator.roles as string[])?.includes('mediator')) {
           throw new AppError(404, 'MEDIATOR_NOT_FOUND', 'Mediator not found');
         }
@@ -300,7 +301,6 @@ export function makeInviteController() {
 
         const invite = await db().invite.create({
           data: {
-            mongoId: randomUUID(),
             code,
             role: 'shopper' as any,
             parentUserId: mediator.id,
@@ -314,12 +314,12 @@ export function makeInviteController() {
           req,
           action: 'INVITE_CREATED',
           entityType: 'Invite',
-          entityId: invite.mongoId!,
+          entityId: invite.id!,
           metadata: { code: invite.code, role: invite.role, parentCode: invite.parentCode, parentUserId: invite.parentUserId },
         });
-        businessLog.info('Buyer invite generated', { inviteId: invite.mongoId, code: invite.code, mediatorCode: mediator.mediatorCode });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Invite', entityId: invite.mongoId!, action: 'BUYER_INVITE_CREATED', changedFields: ['code', 'role'], before: {}, after: { code: invite.code, role: 'shopper', parentCode: mediator.mediatorCode } });
-        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Invite', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'BUYER_INVITE_CREATED', inviteId: invite.mongoId, code: invite.code, mediatorCode: mediator.mediatorCode } });
+        businessLog.info('Buyer invite generated', { inviteId: invite.id, code: invite.code, mediatorCode: mediator.mediatorCode });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Invite', entityId: invite.id!, action: 'BUYER_INVITE_CREATED', changedFields: ['code', 'role'], before: {}, after: { code: invite.code, role: 'shopper', parentCode: mediator.mediatorCode } });
+        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Invite', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'BUYER_INVITE_CREATED', inviteId: invite.id, code: invite.code, mediatorCode: mediator.mediatorCode } });
 
         const privilegedRoles: Role[] = ['admin', 'ops'];
         publishRealtime({ type: 'invites.changed', ts: new Date().toISOString(), audience: { roles: privilegedRoles } });

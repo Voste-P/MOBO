@@ -33,17 +33,20 @@ test.describe('Order lifecycle: create → verify → settle → wallet', () => 
   });
 
   test('full order lifecycle', async ({ request }) => {
-    // 1. Get available products
-    const productsRes = await request.get('/api/products', {
-      headers: authHeaders(buyer.accessToken),
-    });
-    expect(productsRes.ok()).toBeTruthy();
-    const products = await productsRes.json();
-    const deals = products?.data ?? products;
-    if (!Array.isArray(deals) || deals.length === 0) {
-      test.skip(true, 'No deals available in test DB');
-      return;
+    // 1. Get available products — retry up to 10 times (seed may still be settling)
+    let deals: any[] = [];
+    for (let attempt = 0; attempt < 10; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 1500));
+      const productsRes = await request.get('/api/products', {
+        headers: authHeaders(buyer.accessToken),
+      });
+      expect(productsRes.ok()).toBeTruthy();
+      const products = await productsRes.json();
+      const raw = products?.data ?? products;
+      if (Array.isArray(raw) && raw.length > 0) { deals = raw; break; }
     }
+    // Fail with diagnostics instead of silently skipping
+    expect(deals.length, 'No deals found after 10 retries — check E2E seed').toBeGreaterThan(0);
     // Pick the E2E Deal (has valid payout) instead of whatever comes first
     const deal = deals.find((d: any) => d.title === 'E2E Deal' && d.commission > 0)
       ?? deals.find((d: any) => d.commission > 0)
@@ -101,10 +104,10 @@ test.describe('Order lifecycle: create → verify → settle → wallet', () => 
         headers: authHeaders(buyer.accessToken),
       });
       const existing = (await expectOk(existingRes, 'List buyer orders (fallback)')) as any[];
-      if (!Array.isArray(existing) || existing.length === 0) {
-        test.skip(true, 'No orders exist and creation failed');
-        return;
-      }
+      expect(
+        Array.isArray(existing) && existing.length > 0,
+        'No orders exist and creation failed — check seed data and order creation',
+      ).toBeTruthy();
       const reusable =
         existing.find((o) => o?.items?.[0]?.productId === String(deal.id)) ?? existing[0];
       orderId = String(reusable?.id || '');

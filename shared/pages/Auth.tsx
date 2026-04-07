@@ -1,7 +1,9 @@
 ﻿import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Bot, ArrowRight, Lock, User, Phone, Hash, ChevronLeft } from 'lucide-react';
-import { Button, Input } from '../components/ui';
+import { Button, Input, AnimatedView } from '../components/ui';
+import { SecurityQuestionsSetup, type SecurityQA } from '../components/SecurityQuestionsSetup';
+import { ForgotPassword } from './ForgotPassword';
 import { normalizeMobileTo10Digits } from '../utils/mobiles';
 import { formatErrorMessage } from '../utils/errors';
 
@@ -10,13 +12,15 @@ interface AuthScreenProps {
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
-  const [view, setView] = useState<'splash' | 'login' | 'register'>('splash');
+  const [view, setView] = useState<'splash' | 'login' | 'register' | 'securityQuestions' | 'forgotPassword'>('splash');
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [mediatorCode, setMediatorCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  // Temporarily stored registration data while user sets up security questions
+  const pendingRegRef = useRef<{ name: string; mobile: string; password: string; mediatorCode: string } | null>(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -78,17 +82,21 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
 
     try {
       if (view === 'login') {
-        // Login once; if it's the wrong role, immediately sign them out and explain.
         const u = await login(mobile, password);
         if (u?.role !== 'user') {
           const portal = u.role === 'brand' ? 'Brand Portal' : u.role === 'admin' ? 'Admin Portal' : 'Partner Ops Portal';
           if (mountedRef.current) setError(`This account is a ${u.role}. Please use the ${portal}.`);
-          // AuthProvider logout clears local session + tokens.
           logout();
           return;
         }
       } else {
-        await register(name, mobile, password, mediatorCode);
+        // Store registration data and go to security questions step
+        pendingRegRef.current = { name, mobile, password, mediatorCode };
+        if (mountedRef.current) {
+          setIsLoading(false);
+          setView('securityQuestions');
+        }
+        return;
       }
     } catch (err: any) {
       if (mountedRef.current) setError(formatErrorMessage(err, 'Authentication failed'));
@@ -97,13 +105,57 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
     }
   };
 
+  const handleSecurityQuestionsComplete = async (questions: SecurityQA[]) => {
+    const reg = pendingRegRef.current;
+    if (!reg) return;
+
+    setIsLoading(true);
+    setError('');
+    try {
+      await register(reg.name, reg.mobile, reg.password, reg.mediatorCode, questions);
+    } catch (err: any) {
+      if (mountedRef.current) {
+        setError(formatErrorMessage(err, 'Registration failed'));
+        setView('register');
+      }
+    } finally {
+      if (mountedRef.current) setIsLoading(false);
+      pendingRegRef.current = null;
+    }
+  };
+
+  // Forgot Password Flow
+  if (view === 'forgotPassword') {
+    return (
+      <AnimatedView viewKey="forgotPassword" variant="slideRight">
+        <ForgotPassword
+          onBack={() => { setView('login'); setError(''); }}
+          onSuccess={() => { setView('login'); setError(''); }}
+        />
+      </AnimatedView>
+    );
+  }
+
+  // Security Questions Setup (after registration form submit)
+  if (view === 'securityQuestions') {
+    return (
+      <AnimatedView viewKey="securityQuestions" variant="slideUp">
+        <SecurityQuestionsSetup
+          onComplete={handleSecurityQuestionsComplete}
+          onBack={() => setView('register')}
+        />
+      </AnimatedView>
+    );
+  }
+
   // 1. Splash Screen (Dark Theme)
   if (view === 'splash') {
     return (
-      <div className="flex-1 flex flex-col bg-black text-white relative overflow-hidden h-full pb-[env(safe-area-inset-bottom)]">
+      <AnimatedView viewKey="splash" variant="fade">
+      <div className="flex-1 flex flex-col bg-black text-white relative overflow-x-hidden pb-[env(safe-area-inset-bottom)]" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
         {/* Background Effects */}
         <div className="absolute top-[-20%] right-[-20%] w-[500px] h-[500px] bg-lime-500/20 rounded-full blur-[120px] pointer-events-none animate-pulse motion-reduce:animate-none"></div>
-        <div className="absolute bottom-[-10%] left-[-10%] w-[300px] h-[300px] bg-indigo-600/20 rounded-full blur-[100px] pointer-events-none"></div>
+        <div className="absolute bottom-[-10%] left-[-10%] w-[300px] h-[300px] bg-lime-600/15 rounded-full blur-[100px] pointer-events-none"></div>
 
         {/* Back Navigation */}
         {onBack && (
@@ -148,12 +200,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
           </div>
         </div>
       </div>
+      </AnimatedView>
     );
   }
 
   // 2. Login / Register Form
   return (
-    <div className="flex-1 flex flex-col bg-white h-full relative px-8 pt-12 pb-[env(safe-area-inset-bottom)] overflow-y-auto scrollbar-styled">
+    <AnimatedView viewKey={view} variant="slideUp">
+    <div className="flex-1 flex flex-col bg-white relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
       <div className="mb-8">
         <Button
           type="button"
@@ -245,6 +299,16 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
         >
           {view === 'login' ? 'Sign In' : 'Create Account'}
         </Button>
+
+        {view === 'login' && (
+          <button
+            type="button"
+            onClick={() => { setView('forgotPassword'); setError(''); }}
+            className="w-full text-center text-sm text-gray-500 font-bold hover:text-black transition-colors mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white rounded py-1"
+          >
+            Forgot Password?
+          </button>
+        )}
       </form>
 
       <div className="mt-auto text-center pb-8 pt-4">
@@ -266,5 +330,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
         </p>
       </div>
     </div>
+    </AnimatedView>
   );
 };

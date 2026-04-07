@@ -10,7 +10,7 @@ import { getDirectBackendUrl } from '../utils/apiBaseUrl';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 import { User, Campaign, Order, Ticket } from '../types';
-import { EmptyState, Spinner, Pagination } from '../components/ui';
+import { EmptyState, Spinner, Pagination, SidebarItem, ExpandableText } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { DesktopShell } from '../components/DesktopShell';
 import { formatCurrency } from '../utils/formatCurrency';
@@ -93,35 +93,9 @@ import {
 
 // --- COMPONENTS ---
 
-const SidebarItem = ({ icon, label, active, onClick, badge }: any) => (
-  <button
-    onClick={onClick}
-    aria-current={active ? 'page' : undefined}
-    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group mb-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white motion-reduce:transition-none motion-reduce:transform-none ${
-      active
-        ? 'bg-purple-600 text-white shadow-lg shadow-purple-200'
-        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
-    }`}
-  >
-    <div className="flex items-center gap-3">
-      {React.cloneElement(icon, {
-        size: 20,
-        strokeWidth: active ? 2.5 : 2,
-        className: active ? 'text-white' : 'text-slate-400 group-hover:text-slate-600',
-      })}
-      <span className={`text-sm ${active ? 'font-bold' : 'font-medium'}`}>{label}</span>
-    </div>
-    {badge > 0 && (
-      <span
-        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${active ? 'bg-white text-purple-600' : 'bg-purple-100 text-purple-600'}`}
-      >
-        {badge}
-      </span>
-    )}
-  </button>
-);
+// SidebarItem imported from shared/components/ui
 
-const StatCard = ({ label, value, icon: Icon, trend, colorClass = 'bg-white' }: any) => (
+const StatCard = ({ label, value, icon: Icon, trend, colorClass = 'bg-white' }: { label: string; value: string | number; icon: React.ComponentType<{ size: number }>; trend?: string; colorClass?: string }) => (
   <div
     className={`${colorClass} p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 group`}
   >
@@ -144,7 +118,7 @@ const StatCard = ({ label, value, icon: Icon, trend, colorClass = 'bg-white' }: 
 
 // --- VIEWS ---
 
-const AgencyProfile = ({ user }: any) => {
+const AgencyProfile = ({ user }: { user: User }) => {
   const { updateUser } = useAuth();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
@@ -211,6 +185,7 @@ const AgencyProfile = ({ user }: any) => {
       if (!isEditing) setIsEditing(true);
       const reader = new FileReader();
       reader.onload = () => setAvatar(reader.result as string);
+      reader.onerror = () => toast.error('Failed to read image. Please try again.');
       reader.readAsDataURL(file);
     }
   };
@@ -218,7 +193,7 @@ const AgencyProfile = ({ user }: any) => {
     <div className="max-w-5xl mx-auto animate-enter pb-12">
       {/* Header */}
       <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden relative mb-8 group">
-        <div className="h-28 sm:h-32 bg-gradient-to-r from-purple-600 to-indigo-600 relative">
+        <div className="h-28 sm:h-32 bg-gradient-to-r from-zinc-800 to-zinc-900 relative">
           <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.7\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\'/%3E%3C/svg%3E")' }} />
         </div>
         <div className="px-4 sm:px-8 pb-6 sm:pb-8 flex flex-col md:flex-row items-end -mt-10 sm:-mt-12 gap-4 sm:gap-6">
@@ -254,10 +229,10 @@ const AgencyProfile = ({ user }: any) => {
             />
           </div>
 
-          <div className="flex-1 pb-2 flex justify-between items-end">
+          <div className="flex-1 pb-2 flex flex-wrap justify-between items-end gap-4">
             <div>
               <h2 className="text-3xl font-black text-slate-900">{user?.name}</h2>
-              <div className="flex items-center gap-4 mt-2">
+              <div className="flex items-center gap-4 mt-2 flex-wrap">
                 <span className="px-3 py-1 bg-purple-50 text-purple-700 rounded-lg text-xs font-bold border border-purple-100">
                   Agency Partner
                 </span>
@@ -352,6 +327,7 @@ const AgencyProfile = ({ user }: any) => {
                 disabled={!isEditing}
                 value={form.upiId}
                 onChange={(e) => setForm({ ...form, upiId: e.target.value })}
+                aria-label="Official UPI ID"
                 placeholder="agency@upi"
                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:opacity-70 disabled:bg-slate-50/50 transition-all"
               />
@@ -367,6 +343,7 @@ const AgencyProfile = ({ user }: any) => {
                   disabled={!isEditing}
                   value={form.bankName}
                   onChange={(e) => setForm({ ...form, bankName: e.target.value })}
+                  aria-label="Bank Name"
                   placeholder="e.g. HDFC"
                   className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:opacity-70 disabled:bg-slate-50/50 transition-all"
                 />
@@ -380,6 +357,7 @@ const AgencyProfile = ({ user }: any) => {
                   disabled={!isEditing}
                   value={form.ifsc}
                   onChange={(e) => setForm({ ...form, ifsc: e.target.value })}
+                  aria-label="IFSC Code"
                   placeholder="HDFC000..."
                   className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:opacity-70 disabled:bg-slate-50/50 transition-all"
                 />
@@ -425,7 +403,7 @@ const AgencyProfile = ({ user }: any) => {
   );
 };
 
-const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, user }: any) => {
+const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, user }: { allOrders: Order[]; mediators: User[]; loading: boolean; onRefresh: (keys?: string[]) => void; user: User }) => {
   const { toast } = useToast();
   const [sheetsExporting, setSheetsExporting] = useState(false);
   // Flatten orders for detailed ledger view
@@ -729,7 +707,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
           {/* Compact Integrated Stats */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-8 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-sm">
             <div className="px-4 py-2 flex flex-col justify-center border-b sm:border-b-0 sm:border-r border-slate-50 w-full sm:w-auto">
-              <p className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-0.5 flex items-center gap-1">
+              <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-0.5 flex items-center gap-1">
                 <CheckCircle size={10} className="text-green-500" /> Settled
               </p>
               <p className="text-lg font-black text-slate-900 leading-tight">
@@ -737,7 +715,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
               </p>
             </div>
             <div className="px-4 py-2 flex flex-col justify-center border-b sm:border-b-0 sm:border-r border-slate-50 w-full sm:w-auto">
-              <p className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-0.5 flex items-center gap-1">
+              <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-0.5 flex items-center gap-1">
                 <Lock size={10} className="text-blue-500" /> Locked (Cooling)
               </p>
               <p className="text-lg font-black text-slate-900 leading-tight">
@@ -745,7 +723,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
               </p>
             </div>
             <div className="px-4 py-2 flex flex-col justify-center w-full sm:w-auto">
-              <p className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-0.5 flex items-center gap-1">
+              <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-0.5 flex items-center gap-1">
                 <Hourglass size={10} className="text-amber-500" /> Pending Review
               </p>
               <p className="text-lg font-black text-slate-900 leading-tight">
@@ -804,7 +782,6 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
             <option value="All">All Types</option>
             <option value="Discount">Order Deal</option>
             <option value="Rating">Rating Deal</option>
-            <option value="Review">Review Deal</option>
           </select>
           <select
             value={financeMediatorFilter}
@@ -895,11 +872,11 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
                       <div className="font-bold text-slate-900 text-sm mb-0.5">
                         {o.brandName || 'Brand'}
                       </div>
-                      <div className="text-[10px] text-slate-500 truncate max-w-[180px]">
+                      <ExpandableText text={o.items?.[0]?.title || 'Unknown Product'} clampClass="truncate" className="text-[10px] text-slate-500 max-w-[180px]" as="div">
                         {o.items?.[0]?.title || 'Unknown Product'}
-                      </div>
+                      </ExpandableText>
                       {o.soldBy && o.soldBy !== 'null' && o.soldBy !== 'undefined' && (
-                        <div className="text-[9px] text-slate-400 mt-0.5">Seller: {o.soldBy}</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">Seller: {o.soldBy}</div>
                       )}
                     </td>
                     <td className="p-5">
@@ -911,7 +888,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
                           <div className="text-xs font-bold text-slate-700">
                             {o.managerName || 'Unknown'}
                           </div>
-                          <div className="text-[9px] text-slate-400 font-mono">
+                          <div className="text-[10px] text-slate-400 font-mono">
                             {o.mediatorCode || o.managerCode || ''}
                           </div>
                         </div>
@@ -982,22 +959,22 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
                     <tr key={o._id || i} className="border-b border-slate-50 hover:bg-purple-50/30 transition-colors">
                       <td className="p-4 pl-8">
                         <span className="font-mono text-xs font-bold text-slate-700">{getPrimaryOrderId(o)}</span>
-                        <div className="text-[9px] text-slate-400 mt-0.5">
+                        <div className="text-[10px] text-slate-400 mt-0.5">
                           {new Date(o.createdAt).toLocaleDateString('en-GB')}
                         </div>
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center text-[9px] font-bold text-purple-600">M</div>
+                          <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center text-[10px] font-bold text-purple-600">M</div>
                           <div>
                             <div className="text-xs font-bold text-slate-700">{o.managerName || 'Unknown'}</div>
-                            <div className="text-[9px] text-slate-400 font-mono">{o.mediatorCode || o.managerCode || ''}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">{o.mediatorCode || o.managerCode || ''}</div>
                           </div>
                         </div>
                       </td>
                       <td className="p-4">
-                        <div className="text-xs font-semibold text-slate-700 max-w-[150px] truncate">{o.items?.[0]?.productName || 'Product'}</div>
-                        <div className="text-[9px] text-slate-400">Qty: {o.items?.[0]?.qty || 1}</div>
+                        <ExpandableText text={o.items?.[0]?.productName || 'Product'} clampClass="truncate" className="text-xs font-semibold text-slate-700 max-w-[150px]" as="div">{o.items?.[0]?.productName || 'Product'}</ExpandableText>
+                        <div className="text-[10px] text-slate-400">Qty: {o.items?.[0]?.qty || 1}</div>
                       </td>
                       <td className="p-4 text-right font-mono font-bold text-slate-900">{formatCurrency(o.total)}</td>
                       <td className="p-4 text-right font-mono font-bold text-lime-600">{formatCurrency(o.commission || 0)}</td>
@@ -1047,17 +1024,17 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
                         <div className="text-xs font-bold text-slate-700">{o.brandName || o.items?.[0]?.brandName || 'Brand'}</div>
                       </td>
                       <td className="p-4">
-                        <div className="text-xs font-semibold text-slate-700 max-w-[150px] truncate">{o.items?.[0]?.productName || 'Product'}</div>
+                        <ExpandableText text={o.items?.[0]?.productName || 'Product'} clampClass="truncate" className="text-xs font-semibold text-slate-700 max-w-[150px]" as="div">{o.items?.[0]?.productName || 'Product'}</ExpandableText>
                       </td>
                       <td className="p-4 text-center">
                         <span className="text-xs font-bold text-slate-600">{o.items?.[0]?.qty || 1}</span>
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center text-[9px] font-bold text-purple-600">M</div>
+                          <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center text-[10px] font-bold text-purple-600">M</div>
                           <div>
                             <div className="text-xs font-bold text-slate-700">{o.managerName || 'Unknown'}</div>
-                            <div className="text-[9px] text-slate-400 font-mono">{o.mediatorCode || o.managerCode || ''}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">{o.mediatorCode || o.managerCode || ''}</div>
                           </div>
                         </div>
                       </td>
@@ -1218,7 +1195,7 @@ const BrandsView = () => {
   );
 };
 
-const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
+const PayoutsView = ({ payouts, loading, onRefresh }: { payouts: Record<string, unknown>[]; loading: boolean; onRefresh: (keys?: string[]) => void }) => {
   const { toast } = useToast();
   const { confirm, ConfirmDialogElement } = useConfirm();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -1330,7 +1307,7 @@ const PayoutsView = ({ payouts, loading, onRefresh }: any) => {
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-8 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-sm">
             <div className="px-4 py-2 flex flex-col justify-center w-full sm:w-auto">
-              <p className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-0.5">
+              <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-0.5">
                 Total Disbursed
               </p>
               <p className="text-lg font-black text-slate-900 leading-tight">
@@ -1625,7 +1602,7 @@ const DashboardView = ({ stats, revenueTrendData, brandPerfData, onRangeChange }
   );
 };
 
-const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrders }: any) => {
+const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrders, setCampaigns }: { campaigns: Campaign[]; user: User; loading: boolean; onRefresh: (keys?: string[]) => void; mediators: User[]; allOrders: Order[]; setCampaigns: React.Dispatch<React.SetStateAction<Campaign[]>> }) => {
   const { toast } = useToast();
   const { confirm, ConfirmDialogElement: InventoryConfirmDialog } = useConfirm();
   const [subTab, setSubTab] = useState<'inventory' | 'offered'>('inventory');
@@ -1709,7 +1686,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
   const activeInventory = useMemo(() => {
     const base = campaigns.filter(
       (c: Campaign) =>
-        c.allowedAgencies.includes(user.mediatorCode) &&
+        c.allowedAgencies.includes(user.mediatorCode ?? '') &&
         (
           c.status === 'Draft' ||
           String(c.brandId || '') === String(user.id || '') ||
@@ -1724,7 +1701,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
   const offeredCampaigns = useMemo(() => {
     const base = campaigns.filter(
       (c: Campaign) =>
-        c.allowedAgencies.includes(user.mediatorCode) &&
+        c.allowedAgencies.includes(user.mediatorCode ?? '') &&
         c.status !== 'Draft' &&
         String(c.brandId || '') !== String(user.id || '') &&
         !c.openToAll &&
@@ -1939,6 +1916,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     setStatusUpdatingId(campaign.id);
     try {
       await api.ops.updateCampaignStatus(campaign.id, next);
+      setCampaigns((prev: any[]) => prev.map(c => c.id === campaign.id ? { ...c, status: next } : c));
       toast.success(next === 'paused' ? 'Campaign paused' : 'Campaign resumed');
       onRefresh(['campaigns']);
     } catch (err) {
@@ -1954,6 +1932,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     setDeletingId(campaign.id);
     try {
       await api.ops.deleteCampaign(campaign.id);
+      setCampaigns((prev: any[]) => prev.filter(c => c.id !== campaign.id));
       toast.success('Campaign deleted');
       onRefresh(['campaigns']);
     } catch (err) {
@@ -2049,7 +2028,6 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
         >
           <option value="All">All Types</option>
           <option value="Discount">Discount</option>
-          <option value="Review">Review</option>
           <option value="Rating">Rating</option>
         </select>
         <select
@@ -2136,11 +2114,11 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                             className="w-10 h-10 object-contain rounded-lg bg-slate-50 border border-slate-100 p-1 group-hover:scale-105 transition-transform"
                           />
                           <div>
-                            <span className="font-bold text-slate-900 truncate max-w-[200px] block">
+                            <ExpandableText text={c.title || ''} clampClass="truncate" className="font-bold text-slate-900 max-w-[200px] block" as="span">
                               {c.title}
-                            </span>
+                            </ExpandableText>
                             <span
-                              className="text-[9px] text-slate-400 font-mono cursor-pointer hover:text-purple-600 transition-colors"
+                              className="text-[10px] text-slate-400 font-mono cursor-pointer hover:text-purple-600 transition-colors"
                               title="Click to copy Campaign ID"
                               onClick={() => {
                                 navigator.clipboard.writeText(String(c.id));
@@ -2151,16 +2129,16 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                             </span>
                           </div>
                           {String(c.brandId || '') === String(user.id || '') && (
-                            <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                            <span className="text-[10px] font-bold text-zinc-600 bg-zinc-50 px-2 py-0.5 rounded-full border border-zinc-200">
                               Agency Campaign
                             </span>
                           )}
                         </div>
                       </td>
                       <td className="p-5">
-                        <span className="text-xs font-bold text-indigo-700 truncate max-w-[120px] block">
+                        <ExpandableText text={c.brand || '—'} clampClass="truncate" className="text-xs font-bold text-zinc-700 max-w-[120px] block" as="span">
                           {c.brand || '—'}
-                        </span>
+                        </ExpandableText>
                       </td>
                       <td className="p-5">
                         <span className="text-[10px] font-bold text-slate-500 uppercase bg-slate-100 px-2 py-1 rounded border border-slate-200">
@@ -2169,7 +2147,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                       </td>
                       <td className="p-5">
                         <span
-                          className={`px-2 py-1 rounded text-[9px] font-bold uppercase border ${
+                          className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${
                             c.dealType === 'Review'
                               ? 'bg-purple-50 text-purple-700 border-purple-100'
                               : c.dealType === 'Rating'
@@ -2193,13 +2171,17 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                         </span>
                       </td>
                       <td className="p-5 text-right font-mono text-slate-700 font-bold">
-                        {c.openToAll && (
-                          <span className="text-[9px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 mr-2">
-                            🌐 Open to All
+                        <div className="flex flex-col items-end gap-1">
+                          {c.openToAll && (
+                            <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 whitespace-nowrap inline-flex items-center gap-1">
+                              🌐 Open to All
+                            </span>
+                          )}
+                          <span className="whitespace-nowrap">
+                            <span className="text-slate-400 mr-1">SOLD:</span> {c.usedSlots}{' '}
+                            <span className="text-slate-300 mx-1">/</span> {c.totalSlots}
                           </span>
-                        )}
-                        <span className="text-slate-400 mr-1">SOLD:</span> {c.usedSlots}{' '}
-                        <span className="text-slate-300 mx-1">/</span> {c.totalSlots}
+                        </div>
                       </td>
                       <td className="p-5 pr-8 text-center">
                         <div className="flex flex-col items-center gap-2">
@@ -2336,30 +2318,30 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-start mb-1">
-                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                             {c.platform}
                           </span>
-                          <span className="text-[9px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">
+                          <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">
                             {c.dealType || 'Discount'}
                           </span>
                         </div>
-                        <h4 className="font-bold text-slate-900 text-sm leading-tight line-clamp-2 mb-2">
+                        <ExpandableText text={c.title || ''} clampClass="line-clamp-2" className="font-bold text-slate-900 text-sm leading-tight mb-2" as="h4">
                           {c.title}
-                        </h4>
+                        </ExpandableText>
                         <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                          Offered by <span className="text-indigo-600">"{c.brand}"</span>
+                          Offered by <span className="text-zinc-700 font-semibold">"{c.brand}"</span>
                         </p>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2 mb-5">
                       <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                        <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">
                           Budget
                         </p>
                         <p className="text-sm font-black text-slate-900">{c.payout}/unit</p>
                       </div>
                       <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                        <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">
                           Availability
                         </p>
                         <p className="text-sm font-black text-slate-900">{c.totalSlots} Slots</p>
@@ -2379,6 +2361,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                           setDecliningId(c.id);
                           try {
                             await api.ops.declineOffer(c.id);
+                            setCampaigns((prev: any[]) => prev.filter(camp => camp.id !== c.id));
                             toast.success('Offer declined');
                             onRefresh(['campaigns']);
                           } catch (err) {
@@ -2460,6 +2443,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                   >
                     <option value="">Select Platform</option>
                     <option value="Amazon">Amazon</option>
+                    <option value="Flipkart">Flipkart</option>
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -2488,7 +2472,6 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                     aria-label="Deal type"
                   >
                     <option value="Discount">Order Deal</option>
-                    <option value="Review">Review Deal</option>
                     <option value="Rating">Rating Deal</option>
                     
                   </select>
@@ -2605,11 +2588,11 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                   <p className="text-xs text-slate-400 font-extrabold mb-1 uppercase tracking-widest">
                     Selected Campaign
                   </p>
-                  <h4 className="text-sm sm:text-base font-black text-slate-900 mb-0.5 leading-tight line-clamp-1">
+                  <ExpandableText text={assignModal.title || ''} clampClass="line-clamp-1" className="text-sm sm:text-base font-black text-slate-900 mb-0.5 leading-tight" as="h4">
                     {assignModal.title}
-                  </h4>
+                  </ExpandableText>
                   <span
-                    className="text-[9px] text-slate-400 font-mono cursor-pointer hover:text-purple-600 transition-colors"
+                    className="text-[10px] text-slate-400 font-mono cursor-pointer hover:text-purple-600 transition-colors"
                     title="Click to copy Campaign ID"
                     onClick={() => {
                       navigator.clipboard.writeText(String(assignModal.id));
@@ -2619,7 +2602,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                     ID: {String(assignModal.id).slice(-8)}
                   </span>
                   {isAgencyCampaign && (
-                    <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                    <span className="text-[10px] font-bold text-zinc-600 bg-zinc-50 px-2 py-0.5 rounded-full border border-zinc-200">
                       Agency Campaign
                     </span>
                   )}
@@ -2755,7 +2738,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
               </div>
             </div>
 
-            {/* ── Open to All Toggle ── */}
+            {/* ─Open to All Toggle ─*/}
             <div className={`px-3 py-1.5 rounded-xl mb-1 border transition-all shrink-0 ${openToAll ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'}`}>
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -2862,15 +2845,15 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-slate-900 group-hover:text-purple-700 transition-colors truncate">
+                          <ExpandableText text={m.name || 'Unknown'} clampClass="truncate" className="text-sm font-bold text-slate-900 group-hover:text-purple-700 transition-colors" as="p">
                             {m.name || 'Unknown'}
-                          </p>
+                          </ExpandableText>
                           <div className="flex items-center gap-2 mt-0.5">
                             <p className="text-[10px] text-slate-400 font-mono bg-slate-50 px-1.5 py-0.5 rounded w-fit border border-slate-100">
                               {m.mediatorCode}
                             </p>
                             {!isActive && (
-                              <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">
+                              <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">
                                 {m.status || 'inactive'}
                               </span>
                             )}
@@ -2883,7 +2866,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                         <p className="text-base font-black text-slate-900">
                           {formatCurrency(salesRevenue)}
                         </p>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                           {salesCount} Orders
                         </p>
                       </div>
@@ -2908,7 +2891,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                           />
                         </div>
                         {mediatorPayouts[m.mediatorCode!]?.trim() && (
-                          <span className="text-[8px] text-purple-500 font-bold mt-0.5">Override</span>
+                          <span className="text-[10px] text-purple-500 font-bold mt-0.5">Override</span>
                         )}
                       </div>
 
@@ -2953,7 +2936,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                             }}
                           />
                         </div>
-                        <span className="text-[9px] text-slate-400 font-bold mt-1">
+                        <span className="text-[10px] text-slate-400 font-bold mt-1">
                           Current: {assignModal?.assignments?.[m.mediatorCode!] || 0}
                         </span>
                       </div>
@@ -3004,8 +2987,8 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
   );
 };
 
-/* ─── ORDER REVIEW TAB ─── */
-const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading, onRefresh }: any) => {
+/* ──ORDER REVIEW TAB ──*/
+const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading, onRefresh }: { allOrders: Order[]; campaigns: Campaign[]; mediators: User[]; loading: boolean; onRefresh: (keys?: string[]) => void }) => {
   const { toast } = useToast();
   const [campaignFilter, setCampaignFilter] = useState('all');
   const [mediatorFilter, setMediatorFilter] = useState('all');
@@ -3190,14 +3173,14 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
                         <div className="text-[10px] text-slate-400 font-bold mt-0.5">{new Date(o.createdAt).toLocaleDateString('en-GB')}</div>
                       </td>
                       <td className="p-4">
-                        <div className="font-bold text-slate-900 text-xs truncate max-w-[160px]">{o.buyerName || 'Unknown'}</div>
-                        <div className="text-[10px] text-slate-500 truncate max-w-[160px]">{o.items?.[0]?.title}</div>
+                        <ExpandableText text={o.buyerName || 'Unknown'} clampClass="truncate" className="font-bold text-slate-900 text-xs max-w-[160px]" as="div">{o.buyerName || 'Unknown'}</ExpandableText>
+                        <ExpandableText text={o.items?.[0]?.title || ''} clampClass="truncate" className="text-[10px] text-slate-500 max-w-[160px]" as="div">{o.items?.[0]?.title}</ExpandableText>
                       </td>
                       <td className="p-4">
                         <div className="text-xs font-bold text-slate-700">{o.managerName || 'Unknown'}</div>
                       </td>
                       <td className="p-4">
-                        <div className="text-xs text-slate-600 truncate max-w-[120px]">{campTitle}</div>
+                        <ExpandableText text={campTitle} clampClass="truncate" className="text-xs text-slate-600 max-w-[120px]" as="div">{campTitle}</ExpandableText>
                       </td>
                       <td className="p-4 text-right font-mono font-bold text-slate-900 text-xs">{formatCurrency(o.total)}</td>
                       <td className="p-4 text-center">
@@ -3286,7 +3269,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
       {/* Proof Modal (reusable) */}
       {proofOrder && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in"
+          className="fixed inset-0 z-modal flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in"
           onClick={() => setProofOrder(null)}
         >
           <div
@@ -3323,10 +3306,10 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
               <div className="flex gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <ProxiedImage src={proofOrder.items?.[0]?.image} alt={proofOrder.items?.[0]?.title || 'Product'} className="w-12 h-12 object-contain mix-blend-multiply rounded-lg bg-white border border-slate-100 p-1" />
                 <div>
-                  <p className="text-sm font-bold text-slate-900 line-clamp-1">{proofOrder.items?.[0]?.title}</p>
+                  <ExpandableText text={proofOrder.items?.[0]?.title || ''} clampClass="line-clamp-1" className="text-sm font-bold text-slate-900" as="p">{proofOrder.items?.[0]?.title}</ExpandableText>
                   <p className="text-xs text-slate-500 mt-0.5">Total: <span className="font-mono font-bold text-zinc-900">{formatCurrency(proofOrder.total)}</span></p>
                   <p className="text-[10px] text-slate-400 mt-0.5">Mediator: {proofOrder.managerName} · Buyer: {proofOrder.buyerName}</p>
-                  {proofOrder.reviewerName && <p className="text-[10px] text-indigo-500 font-bold mt-0.5">Reviewer: {proofOrder.reviewerName}</p>}
+                  {proofOrder.reviewerName && <p className="text-[10px] text-zinc-500 font-bold mt-0.5">Reviewer: {proofOrder.reviewerName}</p>}
                   {proofOrder.items?.[0]?.platform && <p className="text-[10px] text-slate-400 mt-0.5">Platform: {proofOrder.items[0].platform}</p>}
                 </div>
               </div>
@@ -3348,19 +3331,19 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
                   <div className="p-6 border-2 border-dashed border-red-200 bg-red-50 rounded-2xl text-center"><AlertCircle size={20} className="mx-auto text-red-400 mb-1" /><p className="text-xs font-bold text-red-500">Missing</p></div>
                 )}
                 {proofOrder.orderAiVerification && (
-                  <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
-                    <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-2"><Sparkles size={12} className="inline mr-1" />AI Verification</p>
+                  <div className="bg-lime-50 p-3 rounded-xl border border-lime-100">
+                    <p className="text-[10px] font-bold text-lime-600 uppercase tracking-wider mb-2"><Sparkles size={12} className="inline mr-1" />AI Verification</p>
                     <div className="flex gap-2">
                       <div className={`flex-1 p-2 rounded-lg border text-center ${proofOrder.orderAiVerification.orderIdMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                        <p className="text-[9px] font-bold uppercase text-slate-500">Order ID</p>
+                        <p className="text-[10px] font-bold uppercase text-slate-500">Order ID</p>
                         <p className={`text-xs font-bold ${proofOrder.orderAiVerification.orderIdMatch ? 'text-green-600' : 'text-red-600'}`}>{proofOrder.orderAiVerification.orderIdMatch ? 'Match' : 'Mismatch'}</p>
                       </div>
                       <div className={`flex-1 p-2 rounded-lg border text-center ${proofOrder.orderAiVerification.amountMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                        <p className="text-[9px] font-bold uppercase text-slate-500">Amount</p>
+                        <p className="text-[10px] font-bold uppercase text-slate-500">Amount</p>
                         <p className={`text-xs font-bold ${proofOrder.orderAiVerification.amountMatch ? 'text-green-600' : 'text-red-600'}`}>{proofOrder.orderAiVerification.amountMatch ? 'Match' : 'Mismatch'}</p>
                       </div>
                     </div>
-                    <p className="text-[9px] text-slate-500 mt-2">Confidence: {proofOrder.orderAiVerification.confidenceScore ?? 0}%</p>
+                    <p className="text-[10px] text-slate-500 mt-2">Confidence: {proofOrder.orderAiVerification.confidenceScore ?? 0}%</p>
                   </div>
                 )}
               </div>
@@ -3405,7 +3388,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3">
                   <p className="text-[10px] font-bold text-red-600 uppercase tracking-wider mb-1">Rejected: {proofOrder.rejection.type}</p>
                   <p className="text-xs text-red-700">{proofOrder.rejection.reason || 'No reason provided'}</p>
-                  {proofOrder.rejection.rejectedAt && <p className="text-[9px] text-red-400 mt-1">{new Date(proofOrder.rejection.rejectedAt).toLocaleDateString('en-GB')}</p>}
+                  {proofOrder.rejection.rejectedAt && <p className="text-[10px] text-red-400 mt-1">{new Date(proofOrder.rejection.rejectedAt).toLocaleDateString('en-GB')}</p>}
                 </div>
               )}
             </div>
@@ -3416,7 +3399,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
 
       {/* Reject Modal */}
       {rejectModal && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in" onClick={() => { setRejectModal(null); setRejectReason(''); }}>
+        <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in" onClick={() => { setRejectModal(null); setRejectReason(''); }}>
           <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl max-h-[90dvh] overflow-y-auto scrollbar-styled" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-extrabold text-lg text-red-600 mb-1 flex items-center gap-2"><AlertTriangle size={20} /> Reject Proof</h3>
             <p className="text-xs text-slate-500 mb-4">Order {getPrimaryOrderId(rejectModal.order)} · Rejecting <strong>{rejectModal.type}</strong> proof</p>
@@ -3439,7 +3422,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
   );
 };
 
-const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
+const TeamView = ({ mediators, user, loading, onRefresh, allOrders, setMediators }: { mediators: User[]; user: User; loading: boolean; onRefresh: (keys?: string[]) => void; allOrders: Order[]; setMediators: React.Dispatch<React.SetStateAction<User[]>> }) => {
   const { toast } = useToast();
   const [subTab, setSubTab] = useState<'roster' | 'requests'>('roster');
   const [searchTerm, setSearchTerm] = useState('');
@@ -3515,14 +3498,26 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
     }
   };
 
+  const [processingMediatorId, setProcessingMediatorId] = useState<string | null>(null);
+
   const handleApproval = async (e: React.MouseEvent, id: string, action: 'approve' | 'reject') => {
     e.stopPropagation(); // Prevents opening the modal row
+    if (processingMediatorId) return; // Guard against double-click
+    setProcessingMediatorId(id);
     try {
       if (action === 'approve') await api.ops.approveMediator(id);
       else await api.ops.rejectMediator(id);
+      // Optimistic update: change status locally
+      if (setMediators) {
+        setMediators((prev: any[]) => prev.map((m: any) =>
+          m.id === id ? { ...m, status: action === 'approve' ? 'active' : 'rejected', isVerifiedByMediator: action === 'approve' } : m
+        ));
+      }
       onRefresh(['mediators']);
     } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to update mediator request'));
+    } finally {
+      setProcessingMediatorId(null);
     }
   };
 
@@ -3729,7 +3724,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                           ? '…'
                           : ordersAvailable
                             ? `${effectiveOrders.filter((o: Order) => (o.mediatorCode || o.managerName) === m.mediatorCode).length} Orders`
-                            : '–'}
+                            : '—'}
                       </div>
                     </td>
                     <td className="p-5 text-right">
@@ -3860,9 +3855,9 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                             </span>
                             {getStatusBadge(o)}
                           </div>
-                          <h4 className="font-bold text-slate-900 text-sm truncate">
+                          <ExpandableText text={o.items?.[0]?.title || ''} clampClass="truncate" className="font-bold text-slate-900 text-sm" as="h4">
                             {o.items?.[0]?.title}
-                          </h4>
+                          </ExpandableText>
                           <div className="flex justify-between items-center mt-1">
                             <span className="text-xs text-slate-500">Buyer: {o.buyerName}</span>
                             <button
@@ -3891,7 +3886,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                   </h3>
 
                   <div className="bg-white p-5 rounded-2xl border border-slate-200 mb-6 shadow-md relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-bl-full -mr-10 -mt-10 z-0 opacity-50 group-hover:opacity-100 transition-opacity"></div>
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-purple-50 to-zinc-50 rounded-bl-full -mr-10 -mt-10 z-0 opacity-50 group-hover:opacity-100 transition-opacity"></div>
                     <div className="flex justify-between items-center mb-5 relative z-10">
                       <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">
                         Beneficiary Details
@@ -3901,7 +3896,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
 
                     <div className="space-y-4 relative z-10">
                       <div className="p-4 bg-slate-50/50 rounded-xl border border-slate-100 hover:border-purple-200 hover:bg-purple-50/20 transition-all">
-                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-2 flex justify-between">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase mb-2 flex justify-between">
                           UPI Address
                           {selectedMediator.upiId && (
                             <button
@@ -3928,7 +3923,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                       </div>
 
                       <div className="p-4 bg-slate-50/50 rounded-xl border border-slate-100 hover:border-purple-200 hover:bg-purple-50/20 transition-all">
-                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-2 flex justify-between">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase mb-2 flex justify-between">
                           UPI QR
                           {selectedMediator.qrCode && (
                             <button
@@ -4027,7 +4022,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
       {/* PROOF MODAL */}
       {proofOrder && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in"
+          className="fixed inset-0 z-modal flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in"
           onClick={() => setProofOrder(null)}
         >
           <div
@@ -4073,9 +4068,9 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                   className="w-14 h-14 object-contain mix-blend-multiply rounded-xl bg-white border border-slate-100 p-1"
                 />
                 <div>
-                  <p className="text-sm font-bold text-slate-900 line-clamp-1">
+                  <ExpandableText text={proofOrder.items?.[0]?.title || ''} clampClass="line-clamp-1" className="text-sm font-bold text-slate-900" as="p">
                     {proofOrder.items?.[0]?.title}
-                  </p>
+                  </ExpandableText>
                   <p className="text-xs text-slate-500 mt-1">
                     Total:{' '}
                     <span className="font-mono font-bold text-zinc-900">{formatCurrency(proofOrder.total)}</span>
@@ -4101,10 +4096,10 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                     </div>
                     {/* AI Verification — stored from buyer's proof submission */}
                     {proofOrder.orderAiVerification && (
-                    <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mt-3 relative overflow-hidden">
+                    <div className="bg-lime-50 p-4 rounded-xl border border-lime-100 mt-3 relative overflow-hidden">
                       <div className="flex justify-between items-center mb-3">
-                        <h4 className="font-bold text-indigo-600 flex items-center gap-2 text-xs uppercase tracking-widest">
-                          <Sparkles size={14} className="text-indigo-500" /> AI Verification
+                        <h4 className="font-bold text-lime-600 flex items-center gap-2 text-xs uppercase tracking-widest">
+                          <Sparkles size={14} className="text-lime-500" /> AI Verification
                         </h4>
                       </div>
                         <div className="space-y-3 animate-fade-in">
@@ -4116,17 +4111,17 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                               <>
                                 <div className="flex gap-2">
                                   <div className={`flex-1 p-2 rounded-lg border ${aiData?.orderIdMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                                    <p className={`text-[9px] font-bold uppercase ${aiData?.orderIdMatch ? 'text-green-600' : 'text-red-600'}`}>Order ID</p>
+                                    <p className={`text-[10px] font-bold uppercase ${aiData?.orderIdMatch ? 'text-green-600' : 'text-red-600'}`}>Order ID</p>
                                     <p className="text-xs font-bold text-slate-900">{aiData?.orderIdMatch ? 'Matched' : 'Mismatch'}</p>
                                     {aiData?.detectedOrderId && (
-                                      <p className="text-[9px] text-slate-500 mt-0.5 font-mono break-all">Detected: {aiData.detectedOrderId}</p>
+                                      <p className="text-[10px] text-slate-500 mt-0.5 font-mono break-all">Detected: {aiData.detectedOrderId}</p>
                                     )}
                                   </div>
                                   <div className={`flex-1 p-2 rounded-lg border ${aiData?.amountMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                                    <p className={`text-[9px] font-bold uppercase ${aiData?.amountMatch ? 'text-green-600' : 'text-red-600'}`}>Amount</p>
+                                    <p className={`text-[10px] font-bold uppercase ${aiData?.amountMatch ? 'text-green-600' : 'text-red-600'}`}>Amount</p>
                                     <p className="text-xs font-bold text-slate-900">{aiData?.amountMatch ? 'Matched' : 'Mismatch'}</p>
                                     {aiData?.detectedAmount != null && (
-                                      <p className="text-[9px] text-slate-500 mt-0.5 font-mono">Detected: {formatCurrency(aiData.detectedAmount)}</p>
+                                      <p className="text-[10px] text-slate-500 mt-0.5 font-mono">Detected: {formatCurrency(aiData.detectedAmount)}</p>
                                     )}
                                   </div>
                                 </div>
@@ -4134,7 +4129,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                                   <p className="text-[10px] text-slate-600 leading-relaxed">{aiData?.discrepancyNote || 'Verified. Details match expected values.'}</p>
                                 </div>
                                 <div className="flex justify-between items-center pt-1">
-                                  <span className="text-[9px] text-indigo-500 font-bold uppercase">Confidence Score</span>
+                                  <span className="text-[10px] text-lime-600 font-bold uppercase">Confidence Score</span>
                                   <div className="flex items-center gap-2">
                                     <div className="w-24 h-1.5 bg-slate-200 rounded-full overflow-hidden">
                                       <div
@@ -4168,7 +4163,7 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                   </div>
                   {proofOrder.screenshots?.rating ? (
                     <div className="rounded-2xl border-2 border-orange-100 overflow-hidden shadow-sm relative">
-                      <div className="absolute top-2 right-2 bg-orange-500 text-white text-[9px] font-bold px-2 py-1 rounded-lg">
+                      <div className="absolute top-2 right-2 bg-orange-500 text-white text-[10px] font-bold px-2 py-1 rounded-lg">
                         5 Stars
                       </div>
                       <ProofImage
@@ -4192,25 +4187,25 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                       <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">AI Rating Verification</p>
                       <div className="grid grid-cols-2 gap-2">
                         <div className={`p-2 rounded-lg text-center ${proofOrder.ratingAiVerification.accountNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase">Account Name</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">Account Name</p>
                           <p className={`text-xs font-bold ${proofOrder.ratingAiVerification.accountNameMatch ? 'text-green-600' : 'text-red-600'}`}>
-                            {proofOrder.ratingAiVerification.accountNameMatch ? '✓ Match' : '✗ Mismatch'}
+                            {proofOrder.ratingAiVerification.accountNameMatch ? '✔ Match' : '✗ Mismatch'}
                           </p>
                           {proofOrder.ratingAiVerification.detectedAccountName && (
-                            <p className="text-[9px] text-slate-500 truncate mt-0.5">Found: {proofOrder.ratingAiVerification.detectedAccountName}</p>
+                            <ExpandableText text={`Found: ${proofOrder.ratingAiVerification.detectedAccountName}`} clampClass="truncate" className="text-[10px] text-slate-500 mt-0.5" as="p">Found: {proofOrder.ratingAiVerification.detectedAccountName}</ExpandableText>
                           )}
                         </div>
                         <div className={`p-2 rounded-lg text-center ${proofOrder.ratingAiVerification.productNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase">Product Name</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">Product Name</p>
                           <p className={`text-xs font-bold ${proofOrder.ratingAiVerification.productNameMatch ? 'text-green-600' : 'text-red-600'}`}>
-                            {proofOrder.ratingAiVerification.productNameMatch ? '✓ Match' : '✗ Mismatch'}
+                            {proofOrder.ratingAiVerification.productNameMatch ? '✔ Match' : '✗ Mismatch'}
                           </p>
                           {proofOrder.ratingAiVerification.detectedProductName && (
-                            <p className="text-[9px] text-slate-500 truncate mt-0.5">Found: {proofOrder.ratingAiVerification.detectedProductName}</p>
+                            <ExpandableText text={`Found: ${proofOrder.ratingAiVerification.detectedProductName}`} clampClass="truncate" className="text-[10px] text-slate-500 mt-0.5" as="p">Found: {proofOrder.ratingAiVerification.detectedProductName}</ExpandableText>
                           )}
                         </div>
                       </div>
-                      <p className="text-[9px] text-slate-500">Confidence: {proofOrder.ratingAiVerification.confidenceScore}%</p>
+                      <p className="text-[10px] text-slate-500">Confidence: {proofOrder.ratingAiVerification.confidenceScore}%</p>
                     </div>
                   )}
                 </div>
@@ -4264,44 +4259,44 @@ const TeamView = ({ mediators, user, loading, onRefresh, allOrders }: any) => {
                       <div className="grid grid-cols-2 gap-2">
                         {proofOrder.returnWindowAiVerification.orderIdMatch !== undefined && (
                           <div className={`p-2 rounded-lg text-center ${proofOrder.returnWindowAiVerification.orderIdMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase">Order ID</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Order ID</p>
                             <p className={`text-xs font-bold ${proofOrder.returnWindowAiVerification.orderIdMatch ? 'text-green-600' : 'text-red-600'}`}>
-                              {proofOrder.returnWindowAiVerification.orderIdMatch ? '✓ Match' : '✗ Mismatch'}
+                              {proofOrder.returnWindowAiVerification.orderIdMatch ? '✔ Match' : '✗ Mismatch'}
                             </p>
                           </div>
                         )}
                         {proofOrder.returnWindowAiVerification.productNameMatch !== undefined && (
                           <div className={`p-2 rounded-lg text-center ${proofOrder.returnWindowAiVerification.productNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase">Product Name</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Product Name</p>
                             <p className={`text-xs font-bold ${proofOrder.returnWindowAiVerification.productNameMatch ? 'text-green-600' : 'text-red-600'}`}>
-                              {proofOrder.returnWindowAiVerification.productNameMatch ? '✓ Match' : '✗ Mismatch'}
+                              {proofOrder.returnWindowAiVerification.productNameMatch ? '✔ Match' : '✗ Mismatch'}
                             </p>
                           </div>
                         )}
                         {proofOrder.returnWindowAiVerification.amountMatch !== undefined && (
                           <div className={`p-2 rounded-lg text-center ${proofOrder.returnWindowAiVerification.amountMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase">Amount</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Amount</p>
                             <p className={`text-xs font-bold ${proofOrder.returnWindowAiVerification.amountMatch ? 'text-green-600' : 'text-red-600'}`}>
-                              {proofOrder.returnWindowAiVerification.amountMatch ? '✓ Match' : '✗ Mismatch'}
+                              {proofOrder.returnWindowAiVerification.amountMatch ? '✔ Match' : '✗ Mismatch'}
                             </p>
                           </div>
                         )}
                         {proofOrder.returnWindowAiVerification.returnWindowClosed !== undefined && (
                           <div className={`p-2 rounded-lg text-center ${proofOrder.returnWindowAiVerification.returnWindowClosed ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'}`}>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase">Window Closed</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Window Closed</p>
                             <p className={`text-xs font-bold ${proofOrder.returnWindowAiVerification.returnWindowClosed ? 'text-green-600' : 'text-yellow-600'}`}>
-                              {proofOrder.returnWindowAiVerification.returnWindowClosed ? '✓ Closed' : '⏳ Open'}
+                              {proofOrder.returnWindowAiVerification.returnWindowClosed ? '✔ Closed' : '⏳ Open'}
                             </p>
                           </div>
                         )}
                       </div>
                       {proofOrder.returnWindowAiVerification.detectedReturnWindow && (
-                        <p className="text-[9px] text-slate-500">Detected Window: {proofOrder.returnWindowAiVerification.detectedReturnWindow}</p>
+                        <p className="text-[10px] text-slate-500">Detected Window: {proofOrder.returnWindowAiVerification.detectedReturnWindow}</p>
                       )}
                       {proofOrder.returnWindowAiVerification.discrepancyNote && (
-                        <p className="text-[9px] text-red-500 font-semibold">Note: {proofOrder.returnWindowAiVerification.discrepancyNote}</p>
+                        <p className="text-[10px] text-red-500 font-semibold">Note: {proofOrder.returnWindowAiVerification.discrepancyNote}</p>
                       )}
-                      <p className="text-[9px] text-slate-500">Confidence: {proofOrder.returnWindowAiVerification.confidenceScore}%</p>
+                      <p className="text-[10px] text-slate-500">Confidence: {proofOrder.returnWindowAiVerification.confidenceScore}%</p>
                     </div>
                   )}
                 </div>
@@ -4532,9 +4527,9 @@ export const AgencyDashboard: React.FC = () => {
     <DesktopShell
       isSidebarOpen={isSidebarOpen}
       onSidebarOpenChange={setIsSidebarOpen}
-      containerClassName="flex h-[100dvh] min-h-0 bg-[#F8F9FA] overflow-hidden relative"
+      containerClassName="flex h-[100dvh] min-h-0 bg-slate-50 overflow-hidden relative"
       asideClassName="bg-white border-r border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col"
-      mainClassName="flex-1 min-w-0 min-h-0 overflow-y-auto bg-[#FAFAFA] relative scrollbar-styled p-4 md:p-8"
+      mainClassName="flex-1 min-w-0 min-h-0 overflow-y-auto bg-mobo-dark-50 relative scrollbar-styled p-4 md:p-8"
       mobileHeader={<h2 className="text-xl font-black text-slate-900">Agency Portal</h2>}
       mobileMenuButton={
         <button
@@ -4565,7 +4560,7 @@ export const AgencyDashboard: React.FC = () => {
             </div>
 
             <nav className="space-y-1">
-              <SidebarItem
+              <SidebarItem theme="agency"
                 icon={<LayoutDashboard />}
                 label="Dashboard"
                 active={activeTab === 'dashboard'}
@@ -4574,7 +4569,7 @@ export const AgencyDashboard: React.FC = () => {
                   setIsSidebarOpen(false);
                 }}
               />
-              <SidebarItem
+              <SidebarItem theme="agency"
                 icon={<Users />}
                 label="My Team"
                 active={activeTab === 'team'}
@@ -4584,7 +4579,7 @@ export const AgencyDashboard: React.FC = () => {
                 }}
                 badge={mediators.filter((m) => m.kycStatus === 'pending').length}
               />
-              <SidebarItem
+              <SidebarItem theme="agency"
                 icon={<Layers />}
                 label="Inventory"
                 active={activeTab === 'inventory'}
@@ -4593,7 +4588,7 @@ export const AgencyDashboard: React.FC = () => {
                   setIsSidebarOpen(false);
                 }}
               />
-              <SidebarItem
+              <SidebarItem theme="agency"
                 icon={<ClipboardList />}
                 label="Order Review"
                 active={activeTab === 'orders'}
@@ -4602,7 +4597,7 @@ export const AgencyDashboard: React.FC = () => {
                   setIsSidebarOpen(false);
                 }}
               />
-              <SidebarItem
+              <SidebarItem theme="agency"
                 icon={<FileText />}
                 label="Finance"
                 active={activeTab === 'finance'}
@@ -4611,7 +4606,7 @@ export const AgencyDashboard: React.FC = () => {
                   setIsSidebarOpen(false);
                 }}
               />
-              <SidebarItem
+              <SidebarItem theme="agency"
                 icon={<Banknote />}
                 label="Payouts"
                 active={activeTab === 'payouts'}
@@ -4620,7 +4615,7 @@ export const AgencyDashboard: React.FC = () => {
                   setIsSidebarOpen(false);
                 }}
               />
-              <SidebarItem
+              <SidebarItem theme="agency"
                 icon={<LinkIcon />}
                 label="Connect Brands"
                 active={activeTab === 'brands'}
@@ -4629,7 +4624,7 @@ export const AgencyDashboard: React.FC = () => {
                   setIsSidebarOpen(false);
                 }}
               />
-              <SidebarItem
+              <SidebarItem theme="agency"
                 icon={<HelpCircle />}
                 label="Tickets"
                 active={activeTab === 'tickets'}
@@ -4679,16 +4674,17 @@ export const AgencyDashboard: React.FC = () => {
       }
     >
       {activeTab === 'dashboard' && <DashboardView stats={stats} revenueTrendData={revenueTrendData} brandPerfData={brandPerfData} onRangeChange={handleRevenueTrendRange} />}
-      {activeTab === 'team' && (
+      {activeTab === 'team' && user && (
         <TeamView
           mediators={mediators}
           user={user}
           loading={isDataLoading}
           onRefresh={refreshData}
           allOrders={orders}
+          setMediators={setMediators}
         />
       )}
-      {activeTab === 'inventory' && (
+      {activeTab === 'inventory' && user && (
         <InventoryView
           campaigns={campaigns}
           user={user}
@@ -4696,6 +4692,7 @@ export const AgencyDashboard: React.FC = () => {
           onRefresh={refreshData}
           mediators={mediators}
           allOrders={orders}
+          setCampaigns={setCampaigns}
         />
       )}
       {activeTab === 'orders' && (
@@ -4707,7 +4704,7 @@ export const AgencyDashboard: React.FC = () => {
           onRefresh={refreshData}
         />
       )}
-      {activeTab === 'finance' && (
+      {activeTab === 'finance' && user && (
         <FinanceView
           allOrders={orders}
           mediators={mediators}
@@ -4752,7 +4749,7 @@ export const AgencyDashboard: React.FC = () => {
             <>
             <div className="mb-2">
               <input type="text" placeholder="Search tickets..." value={ticketSearch} onChange={e => setTicketSearch(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+                className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-lime-300" />
             </div>
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               {(['All', 'Open', 'Resolved', 'Rejected'] as const).map(f => {
@@ -4761,8 +4758,8 @@ export const AgencyDashboard: React.FC = () => {
                   <button key={f} type="button" onClick={() => setTicketFilter(f)}
                     className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
                       ticketFilter === f
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                        : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+                        ? 'bg-zinc-900 text-white border-zinc-900 shadow-sm'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-zinc-400'
                     }`}>
                     {f} ({count})
                   </button>
@@ -4791,7 +4788,7 @@ export const AgencyDashboard: React.FC = () => {
                 }
                 return true;
               }).map((t: Ticket) => (
-                <div key={t.id} className="rounded-xl border border-slate-100 bg-white px-3 py-3 shadow-sm space-y-2 cursor-pointer hover:border-slate-300 transition-colors" onClick={() => setSelectedTicket(t)}>
+                <div key={t.id} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTicket(t); } }} className="rounded-xl border border-slate-100 bg-white px-3 py-3 shadow-sm space-y-2 cursor-pointer hover:border-slate-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400" onClick={() => setSelectedTicket(t)}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
@@ -4806,9 +4803,9 @@ export const AgencyDashboard: React.FC = () => {
                     <span className="text-[10px] text-slate-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''}</span>
                   </div>
                   {t.description && (
-                    <div className="text-xs text-slate-600 bg-slate-50 rounded-lg px-3 py-2 line-clamp-3">
+                    <ExpandableText text={String(t.description)} clampClass="line-clamp-3" className="text-xs text-slate-600 bg-slate-50 rounded-lg px-3 py-2" as="div">
                       &ldquo;{String(t.description)}&rdquo;
-                    </div>
+                    </ExpandableText>
                   )}
                   {t.userName && (
                     <div className="text-[10px] text-slate-400">From: {String(t.userName)} ({String(t.userRole || '')})</div>
@@ -4832,19 +4829,19 @@ export const AgencyDashboard: React.FC = () => {
                     {String(t.status || '').toLowerCase() === 'open' && resolvingTicketId !== t.id && (
                         <button type="button" onClick={() => { setResolvingTicketId(t.id); setResolutionNote(''); }}
                           className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
-                          ✓ Resolve / Reject
+                          ✔ Resolve / Reject
                         </button>
                     )}
                     {String(t.status || '').toLowerCase() === 'open' && resolvingTicketId === t.id && (
                       <div className="w-full mt-1 space-y-1.5">
                         <textarea placeholder="Resolution / rejection note (optional)..." value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} rows={2}
-                          className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
+                          className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-lime-300 resize-none" />
                         <div className="flex items-center gap-2">
                           <button type="button" onClick={async () => {
-                            try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
-                          }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✓ Resolve</button>
+                            try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
+                          }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✔ Resolve</button>
                           <button type="button" onClick={async () => {
-                            try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
+                            try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
                           }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
                           <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
                             className="px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 hover:bg-slate-200">Cancel</button>
@@ -4860,7 +4857,7 @@ export const AgencyDashboard: React.FC = () => {
                               await api.tickets.update(t.id, 'Open');
                               toast.success('Ticket reopened.');
                               fetchData({ keys: ['tickets'] });
-                            } catch (err: any) {
+                            } catch (err) {
                               toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
                             }
                           }}
@@ -4875,7 +4872,7 @@ export const AgencyDashboard: React.FC = () => {
                               await api.tickets.delete(t.id);
                               toast.success('Ticket deleted.');
                               fetchData({ keys: ['tickets'] });
-                            } catch (err: any) {
+                            } catch (err) {
                               toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
                             }
                           }}
@@ -4892,7 +4889,7 @@ export const AgencyDashboard: React.FC = () => {
           )}
         </div>
       )}
-      {activeTab === 'profile' && <AgencyProfile user={user} />}
+      {activeTab === 'profile' && user && <AgencyProfile user={user} />}
       <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20"><Spinner /></div>}>
         <RaiseTicketModal open={ticketOpen} onClose={() => setTicketOpen(false)} />
         <TicketDetailModal

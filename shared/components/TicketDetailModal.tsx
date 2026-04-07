@@ -123,7 +123,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
       await api.tickets.addComment(ticket.id, msg);
       setNewComment('');
       await loadComments();
-    } catch (err: any) {
+    } catch (err) {
       toast.error(formatErrorMessage(err, 'Failed to add comment.'));
     } finally {
       setSubmittingComment(false);
@@ -139,7 +139,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
       setResolutionNote('');
       onRefresh();
       onClose();
-    } catch (err: any) {
+    } catch (err) {
       const msg = formatErrorMessage(err, `Unable to ${status === 'Resolved' ? 'resolve' : 'reject'} this ticket. Please try again.`);
       toast.error(msg);
     } finally {
@@ -154,7 +154,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
       toast.success(`Ticket escalated to ${ESCALATION_PATH[ticket?.targetRole || ''] || 'higher authority'} successfully.`);
       onRefresh();
       onClose();
-    } catch (err: any) {
+    } catch (err) {
       const msg = formatErrorMessage(err, 'Unable to escalate this ticket. Please try again.');
       toast.error(msg);
     } finally {
@@ -169,7 +169,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
       toast.success('Ticket reopened successfully.');
       onRefresh();
       onClose();
-    } catch (err: any) {
+    } catch (err) {
       toast.error(formatErrorMessage(err, 'Unable to reopen this ticket. Please try again.'));
     } finally {
       setActionLoading(null);
@@ -183,7 +183,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
       toast.success('Ticket deleted successfully.');
       onRefresh();
       onClose();
-    } catch (err: any) {
+    } catch (err) {
       toast.error(formatErrorMessage(err, 'Unable to delete this ticket. Please try again.'));
     } finally {
       setActionLoading(null);
@@ -192,8 +192,11 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in"
+      className="fixed inset-0 z-modal flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Ticket: ${ticket.issueType}`}
     >
       <div
         className="bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[85dvh] animate-slide-up"
@@ -352,15 +355,15 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
                     <div key={c.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[80%] rounded-xl px-3 py-2 ${isMe ? 'bg-slate-900 text-white' : 'bg-zinc-100 text-zinc-800'}`}>
                         <div className={`flex items-center gap-1.5 mb-0.5 ${isMe ? 'justify-end' : ''}`}>
-                          <span className={`text-[9px] font-bold ${isMe ? 'text-zinc-300' : (roleColors[c.role] || 'text-zinc-500')}`}>
+                          <span className={`text-[10px] font-bold ${isMe ? 'text-zinc-300' : (roleColors[c.role] || 'text-zinc-500')}`}>
                             {c.userName}
                           </span>
-                          <span className={`text-[8px] ${isMe ? 'text-zinc-400' : 'text-zinc-400'}`}>
+                          <span className={`text-[10px] ${isMe ? 'text-zinc-400' : 'text-zinc-400'}`}>
                             {c.role}
                           </span>
                         </div>
                         <p className="text-[11px] leading-relaxed whitespace-pre-wrap break-words">{c.message}</p>
-                        <p className={`text-[8px] mt-1 ${isMe ? 'text-zinc-400 text-right' : 'text-zinc-400'}`}>
+                        <p className={`text-[10px] mt-1 ${isMe ? 'text-zinc-400 text-right' : 'text-zinc-400'}`}>
                           {new Date(c.createdAt).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
@@ -409,7 +412,7 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
                 value={resolutionNote}
                 onChange={(e) => setResolutionNote(e.target.value)}
                 placeholder="Add a resolution/rejection note (optional)..."
-                className="w-full px-3 py-2 text-xs rounded-lg border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none"
+                className="w-full px-3 py-2 text-xs rounded-lg border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-lime-300 resize-none"
                 rows={2}
                 maxLength={2000}
               />

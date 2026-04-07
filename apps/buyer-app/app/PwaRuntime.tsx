@@ -91,7 +91,7 @@ function isStandalonePwa(): boolean {
 }
 
 export function PwaRuntime({ app }: { app: 'buyer' | 'mediator' }) {
-  /* ── Back-swipe / back-button trap (prevents PWA from closing) ── */
+  /* ─Back-swipe / back-button trap (prevents PWA from closing) ─*/
   useEffect(() => {
     if (!isStandalonePwa()) return;
     const GUARD = 'mobo-pwa-guard';
@@ -121,7 +121,7 @@ export function PwaRuntime({ app }: { app: 'buyer' | 'mediator' }) {
     };
   }, []);
 
-  /* ── Prevent pinch-zoom and double-tap zoom on iOS/Android ── */
+  /* ─Prevent pinch-zoom and double-tap zoom on iOS/Android ─*/
   useEffect(() => {
     const prevent = (e: Event) => e.preventDefault();
     const preventMulti = (e: TouchEvent) => { if (e.touches.length > 1) e.preventDefault(); };

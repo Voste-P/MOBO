@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
+import { ExpandableText } from './ui';
 
-/* ── Types ──────────────────────────────────────────────────────────── */
+/* —— Types ———————————————————————————————————————————————————————————— */
 
 export interface RatingAiVerification {
   accountNameMatch?: boolean;
@@ -30,7 +31,7 @@ export interface OrderAiVerification {
   confidenceScore?: number;
 }
 
-/* ── Theme variants for light/dark portals ──────────────────────────── */
+/* —— Theme variants for light/dark portals ———————————————————————————— */
 
 type Theme = 'light' | 'dark';
 
@@ -61,7 +62,7 @@ const themeStyles = {
   },
 } as const;
 
-/* ── Single verification item ───────────────────────────────────────── */
+/* —— Single verification item ————————————————————————————————————————— */
 
 function VerifyItem({
   label,
@@ -85,20 +86,20 @@ function VerifyItem({
 
   return (
     <div className={`p-2 rounded-lg text-center ${bg}`}>
-      <p className="text-[9px] font-bold text-slate-400 uppercase">{label}</p>
+      <p className="text-[10px] font-bold text-slate-400 uppercase">{label}</p>
       <p className={`text-xs font-bold ${text}`}>
         {match ? trueLabel : falseLabel}
       </p>
       {detected && (
-        <p className={`text-[9px] ${s.detailText} truncate mt-0.5`}>
+        <ExpandableText text={detected} clampClass="truncate" className={`text-[10px] ${s.detailText} mt-0.5`} as="p">
           Found: {detected}
-        </p>
+        </ExpandableText>
       )}
     </div>
   );
 }
 
-/* ── Rating AI Verification Badge ───────────────────────────────────── */
+/* —— Rating AI Verification Badge ————————————————————————————————————— */
 
 export const RatingVerificationBadge = React.memo(function RatingVerificationBadge({
   data,
@@ -118,13 +119,13 @@ export const RatingVerificationBadge = React.memo(function RatingVerificationBad
         <VerifyItem label="Product Name" match={data.productNameMatch} detected={data.detectedProductName} theme={theme} />
       </div>
       {data.confidenceScore !== undefined && (
-        <p className={`text-[9px] ${s.confidenceText}`}>Confidence: {data.confidenceScore}%</p>
+        <p className={`text-[10px] ${s.confidenceText}`}>Confidence: {data.confidenceScore}%</p>
       )}
     </div>
   );
 });
 
-/* ── Return Window AI Verification Badge ────────────────────────────── */
+/* —— Return Window AI Verification Badge —————————————————————————————— */
 
 export const ReturnWindowVerificationBadge = React.memo(function ReturnWindowVerificationBadge({
   data,
@@ -152,19 +153,19 @@ export const ReturnWindowVerificationBadge = React.memo(function ReturnWindowVer
         />
       </div>
       {data.detectedReturnWindow && (
-        <p className={`text-[9px] ${s.detailText}`}>Detected Window: {data.detectedReturnWindow}</p>
+        <p className={`text-[10px] ${s.detailText}`}>Detected Window: {data.detectedReturnWindow}</p>
       )}
       {data.discrepancyNote && (
-        <p className={`text-[9px] ${s.noteText} font-semibold`}>Note: {data.discrepancyNote}</p>
+        <p className={`text-[10px] ${s.noteText} font-semibold`}>Note: {data.discrepancyNote}</p>
       )}
       {data.confidenceScore !== undefined && (
-        <p className={`text-[9px] ${s.confidenceText}`}>Confidence: {data.confidenceScore}%</p>
+        <p className={`text-[10px] ${s.confidenceText}`}>Confidence: {data.confidenceScore}%</p>
       )}
     </div>
   );
 });
 
-/* ── Order Proof AI Verification Badge ──────────────────────────────── */
+/* —— Order Proof AI Verification Badge ———————————————————————————————— */
 
 export const OrderVerificationBadge = React.memo(function OrderVerificationBadge({
   data,
@@ -184,7 +185,7 @@ export const OrderVerificationBadge = React.memo(function OrderVerificationBadge
         <VerifyItem label="Amount" match={data.amountMatch} theme={theme} />
       </div>
       {data.confidenceScore !== undefined && (
-        <p className={`text-[9px] ${s.confidenceText}`}>Confidence: {data.confidenceScore}%</p>
+        <p className={`text-[10px] ${s.confidenceText}`}>Confidence: {data.confidenceScore}%</p>
       )}
     </div>
   );

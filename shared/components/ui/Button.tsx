@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn, type ClassValue } from './cn';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'destructive';
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'destructive' | 'accent' | 'success';
 type ButtonSize = 'sm' | 'md' | 'lg' | 'icon';
 
 type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -14,20 +14,24 @@ type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    'bg-indigo-600 text-white hover:bg-indigo-500 focus-visible:ring-indigo-400 focus-visible:ring-offset-white',
+    'bg-zinc-900 text-white hover:bg-zinc-800 focus-visible:ring-zinc-700 focus-visible:ring-offset-white',
   secondary:
-    'bg-white text-zinc-900 border border-zinc-200 hover:bg-zinc-50 focus-visible:ring-indigo-400 focus-visible:ring-offset-white',
+    'bg-white text-zinc-900 border border-zinc-200 hover:bg-zinc-50 focus-visible:ring-zinc-400 focus-visible:ring-offset-white',
   ghost:
-    'bg-transparent text-zinc-700 hover:bg-zinc-100 focus-visible:ring-indigo-400 focus-visible:ring-offset-white',
+    'bg-transparent text-zinc-700 hover:bg-zinc-100 focus-visible:ring-zinc-400 focus-visible:ring-offset-white',
   destructive:
     'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-400 focus-visible:ring-offset-white disabled:opacity-50',
+  accent:
+    'bg-[#CCF381] text-zinc-900 hover:bg-lime-300 focus-visible:ring-lime-400 focus-visible:ring-offset-white font-extrabold',
+  success:
+    'bg-emerald-500 text-white hover:bg-emerald-600 focus-visible:ring-emerald-400 focus-visible:ring-offset-white',
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
   sm: 'h-10 px-4 rounded-xl text-sm',
   md: 'h-12 px-5 rounded-2xl text-sm',
   lg: 'h-14 px-6 rounded-[2rem] text-base',
-  icon: 'h-10 w-10 rounded-xl',
+  icon: 'h-11 w-11 rounded-xl',
 };
 
 export const Button = React.forwardRef<HTMLButtonElement, Props>(function Button(
@@ -50,6 +54,7 @@ export const Button = React.forwardRef<HTMLButtonElement, Props>(function Button
   return (
     <button
       ref={ref}
+      type={props.type ?? 'button'}
       disabled={isDisabled}
       aria-busy={loading || undefined}
       className={cn(
@@ -64,10 +69,17 @@ export const Button = React.forwardRef<HTMLButtonElement, Props>(function Button
       {...props}
     >
       {loading ? (
-        <span className="inline-block w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" aria-hidden="true" />
-      ) : leftIcon}
-      {children}
-      {!loading && rightIcon}
+        <>
+          <span className="inline-block w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" aria-hidden="true" />
+          <span className="sr-only">Loading…</span>
+        </>
+      ) : (
+        <>
+          {leftIcon}
+          {children}
+          {rightIcon}
+        </>
+      )}
     </button>
   );
 });

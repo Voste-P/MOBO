@@ -1,5 +1,4 @@
 import type { NextFunction, Request, Response } from 'express';
-import { randomUUID } from 'node:crypto';
 import { AppError } from '../middleware/errors.js';
 import { idWhere } from '../utils/idWhere.js';
 import type { Role } from '../middleware/auth.js';
@@ -23,7 +22,7 @@ async function enrichTicketsWithResolverNames(tickets: any[]): Promise<any[]> {
   const resolverIds = [...new Set(tickets.map(t => t.resolvedBy).filter(Boolean))];
   if (!resolverIds.length) return tickets;
   const resolvers = await db.user.findMany({
-    where: { id: { in: resolverIds.slice(0, 500) } },
+    where: { id: { in: resolverIds } },
     select: { id: true, name: true },
   });
   const nameMap = new Map(resolvers.map(r => [r.id, r.name]));
@@ -38,17 +37,15 @@ async function enrichTicketsWithExternalOrderIds(tickets: any[]): Promise<any[]>
   const db = prisma();
   const orderIds = [...new Set(tickets.map(t => String(t.orderId || '').trim()).filter(Boolean))];
   if (!orderIds.length) return tickets;
-  const uuidIds = orderIds.filter(id => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
-  const mongoIds = orderIds.filter(id => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
   const orders = await db.order.findMany({
-    where: { OR: [...(uuidIds.length ? [{ id: { in: uuidIds } }] : []), ...(mongoIds.length ? [{ mongoId: { in: mongoIds } }] : [])] },
-    select: { id: true, mongoId: true, externalOrderId: true },
+    where: { id: { in: orderIds } },
+    select: { id: true, externalOrderId: true },
   });
   const extMap = new Map<string, string>();
   for (const o of orders) {
     if (o.externalOrderId) {
       extMap.set(o.id, o.externalOrderId);
-      if (o.mongoId) extMap.set(o.mongoId, o.externalOrderId);
+      if (o.id) extMap.set(o.id, o.externalOrderId);
     }
   }
   return tickets.map(t => ({
@@ -75,7 +72,7 @@ async function enrichTickets(tickets: any[]): Promise<any[]> {
 async function buildTicketAudience(ticket: any) {
   const privilegedRoles: Role[] = ['admin', 'ops'];
   const userIds = new Set<string>();
-  const ticketOwnerMongoId = String(ticket?._id || ticket?.mongoId || '').trim();
+  const ticketOwnerId = String(ticket?._id || ticket?.id || '').trim();
 
   let mediatorCodes: string[] | undefined;
   let agencyCodes: string[] | undefined;
@@ -87,13 +84,13 @@ async function buildTicketAudience(ticket: any) {
       where: { ...idWhere(orderId), isDeleted: false },
       select: {
         managerName: true,
-        user: { select: { mongoId: true } },
-        brandUser: { select: { mongoId: true } },
+        user: { select: { id: true } },
+        brandUser: { select: { id: true } },
       },
     });
     if (order) {
-      if (order.user?.mongoId) userIds.add(order.user.mongoId);
-      if (order.brandUser?.mongoId) userIds.add(order.brandUser.mongoId);
+      if (order.user?.id) userIds.add(order.user.id);
+      if (order.brandUser?.id) userIds.add(order.brandUser.id);
       const mediatorCode = String(order.managerName || '').trim();
       if (mediatorCode) {
         mediatorCodes = [mediatorCode];
@@ -103,8 +100,8 @@ async function buildTicketAudience(ticket: any) {
     }
   }
 
-  // Add ticket owner's mongoId for realtime targeting
-  if (ticketOwnerMongoId) userIds.add(ticketOwnerMongoId);
+  // Add ticket owner id for realtime targeting
+  if (ticketOwnerId) userIds.add(ticketOwnerId);
 
   return { roles: privilegedRoles, userIds: Array.from(userIds), mediatorCodes, agencyCodes };
 }
@@ -112,7 +109,7 @@ async function buildTicketAudience(ticket: any) {
 /** Max recent orders to fetch for ticket permission scoping per user/role. */
 const TICKET_SCOPE_LIMIT = 500;
 
-async function getScopedOrderMongoIds(params: {
+async function getScopedOrderIds(params: {
   roles: string[];
   pgUserId: string;
   requesterUser: any;
@@ -125,11 +122,11 @@ async function getScopedOrderMongoIds(params: {
   if (roles.includes('brand')) {
     const orders = await db.order.findMany({
       where: { brandUserId: pgUserId, isDeleted: false },
-      select: { mongoId: true },
+      select: { id: true },
       orderBy: { createdAt: 'desc' },
       take: TICKET_SCOPE_LIMIT,
     });
-    return orders.map((o) => o.mongoId!).filter(Boolean);
+    return orders.map((o) => o.id!).filter(Boolean);
   }
 
   if (roles.includes('mediator')) {
@@ -137,11 +134,11 @@ async function getScopedOrderMongoIds(params: {
     if (!mediatorCode) return [];
     const orders = await db.order.findMany({
       where: { managerName: mediatorCode, isDeleted: false },
-      select: { mongoId: true },
+      select: { id: true },
       orderBy: { createdAt: 'desc' },
       take: TICKET_SCOPE_LIMIT,
     });
-    return orders.map((o) => o.mongoId!).filter(Boolean);
+    return orders.map((o) => o.id!).filter(Boolean);
   }
 
   if (roles.includes('agency')) {
@@ -151,11 +148,11 @@ async function getScopedOrderMongoIds(params: {
     if (!mediatorCodes.length) return [];
     const orders = await db.order.findMany({
       where: { managerName: { in: mediatorCodes }, isDeleted: false },
-      select: { mongoId: true },
+      select: { id: true },
       orderBy: { createdAt: 'desc' },
       take: TICKET_SCOPE_LIMIT,
     });
-    return orders.map((o) => o.mongoId!).filter(Boolean);
+    return orders.map((o) => o.id!).filter(Boolean);
   }
 
   return [];
@@ -442,6 +439,7 @@ async function canManageTicketByRole(params: {
               const allMedU = await db.user.findMany({
                 where: { parentCode: { in: connectedCodes }, roles: { has: 'mediator' as any }, isDeleted: false },
                 select: { mediatorCode: true },
+                take: 1000,
               });
               const allMediatorCodes: string[] = allMedU.map(u => u.mediatorCode).filter(Boolean) as string[];
               if (allMediatorCodes.includes(creatorParent) || allMediatorCodes.includes(creatorMediator)) return true;
@@ -666,7 +664,7 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
           if (issueTypeFilter === 'Feedback') ticketWhere.issueType = 'Feedback';
           else if (issueTypeFilter === 'support') ticketWhere.issueType = { not: 'Feedback' };
           const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
-          const ticketSelect = { id: true, mongoId: true, userId: true, userName: true, role: true, orderId: true, issueType: true, description: true, status: true, targetRole: true, resolutionNote: true, resolvedBy: true, resolvedAt: true, createdAt: true } as const;
+          const ticketSelect = { id: true, userId: true, userName: true, role: true, orderId: true, issueType: true, description: true, status: true, targetRole: true, resolutionNote: true, resolvedBy: true, resolvedAt: true, createdAt: true } as const;
           const [tickets, total] = await Promise.all([
             db.ticket.findMany({ where: ticketWhere, orderBy: { createdAt: 'desc' }, skip, take: limit, select: ticketSelect }),
             db.ticket.count({ where: ticketWhere }),
@@ -680,7 +678,7 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
         if (roles.includes('shopper')) {
           const shopperWhere = { userId: pgUserId, isDeleted: false };
           const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
-          const ticketSelect = { id: true, mongoId: true, userId: true, userName: true, role: true, orderId: true, issueType: true, description: true, status: true, targetRole: true, resolutionNote: true, resolvedBy: true, resolvedAt: true, createdAt: true } as const;
+          const ticketSelect = { id: true, userId: true, userName: true, role: true, orderId: true, issueType: true, description: true, status: true, targetRole: true, resolutionNote: true, resolvedBy: true, resolvedAt: true, createdAt: true } as const;
           const [tickets, total] = await Promise.all([
             db.ticket.findMany({ where: shopperWhere, orderBy: { createdAt: 'desc' }, skip, take: limit, select: ticketSelect }),
             db.ticket.count({ where: shopperWhere }),
@@ -763,6 +761,7 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
             const allMediatorUsers = await db.user.findMany({
               where: { parentCode: { in: connectedCodes }, roles: { has: 'mediator' as any }, isDeleted: false },
               select: { mediatorCode: true },
+              take: 5000,
             });
             const allMediatorCodes: string[] = allMediatorUsers.map(u => u.mediatorCode).filter(Boolean) as string[];
 
@@ -796,16 +795,16 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
           }
         }
 
-        const orderMongoIds = await getScopedOrderMongoIds({ roles, pgUserId, requesterUser: user });
-        if (orderMongoIds.length) {
-          cascadeTargets.push({ orderId: { in: orderMongoIds } });
+        const orderIds = await getScopedOrderIds({ roles, pgUserId, requesterUser: user });
+        if (orderIds.length) {
+          cascadeTargets.push({ orderId: { in: orderIds } });
         }
         const ticketWhere = {
             isDeleted: false,
             OR: cascadeTargets,
         };
         const { page, limit, skip, isPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
-        const ticketSelect = { id: true, mongoId: true, userId: true, userName: true, role: true, orderId: true, issueType: true, description: true, status: true, targetRole: true, resolutionNote: true, resolvedBy: true, resolvedAt: true, createdAt: true } as const;
+        const ticketSelect = { id: true, userId: true, userName: true, role: true, orderId: true, issueType: true, description: true, status: true, targetRole: true, resolutionNote: true, resolvedBy: true, resolvedAt: true, createdAt: true } as const;
         const [tickets, total] = await Promise.all([
           db.ticket.findMany({
             where: ticketWhere,
@@ -850,11 +849,9 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
           await assertCanReferenceOrder({ orderId: body.orderId, pgUserId, roles, user });
         }
 
-        const mongoId = randomUUID();
         const targetRole = TICKET_TARGET_ROLE[role] || 'admin';
         const ticket = await db.ticket.create({
           data: {
-            mongoId,
             userId: pgUserId,
             userName,
             role,

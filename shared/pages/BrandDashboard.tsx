@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import { getDirectBackendUrl } from '../utils/apiBaseUrl';
 import { maskMobile } from '../utils/mobiles';
 import { formatErrorMessage } from '../utils/errors';
@@ -58,7 +58,7 @@ import { api, asArray, invalidateGetCache } from '../services/api';
 import { subscribeRealtime } from '../services/realtime';
 import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 import { User, Campaign, Order, Ticket } from '../types';
-import { EmptyState, Spinner, Pagination } from '../components/ui';
+import { EmptyState, Spinner, Pagination, SidebarItem, ExpandableText } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { FeedbackCard } from '../components/FeedbackCard';
 import { RatingVerificationBadge, ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
@@ -94,39 +94,11 @@ type Tab = 'dashboard' | 'agencies' | 'campaigns' | 'requests' | 'orders' | 'tic
 
 // --- COMPONENTS ---
 
-const SidebarItem = ({ icon, label, active, onClick, badge }: any) => (
-  <button
-    onClick={onClick}
-    aria-current={active ? 'page' : undefined}
-    className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl transition-all duration-300 group mb-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white motion-reduce:transition-none motion-reduce:transform-none ${
-      active
-        ? 'bg-zinc-900 text-white shadow-xl shadow-zinc-900/10 scale-100'
-        : 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900'
-    }`}
-  >
-    <div className="flex items-center gap-4 min-w-0 flex-1">
-      <span
-        className={`transition-colors flex-shrink-0 ${active ? 'text-lime-400' : 'group-hover:text-zinc-900'}`}
-      >
-        {React.cloneElement(icon, { size: 20, strokeWidth: active ? 2.5 : 2 })}
-      </span>
-      <span
-        className={`font-bold text-[15px] tracking-wide whitespace-nowrap truncate ${active ? 'font-extrabold' : ''}`}
-      >
-        {label}
-      </span>
-    </div>
-    {badge > 0 && (
-      <span className="bg-lime-500 text-zinc-900 text-[10px] font-extrabold px-2.5 py-1 rounded-full shadow-sm flex-shrink-0 ml-2">
-        {badge}
-      </span>
-    )}
-  </button>
-);
+// SidebarItem imported from shared/components/ui
 
-const StatCard = ({ label, value, icon, trend, dark }: any) => (
+const StatCard = ({ label, value, icon, trend, dark }: { label: string; value: string | number; icon: React.ReactNode; trend?: string; dark?: boolean }) => (
   <div
-    className={`p-6 rounded-[2rem] flex flex-col justify-between h-44 relative overflow-hidden group hover:-translate-y-1 transition-all duration-300 ${
+    className={`p-6 rounded-[2rem] flex flex-col justify-between min-h-44 relative overflow-hidden group hover:-translate-y-1 transition-all duration-300 ${
       dark
         ? 'bg-zinc-900 text-white shadow-2xl shadow-zinc-900/20'
         : 'bg-white border border-zinc-100 shadow-sm hover:shadow-xl hover:shadow-zinc-200/50'
@@ -220,6 +192,7 @@ const BrandProfileView = () => {
       if (file.size > 2 * 1024 * 1024) { toast.error('Avatar must be under 2 MB'); return; }
       const reader = new FileReader();
       reader.onload = () => setAvatar(reader.result as string);
+      reader.onerror = () => toast.error('Failed to read image. Please try again.');
       reader.readAsDataURL(file);
     }
   };
@@ -261,7 +234,7 @@ const BrandProfileView = () => {
             />
           </div>
           <div className="flex-1 pb-2">
-            <h2 className="text-4xl font-black text-zinc-900 tracking-tight truncate">{user?.name}</h2>
+            <h2 className="text-4xl font-black text-zinc-900 tracking-tight truncate" title={user?.name}>{user?.name}</h2>
             <div className="flex flex-wrap items-center gap-3 mt-3">
               <span className="px-3 py-1 bg-lime-100 text-lime-700 rounded-lg text-xs font-bold border border-lime-200">
                 Verified Brand
@@ -363,6 +336,7 @@ const BrandProfileView = () => {
                   disabled={!isEditing}
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  aria-label="Email Address"
                   placeholder="brand@company.com"
                   className="w-full pl-12 pr-4 py-4 bg-zinc-50 rounded-2xl font-bold text-zinc-900 outline-none focus:ring-4 focus:ring-lime-100 focus:bg-white transition-all disabled:opacity-70 disabled:bg-zinc-50/50"
                 />
@@ -435,15 +409,15 @@ const DashboardView = ({
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-auto lg:h-[400px]">
         {/* Revenue Chart */}
-        <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] shadow-sm border border-zinc-100 relative overflow-hidden h-[400px] lg:h-full">
-          <div className="flex justify-between items-center mb-8">
+        <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] shadow-sm border border-zinc-100 overflow-hidden flex flex-col h-[400px] lg:h-full">
+          <div className="flex justify-between items-center mb-8 flex-shrink-0">
             <h3 className="font-bold text-lg text-zinc-900">Revenue Trajectory</h3>
             <div className="flex gap-2">
               <span className="w-3 h-3 rounded-full bg-lime-500"></span>
               <span className="text-xs font-bold text-zinc-400 uppercase">Gross Sales</span>
             </div>
           </div>
-          <div className="absolute inset-x-0 bottom-0 top-20 px-4 pb-4">
+          <div className="flex-1 min-h-0 px-4 pb-4">
             {revenueData.length === 0 || revenueData.every((d: any) => !d.revenue) ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
                 <div className="p-4 rounded-full bg-zinc-50 mb-4"><TrendingUp size={32} className="text-zinc-300" /></div>
@@ -900,7 +874,6 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
               <option value="All">All Deal Types</option>
               <option value="Discount">Order Deal</option>
               <option value="Rating">Rating Deal</option>
-              <option value="Review">Review Deal</option>
             </select>
             <select
               value={mediatorFilter}
@@ -977,13 +950,19 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
               <tbody className="divide-y divide-zinc-50">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={7} className="p-8">
-                      <EmptyState
-                        title="Loading orders"
-                        description="Fetching the latest orders"
-                        icon={<Spinner className="w-6 h-6 text-zinc-400" />}
-                        className="bg-transparent"
-                      />
+                    <td colSpan={7} className="p-4">
+                      <div className="space-y-3">
+                        {[0, 1, 2].map((i) => (
+                          <div key={i} className="flex items-center gap-4 animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
+                            <div className="w-10 h-10 rounded-lg bg-zinc-200" />
+                            <div className="flex-1 space-y-2">
+                              <div className="h-4 bg-zinc-200 rounded w-1/2" />
+                              <div className="h-3 bg-zinc-100 rounded w-1/3" />
+                            </div>
+                            <div className="h-6 w-16 bg-zinc-100 rounded-full" />
+                          </div>
+                        ))}
+                      </div>
                     </td>
                   </tr>
                 ) : filtered.length === 0 ? (
@@ -1014,9 +993,9 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                               className="w-full h-full object-contain mix-blend-multiply"
                             />
                           </div>
-                          <span className="text-sm font-bold text-zinc-900 line-clamp-1">
+                          <ExpandableText text={o.items?.[0]?.title || 'Unknown'} clampClass="line-clamp-1" className="text-sm font-bold text-zinc-900">
                             {o.items?.[0]?.title || 'Unknown'}
-                          </span>
+                          </ExpandableText>
                         </div>
                       </td>
                       <td className="p-6">
@@ -1027,7 +1006,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                       <td className="p-6 text-sm text-zinc-700">
                         <div className="text-xs font-bold text-zinc-700">{o.managerName || '-'}</div>
                         {o.mediatorCode && o.mediatorCode !== o.managerName && (
-                          <div className="text-[9px] text-zinc-400 font-mono">{o.mediatorCode}</div>
+                          <div className="text-[10px] text-zinc-400 font-mono">{o.mediatorCode}</div>
                         )}
                       </td>
                       <td className="p-6 text-right font-bold text-zinc-900">{formatCurrency(o.total)}</td>
@@ -1094,12 +1073,12 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                         <td className="p-6">
                           <div className="text-xs font-bold text-zinc-700">{o.managerName || '-'}</div>
                           {o.mediatorCode && o.mediatorCode !== o.managerName && (
-                            <div className="text-[9px] text-zinc-400 font-mono">{o.mediatorCode}</div>
+                            <div className="text-[10px] text-zinc-400 font-mono">{o.mediatorCode}</div>
                           )}
                         </td>
                         <td className="p-6">
-                          <span className="text-sm font-bold text-zinc-900 line-clamp-1">{o.items?.[0]?.title || 'Product'}</span>
-                          <div className="text-[9px] text-zinc-400">Qty: {o.items?.[0]?.quantity || 1}</div>
+                          <ExpandableText text={o.items?.[0]?.title || 'Product'} clampClass="line-clamp-1" className="text-sm font-bold text-zinc-900">{o.items?.[0]?.title || 'Product'}</ExpandableText>
+                          <div className="text-[10px] text-zinc-400">Qty: {o.items?.[0]?.quantity || 1}</div>
                         </td>
                         <td className="p-6 text-right font-bold text-zinc-900">{formatCurrency(o.total)}</td>
                         <td className="p-6 text-right font-mono font-bold text-green-600">{formatCurrency(o.commission || 0)}</td>
@@ -1154,11 +1133,11 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                         <td className="p-6">
                           <div className="text-xs font-bold text-zinc-700">{o.managerName || '-'}</div>
                           {o.mediatorCode && o.mediatorCode !== o.managerName && (
-                            <div className="text-[9px] text-zinc-400 font-mono">{o.mediatorCode}</div>
+                            <div className="text-[10px] text-zinc-400 font-mono">{o.mediatorCode}</div>
                           )}
                         </td>
                         <td className="p-6">
-                          <span className="text-sm font-bold text-zinc-900 line-clamp-1">{o.items?.[0]?.title || 'Product'}</span>
+                          <ExpandableText text={o.items?.[0]?.title || 'Product'} clampClass="line-clamp-1" className="text-sm font-bold text-zinc-900">{o.items?.[0]?.title || 'Product'}</ExpandableText>
                         </td>
                         <td className="p-6 text-center">
                           <span className="text-xs font-bold text-zinc-600">{o.items?.[0]?.quantity || 1}</span>
@@ -1206,7 +1185,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
 
       {viewProofOrder && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-enter"
+          className="fixed inset-0 z-modal flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-enter"
           onClick={() => { setViewProofOrder(null); }}
         >
           <div
@@ -1251,9 +1230,9 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                   className="w-14 h-14 object-contain mix-blend-multiply rounded-xl bg-white border border-zinc-100 p-1"
                 />
                 <div>
-                  <p className="text-sm font-bold text-zinc-900 line-clamp-1">
+                  <ExpandableText as="p" text={viewProofOrder.items?.[0]?.title || ''} clampClass="line-clamp-1" className="text-sm font-bold text-zinc-900">
                     {viewProofOrder.items?.[0]?.title}
-                  </p>
+                  </ExpandableText>
                   <p className="text-xs text-zinc-500 mt-1">
                     Value:{' '}
                     <span className="font-mono font-bold text-zinc-900">
@@ -1266,7 +1245,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                     const validDate = d && !isNaN(d.getTime()) && d.getFullYear() > 2020 ? d : null;
                     return (viewProofOrder.extractedProductName || seller || validDate || viewProofOrder.reviewerName) ? (
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[10px] text-zinc-400">
-                        {viewProofOrder.reviewerName && <span className="text-indigo-500 font-bold">Reviewer: {viewProofOrder.reviewerName}</span>}
+                        {viewProofOrder.reviewerName && <span className="text-zinc-500 font-bold">Reviewer: {viewProofOrder.reviewerName}</span>}
                         {viewProofOrder.extractedProductName && <span>Product: {viewProofOrder.extractedProductName}</span>}
                         {seller && <span>Seller: {seller}</span>}
                         {validDate && <span>Ordered: {validDate.toLocaleDateString('en-GB')}</span>}
@@ -1301,10 +1280,10 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                     </div>
                     {/* AI Verification — stored from buyer's proof submission */}
                     {viewProofOrder.orderAiVerification && (
-                    <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-200 mt-2">
+                    <div className="bg-lime-50 p-3 rounded-xl border border-lime-200 mt-2">
                       <div className="flex justify-between items-center mb-2">
-                        <h5 className="font-bold text-indigo-600 flex items-center gap-1.5 text-[10px] uppercase tracking-widest">
-                          <Sparkles size={12} className="text-indigo-500" /> AI Verification
+                        <h5 className="font-bold text-lime-600 flex items-center gap-1.5 text-[10px] uppercase tracking-widest">
+                          <Sparkles size={12} className="text-lime-500" /> AI Verification
                         </h5>
                       </div>
                         <div className="space-y-2">
@@ -1316,25 +1295,25 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                               <>
                                 <div className="flex gap-2">
                                   <div className={`flex-1 p-2 rounded-lg border text-center ${aiData?.orderIdMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                                    <p className="text-[9px] font-bold text-zinc-400 uppercase">Order ID</p>
+                                    <p className="text-[10px] font-bold text-zinc-400 uppercase">Order ID</p>
                                     <p className={`text-xs font-bold ${aiData?.orderIdMatch ? 'text-green-600' : 'text-red-600'}`}>
                                       {aiData?.orderIdMatch ? '✓ Match' : '✗ Mismatch'}
                                     </p>
-                                    {aiData?.detectedOrderId && <p className="text-[9px] text-zinc-500 font-mono mt-0.5">Detected: {aiData.detectedOrderId}</p>}
+                                    {aiData?.detectedOrderId && <p className="text-[10px] text-zinc-500 font-mono mt-0.5">Detected: {aiData.detectedOrderId}</p>}
                                   </div>
                                   <div className={`flex-1 p-2 rounded-lg border text-center ${aiData?.amountMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                                    <p className="text-[9px] font-bold text-zinc-400 uppercase">Amount</p>
+                                    <p className="text-[10px] font-bold text-zinc-400 uppercase">Amount</p>
                                     <p className={`text-xs font-bold ${aiData?.amountMatch ? 'text-green-600' : 'text-red-600'}`}>
                                       {aiData?.amountMatch ? '✓ Match' : '✗ Mismatch'}
                                     </p>
-                                    {aiData?.detectedAmount != null && <p className="text-[9px] text-zinc-500 font-mono mt-0.5">Detected: {formatCurrency(aiData.detectedAmount)}</p>}
+                                    {aiData?.detectedAmount != null && <p className="text-[10px] text-zinc-500 font-mono mt-0.5">Detected: {formatCurrency(aiData.detectedAmount)}</p>}
                                   </div>
                                 </div>
                                 {aiData?.discrepancyNote && (
                                   <p className="text-[10px] text-zinc-500 bg-white rounded-lg p-2 border border-zinc-100">{aiData.discrepancyNote}</p>
                                 )}
                                 <div className="flex justify-between items-center pt-1">
-                                  <span className="text-[9px] text-indigo-500 font-bold uppercase">Confidence</span>
+                                  <span className="text-[10px] text-lime-600 font-bold uppercase">Confidence</span>
                                   <div className="flex items-center gap-2">
                                     <div className="w-20 h-1.5 bg-zinc-200 rounded-full overflow-hidden">
                                       <div className={`h-full rounded-full ${score > 80 ? 'bg-green-500' : score > 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${score}%` }} />
@@ -1365,7 +1344,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                   </div>
                   {viewProofOrder.screenshots?.rating ? (
                     <div className="rounded-2xl border-2 border-orange-100 overflow-hidden shadow-sm relative">
-                      <div className="absolute top-2 right-2 bg-orange-500 text-white text-[9px] font-bold px-2 py-1 rounded-lg">
+                      <div className="absolute top-2 right-2 bg-orange-500 text-white text-[10px] font-bold px-2 py-1 rounded-lg">
                         5 Stars
                       </div>
                       <ProofImage
@@ -1479,7 +1458,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
   );
 };
 
-const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) => {
+const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampaigns }: { campaigns: Campaign[]; agencies: User[]; user: User; loading: boolean; onRefresh: (keys?: string[]) => void; setCampaigns: React.Dispatch<React.SetStateAction<Campaign[]>> }) => {
   const { toast } = useToast();
   const { confirm, ConfirmDialogElement } = useConfirm();
   const [view, setView] = useState<'list' | 'create'>('list');
@@ -1531,7 +1510,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
   const [form, setForm] = useState(initialForm);
   const [selAgencies, setSelAgencies] = useState<string[]>([]);
 
-  const handleCreate = async (e: any) => {
+  const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const price = Number(form.price);
     const payout = Number(form.payout);
@@ -1603,6 +1582,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
     setStatusUpdatingId(campaign.id);
     try {
       await api.brand.updateCampaign(campaign.id, { status: next });
+      setCampaigns((prev: any[]) => prev.map(c => c.id === campaign.id ? { ...c, status: next } : c));
       toast.success(next === 'paused' ? 'Campaign paused' : 'Campaign resumed');
       onRefresh(['campaigns']);
     } catch (err) {
@@ -1619,6 +1599,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
     setDeletingId(campaign.id);
     try {
       await api.brand.deleteCampaign(campaign.id);
+      setCampaigns((prev: any[]) => prev.filter(c => c.id !== campaign.id));
       toast.success('Campaign deleted');
       onRefresh(['campaigns']);
     } catch (err: any) {
@@ -1687,6 +1668,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
                     >
                       <option value="">Select Platform</option>
                       <option value="Amazon">Amazon</option>
+                      <option value="Flipkart">Flipkart</option>
                     </select>
                   </div>
                   <div>
@@ -1695,7 +1677,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
                     </label>
                     <input
                       type="number"
-                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none"
+                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-lime-400"
                       placeholder="1000"
                       value={form.totalSlots}
                       onChange={(e) => setForm({ ...form, totalSlots: e.target.value })}
@@ -1708,7 +1690,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
                     </label>
                     <input
                       type="url"
-                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none"
+                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-lime-400"
                       placeholder="https://..."
                       value={form.image}
                       onChange={(e) => setForm({ ...form, image: e.target.value })}
@@ -1721,7 +1703,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
                     </label>
                     <input
                       type="url"
-                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none"
+                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-lime-400"
                       placeholder="https://amazon.in/..."
                       value={form.productUrl}
                       onChange={(e) => setForm({ ...form, productUrl: e.target.value })}
@@ -1746,7 +1728,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
                     </label>
                     <input
                       type="number"
-                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none"
+                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-lime-400"
                       placeholder="2000"
                       value={form.originalPrice}
                       onChange={(e) => setForm({ ...form, originalPrice: e.target.value })}
@@ -1759,7 +1741,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
                     </label>
                     <input
                       type="number"
-                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none"
+                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-lime-400"
                       placeholder="1000"
                       value={form.price}
                       onChange={(e) => setForm({ ...form, price: e.target.value })}
@@ -1772,7 +1754,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
                     </label>
                     <input
                       type="number"
-                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none"
+                      className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-lime-400"
                       placeholder="200"
                       value={form.payout}
                       onChange={(e) => setForm({ ...form, payout: e.target.value })}
@@ -1791,7 +1773,6 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
                     >
                       <option value="">Flexible (Agency Decide)</option>
                       <option value="Discount">Discount Only</option>
-                      <option value="Review">Review Required</option>
                       <option value="Rating">Rating Required</option>
                     </select>
                     <p className="text-[10px] text-zinc-400 mt-2 ml-1 font-medium italic">
@@ -1879,7 +1860,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
 
               <div className="bg-zinc-50 rounded-xl p-3 mb-3 border border-zinc-100 relative font-mono text-[10px] text-zinc-500 leading-relaxed">
                 <div className="mb-1">
-                  <span className="text-indigo-600 font-bold">"{user.name}"</span> Direct Deal.
+                  <span className="text-zinc-700 font-bold">"{user.name}"</span> Direct Deal.
                 </div>
                 <div className="pt-2 border-t border-zinc-200 border-dashed flex justify-between items-center">
                   <span>Product Price:</span>
@@ -1952,7 +1933,6 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
         >
           <option value="All">All Deal Types</option>
           <option value="Discount">Discount</option>
-          <option value="Review">Review</option>
           <option value="Rating">Rating</option>
         </select>
         <input
@@ -1981,12 +1961,20 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
       </div>
 
       {loading ? (
-        <EmptyState
-          title="Loading campaigns"
-          description="Fetching your latest campaigns"
-          icon={<Spinner className="w-6 h-6 text-zinc-400" />}
-          className="bg-transparent"
-        />
+        <div className="space-y-3 py-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="bg-white rounded-2xl p-5 shadow-sm border border-zinc-100 animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-zinc-200 flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-zinc-200 rounded w-2/3" />
+                  <div className="h-3 bg-zinc-100 rounded w-1/3" />
+                </div>
+                <div className="h-6 w-16 bg-zinc-100 rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : filteredCampaigns.length === 0 ? (
         <EmptyState
           title={campaigns.length === 0 ? "No campaigns yet" : "No matching campaigns"}
@@ -2024,11 +2012,11 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
                       {c.platform}
                     </span>
                   </div>
-                  <h3 className="font-bold text-zinc-900 text-sm line-clamp-1 leading-tight mb-1">
+                  <ExpandableText as="h3" text={c.title || ''} clampClass="line-clamp-1" className="font-bold text-zinc-900 text-sm leading-tight mb-1">
                     {c.title}
-                  </h3>
+                  </ExpandableText>
                   <span
-                    className="text-[9px] text-zinc-400 font-mono cursor-pointer hover:text-lime-600 transition-colors mb-2 block"
+                    className="text-[10px] text-zinc-400 font-mono cursor-pointer hover:text-lime-600 transition-colors mb-2 block"
                     title="Click to copy Campaign ID"
                     onClick={() => {
                       navigator.clipboard.writeText(String(c.id)).then(() => toast.success('Campaign ID copied!')).catch(() => {});
@@ -2038,17 +2026,17 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh }: any) =
                   </span>
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col">
-                      <span className="text-[9px] font-bold text-zinc-400 uppercase">Payout</span>
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase">Payout</span>
                       <span className="text-xs font-black text-zinc-900">{c.payout}</span>
                     </div>
                     <div className="w-[1px] h-6 bg-zinc-100"></div>
                     <div className="flex flex-col">
-                      <span className="text-[9px] font-bold text-zinc-400 uppercase">Cost</span>
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase">Cost</span>
                       <span className="text-xs font-black text-zinc-900">{c.price}</span>
                     </div>
                     <div className="w-[1px] h-6 bg-zinc-100"></div>
                     <div className="flex flex-col">
-                      <span className="text-[9px] font-bold text-zinc-400 uppercase">Created</span>
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase">Created</span>
                       <span className="text-[10px] font-medium text-zinc-500">{c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB') : '—'}</span>
                     </div>
                   </div>
@@ -2171,6 +2159,9 @@ export const BrandDashboard: React.FC = () => {
   const [resolvingTicketId, setResolvingTicketId] = useState<string | null>(null);
   const [resolutionNote, setResolutionNote] = useState('');
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+
+  // Optimistic UI: track dismissed connection requests so they disappear instantly
+  const [dismissedRequestIds, setDismissedRequestIds] = useState<Set<string>>(new Set());
 
   const loadedRef = useRef<Set<string>>(new Set());
   const inFlightRef = useRef<Set<string>>(new Set());
@@ -2412,18 +2403,22 @@ export const BrandDashboard: React.FC = () => {
     }));
   };
 
-  const pendingRequests = user?.pendingConnections?.length || 0;
+  // Filter out optimistically dismissed requests
+  const visiblePendingConnections = (user?.pendingConnections ?? []).filter(
+    (p: any) => !dismissedRequestIds.has(p.agencyId)
+  );
+  const pendingRequests = visiblePendingConnections.length;
 
   return (
     <>
     <DesktopShell
       isSidebarOpen={isSidebarOpen}
       onSidebarOpenChange={setIsSidebarOpen}
-      containerClassName="flex h-[100dvh] min-h-0 bg-[#F4F4F5] font-sans text-zinc-900 overflow-hidden relative"
+      containerClassName="flex h-[100dvh] min-h-0 bg-mobo-dark-100 font-sans text-zinc-900 overflow-hidden relative"
       overlayClassName="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm"
       sidebarWidthClassName="w-80"
       asideClassName="bg-white flex flex-col border-r border-zinc-100 shadow-[4px_0_24px_rgba(0,0,0,0.02)]"
-      mainClassName="flex-1 min-w-0 min-h-0 overflow-y-auto bg-[#FAFAFA] relative scrollbar-styled p-4 md:p-8"
+      mainClassName="flex-1 min-w-0 min-h-0 overflow-y-auto bg-mobo-dark-50 relative scrollbar-styled p-4 md:p-8"
       mobileHeader={
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-black text-lime-400 rounded-lg flex items-center justify-center">
@@ -2469,7 +2464,7 @@ export const BrandDashboard: React.FC = () => {
               </button>
             </div>
             <nav className="space-y-1">
-              <SidebarItem
+              <SidebarItem theme="brand"
                 icon={<LayoutDashboard />}
                 label="Command Center"
                 active={activeTab === 'dashboard'}
@@ -2478,7 +2473,7 @@ export const BrandDashboard: React.FC = () => {
                   setIsSidebarOpen(false);
                 }}
               />
-              <SidebarItem
+              <SidebarItem theme="brand"
                 icon={<Briefcase />}
                 label="Campaigns"
                 active={activeTab === 'campaigns'}
@@ -2488,7 +2483,7 @@ export const BrandDashboard: React.FC = () => {
                 }}
                 badge={campaigns.filter((c) => c.status === 'Active').length}
               />
-              <SidebarItem
+              <SidebarItem theme="brand"
                 icon={<ShoppingBag />}
                 label="Order Intelligence"
                 active={activeTab === 'orders'}
@@ -2497,7 +2492,7 @@ export const BrandDashboard: React.FC = () => {
                   setIsSidebarOpen(false);
                 }}
               />
-              <SidebarItem
+              <SidebarItem theme="brand"
                 icon={<Users />}
                 label="Agency Partners"
                 active={activeTab === 'agencies'}
@@ -2506,7 +2501,7 @@ export const BrandDashboard: React.FC = () => {
                   setIsSidebarOpen(false);
                 }}
               />
-              <SidebarItem
+              <SidebarItem theme="brand"
                 icon={<Bell />}
                 label="Requests"
                 active={activeTab === 'requests'}
@@ -2516,7 +2511,7 @@ export const BrandDashboard: React.FC = () => {
                 }}
                 badge={pendingRequests}
               />
-              <SidebarItem
+              <SidebarItem theme="brand"
                 icon={<HelpCircle />}
                 label="Tickets"
                 active={activeTab === 'tickets'}
@@ -2578,13 +2573,14 @@ export const BrandDashboard: React.FC = () => {
         {activeTab === 'dashboard' && (
           <DashboardView stats={dashboardStats} revenueData={revenueChartData} campaignPerformance={inventoryFillData} />
         )}
-        {activeTab === 'campaigns' && (
+        {activeTab === 'campaigns' && user && (
           <CampaignsView
             campaigns={campaigns}
             agencies={agencies}
             user={user}
             loading={isDataLoading}
             onRefresh={refreshData}
+            setCampaigns={setCampaigns}
           />
         )}
         {activeTab === 'orders' && <OrdersView orders={orders} isLoading={isDataLoading} />}
@@ -2617,7 +2613,7 @@ export const BrandDashboard: React.FC = () => {
               <>
               <div className="mb-2">
                 <input type="text" placeholder="Search tickets..." value={ticketSearch} onChange={e => setTicketSearch(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs rounded-lg border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+                  className="w-full px-3 py-1.5 text-xs rounded-lg border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-lime-300" />
               </div>
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 {(['All', 'Open', 'Resolved', 'Rejected'] as const).map(f => {
@@ -2626,8 +2622,8 @@ export const BrandDashboard: React.FC = () => {
                     <button key={f} type="button" onClick={() => setTicketFilter(f)}
                       className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
                         ticketFilter === f
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                          : 'bg-white text-zinc-600 border-zinc-200 hover:border-indigo-300'
+                          ? 'bg-zinc-900 text-white border-zinc-900 shadow-sm'
+                          : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400'
                       }`}>
                       {f} ({count})
                     </button>
@@ -2656,7 +2652,7 @@ export const BrandDashboard: React.FC = () => {
                   }
                   return true;
                 }).map((t: Ticket) => (
-                  <div key={t.id} className="rounded-xl border border-zinc-100 bg-white px-3 py-3 shadow-sm space-y-2 cursor-pointer hover:border-zinc-300 transition-colors" onClick={() => setSelectedTicket(t)}>
+                  <div key={t.id} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTicket(t); } }} className="rounded-xl border border-zinc-100 bg-white px-3 py-3 shadow-sm space-y-2 cursor-pointer hover:border-zinc-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400" onClick={() => setSelectedTicket(t)}>
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
@@ -2671,9 +2667,9 @@ export const BrandDashboard: React.FC = () => {
                       <span className="text-[10px] text-zinc-400 shrink-0">{t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''}</span>
                     </div>
                     {t.description && (
-                      <div className="text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2 line-clamp-3">
+                      <ExpandableText as="div" text={String(t.description)} clampClass="line-clamp-3" className="text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2">
                         &ldquo;{String(t.description)}&rdquo;
-                      </div>
+                      </ExpandableText>
                     )}
                     {t.userName && (
                       <div className="text-[10px] text-zinc-400">From: {String(t.userName)} ({String(t.userRole || '')})</div>
@@ -2720,7 +2716,7 @@ export const BrandDashboard: React.FC = () => {
                       {String(t.status || '').toLowerCase() === 'open' && resolvingTicketId === t.id && (
                         <div className="w-full mt-1 space-y-1.5">
                           <textarea placeholder="Resolution / rejection note (optional)..." value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} rows={2}
-                            className="w-full px-2 py-1.5 text-xs rounded-lg border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
+                            className="w-full px-2 py-1.5 text-xs rounded-lg border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-lime-300 resize-none" />
                           <div className="flex items-center gap-2">
                             <button type="button" onClick={async () => {
                               try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
@@ -2815,7 +2811,7 @@ export const BrandDashboard: React.FC = () => {
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-xl font-bold text-zinc-900 truncate">{ag.name || 'Unknown'}</h3>
+                      <ExpandableText as="h3" text={ag.name || 'Unknown'} clampClass="truncate" className="text-xl font-bold text-zinc-900">{ag.name || 'Unknown'}</ExpandableText>
                       <p className="text-xs text-zinc-400 font-mono mt-1 mb-3 bg-zinc-50 px-2 py-0.5 rounded w-fit">
                         {ag.mediatorCode}
                       </p>
@@ -2832,7 +2828,9 @@ export const BrandDashboard: React.FC = () => {
                         e.stopPropagation();
                         if (!user) return;
                         if (await confirmDialog({ message: 'Disconnect this Agency?', confirmLabel: 'Disconnect', variant: 'destructive' })) {
-                          api.brand.removeAgency(user.id, ag.mediatorCode!).then(async () => { await refreshSession(); refreshData(['agencies']); }).catch((err: any) => toast.error(formatErrorMessage(err, 'Failed to disconnect agency')));
+                          const code = ag.mediatorCode!;
+                          setAgencies(prev => prev.filter(a => a.mediatorCode !== code));
+                          api.brand.removeAgency(user.id, code).then(async () => { await refreshSession(); refreshData(['agencies']); }).catch((err: any) => { refreshData(['agencies']); toast.error(formatErrorMessage(err, 'Failed to disconnect agency')); });
                         }
                       }}
                       aria-label="Disconnect agency"
@@ -2956,7 +2954,7 @@ export const BrandDashboard: React.FC = () => {
                 icon={<Spinner className="w-6 h-6 text-zinc-400" />}
                 className="bg-transparent"
               />
-            ) : !user?.pendingConnections || user.pendingConnections.length === 0 ? (
+            ) : visiblePendingConnections.length === 0 ? (
               <EmptyState
                 title="No pending requests"
                 description={`Share your Brand Code: ${user?.brandCode || ''}`}
@@ -2965,7 +2963,7 @@ export const BrandDashboard: React.FC = () => {
               />
             ) : (
               <div className="space-y-4">
-                {user.pendingConnections.map((req: any) => (
+                {visiblePendingConnections.map((req: any) => (
                   <div
                     key={req.agencyId}
                     className="bg-white p-3 rounded-[1.5rem] shadow-sm border border-zinc-100 flex flex-col sm:flex-row justify-between items-center pr-4 transition-all hover:shadow-md gap-4"
@@ -2985,14 +2983,16 @@ export const BrandDashboard: React.FC = () => {
                       <button
                         onClick={async () => {
                           try {
+                            setDismissedRequestIds(prev => new Set(prev).add(req.agencyId));
                             await api.brand.resolveConnectionRequest(
-                              user.id,
+                              user!.id,
                               req.agencyId,
                               'reject'
                             );
                             await refreshSession();
                             fetchData({ keys: ['agencies'] });
                           } catch (e) {
+                            setDismissedRequestIds(prev => { const next = new Set(prev); next.delete(req.agencyId); return next; });
                             if (process.env.NODE_ENV !== 'production') console.error('Failed to decline', e);
                             toast.error(formatErrorMessage(e, 'Failed to decline connection'));
                           }
@@ -3004,14 +3004,16 @@ export const BrandDashboard: React.FC = () => {
                       <button
                         onClick={async () => {
                           try {
+                            setDismissedRequestIds(prev => new Set(prev).add(req.agencyId));
                             await api.brand.resolveConnectionRequest(
-                              user.id,
+                              user!.id,
                               req.agencyId,
                               'approve'
                             );
                             await refreshSession();
                             fetchData({ keys: ['agencies'] });
                           } catch (e) {
+                            setDismissedRequestIds(prev => { const next = new Set(prev); next.delete(req.agencyId); return next; });
                             if (process.env.NODE_ENV !== 'production') console.error('Failed to approve', e);
                             toast.error(formatErrorMessage(e, 'Failed to approve connection'));
                           }
@@ -3030,7 +3032,7 @@ export const BrandDashboard: React.FC = () => {
       {/* AGENCY DETAIL / PAYMENT MODAL */}
       {selectedAgency && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-enter"
+          className="fixed inset-0 z-modal flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-enter"
           onClick={() => setSelectedAgency(null)}
         >
           <div

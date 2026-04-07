@@ -51,7 +51,7 @@ All tables implement soft delete:
 
 ## Core data model (conceptual)
 
-> 20 Prisma models. Full details: `docs/DOMAIN_MODEL.md`
+> 21 Prisma models. Full details: `docs/DOMAIN_MODEL.md`
 
 ```mermaid
 erDiagram
@@ -150,6 +150,8 @@ erDiagram
 
 - Wallet updates are done via idempotent transactions (`Transaction.idempotencyKey` has a unique index for non-deleted rows).
 - Brand→Agency payouts debit the brand wallet and credit the agency wallet with replay-safe idempotency keys.
+- Cooling-period settlement uses an **atomic claim guard** (`updateMany` with WHERE on `affiliateStatus: 'Pending_Cooling'`) to prevent double-settlement from concurrent cron invocations.
+- Settler interval and transaction timeout are configurable via `SETTLER_INTERVAL_MS` and `SETTLER_TX_TIMEOUT_MS` env vars.
 
 ## Order workflow
 
@@ -157,3 +159,33 @@ Orders have a strict state machine (`workflowStatus`), with anti-fraud constrain
 
 - A buyer cannot have more than one active order per deal.
 - Some workflows can be frozen (e.g., suspensions) and require explicit reactivation.
+- Re-proof submissions are capped at `DEFAULT_MAX_REPROOF_ATTEMPTS` (5) per order, tracked via `WORKFLOW_TRANSITION` events with `metadata.to === 'REJECTED'`.
+
+## AI verification
+
+- Google Gemini Vision API with **circuit breaker** (3-failure threshold, 5 min cooldown, HALF_OPEN requires 3 consecutive successes before closing).
+- AI extraction uses **exponential backoff retry** (3 attempts, 200/400/800ms) for transient failures; validation errors are thrown immediately.
+- **Overall timeout** (50 s) on all three verification functions (`verifyProofWithAi`, `verifyRatingScreenshotWithAi`, `verifyReturnWindowWithAi`) prevents the Gemini multi-model loop from exceeding the frontend 60 s request timeout.
+- **Graceful degradation**: Infrastructure failures (OCR capacity, Gemini downtime, timeouts) in all proof submission paths (order creation, rating, return-window, re-upload) fall through to manual mediator review instead of returning 500. User-facing validation errors (422 `AppError`) are still thrown.
+- Confidence thresholds: 80% for individual proofs, 70% for bulk — configurable via `AI_PROOF_CONFIDENCE_THRESHOLD`.
+- Confidence values are sanitised with `Number.isFinite()` and clamped to 0–100 before comparison.
+- Fallback to Tesseract OCR when Gemini circuit is open.
+
+## Security hardening
+
+- All proof-download endpoints enforce role-based authorization (brand owner, assigned agency, mediator, or buyer ownership).
+- Proof upload accepts JPEG, PNG, and WebP only (GIF excluded).
+- Token refresh uses retry with exponential backoff (3 attempts, 300/600/1200ms) before expiring the session.
+- All deletion is soft-delete via `deletedAt`/`is_deleted`; no hard deletes in application code.
+
+## Error handling
+
+- Every `FileReader` in the frontend has an `onerror` handler — either rejecting a wrapping Promise or showing a user-facing toast (15 instances audited).
+- `shared/utils/imageHelpers.ts` provides `readFileAsDataUrl()` with a configurable timeout (default 30 s) and abort support.
+
+## Accessibility
+
+- All interactive elements meet a 44 × 44 px minimum touch target (WCAG 2.5.5 AAA).
+- Confirmation dialogs focus the cancel button by default (safe action first for destructive dialogs).
+- Notification items expose `role="status"` and `aria-label` for screen readers.
+- Modal component implements a focus trap (Tab/Shift+Tab cycles within the dialog panel).

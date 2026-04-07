@@ -1,5 +1,4 @@
 import request from 'supertest';
-import { randomUUID } from 'node:crypto';
 
 import { createApp } from '../../app.js';
 import { loadEnv } from '../../config/env.js';
@@ -31,7 +30,6 @@ describe('api smoke', () => {
     if (!existingDeal) {
       await prisma().deal.create({
         data: {
-          mongoId: randomUUID(),
           campaignId: campaign!.id,
           mediatorCode: 'MED_TEST',
           title: 'E2E Deal',

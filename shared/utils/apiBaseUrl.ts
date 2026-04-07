@@ -1,4 +1,4 @@
-// ── Cross-platform env accessors (avoid `as any`) ───────────────────────
+// ─Cross-platform env accessors (avoid `as any`) ───────────────────────
 type EnvRecord = Record<string, string | undefined>;
 
 /** Safely read a `process.env` variable (Node.js / Next.js). */

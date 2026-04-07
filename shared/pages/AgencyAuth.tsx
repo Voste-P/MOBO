@@ -1,6 +1,8 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Button, Input, Spinner } from '../components/ui';
+import { Button, Input, Spinner, AnimatedView } from '../components/ui';
+import { SecurityQuestionsSetup, type SecurityQA } from '../components/SecurityQuestionsSetup';
+import { ForgotPassword } from './ForgotPassword';
 import { normalizeMobileTo10Digits } from '../utils/mobiles';
 import { formatErrorMessage } from '../utils/errors';
 import {
@@ -21,7 +23,7 @@ interface AgencyAuthProps {
 }
 
 export const AgencyAuthScreen: React.FC<AgencyAuthProps> = ({ onBack }) => {
-  const [view, setView] = useState<'splash' | 'login' | 'register'>('splash');
+  const [view, setView] = useState<'splash' | 'login' | 'register' | 'securityQuestions' | 'forgotPassword'>('splash');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -30,6 +32,8 @@ export const AgencyAuthScreen: React.FC<AgencyAuthProps> = ({ onBack }) => {
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [adminCode, setAdminCode] = useState('');
+
+  const pendingRegRef = useRef<{ name: string; mobile: string; password: string; adminCode: string } | null>(null);
 
   const { login, registerOps, logout } = useAuth();
 
@@ -69,19 +73,51 @@ export const AgencyAuthScreen: React.FC<AgencyAuthProps> = ({ onBack }) => {
       setError('Password needs 8+ chars with uppercase, lowercase, number, and special character.');
       return;
     }
+    setError('');
+    pendingRegRef.current = { name, mobile, password, adminCode };
+    setView('securityQuestions');
+  };
+
+  const handleSecurityQuestionsComplete = async (questions: SecurityQA[]) => {
+    const reg = pendingRegRef.current;
+    if (!reg) return;
     setIsLoading(true);
     setError('');
     try {
-      await registerOps(name, mobile, password, 'agency', adminCode.toUpperCase());
+      await registerOps(reg.name, reg.mobile, reg.password, 'agency', reg.adminCode.toUpperCase(), questions);
     } catch (err: any) {
       setError(formatErrorMessage(err, 'Registration failed'));
+      setView('register');
       setIsLoading(false);
     }
   };
 
+  if (view === 'forgotPassword') {
+    return (
+      <AnimatedView viewKey="forgotPassword" variant="slideRight">
+        <ForgotPassword
+          onBack={() => { setView('login'); setError(''); }}
+          onSuccess={() => { setView('login'); setError(''); }}
+        />
+      </AnimatedView>
+    );
+  }
+
+  if (view === 'securityQuestions') {
+    return (
+      <AnimatedView viewKey="securityQuestions" variant="slideUp">
+        <SecurityQuestionsSetup
+          onComplete={handleSecurityQuestionsComplete}
+          onBack={() => { setView('register'); setError(''); }}
+        />
+      </AnimatedView>
+    );
+  }
+
   if (view === 'splash') {
     return (
-      <div className="flex min-h-[100dvh] w-full bg-zinc-950 text-white overflow-hidden relative font-sans">
+      <AnimatedView viewKey="splash" variant="fade">
+      <div className="flex w-full bg-zinc-950 text-white overflow-x-hidden relative font-sans" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
         {/* Abstract Background */}
         <div className="absolute inset-0 z-0">
           <div className="absolute top-[-10%] left-[-10%] w-[60vw] h-[60vw] bg-purple-500/10 rounded-full blur-[150px] animate-pulse motion-reduce:animate-none"></div>
@@ -100,7 +136,7 @@ export const AgencyAuthScreen: React.FC<AgencyAuthProps> = ({ onBack }) => {
             </button>
           )}
 
-          <div className="w-24 h-24 bg-gradient-to-tr from-purple-400 to-indigo-500 rounded-3xl flex items-center justify-center shadow-2xl shadow-purple-500/20 mb-10 rotate-3 border-t border-white/20">
+          <div className="w-24 h-24 bg-gradient-to-tr from-purple-400 to-zinc-700 rounded-3xl flex items-center justify-center shadow-2xl shadow-purple-500/20 mb-10 rotate-3 border-t border-white/20">
             <Building2 size={40} className="text-white" />
           </div>
 
@@ -138,12 +174,14 @@ export const AgencyAuthScreen: React.FC<AgencyAuthProps> = ({ onBack }) => {
           </div>
         </div>
       </div>
+      </AnimatedView>
     );
   }
 
   // --- SPLIT LAYOUT FOR FORMS ---
   return (
-    <div className="flex min-h-[100dvh] w-full bg-white font-sans">
+    <AnimatedView viewKey={view} variant="slideUp">
+    <div className="flex w-full bg-white font-sans" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
       {/* Left Visual Side */}
       <div className="hidden lg:flex lg:w-1/2 bg-zinc-950 relative overflow-hidden flex-col justify-between p-12 text-white">
         <div className="absolute inset-0 z-0">
@@ -272,6 +310,16 @@ export const AgencyAuthScreen: React.FC<AgencyAuthProps> = ({ onBack }) => {
             >
               {view === 'login' ? 'Login to Ops' : 'Initialize Agency'}
             </Button>
+
+            {view === 'login' && (
+              <button
+                type="button"
+                className="w-full text-center text-xs text-zinc-500 hover:text-purple-500 mt-2 transition-colors"
+                onClick={() => { setView('forgotPassword'); setError(''); }}
+              >
+                Forgot Password?
+              </button>
+            )}
           </form>
 
           <p className="text-center mt-6 text-xs text-zinc-400 font-medium">
@@ -286,5 +334,6 @@ export const AgencyAuthScreen: React.FC<AgencyAuthProps> = ({ onBack }) => {
         </div>
       </div>
     </div>
+    </AnimatedView>
   );
 };

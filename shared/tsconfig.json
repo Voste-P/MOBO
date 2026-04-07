@@ -9,6 +9,6 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
-  "exclude": ["node_modules", "dist", "build", "**/*.d.ts"]
+  "include": ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts", "env.d.ts"],
+  "exclude": ["node_modules", "dist", "build"]
 }

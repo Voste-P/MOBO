@@ -51,6 +51,7 @@ export function DesktopShell({
           role="button"
           tabIndex={0}
           aria-label="Close sidebar"
+          aria-pressed="true"
           onClick={() => onSidebarOpenChange(false)}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSidebarOpenChange(false); }}
         />

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect, useRef, useMemo } from 'react';
 import { ChatMessage } from '../types';
 
 const MAX_PERSISTED_MESSAGES = 200;
@@ -99,8 +99,13 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [userId]);
 
+  const value = useMemo(
+    () => ({ messages, addMessage, setMessages, clearChat, setUserId }),
+    [messages, addMessage, setMessages, clearChat, setUserId],
+  );
+
   return (
-    <ChatContext.Provider value={{ messages, addMessage, setMessages, clearChat, setUserId }}>
+    <ChatContext.Provider value={value}>
       {children}
     </ChatContext.Provider>
   );

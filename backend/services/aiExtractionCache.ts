@@ -37,7 +37,7 @@ function parseVerification(v: any): Record<string, any> {
  * Get cached AI extraction for a proof type, or extract if not cached.
  */
 export async function getOrExtractProof(params: {
-  orderId: string; // mongoId
+  orderId: string;
   proofType: ProofType;
   imageBase64: string;
   expectedOrderId?: string;
@@ -66,7 +66,7 @@ export async function getOrExtractProof(params: {
   // Check cache first (unless forced)
   if (!forceReExtract) {
     const order = await prisma().order.findFirst({
-      where: { mongoId: orderId },
+      where: { id: orderId },
       select: { verification: true },
     });
 
@@ -92,70 +92,86 @@ export async function getOrExtractProof(params: {
   let extraction: any;
   const startTime = Date.now();
 
-  try {
-    switch (proofType) {
-      case 'order':
-      case 'payment':
-        if (!expectedOrderId || expectedAmount === undefined) {
-          throw new Error('Order/payment proof requires expectedOrderId and expectedAmount');
-        }
-        extraction = await verifyProofWithAi(env, { imageBase64, expectedOrderId, expectedAmount });
-        break;
+  const MAX_RETRIES = 3;
+  const BASE_DELAY_MS = 200;
 
-      case 'review':
-        if (!expectedOrderId) {
-          throw new Error('Review proof requires expectedOrderId');
-        }
-        extraction = await extractOrderDetailsWithAi(env, { imageBase64 });
-        break;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      switch (proofType) {
+        case 'order':
+        case 'payment':
+          if (!expectedOrderId || expectedAmount === undefined) {
+            throw new Error('Order/payment proof requires expectedOrderId and expectedAmount');
+          }
+          extraction = await verifyProofWithAi(env, { imageBase64, expectedOrderId, expectedAmount });
+          break;
 
-      case 'rating':
-        if (!expectedBuyerName || !expectedProductName) {
-          throw new Error('Rating proof requires expectedBuyerName and expectedProductName');
-        }
-        extraction = await verifyRatingScreenshotWithAi(env, {
-          imageBase64,
-          expectedBuyerName,
-          expectedProductName,
-          expectedReviewerName,
-        });
-        break;
+        case 'review':
+          if (!expectedOrderId) {
+            throw new Error('Review proof requires expectedOrderId');
+          }
+          extraction = await extractOrderDetailsWithAi(env, { imageBase64 });
+          break;
 
-      case 'returnWindow':
-        extraction = await extractOrderDetailsWithAi(env, { imageBase64 });
-        break;
+        case 'rating':
+          if (!expectedBuyerName || !expectedProductName) {
+            throw new Error('Rating proof requires expectedBuyerName and expectedProductName');
+          }
+          extraction = await verifyRatingScreenshotWithAi(env, {
+            imageBase64,
+            expectedBuyerName,
+            expectedProductName,
+            expectedReviewerName,
+          });
+          break;
 
-      default:
-        throw new Error(`Unknown proof type: ${proofType}`);
+        case 'returnWindow':
+          extraction = await extractOrderDetailsWithAi(env, { imageBase64 });
+          break;
+
+        default:
+          throw new Error(`Unknown proof type: ${proofType}`);
+      }
+      break; // Success — exit retry loop
+    } catch (error) {
+      // Don't retry validation errors (programmer mistakes), only transient AI failures
+      if (error instanceof Error && error.message.includes('requires expected')) throw error;
+      if (error instanceof Error && error.message.includes('Unknown proof type')) throw error;
+
+      if (attempt < MAX_RETRIES) {
+        const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1); // 200, 400, 800ms
+        aiLog.warn(`AI extraction attempt ${attempt}/${MAX_RETRIES} failed for order ${orderId} proof ${proofType}, retrying in ${delay}ms`, { error });
+        await new Promise(r => setTimeout(r, delay));
+      } else {
+        aiLog.error(`AI extraction failed after ${MAX_RETRIES} attempts for order ${orderId} proof ${proofType}`, { error });
+        throw error;
+      }
     }
-
-    const duration = Date.now() - startTime;
-    const now = new Date().toISOString();
-
-    // Merge into existing verification JSONB
-    const existing = await prisma().order.findFirst({
-      where: { mongoId: orderId },
-      select: { verification: true },
-    });
-    const veri = parseVerification(existing?.verification);
-    veri[cacheKey] = { ...extraction, extractedAt: now };
-
-    await prisma().order.update({
-      where: { mongoId: orderId },
-      data: { verification: veri as any },
-    });
-
-    aiLog.info(`AI extraction completed and cached for order ${orderId} proof ${proofType}`, {
-      duration,
-      confidence: extraction?.confidence,
-      verified: extraction?.verified,
-    });
-
-    return { ...extraction, cached: false, extractedAt: now };
-  } catch (error) {
-    aiLog.error(`AI extraction failed for order ${orderId} proof ${proofType}`, { error });
-    throw error;
   }
+
+  const duration = Date.now() - startTime;
+  const now = new Date().toISOString();
+
+  // Merge into existing verification JSONB
+  const existing = await prisma().order.findFirst({
+    where: { id: orderId },
+    select: { verification: true },
+  });
+  const veri = parseVerification(existing?.verification);
+  veri[cacheKey] = { ...extraction, extractedAt: now };
+
+  await prisma().order.update({
+    where: { id: orderId },
+    data: { verification: veri as any },
+  });
+
+  aiLog.info(`AI extraction completed and cached for order ${orderId} proof ${proofType}`, {
+    duration,
+    confidence: extraction?.confidence,
+    verified: extraction?.verified,
+  });
+
+  return { ...extraction, cached: false, extractedAt: now };
 }
 
 /**
@@ -165,14 +181,14 @@ export async function clearProofCache(orderId: string, proofType: ProofType): Pr
   const cacheKey = `${proofType}AiExtraction`;
 
   const existing = await prisma().order.findFirst({
-    where: { mongoId: orderId },
+    where: { id: orderId },
     select: { verification: true },
   });
   const veri = parseVerification(existing?.verification);
   delete veri[cacheKey];
 
   await prisma().order.update({
-    where: { mongoId: orderId },
+    where: { id: orderId },
     data: { verification: veri as any },
   });
 
@@ -190,7 +206,7 @@ export async function getExtractionStatus(orderId: string): Promise<{
   returnWindow: { extracted: boolean; at: string | null };
 }> {
   const row = await prisma().order.findFirst({
-    where: { mongoId: orderId },
+    where: { id: orderId },
     select: { verification: true },
   });
 
@@ -275,7 +291,7 @@ export async function preWarmCache(params: {
       try {
         const screenshotKey = `screenshot${proofType.charAt(0).toUpperCase() + proofType.slice(1)}` as any;
         const order = await prisma().order.findFirst({
-          where: { mongoId: orderId },
+          where: { id: orderId },
           select: { [screenshotKey]: true, verification: true } as any,
         });
 

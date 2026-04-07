@@ -1,6 +1,6 @@
 /* ────────────────────────────────────────────────────────────
  *  Error classification & user-friendly message helpers
- * ──────────────────────────────────────────────────────────── */
+ * ───────────────────────────────────────────────────────────*/
 
 export type ErrorCategory =
   | 'network'
@@ -78,13 +78,13 @@ export function formatErrorMessage(err: unknown, fallback: string): string {
   if (!err) return fallback;
   if (typeof err === 'string' && err.trim()) return err;
 
-  // ── Network / Timeout (no server message available) ──
+  // ─Network / Timeout (no server message available) ──
   if (isNetworkError(err))
     return 'Unable to connect. Please check your internet connection and try again.';
   if (isTimeoutError(err))
     return 'The request took too long. Please try again.';
 
-  // ── Error with a message from the server ──
+  // ─Error with a message from the server ──
   if (err instanceof Error && err.message) {
     // Strip raw status-only messages and replace with friendly text
     const statusMatch = err.message.match(/^Request failed:\s*(\d{3})$/);

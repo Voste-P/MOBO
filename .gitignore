@@ -11,6 +11,7 @@ dist
 dist-ssr
 .next
 out
+generated
 .vercel
 .turbo
 .swc

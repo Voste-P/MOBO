@@ -1,4 +1,5 @@
 import { prisma as db } from '../database/prisma.js';
+import { Prisma } from '../generated/prisma/client.js';
 import { orderLog } from '../config/logger.js';
 import { logErrorEvent, logChangeEvent } from '../config/appLogs.js';
 import { ensureWallet, applyWalletDebit, applyWalletCredit } from './walletService.js';
@@ -15,9 +16,11 @@ const SYSTEM_ACTOR = 'system:cooling-settler';
 interface SettlePrefetch {
   disputeOrderIds: Set<string | null>;
   campaignMap: Map<string, { id: string; assignments: any; brandUserId: string }>;
-  dealMap: Map<string, { id: string; mongoId: string | null; payoutPaise: number }>;
-  userMap: Map<string, { id: string; mongoId: string | null; status: string; isDeleted: boolean }>;
+  dealMap: Map<string, { id: string; payoutPaise: number }>;
+  userMap: Map<string, { id: string; status: string; isDeleted: boolean }>;
   mediatorMap: Map<string, { id: string; mediatorCode: string | null }>;
+  /** Batch cap counts: "mediatorCode::campaignId" -> count of already settled orders */
+  capCountMap: Map<string, number>;
 }
 
 /**
@@ -26,7 +29,7 @@ interface SettlePrefetch {
  * Returns true if settled, false if skipped (disputed/frozen/already settled).
  */
 async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promise<boolean> {
-  const orderDisplayId = order.mongoId ?? order.id;
+  const orderDisplayId = order.id ?? order.id;
 
   // Skip frozen orders
   if (order.frozen) {
@@ -40,6 +43,24 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
       orderId: orderDisplayId,
       workflowStatus: order.workflowStatus,
     });
+    return false;
+  }
+
+  // ── Atomic claim: prevent double-settlement from concurrent cron invocations ──
+  // Set updatedBy to claim this order; concurrent settlers will see the claim and skip.
+  const claimed = await db().order.updateMany({
+    where: {
+      id: order.id,
+      workflowStatus: 'APPROVED',
+      affiliateStatus: 'Pending_Cooling',
+      frozen: false,
+      isDeleted: false,
+      updatedBy: { not: SYSTEM_ACTOR },
+    },
+    data: { updatedBy: SYSTEM_ACTOR },
+  });
+  if (claimed.count === 0) {
+    orderLog.info('[cooling-settler] Order already claimed by another settler', { orderId: orderDisplayId });
     return false;
   }
 
@@ -105,15 +126,18 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
       typeof rawAssigned === 'number' ? rawAssigned : Number(rawAssigned?.limit ?? 0);
 
     if (assignedLimit > 0) {
-      const settledCount = await db().order.count({
-        where: {
-          managerName: mediatorCode,
-          items: { some: { campaignId } },
-          OR: [{ affiliateStatus: 'Approved_Settled' }, { paymentStatus: 'Paid' }],
-          id: { not: order.id },
-          isDeleted: false,
-        },
-      });
+      const capKey = `${mediatorCode}::${campaignId}`;
+      const settledCount = prefetch?.capCountMap.has(capKey)
+        ? prefetch.capCountMap.get(capKey)!
+        : await db().order.count({
+            where: {
+              managerName: mediatorCode,
+              items: { some: { campaignId } },
+              OR: [{ affiliateStatus: 'Approved_Settled' }, { paymentStatus: 'Paid' }],
+              id: { not: order.id },
+              isDeleted: false,
+            },
+          });
       if (settledCount >= assignedLimit) isOverLimit = true;
     }
   }
@@ -172,13 +196,13 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
     await db().$transaction(
       async (tx: any) => {
         await applyWalletDebit({
-          idempotencyKey: `order-settlement-debit-${order.mongoId}`,
+          idempotencyKey: `order-settlement-debit-${order.id}`,
           type: 'order_settlement_debit',
           ownerUserId: brandId,
           fromUserId: brandId,
           toUserId: buyerUserId,
           amountPaise: payoutPaise,
-          orderId: order.mongoId!,
+          orderId: order.id!,
           campaignId: campaignId ? String(campaignId) : undefined,
           metadata: { reason: 'ORDER_PAYOUT', dealId: productId, mediatorCode, source: 'cooling-settler' },
           tx,
@@ -186,11 +210,11 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
 
         if (buyerCommissionPaise > 0) {
           await applyWalletCredit({
-            idempotencyKey: `order-commission-${order.mongoId}`,
+            idempotencyKey: `order-commission-${order.id}`,
             type: 'commission_settle',
             ownerUserId: buyerUserId,
             amountPaise: buyerCommissionPaise,
-            orderId: order.mongoId!,
+            orderId: order.id!,
             campaignId: campaignId ? String(campaignId) : undefined,
             metadata: { reason: 'ORDER_COMMISSION', dealId: productId, source: 'cooling-settler' },
             tx,
@@ -199,11 +223,11 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
 
         if (mediatorUserId && mediatorMarginPaise > 0) {
           await applyWalletCredit({
-            idempotencyKey: `order-margin-${order.mongoId}`,
+            idempotencyKey: `order-margin-${order.id}`,
             type: 'commission_settle',
             ownerUserId: mediatorUserId,
             amountPaise: mediatorMarginPaise,
-            orderId: order.mongoId!,
+            orderId: order.id!,
             campaignId: campaignId ? String(campaignId) : undefined,
             metadata: {
               reason: 'ORDER_MARGIN',
@@ -231,7 +255,7 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
           },
         });
       },
-      { timeout: 15000 },
+      { timeout: env.SETTLER_TX_TIMEOUT_MS },
     );
   } else {
     // Cap-exceeded or missing product: update status without wallet movement
@@ -253,7 +277,7 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
 
   // Workflow transitions: APPROVED → REWARD_PENDING → COMPLETED/FAILED
   await transitionOrderWorkflow({
-    orderId: order.mongoId!,
+    orderId: order.id!,
     from: 'APPROVED',
     to: 'REWARD_PENDING',
     actorUserId: SYSTEM_ACTOR,
@@ -262,7 +286,7 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
   });
 
   await transitionOrderWorkflow({
-    orderId: order.mongoId!,
+    orderId: order.id!,
     from: 'REWARD_PENDING',
     to: isOverLimit ? 'FAILED' : 'COMPLETED',
     actorUserId: SYSTEM_ACTOR,
@@ -278,12 +302,12 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
   const audience: { roles?: Role[]; userIds?: string[] } = { roles: privilegedRoles, userIds: [] };
   const buyerUser = prefetch
     ? (prefetch.userMap.get(order.userId) ?? null)
-    : order.userId ? await db().user.findUnique({ where: { id: order.userId }, select: { mongoId: true } }) : null;
+    : order.userId ? await db().user.findUnique({ where: { id: order.userId }, select: { id: true } }) : null;
   const brandUser = prefetch
     ? (order.brandUserId ? (prefetch.userMap.get(order.brandUserId) ?? null) : null)
-    : order.brandUserId ? await db().user.findUnique({ where: { id: order.brandUserId }, select: { mongoId: true } }) : null;
-  if (buyerUser?.mongoId) audience.userIds!.push(buyerUser.mongoId);
-  if (brandUser?.mongoId) audience.userIds!.push(brandUser.mongoId);
+    : order.brandUserId ? await db().user.findUnique({ where: { id: order.brandUserId }, select: { id: true } }) : null;
+  if (buyerUser?.id) audience.userIds!.push(buyerUser.id);
+  if (brandUser?.id) audience.userIds!.push(brandUser.id);
 
   publishRealtime({ type: 'orders.changed', ts: new Date().toISOString(), audience });
   publishRealtime({ type: 'notifications.changed', ts: new Date().toISOString(), audience });
@@ -317,12 +341,14 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
  */
 export async function processCoolingPeriodSettlements(env: Env): Promise<{ settled: number; skipped: number; errors: number }> {
   const BATCH_SIZE = 50;
+  const MAX_BATCHES = 20; // Safety cap: process at most 1000 orders per run
   let settled = 0;
   let skipped = 0;
   let errors = 0;
 
   orderLog.info('[cooling-settler] Starting cooling period settlement run');
 
+  for (let batch = 0; batch < MAX_BATCHES; batch++) {
   // Find orders past their cooling period that haven't been settled
   const orders = await db().order.findMany({
     where: {
@@ -338,14 +364,14 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
   });
 
   if (orders.length === 0) {
-    orderLog.info('[cooling-settler] No orders ready for settlement');
-    return { settled, skipped, errors };
+    if (batch === 0) orderLog.info('[cooling-settler] No orders ready for settlement');
+    break; // No more orders to process
   }
 
   orderLog.info(`[cooling-settler] Found ${orders.length} orders ready for settlement`);
 
   // ── Batch prefetch: load all related data in parallel to eliminate N+1 queries ──
-  const orderIds = orders.map(o => o.mongoId ?? o.id);
+  const orderIds = orders.map(o => o.id ?? o.id);
   const campaignIds = [...new Set(orders.map(o => o.items?.[0]?.campaignId).filter(Boolean))] as string[];
   const productIds = [...new Set(orders.map(o => String(o.items?.[0]?.productId || '').trim()).filter(Boolean))];
   const userIds = [...new Set(orders.flatMap(o => [o.userId, o.brandUserId].filter(Boolean)))] as string[];
@@ -367,25 +393,17 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
     // Batch deal lookup
     productIds.length > 0
       ? db().deal.findMany({
-          where: { mongoId: { in: productIds }, isDeleted: false },
-          select: { id: true, mongoId: true, payoutPaise: true },
-        }).then(async (byMongo) => {
-          // Also try by UUID for non-mongo product IDs
-          const foundMongoIds = new Set(byMongo.map(d => d.mongoId));
-          const remaining = productIds.filter(pid => !foundMongoIds.has(pid) && pid.includes('-'));
-          if (remaining.length === 0) return byMongo;
-          const byUuid = await db().deal.findMany({
-            where: { id: { in: remaining }, isDeleted: false },
-            select: { id: true, mongoId: true, payoutPaise: true },
-          });
-          return [...byMongo, ...byUuid];
+          where: { id: { in: productIds }, isDeleted: false },
+          select: { id: true, payoutPaise: true },
+        }).then(async (byId) => {
+          return byId;
         })
       : [],
     // Batch user lookup (buyers + brands)
     userIds.length > 0
       ? db().user.findMany({
           where: { id: { in: userIds } },
-          select: { id: true, mongoId: true, status: true, isDeleted: true },
+          select: { id: true, status: true, isDeleted: true },
         })
       : [],
     // Batch mediator lookup
@@ -400,38 +418,85 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
   // Build lookup maps for O(1) access during settlement
   const disputeOrderIds = new Set(disputes.map(t => t.orderId));
   const campaignMap = new Map(campaignsArr.map(c => [c.id, c]));
-  const dealMap = new Map(dealsArr.map(d => [d.mongoId ?? d.id, d]));
+  const dealMap = new Map(dealsArr.map(d => [d.id ?? d.id, d]));
   const userMap = new Map(usersArr.map(u => [u.id, u]));
   const mediatorMap = new Map(mediatorsArr.map(m => [m.mediatorCode!, m]));
 
-  // Attach prefetched data to a context object passed into settleOne
-  const prefetch = { disputeOrderIds, campaignMap, dealMap, userMap, mediatorMap };
-
-  for (const order of orders) {
-    try {
-      const didSettle = await settleOne(order, env, prefetch);
-      if (didSettle) settled++;
-      else skipped++;
-    } catch (err) {
-      errors++;
-      logErrorEvent({
-        error: err instanceof Error ? err : new Error(String(err)),
-        message: `[cooling-settler] Failed to settle order ${order.mongoId ?? order.id}`,
-        category: 'BUSINESS_LOGIC',
-        severity: 'high',
-        metadata: { orderId: order.mongoId ?? order.id, handler: 'coolingPeriodSettler' },
-      });
+  // Batch cap counts: single GROUP BY aggregate instead of N individual count queries
+  const capPairs = [...new Set(
+    orders
+      .filter(o => o.managerName && o.items?.[0]?.campaignId)
+      .map(o => `${String(o.managerName).trim()}::${o.items![0].campaignId}`),
+  )];
+  const capCountMap = new Map<string, number>();
+  if (capPairs.length > 0) {
+    const mcCodes = [...new Set(capPairs.map(p => p.split('::')[0]))];
+    const cids = [...new Set(capPairs.map(p => p.split('::')[1]))];
+    const rows = await db().$queryRaw<Array<{ manager_name: string; campaign_id: string; cnt: bigint }>>(
+      Prisma.sql`
+        SELECT o."managerName" AS manager_name, oi."campaignId" AS campaign_id, COUNT(DISTINCT o.id)::bigint AS cnt
+        FROM "Order" o
+        JOIN "OrderItem" oi ON oi."orderId" = o.id AND oi."isDeleted" = false
+        WHERE o."managerName" IN (${Prisma.join(mcCodes)})
+          AND oi."campaignId" IN (${Prisma.join(cids)})
+          AND (o."affiliateStatus" = 'Approved_Settled' OR o."paymentStatus" = 'Paid')
+          AND o."isDeleted" = false
+        GROUP BY o."managerName", oi."campaignId"
+      `
+    );
+    for (const r of rows) {
+      capCountMap.set(`${r.manager_name}::${r.campaign_id}`, Number(r.cnt));
     }
   }
 
-  orderLog.info('[cooling-settler] Settlement run complete', { settled, skipped, errors, total: orders.length });
+  // Attach prefetched data to a context object passed into settleOne
+  const prefetch = { disputeOrderIds, campaignMap, dealMap, userMap, mediatorMap, capCountMap };
+
+  for (const order of orders) {
+    const orderId = order.id ?? order.id;
+    // Retry up to 2 times on transient DB errors (connection, timeout, deadlock)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const didSettle = await settleOne(order, env, prefetch);
+        if (didSettle) settled++;
+        else skipped++;
+        break;
+      } catch (err: any) {
+        const code = err?.code ?? '';
+        const isTransient = code === 'P1017' || code === 'P1001' || code === 'P1008' || code === 'P2034'
+          || (err?.message && /deadlock|timeout|connection/i.test(err.message));
+        if (isTransient && attempt < 2) {
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+          continue;
+        }
+        errors++;
+        logErrorEvent({
+          error: err instanceof Error ? err : new Error(String(err)),
+          message: `[cooling-settler] Failed to settle order ${orderId}` + (attempt > 0 ? ` (after ${attempt + 1} attempts)` : ''),
+          category: 'BUSINESS_LOGIC',
+          severity: 'high',
+          metadata: { orderId, handler: 'coolingPeriodSettler', attempts: attempt + 1 },
+        });
+        break;
+      }
+    }
+  }
+
+  // If this batch was smaller than BATCH_SIZE, no more orders remain
+  if (orders.length < BATCH_SIZE) break;
+  } // end batch loop
+
+  orderLog.info('[cooling-settler] Settlement run complete', { settled, skipped, errors });
   return { settled, skipped, errors };
 }
 
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
 
 /** Start the cooling period settlement loop. Call once at server startup. */
-export function startCoolingPeriodSettler(env: Env, intervalMs = 15 * 60 * 1000): void {
+export function startCoolingPeriodSettler(env: Env, intervalMs?: number): void {
+  const interval = intervalMs ?? env.SETTLER_INTERVAL_MS;
   if (intervalHandle) return; // already started
 
   // Run once immediately after a short delay (let server fully start)
@@ -443,9 +508,9 @@ export function startCoolingPeriodSettler(env: Env, intervalMs = 15 * 60 * 1000)
   // Then run periodically (default: every 15 minutes for faster settlements)
   intervalHandle = setInterval(() => {
     void processCoolingPeriodSettlements(env);
-  }, intervalMs);
+  }, interval);
   intervalHandle.unref(); // don't prevent graceful shutdown
-  orderLog.info(`[cooling-settler] Scheduled every ${Math.round(intervalMs / 60000)}min`);
+  orderLog.info(`[cooling-settler] Scheduled every ${Math.round(interval / 60000)}min`);
 }
 
 /** Stop the settlement loop (call during graceful shutdown). */

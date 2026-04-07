@@ -1,6 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { randomUUID } from 'node:crypto';
 import { prisma, withDbRetry } from '../database/prisma.js';
 import { AppError } from '../middleware/errors.js';
 import { idWhere } from '../utils/idWhere.js';
@@ -14,6 +13,9 @@ import {
   registerSchema,
   refreshSchema,
   updateProfileSchema,
+  securityQuestionsPayloadSchema,
+  forgotPasswordLookupSchema,
+  forgotPasswordResetSchema,
 } from '../validations/auth.js';
 import { generateHumanCode } from '../services/codes.js';
 import { writeAuditLog } from '../services/audit.js';
@@ -27,6 +29,7 @@ import { ensureRoleDocumentsForUser } from '../services/roleDocuments.js';
 import { publishRealtime } from '../services/realtimeHub.js';
 import { getAgencyCodeForMediatorCode } from '../services/lineage.js';
 import { compressImageDataUrl, compressQrCode } from '../utils/imageCompress.js';
+import { authCacheInvalidate } from '../utils/authCache.js';
 
 export function makeAuthController(env: Env) {
   const db = () => prisma();
@@ -77,6 +80,10 @@ export function makeAuthController(env: Env) {
     register: async (req: Request, res: Response, next: NextFunction) => {
       try {
         const body = registerSchema.parse(req.body);
+
+        // Parse optional security questions from request body
+        const rawSQ = Array.isArray(req.body?.securityQuestions) ? req.body.securityQuestions : null;
+        const parsedSQ = rawSQ ? securityQuestionsPayloadSchema.safeParse(rawSQ) : null;
 
         const existing = await db().user.findFirst({ where: { mobile: body.mobile, isDeleted: false }, select: { id: true } });
         if (existing) {
@@ -130,10 +137,8 @@ export function makeAuthController(env: Env) {
             throw new AppError(400, 'INVALID_INVITE_PARENT', 'The mediator associated with this invite is no longer active. Please contact support.');
           }
 
-          const mongoId = randomUUID();
           const newUser = await tx.user.create({
             data: {
-              mongoId,
               name: body.name,
               mobile: body.mobile,
               email: body.email,
@@ -166,7 +171,7 @@ export function makeAuthController(env: Env) {
             action: 'INVITE_USED',
             entityType: 'Invite',
             entityId: String(consumed._id),
-            metadata: { code: consumed.code, role: consumed.role, usedBy: user.mongoId },
+            metadata: { code: consumed.code, role: consumed.role, usedBy: user.id },
           });
 
           publishRealtime({
@@ -215,7 +220,7 @@ export function makeAuthController(env: Env) {
           publishRealtime({
             type: 'users.changed',
             ts,
-            payload: { userId: user.mongoId, kind: 'buyer', mediatorCode: upstreamMediatorCode },
+            payload: { userId: user.id, kind: 'buyer', mediatorCode: upstreamMediatorCode },
             audience: {
               mediatorCodes: [upstreamMediatorCode],
               ...(agencyCode ? { agencyCodes: [agencyCode] } : {}),
@@ -225,12 +230,26 @@ export function makeAuthController(env: Env) {
           publishRealtime({
             type: 'notifications.changed',
             ts,
-            payload: { source: 'buyer.registered', userId: user.mongoId },
+            payload: { source: 'buyer.registered', userId: user.id },
             audience: {
               mediatorCodes: [upstreamMediatorCode],
               ...(agencyCode ? { agencyCodes: [agencyCode] } : {}),
               roles: ['admin', 'ops'],
             },
+          });
+        }
+        // Save security questions if provided during registration
+        if (parsedSQ?.success && parsedSQ.data.length === 3) {
+          const sqRecords = await Promise.all(
+            parsedSQ.data.map(async (q) => ({
+              userId: user.id,
+              questionId: q.questionId,
+              answerHash: await hashPassword(q.answer.trim().toLowerCase()),
+            }))
+          );
+          await db().securityQuestion.createMany({ data: sqRecords }).catch((sqErr) => {
+            businessLog.warn('Failed to save security questions during registration', { userId: user.id, error: sqErr?.message });
+            // Non-critical: log but continue — user can re-set questions later
           });
         }
         res.status(201).json({
@@ -278,6 +297,9 @@ export function makeAuthController(env: Env) {
           : await withDbRetry(() => db().user.findFirst({ where: { username, roles: { hasSome: ['admin', 'ops'] as any }, isDeleted: false }, select: authSelect }));
 
         if (!authUser) {
+          // Prevent timing side-channel: always run bcrypt so response time
+          // is comparable whether or not the user exists.
+          await verifyPassword(password, '$2a$12$DUMMY_HASH_TO_PREVENT_TIMING_ATTACK_000000000000');
           businessLog.warn('Login failed — user not found', { identifier: mobile || username, ip: req.ip });
           logAuthEvent('LOGIN_FAILURE', {
             identifier: mobile || username,
@@ -352,7 +374,9 @@ export function makeAuthController(env: Env) {
           throw new AppError(429, 'ACCOUNT_LOCKED', `Account locked. Try again in ${minutesLeft} minute${minutesLeft > 1 ? 's' : ''}.`);
         }
 
-        const ok = await verifyPassword(password, authUser.passwordHash);
+        const ok = authUser.passwordHash
+          ? await verifyPassword(password, authUser.passwordHash)
+          : false;
         if (!ok) {
           const newAttempts = (authUser.failedLoginAttempts ?? 0) + 1;
           await db().user.update({
@@ -400,7 +424,7 @@ export function makeAuthController(env: Env) {
           db().user.findFirst({
             where: { id: authUser.id, isDeleted: false },
             select: {
-              id: true, mongoId: true, name: true, mobile: true, email: true,
+              id: true, name: true, mobile: true, email: true,
               avatar: true, role: true, roles: true, status: true,
               parentCode: true, mediatorCode: true, brandCode: true,
               isVerifiedByMediator: true, username: true,
@@ -474,7 +498,7 @@ export function makeAuthController(env: Env) {
         const user = await db().user.findFirst({
           where: { ...idWhere(userId), isDeleted: false },
           select: {
-            id: true, mongoId: true, name: true, email: true, mobile: true,
+            id: true, name: true, email: true, mobile: true,
             role: true, roles: true, status: true, mediatorCode: true,
             parentCode: true, avatar: true, createdAt: true, updatedAt: true,
             isDeleted: true,
@@ -519,6 +543,10 @@ export function makeAuthController(env: Env) {
     registerOps: async (req: Request, res: Response, next: NextFunction) => {
       try {
         const body = registerOpsSchema.parse(req.body);
+
+        // Parse optional security questions from request body
+        const rawSQOps = Array.isArray(req.body?.securityQuestions) ? req.body.securityQuestions : null;
+        const parsedSQOps = rawSQOps ? securityQuestionsPayloadSchema.safeParse(rawSQOps) : null;
 
         const existing = await db().user.findFirst({ where: { mobile: body.mobile, isDeleted: false }, select: { id: true } });
         if (existing) {
@@ -616,10 +644,8 @@ export function makeAuthController(env: Env) {
             throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique code; please retry');
           }
 
-          const mongoId = randomUUID();
           const newUser = await tx.user.create({
             data: {
-              mongoId,
               name: body.name,
               mobile: body.mobile,
               passwordHash,
@@ -653,7 +679,7 @@ export function makeAuthController(env: Env) {
             action: 'INVITE_USED',
             entityType: 'Invite',
             entityId: String(consumed._id),
-            metadata: { code: consumed.code, role: consumed.role, usedBy: user.mongoId },
+            metadata: { code: consumed.code, role: consumed.role, usedBy: user.id },
           });
 
           publishRealtime({
@@ -667,7 +693,7 @@ export function makeAuthController(env: Env) {
           req,
           action: 'USER_REGISTERED',
           entityType: 'User',
-          entityId: user.mongoId!,
+          entityId: user.id!,
           metadata: { role: user.role, mobile: user.mobile, pendingApproval },
         }).catch((err) => { businessLog.warn('Failed to audit registration', { error: err?.message }); });
 
@@ -699,14 +725,28 @@ export function makeAuthController(env: Env) {
             publishRealtime({
               type: 'users.changed',
               ts,
-              payload: { userId: user.mongoId, kind: 'mediator', status: 'pending', agencyCode },
+              payload: { userId: user.id, kind: 'mediator', status: 'pending', agencyCode },
               audience: { agencyCodes: [agencyCode], roles: ['admin', 'ops'] },
             });
             publishRealtime({
               type: 'notifications.changed',
               ts,
-              payload: { source: 'mediator.join.requested', userId: user.mongoId, agencyCode },
+              payload: { source: 'mediator.join.requested', userId: user.id, agencyCode },
               audience: { agencyCodes: [agencyCode], roles: ['admin', 'ops'] },
+            });
+          }
+          // Save security questions if provided during ops registration
+          if (parsedSQOps?.success && parsedSQOps.data.length === 3) {
+            const sqOpsRecords = await Promise.all(
+              parsedSQOps.data.map(async (q) => ({
+                userId: user.id,
+                questionId: q.questionId,
+                answerHash: await hashPassword(q.answer.trim().toLowerCase()),
+              }))
+            );
+            await db().securityQuestion.createMany({ data: sqOpsRecords }).catch((sqErr) => {
+              businessLog.warn('Failed to save security questions during ops registration', { userId: user.id, error: sqErr?.message });
+              // Non-critical: log but continue — user can re-set questions later
             });
           }
           res.status(202).json({
@@ -737,6 +777,10 @@ export function makeAuthController(env: Env) {
     registerBrand: async (req: Request, res: Response, next: NextFunction) => {
       try {
         const body = registerBrandSchema.parse(req.body);
+
+        // Parse optional security questions from request body
+        const rawSQBrand = Array.isArray(req.body?.securityQuestions) ? req.body.securityQuestions : null;
+        const parsedSQBrand = rawSQBrand ? securityQuestionsPayloadSchema.safeParse(rawSQBrand) : null;
 
         const existing = await db().user.findFirst({ where: { mobile: body.mobile, isDeleted: false }, select: { id: true } });
         if (existing) {
@@ -771,10 +815,8 @@ export function makeAuthController(env: Env) {
             throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique brand code; please retry');
           }
 
-          const mongoId = randomUUID();
           const newUser = await tx.user.create({
             data: {
-              mongoId,
               name: body.name,
               mobile: body.mobile,
               passwordHash,
@@ -802,14 +844,14 @@ export function makeAuthController(env: Env) {
           action: 'INVITE_USED',
           entityType: 'Invite',
           entityId: String(consumed._id),
-          metadata: { code: consumed.code, role: consumed.role, usedBy: user.mongoId },
+          metadata: { code: consumed.code, role: consumed.role, usedBy: user.id },
         });
 
         writeAuditLog({
           req,
           action: 'USER_REGISTERED',
           entityType: 'User',
-          entityId: user.mongoId!,
+          entityId: user.id!,
           metadata: { role: 'brand', mobile: user.mobile },
         }).catch((err) => { businessLog.warn('Failed to audit registration', { error: err?.message }); });
 
@@ -843,6 +885,21 @@ export function makeAuthController(env: Env) {
 
         const wallet = await ensureWallet(user.id);
 
+        // Save security questions if provided during brand registration
+        if (parsedSQBrand?.success && parsedSQBrand.data.length === 3) {
+          const sqBrandRecords = await Promise.all(
+            parsedSQBrand.data.map(async (q) => ({
+              userId: user.id,
+              questionId: q.questionId,
+              answerHash: await hashPassword(q.answer.trim().toLowerCase()),
+            }))
+          );
+          await db().securityQuestion.createMany({ data: sqBrandRecords }).catch((sqErr) => {
+            businessLog.warn('Failed to save security questions during brand registration', { userId: user.id, error: sqErr?.message });
+            // Non-critical: log but continue — user can re-set questions later
+          });
+        }
+
         res.status(201).json({
           user: toUiUser(pgUser(user), pgWallet(wallet)),
           tokens: { accessToken, refreshToken },
@@ -868,14 +925,14 @@ export function makeAuthController(env: Env) {
           throw new AppError(401, 'UNAUTHENTICATED', 'Missing auth context');
         }
 
-        const targetMongoId = body.userId ?? requesterId;
+        const targetUserId = body.userId ?? requesterId;
         const requester = await db().user.findFirst({ where: { ...idWhere(requesterId), isDeleted: false } });
         if (!requester) throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
 
-        // targetMongoId may be a mongoId while requesterId is PG UUID — check both.
-        const isSelf = String(targetMongoId) === String(requesterId)
-          || String(targetMongoId) === String(requester.id)
-          || String(targetMongoId) === String(requester.mongoId ?? '');
+        // Check both UUID formats for identity comparison.
+        const isSelf = String(targetUserId) === String(requesterId)
+          || String(targetUserId) === String(requester.id)
+          || String(targetUserId) === String(requester.id ?? '');
         const isAdmin = requester.roles?.includes('admin' as any) || requester.roles?.includes('ops' as any);
         if (!isSelf && !isAdmin) {
           throw new AppError(403, 'FORBIDDEN', 'Cannot update other user profile');
@@ -883,7 +940,7 @@ export function makeAuthController(env: Env) {
 
         const targetUser = isSelf
           ? requester
-          : await db().user.findFirst({ where: { ...idWhere(targetMongoId), isDeleted: false } });
+          : await db().user.findFirst({ where: { ...idWhere(targetUserId), isDeleted: false } });
         if (!targetUser) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
         const update: any = {};
@@ -926,6 +983,9 @@ export function makeAuthController(env: Env) {
           include: { pendingConnections: { where: { isDeleted: false } } },
         });
 
+        // Invalidate auth cache so subsequent requests see updated profile data
+        authCacheInvalidate(user.id);
+
         // Keep role-specific collections consistent with the canonical User record.
         await ensureRoleDocumentsForUser({ user });
 
@@ -933,7 +993,7 @@ export function makeAuthController(env: Env) {
           req,
           action: 'PROFILE_UPDATED',
           entityType: 'User',
-          entityId: user.mongoId!,
+          entityId: user.id!,
           metadata: {
             updatedFields: Object.keys(update).filter(k => k !== 'avatar' && k !== 'qrCode'),
             updatedBy: isSelf ? 'self' : 'admin',
@@ -967,8 +1027,8 @@ export function makeAuthController(env: Env) {
         publishRealtime({
           type: 'users.changed',
           ts: new Date().toISOString(),
-          payload: { userId: user.mongoId },
-          audience: { roles: ['admin', 'ops'], userIds: [user.mongoId!] },
+          payload: { userId: user.id },
+          audience: { roles: ['admin', 'ops'], userIds: [user.id!] },
         });
         const wallet = await ensureWallet(user.id);
         res.json({ user: toUiUser(pgUser(user), pgWallet(wallet)) });
@@ -978,6 +1038,210 @@ export function makeAuthController(env: Env) {
           category: 'AUTHENTICATION',
           severity: 'medium',
           userId: req.auth?.userId,
+          ip: req.ip,
+          requestId: String(res.locals?.requestId || ''),
+          metadata: { error: err instanceof Error ? err.message : String(err) },
+        });
+        next(err);
+      }
+    },
+
+    // ─── Security Questions: save during registration ──────────────
+    saveSecurityQuestions: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const userId = String(req.auth?.userId || '').trim();
+        if (!userId) throw new AppError(401, 'UNAUTHENTICATED', 'Missing auth context');
+
+        const body = securityQuestionsPayloadSchema.parse(req.body);
+
+        const user = await db().user.findFirst({ where: { id: userId, isDeleted: false }, select: { id: true } });
+        if (!user) throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
+
+        // Check if user already has security questions
+        const existing = await db().securityQuestion.count({ where: { userId: user.id } });
+        if (existing > 0) {
+          throw new AppError(409, 'SECURITY_QUESTIONS_ALREADY_SET', 'Security questions are already configured');
+        }
+
+        // Hash all answers (lowercase + trimmed) and store
+        const records = await Promise.all(
+          body.map(async (q) => ({
+            userId: user.id,
+            questionId: q.questionId,
+            answerHash: await hashPassword(q.answer.trim().toLowerCase()),
+          }))
+        );
+
+        await db().securityQuestion.createMany({ data: records });
+
+        await writeAuditLog({
+          req,
+          action: 'SECURITY_QUESTIONS_SET',
+          entityType: 'User',
+          entityId: user.id,
+          metadata: { questionIds: body.map((q) => q.questionId) },
+        });
+
+        businessLog.info('Security questions set', { userId: user.id, ip: req.ip });
+        res.json({ ok: true });
+      } catch (err) {
+        logErrorEvent({
+          message: 'Failed to save security questions',
+          category: 'AUTHENTICATION',
+          severity: 'medium',
+          userId: req.auth?.userId,
+          ip: req.ip,
+          requestId: String(res.locals?.requestId || ''),
+          metadata: { error: err instanceof Error ? err.message : String(err) },
+        });
+        next(err);
+      }
+    },
+
+    // ─── Forgot Password: Step 1 — lookup user & return question IDs ───
+    forgotPasswordLookup: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = forgotPasswordLookupSchema.parse(req.body);
+
+        const user = await db().user.findFirst({
+          where: { mobile: body.mobile, isDeleted: false },
+          select: { id: true, status: true },
+        });
+
+        if (!user) {
+          // Don't reveal whether the mobile exists — generic error
+          throw new AppError(404, 'USER_NOT_FOUND', 'No account found with this mobile number');
+        }
+        if (user.status !== 'active') {
+          throw new AppError(403, 'USER_NOT_ACTIVE', 'Account is not active');
+        }
+
+        const questions = await db().securityQuestion.findMany({
+          where: { userId: user.id },
+          select: { questionId: true },
+          orderBy: { questionId: 'asc' },
+        });
+
+        if (questions.length < 3) {
+          throw new AppError(400, 'NO_SECURITY_QUESTIONS', 'Security questions are not configured for this account. Please contact support.');
+        }
+
+        logAuthEvent('FORGOT_PASSWORD_LOOKUP', {
+          identifier: body.mobile,
+          ip: req.ip,
+          requestId: String(res.locals.requestId || ''),
+        });
+
+        res.json({ questionIds: questions.map((q) => q.questionId) });
+      } catch (err) {
+        logErrorEvent({
+          message: 'Forgot password lookup failed',
+          category: 'AUTHENTICATION',
+          severity: 'medium',
+          ip: req.ip,
+          requestId: String(res.locals?.requestId || ''),
+          metadata: { error: err instanceof Error ? err.message : String(err) },
+        });
+        next(err);
+      }
+    },
+
+    // ─── Forgot Password: Step 2 — verify answers & reset password ───
+    forgotPasswordReset: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = forgotPasswordResetSchema.parse(req.body);
+
+        const user = await db().user.findFirst({
+          where: { mobile: body.mobile, isDeleted: false },
+          select: { id: true, status: true, lockoutUntil: true },
+        });
+
+        if (!user) {
+          throw new AppError(404, 'USER_NOT_FOUND', 'No account found with this mobile number');
+        }
+        if (user.status !== 'active') {
+          throw new AppError(403, 'USER_NOT_ACTIVE', 'Account is not active');
+        }
+
+        const storedQuestions = await db().securityQuestion.findMany({
+          where: { userId: user.id },
+          select: { questionId: true, answerHash: true },
+        });
+
+        if (storedQuestions.length < 3) {
+          throw new AppError(400, 'NO_SECURITY_QUESTIONS', 'Security questions not configured. Contact support.');
+        }
+
+        // Verify each answer
+        for (const submitted of body.answers) {
+          const stored = storedQuestions.find((q) => q.questionId === submitted.questionId);
+          if (!stored) {
+            logSecurityIncident('FORGOT_PASSWORD_INVALID_QUESTION', {
+              severity: 'medium',
+              ip: req.ip,
+              userId: user.id,
+              route: req.originalUrl,
+              method: req.method,
+              requestId: String(res.locals.requestId || ''),
+              metadata: { questionId: submitted.questionId },
+            });
+            throw new AppError(400, 'SECURITY_ANSWER_INCORRECT', 'One or more security answers are incorrect');
+          }
+
+          const isMatch = await verifyPassword(
+            submitted.answer.trim().toLowerCase(),
+            stored.answerHash
+          );
+          if (!isMatch) {
+            logSecurityIncident('FORGOT_PASSWORD_WRONG_ANSWER', {
+              severity: 'medium',
+              ip: req.ip,
+              userId: user.id,
+              route: req.originalUrl,
+              method: req.method,
+              requestId: String(res.locals.requestId || ''),
+              metadata: { questionId: submitted.questionId },
+            });
+            throw new AppError(400, 'SECURITY_ANSWER_INCORRECT', 'One or more security answers are incorrect');
+          }
+        }
+
+        // All answers correct — reset password
+        const newHashedPassword = await hashPassword(body.newPassword);
+
+        await db().user.update({
+          where: { id: user.id },
+          data: {
+            passwordHash: newHashedPassword,
+            failedLoginAttempts: 0,
+            lockoutUntil: null,
+          },
+        });
+
+        await writeAuditLog({
+          req,
+          action: 'PASSWORD_RESET_VIA_SECURITY_QUESTIONS',
+          entityType: 'User',
+          entityId: user.id,
+          metadata: { mobile: body.mobile },
+        });
+
+        businessLog.info('Password reset via security questions', { userId: user.id, mobile: body.mobile, ip: req.ip });
+        logAuthEvent('PASSWORD_RESET', {
+          userId: user.id,
+          identifier: body.mobile,
+          ip: req.ip,
+          requestId: String(res.locals.requestId || ''),
+          userAgent: req.get('user-agent'),
+          metadata: { method: 'security_questions' },
+        });
+
+        res.json({ ok: true, message: 'Password has been reset successfully. You can now login with your new password.' });
+      } catch (err) {
+        logErrorEvent({
+          message: 'Forgot password reset failed',
+          category: 'AUTHENTICATION',
+          severity: 'high',
           ip: req.ip,
           requestId: String(res.locals?.requestId || ''),
           metadata: { error: err instanceof Error ? err.message : String(err) },

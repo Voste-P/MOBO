@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../components/ui/ConfirmDialog';
 import { formatErrorMessage } from '../utils/errors';
 import { maskMobile } from '../utils/mobiles';
 import { ProxiedImage } from '../components/ProxiedImage';
@@ -27,6 +28,7 @@ import { Order } from '../types';
 export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) => {
   const { user, updateUser, logout } = useAuth();
   const { toast } = useToast();
+  const { confirm, ConfirmDialogElement } = useConfirm();
 
   // Form State
   const [name, setName] = useState(user?.name || '');
@@ -45,6 +47,11 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
   const [totalSpent, setTotalSpent] = useState(0);
   const [isStatsLoading, setIsStatsLoading] = useState(false);
   const statsLoadingRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const qrInputRef = useRef<HTMLInputElement>(null);
@@ -162,11 +169,13 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
       }
       const reader = new FileReader();
       reader.onloadend = () => {
+        if (!mountedRef.current) return;
         const base64 = reader.result as string;
         if (type === 'avatar') setAvatar(base64);
         else setQrCode(base64);
       };
       reader.onerror = () => {
+        if (!mountedRef.current) return;
         toast.error('Failed to read image. Please try again.');
       };
       reader.readAsDataURL(file);
@@ -205,8 +214,8 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#F4F4F5] relative overflow-y-auto scrollbar-styled overscroll-none">
-      <div className="max-w-xl mx-auto w-full p-6 pb-32 space-y-6">
+    <div className="flex flex-col h-full min-h-0 bg-mobo-dark-100 relative overflow-y-auto scrollbar-styled overscroll-none">
+      <div className="max-w-xl mx-auto w-full p-6 space-y-6" style={{ paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))' }}>
         {/* Identity Card */}
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-zinc-100 relative overflow-hidden animate-enter">
           <div className="flex justify-between items-center mb-8">
@@ -419,7 +428,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
                 <p className="text-xl font-black text-zinc-900">
                   {orders.filter((o) => o.paymentStatus === 'Paid').length}
                 </p>
-                <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
                   Settled
                 </p>
               </div>
@@ -427,7 +436,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
                 <p className="text-xl font-black text-zinc-900">
                   {orders.filter((o) => o.paymentStatus === 'Pending').length}
                 </p>
-                <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
                   Pending
                 </p>
               </div>
@@ -465,7 +474,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
                     >
                       <Star
                         size={28}
-                        fill={s <= feedbackRating ? '#facc15' : 'none'}
+                        fill={s <= feedbackRating ? 'currentColor' : 'none'}
                         className={s <= feedbackRating ? 'text-yellow-400' : 'text-zinc-200'}
                       />
                     </button>
@@ -485,6 +494,9 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
                   className="w-full p-4 bg-zinc-50 border-none rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-lime-400 h-24 resize-none"
                   placeholder="What do you like? What can be better?"
                 />
+                {feedbackText.length > 0 && (
+                  <p className="text-[10px] text-zinc-400 text-right mt-1">{feedbackText.length}/2000</p>
+                )}
               </div>
 
               <button
@@ -526,8 +538,9 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-zinc-100 animate-slide-up">
           <button
             type="button"
-            onClick={() => {
-              if (window.confirm('Are you sure you want to sign out?')) logout();
+            onClick={async () => {
+              const ok = await confirm({ message: 'Are you sure you want to sign out?', confirmLabel: 'Sign Out', variant: 'destructive' });
+              if (ok) logout();
             }}
             className="w-full py-4 border-2 border-red-50 text-red-500 font-bold rounded-2xl text-sm hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
           >
@@ -535,6 +548,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
           </button>
         </div>
       </div>
+      {ConfirmDialogElement}
     </div>
   );
 };

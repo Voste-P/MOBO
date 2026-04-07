@@ -1,4 +1,3 @@
-import crypto from 'node:crypto';
 import request from 'supertest';
 
 import { createApp } from '../../app.js';
@@ -70,7 +69,6 @@ describe('core flows: products -> redirect -> order -> claim -> ops verify/settl
     await db.wallet.upsert({
       where: { ownerUserId: campaignBrandUserId },
       create: {
-        mongoId: crypto.randomUUID(),
         ownerUserId: campaignBrandUserId,
         currency: 'INR' as any,
         availablePaise: WALLET_START,
@@ -111,14 +109,18 @@ describe('core flows: products -> redirect -> order -> claim -> ops verify/settl
       where: deal?.campaignId
         ? { items: { some: { campaignId: deal.campaignId } } }
         : { userId: shopper.userId },
-      select: { mongoId: true },
+      select: { id: true },
     });
-    const allMongoIds = allCampaignOrders.map((o) => o.mongoId).filter(Boolean) as string[];
-    if (allMongoIds.length > 0) {
-      const allStaleKeys = allMongoIds.flatMap((mid) => [
+    const allOrderIds = allCampaignOrders.map((o) => o.id).filter(Boolean) as string[];
+    if (allOrderIds.length > 0) {
+      const allStaleKeys = allOrderIds.flatMap((mid) => [
         `order-settlement-debit-${mid}`,
         `order-commission-${mid}`,
         `order-margin-${mid}`,
+        // Also clean keys with cycle suffix (settle/unsettle/re-settle)
+        ...Array.from({ length: 4 }, (_, i) => `order-settlement-debit-${mid}-c${i}`),
+        ...Array.from({ length: 4 }, (_, i) => `order-commission-${mid}-c${i}`),
+        ...Array.from({ length: 4 }, (_, i) => `order-margin-${mid}-c${i}`),
       ]);
       try { await db.transaction.deleteMany({ where: { idempotencyKey: { in: allStaleKeys } } }); } catch { /* ignore */ }
     }
@@ -213,9 +215,14 @@ describe('core flows: products -> redirect -> order -> claim -> ops verify/settl
 
     // Also clean any stale settlement transactions for THIS specific order
     // (in case a previous full-suite run left them behind)
-    const thisOrderMongoId = (await db.order.findFirst({ where: { id: orderId }, select: { mongoId: true } }))?.mongoId;
-    if (thisOrderMongoId) {
-      try { await db.transaction.deleteMany({ where: { idempotencyKey: { in: [`order-settlement-debit-${thisOrderMongoId}`, `order-commission-${thisOrderMongoId}`, `order-margin-${thisOrderMongoId}`] } } }); } catch { /* ignore */ }
+    const thisOrderId = (await db.order.findFirst({ where: { id: orderId }, select: { id: true } }))?.id;
+    if (thisOrderId) {
+      const cycleKeys = Array.from({ length: 4 }, (_, i) => [
+        `order-settlement-debit-${thisOrderId}-c${i}`,
+        `order-commission-${thisOrderId}-c${i}`,
+        `order-margin-${thisOrderId}-c${i}`,
+      ]).flat();
+      try { await db.transaction.deleteMany({ where: { idempotencyKey: { in: [`order-settlement-debit-${thisOrderId}`, `order-commission-${thisOrderId}`, `order-margin-${thisOrderId}`, ...cycleKeys] } } }); } catch { /* ignore */ }
     }
 
     // Snapshot wallet balance immediately BEFORE settling

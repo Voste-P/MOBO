@@ -106,6 +106,14 @@ export class ErrorBoundary extends Component<Props, State> {
           >
             {this.state.reloading ? 'Reloading…' : exhausted ? 'Force Reload' : 'Reload'}
           </button>
+          {exhausted && (
+            <a
+              href={`mailto:support@buzzma.io?subject=${encodeURIComponent('App Error Report')}&body=${encodeURIComponent(`Error: ${this.state.error?.message || 'Unknown'}\nURL: ${typeof window !== 'undefined' ? window.location.href : ''}\nTime: ${new Date().toISOString()}`)}`}
+              className="mt-3 text-xs font-bold text-slate-400 hover:text-slate-600 underline transition-colors"
+            >
+              Contact Support
+            </a>
+          )}
         </div>
       );
     }

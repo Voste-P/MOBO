@@ -1,5 +1,4 @@
 import type { Request, Response, NextFunction } from 'express';
-import { randomUUID } from 'node:crypto';
 import { prisma } from '../database/prisma.js';
 import { AppError } from '../middleware/errors.js';
 import { toUiDeal } from '../utils/uiMappers.js';
@@ -122,13 +121,11 @@ export function makeProductsController() {
 
         // Fire brand user lookup in parallel — don't block order creation
         const brandUserPromise = campaign.brandUserId
-          ? db().user.findFirst({ where: { id: campaign.brandUserId }, select: { mongoId: true } })
+          ? db().user.findFirst({ where: { id: campaign.brandUserId }, select: { id: true } })
           : Promise.resolve(null);
 
-        const mongoId = randomUUID();
-        const _preOrder = await db().order.create({
+        const preOrder = await db().order.create({
           data: {
-            mongoId,
             userId: pgUserId,
             brandUserId: campaign.brandUserId,
             totalPaise: 0,
@@ -151,7 +148,7 @@ export function makeProductsController() {
             items: {
               create: [
                 {
-                  productId: deal.mongoId || deal.id,
+                  productId: deal.id || deal.id,
                   title: String(deal.title),
                   image: String(deal.image ?? ''),
                   priceAtPurchasePaise: Number(deal.pricePaise ?? 0),
@@ -171,29 +168,29 @@ export function makeProductsController() {
           req,
           action: 'ORDER_REDIRECT_CREATED',
           entityType: 'Order',
-          entityId: mongoId,
+          entityId: preOrder.id,
           metadata: { dealId, campaignId: deal.campaignId, mediatorCode },
         });
-        orderLog.info('Order redirect tracked', { orderId: mongoId, dealId, campaignId: deal.campaignId, mediatorCode, userId: requesterId });
-        businessLog.info(`[Buyer] User ${requesterId} redirected to deal ${dealId} — order ${mongoId}, campaign ${deal.campaignId}, mediator: ${mediatorCode}`, { actorUserId: requesterId, orderId: mongoId, dealId, campaignId: deal.campaignId, mediatorCode, platform: String(deal.platform ?? ''), ip: req.ip });
-        logChangeEvent({ actorUserId: requesterId, entityType: 'Order', entityId: mongoId, action: 'STATUS_CHANGE', changedFields: ['workflowStatus'], before: {}, after: { workflowStatus: 'REDIRECTED' } });
+        orderLog.info('Order redirect tracked', { orderId: preOrder.id, dealId, campaignId: deal.campaignId, mediatorCode, userId: requesterId });
+        businessLog.info(`[Buyer] User ${requesterId} redirected to deal ${dealId} — order ${preOrder.id}, campaign ${deal.campaignId}, mediator: ${mediatorCode}`, { actorUserId: requesterId, orderId: preOrder.id, dealId, campaignId: deal.campaignId, mediatorCode, platform: String(deal.platform ?? ''), ip: req.ip });
+        logChangeEvent({ actorUserId: requesterId, entityType: 'Order', entityId: preOrder.id, action: 'STATUS_CHANGE', changedFields: ['workflowStatus'], before: {}, after: { workflowStatus: 'REDIRECTED' } });
 
         const ts = new Date().toISOString();
         // Resolve the parallel brand user lookup
         const brandUser = await brandUserPromise;
-        const brandUserMongoId = brandUser?.mongoId ?? undefined;
+        const brandUserPgId = brandUser?.id ?? undefined;
         publishRealtime({
           type: 'orders.changed',
           ts,
-          payload: { orderId: mongoId, dealId },
+          payload: { orderId: preOrder.id, dealId },
           audience: {
-            userIds: [requesterId, brandUserMongoId].filter(Boolean) as string[],
+            userIds: [requesterId, brandUserPgId].filter(Boolean) as string[],
             roles: ['admin', 'ops'],
           },
         });
 
         res.status(201).json({
-          preOrderId: mongoId,
+          preOrderId: preOrder.id,
           url: String(deal.productUrl),
         });
 
@@ -203,7 +200,7 @@ export function makeProductsController() {
           ip: req.ip,
           resource: 'DealRedirect',
           requestId: String((res as any).locals?.requestId || ''),
-          metadata: { action: 'DEAL_REDIRECT', dealId, campaignId: deal.campaignId, mediatorCode, preOrderId: mongoId },
+          metadata: { action: 'DEAL_REDIRECT', dealId, campaignId: deal.campaignId, mediatorCode, preOrderId: preOrder.id },
         });
       } catch (err) {
         logErrorEvent({ category: 'BUSINESS_LOGIC', severity: 'medium', message: 'Deal redirect tracking failed', operation: 'trackRedirect', error: err, metadata: { dealId: String(req.params.dealId || ''), userId: req.auth?.userId } });

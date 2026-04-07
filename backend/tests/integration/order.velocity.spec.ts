@@ -26,7 +26,7 @@ describe('order velocity limits', () => {
     const db = prisma();
     const deal = await db.deal.findFirst({
       where: { active: true, isDeleted: false },
-      select: { id: true, mongoId: true, campaignId: true, title: true, image: true, pricePaise: true, commissionPaise: true, dealType: true, platform: true, brandName: true },
+      select: { id: true, campaignId: true, title: true, image: true, pricePaise: true, commissionPaise: true, dealType: true, platform: true, brandName: true },
     });
 
     if (!deal) {
@@ -40,7 +40,7 @@ describe('order velocity limits', () => {
       .send({
         userId: buyerUserId,
         items: [{
-          productId: String(deal.mongoId || deal.id),
+          productId: String(deal.id || deal.id),
           title: String(deal.title ?? 'Deal'),
           image: String(deal.image ?? 'https://example.com/e2e.png'),
           priceAtPurchase: Number(deal.pricePaise ?? 0) / 100,
@@ -71,7 +71,7 @@ describe('order velocity limits', () => {
     const db = prisma();
     const deal = await db.deal.findFirst({
       where: { active: true, isDeleted: false },
-      select: { id: true, mongoId: true, campaignId: true, title: true, image: true, pricePaise: true, commissionPaise: true, dealType: true },
+      select: { id: true, campaignId: true, title: true, image: true, pricePaise: true, commissionPaise: true, dealType: true },
     });
 
     if (!deal) return;
@@ -80,7 +80,7 @@ describe('order velocity limits', () => {
     const orderPayload = {
       userId: buyerUserId,
       items: [{
-        productId: String(deal.mongoId || deal.id),
+        productId: String(deal.id || deal.id),
         title: String(deal.title ?? 'Deal'),
         image: String(deal.image ?? 'https://example.com/e2e.png'),
         priceAtPurchase: Number(deal.pricePaise ?? 0) / 100,

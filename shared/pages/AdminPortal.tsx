@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../components/ui/ConfirmDialog';
@@ -10,7 +10,7 @@ import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage } from '../components/ProxiedImage';
 
 import { subscribeRealtime } from '../services/realtime';
-import { Button, EmptyState, IconButton, Input, Spinner, Pagination } from '../components/ui';
+import { Button, EmptyState, IconButton, Input, Spinner, Pagination, SidebarItem, ExpandableText } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { RatingVerificationBadge, ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
 import { DesktopShell } from '../components/DesktopShell';
@@ -78,48 +78,42 @@ type ViewMode =
   | 'feedback'
   | 'audit-logs';
 
-const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+const CHART_COLORS = { indigo: '#6366f1', emerald: '#10b981', amber: '#f59e0b', red: '#ef4444', violet: '#8b5cf6' } as const;
+const COLORS = Object.values(CHART_COLORS);
 
 // --- COMPONENTS ---
 
-const SidebarItem = ({ icon: Icon, label, active, onClick, badge }: any) => (
-  <button
-    type="button"
-    onClick={onClick}
-    aria-current={active ? 'page' : undefined}
-    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 motion-reduce:transition-none motion-reduce:transform-none ${
-      active
-        ? 'bg-white/10 text-white shadow-lg backdrop-blur-sm border border-white/5'
-        : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
-    }`}
-  >
-    {active && (
-      <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 rounded-r-full"></div>
-    )}
-    <div className="flex items-center gap-3">
-      <Icon
-        size={18}
-        className={active ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-300'}
-      />
-      <span className="font-medium text-sm tracking-wide">{label}</span>
-    </div>
-    {badge > 0 && (
-      <span className="bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
-        {badge}
-      </span>
-    )}
-  </button>
-);
+// SidebarItem imported from shared/components/ui
 
-const StatCard = ({ title, value, subtext, icon: Icon, colorClass }: any) => (
+// Explicit Tailwind class maps — dynamic string manipulation breaks JIT purging
+const bgFromText: Record<string, string> = {
+  'text-emerald-600': 'bg-emerald-600',
+  'text-indigo-600': 'bg-indigo-600',
+  'text-amber-600': 'bg-amber-600',
+  'text-red-600': 'bg-red-600',
+  'text-violet-600': 'bg-violet-600',
+  'text-blue-600': 'bg-blue-600',
+  'text-pink-600': 'bg-pink-600',
+};
+const bgLightFromText: Record<string, string> = {
+  'text-emerald-600': 'bg-emerald-50',
+  'text-indigo-600': 'bg-indigo-50',
+  'text-amber-600': 'bg-amber-50',
+  'text-red-600': 'bg-red-50',
+  'text-violet-600': 'bg-violet-50',
+  'text-blue-600': 'bg-blue-50',
+  'text-pink-600': 'bg-pink-50',
+};
+
+const StatCard = ({ title, value, subtext, icon: Icon, colorClass = 'text-slate-600' }: { title: string; value: string | number; subtext?: string; icon: React.ComponentType<{ size: number }>; colorClass?: string }) => (
   <div className="bg-white p-6 rounded-[1.5rem] shadow-[0_2px_20px_-12px_rgba(0,0,0,0.1)] border border-slate-100 relative overflow-hidden flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300">
     <div
-      className={`absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-[0.08] group-hover:opacity-[0.15] transition-opacity ${colorClass.replace('text-', 'bg-')}`}
+      className={`absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-[0.08] group-hover:opacity-[0.15] transition-opacity ${bgFromText[colorClass] || 'bg-slate-600'}`}
     ></div>
 
     <div className="flex justify-between items-start z-10">
       <div
-        className={`p-3 rounded-2xl ${colorClass.replace('text-', 'bg-').replace('600', '50')} ${colorClass}`}
+        className={`p-3 rounded-2xl ${bgLightFromText[colorClass] || 'bg-slate-50'} ${colorClass}`}
       >
         <Icon size={24} />
       </div>
@@ -1027,14 +1021,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
   // --- AUTH GUARD ---
   if (!user || user.role !== 'admin') {
     return (
-      <div className="min-h-[100dvh] bg-[#0F172A] flex items-center justify-center p-6 font-sans relative overflow-hidden">
+      <div className="min-h-[100dvh] bg-slate-950 flex items-center justify-center p-6 font-sans relative overflow-hidden">
         {/* Background Grid */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-20"></div>
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,theme(colors.slate.800)_1px,transparent_1px),linear-gradient(to_bottom,theme(colors.slate.800)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-20"></div>
 
-        <div className="bg-[#1E293B] p-10 rounded-[2rem] w-full max-w-md border border-slate-700 shadow-2xl relative z-10">
+        <div className="bg-slate-800 p-10 rounded-[2rem] w-full max-w-md border border-slate-700 shadow-2xl relative z-10">
           <div className="flex justify-center mb-8">
-            <div className="w-20 h-20 bg-indigo-500/10 rounded-3xl flex items-center justify-center border border-indigo-500/20 shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)]">
-              <ShieldAlert size={40} className="text-indigo-400" />
+            <div className="w-20 h-20 bg-lime-500/10 rounded-3xl flex items-center justify-center border border-lime-500/20 shadow-[0_0_40px_-10px_rgba(163,230,53,0.5)]">
+              <ShieldAlert size={40} className="text-lime-400" />
             </div>
           </div>
 
@@ -1082,7 +1076,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
               type="submit"
               size="lg"
               disabled={isAuthLoading}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20"
+              className="w-full bg-zinc-800 hover:bg-zinc-700 text-white shadow-lg shadow-zinc-800/20"
               rightIcon={isAuthLoading ? <Spinner className="w-5 h-5 text-current" /> : null}
             >
               Authenticate Session
@@ -1102,21 +1096,21 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       isSidebarOpen={isSidebarOpen}
       onSidebarOpenChange={setIsSidebarOpen}
       showMobileHeader={false}
-      containerClassName="flex h-[100dvh] min-h-0 bg-[#F8F9FA] font-sans overflow-hidden relative"
+      containerClassName="flex h-[100dvh] min-h-0 bg-slate-50 font-sans overflow-hidden relative"
       sidebarWidthClassName="w-72"
-      asideClassName="bg-[#0F172A] flex flex-col border-r border-slate-800"
+      asideClassName="bg-slate-950 flex flex-col border-r border-slate-800"
       mainClassName="flex-1 min-w-0 min-h-0 overflow-hidden relative flex flex-col"
       sidebar={
         <>
           <div className="p-6 pb-2">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-600/20">
+                <div className="w-10 h-10 bg-zinc-700 rounded-xl flex items-center justify-center text-white shadow-lg shadow-zinc-800/20">
                   <Database size={20} />
                 </div>
                 <div>
                   <h1 className="text-white font-black text-lg tracking-tight">
-                    BUZZMA<span className="text-indigo-500">Admin</span>
+                    BUZZMA<span className="text-lime-400">Admin</span>
                   </h1>
                   <div className="flex items-center gap-2">
                     <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">
@@ -1129,7 +1123,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                 type="button"
                 onClick={() => setIsSidebarOpen(false)}
                 aria-label="Close sidebar"
-                className="md:hidden p-2 text-slate-400 hover:text-white rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+                className="md:hidden p-2 text-slate-400 hover:text-white rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
               >
                 <XCircle size={22} />
               </button>
@@ -1230,7 +1224,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
               onClick={() => setIsSidebarOpen(true)}
               aria-label="Open sidebar"
               title="Menu"
-              className="md:hidden text-slate-400 hover:text-indigo-600 hover:border-indigo-200"
+              className="md:hidden text-slate-400 hover:text-zinc-700 hover:border-zinc-200"
             >
               <Menu size={20} />
             </IconButton>
@@ -1247,14 +1241,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   Online
                 </p>
               </div>
-              <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold border-2 border-white shadow-sm">
+              <div className="w-10 h-10 bg-zinc-100 rounded-full flex items-center justify-center text-zinc-700 font-bold border-2 border-white shadow-sm">
                 AD
               </div>
             </div>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-8 scrollbar-styled bg-[#F8FAFC]">
+        <div className="flex-1 overflow-y-auto p-8 scrollbar-styled bg-slate-50">
           <div className="max-w-[1600px] mx-auto space-y-8 animate-enter">
             {/* DASHBOARD VIEW */}
             {view === 'dashboard' && stats && (
@@ -1301,7 +1295,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         </p>
                       </div>
                       <div className="flex gap-2">
-                        <span className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-bold uppercase tracking-wide border border-indigo-100">
+                        <span className="px-3 py-1 bg-zinc-50 text-zinc-700 rounded-lg text-[10px] font-bold uppercase tracking-wide border border-zinc-200">
                           Weekly
                         </span>
                       </div>
@@ -1312,8 +1306,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         <AreaChart data={chartData}>
                           <defs>
                             <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
-                              <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                              <stop offset="5%" stopColor={CHART_COLORS.indigo} stopOpacity={0.2} />
+                              <stop offset="95%" stopColor={CHART_COLORS.indigo} stopOpacity={0} />
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -1343,7 +1337,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                           <Area
                             type="monotone"
                             dataKey="revenue"
-                            stroke="#6366f1"
+                            stroke={CHART_COLORS.indigo}
                             strokeWidth={3}
                             fillOpacity={1}
                             fill="url(#colorRev)"
@@ -1384,14 +1378,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       </div>
                     </div>
 
-                    <div className="bg-indigo-900 p-6 rounded-[2rem] shadow-xl text-white relative overflow-hidden">
+                    <div className="bg-zinc-900 p-6 rounded-[2rem] shadow-xl text-white relative overflow-hidden">
                       <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full blur-3xl -mr-10 -mt-10"></div>
                       <h3 className="font-bold text-lg relative z-10">System Status</h3>
                       <div className="flex items-center gap-2 mt-4 text-emerald-400 font-bold text-sm">
                         <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>{' '}
                         All Systems Operational
                       </div>
-                      <p className="text-indigo-200 text-xs mt-2 font-medium">
+                      <p className="text-zinc-400 text-xs mt-2 font-medium">
                         Last check: Just now
                       </p>
                     </div>
@@ -1432,7 +1426,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
               <div className="space-y-6 animate-enter">
                 <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+                    <div className="p-3 bg-zinc-50 text-zinc-600 rounded-2xl">
                       <HeadphonesIcon size={24} />
                     </div>
                     <div>
@@ -1443,7 +1437,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-xl text-xs font-bold">
+                    <div className="bg-zinc-50 text-zinc-700 px-4 py-2 rounded-xl text-xs font-bold">
                       {filteredTickets.filter((t) => t.status === 'Open').length} Pending
                     </div>
                     <button type="button" onClick={exportTicketsCsv} className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-all">
@@ -1458,7 +1452,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                   value={ticketSearch}
                   onChange={(e) => setTicketSearch(e.target.value)}
                   placeholder="Search tickets by name, issue, description, order ID..."
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 transition-all"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-lime-400 focus:ring-1 focus:ring-lime-200 transition-all"
                 />
 
                 {/* Role Filter Tabs */}
@@ -1470,8 +1464,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       onClick={() => setTicketRoleFilter(role)}
                       className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                         ticketRoleFilter === role
-                          ? 'bg-indigo-600 text-white shadow-sm'
-                          : 'bg-white text-slate-500 border border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+                          ? 'bg-zinc-900 text-white shadow-sm'
+                          : 'bg-white text-slate-500 border border-slate-200 hover:border-zinc-400 hover:text-zinc-700'
                       }`}
                     >
                       {role} {roleCounts[role] > 0 ? `(${roleCounts[role]})` : ''}
@@ -1520,7 +1514,10 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     filteredTickets.map((t) => (
                       <div
                         key={t.id}
-                        className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col hover:shadow-md transition-all cursor-pointer"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTicket(t); } }}
+                        className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col hover:shadow-md transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
                         onClick={() => setSelectedTicket(t)}
                       >
                         <div className="flex justify-between items-start mb-4">
@@ -1577,10 +1574,10 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                           {t.status === 'Open' && resolvingTicketId === t.id && (
                             <div className="w-full mt-1 space-y-1.5">
                               <textarea placeholder="Resolution / rejection note (optional)..." value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} rows={2}
-                                className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-none" />
+                                className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-lime-300 resize-none" />
                               <div className="flex items-center gap-2">
                                 <button type="button" onClick={() => resolveTicket(t.id, 'Resolved', resolutionNote)}
-                                  className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✓ Resolve</button>
+                                  className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✔ Resolve</button>
                                 <button type="button" onClick={() => resolveTicket(t.id, 'Rejected', resolutionNote)}
                                   className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
                                 <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
@@ -1770,7 +1767,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       placeholder="Search by name, mobile, email, or code..."
                       value={userSearch}
                       onChange={(e) => handleUserSearchChange(e.target.value)}
-                      className="w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all bg-white placeholder:text-slate-400"
+                      className="w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border border-slate-200 focus:border-lime-400 focus:ring-2 focus:ring-lime-100 outline-none transition-all bg-white placeholder:text-slate-400"
                     />
                     {userSearch && (
                       <button
@@ -1802,7 +1799,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         <tr key={u.id} className="hover:bg-slate-50/50 transition-colors group">
                           <td className="p-5">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-500 text-sm shadow-inner group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors overflow-hidden">
+                              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-500 text-sm shadow-inner group-hover:bg-zinc-100 group-hover:text-zinc-700 transition-colors overflow-hidden">
                                 {u.avatar ? (
                                   <ProxiedImage
                                     src={u.avatar}
@@ -1916,7 +1913,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         value={inviteRole}
                         onChange={(e) => setInviteRole(e.target.value as typeof inviteRole)}
                         aria-label="Invite role"
-                        className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-lime-500/20 focus:border-lime-500"
                       >
                         <option value="agency">Agency Partner</option>
                         <option value="brand">Brand Account</option>
@@ -1926,7 +1923,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         placeholder="Assignee Label (e.g. Nike)"
                         value={inviteLabel}
                         onChange={(e) => setInviteLabel(e.target.value)}
-                        className="flex-1 bg-slate-50 border border-slate-200 text-slate-900 text-sm font-bold rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400"
+                        className="flex-1 bg-slate-50 border border-slate-200 text-slate-900 text-sm font-bold rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-lime-500/20 focus:border-lime-500 placeholder:text-slate-400"
                       />
                     </div>
                   </div>
@@ -1934,7 +1931,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     type="button"
                     onClick={handleGenerateInvite}
                     disabled={isLoading}
-                    className="px-8 py-3.5 bg-slate-900 text-white rounded-xl font-bold text-sm shadow-lg hover:bg-indigo-600 transition-all active:scale-95 flex items-center gap-2 whitespace-nowrap"
+                    className="px-8 py-3.5 bg-slate-900 text-white rounded-xl font-bold text-sm shadow-lg hover:bg-zinc-700 transition-all active:scale-95 flex items-center gap-2 whitespace-nowrap"
                   >
                     <Plus size={18} />
                     Generate Code
@@ -1974,7 +1971,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                                   toast.success('Copied');
                                 }}
                                 aria-label="Copy access code"
-                                className="text-slate-400 hover:text-indigo-600 transition-colors"
+                                className="text-slate-400 hover:text-zinc-700 transition-colors"
                               >
                                 <Copy size={18} />
                               </button>
@@ -2019,7 +2016,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     <button
                       type="button"
                       onClick={() => handleExport(view === 'finance' ? 'finance' : 'orders')}
-                      className="flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl hover:bg-indigo-100 transition-colors"
+                      className="flex items-center gap-2 text-xs font-bold text-zinc-700 bg-zinc-100 px-4 py-2 rounded-xl hover:bg-zinc-200 transition-colors"
                     >
                       <Download size={14} /> CSV
                     </button>
@@ -2087,12 +2084,12 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                           <td className="p-5 font-mono text-slate-900 font-bold">{o.total}</td>
                           <td className="p-5 text-slate-700">{o.buyerName}</td>
                           <td className="p-5 text-slate-600 text-xs">{o.managerName || '-'}</td>
-                          <td className="p-5 text-slate-600 text-xs truncate max-w-[160px]" title={o.items?.[0]?.campaignId || ''}>{o.items?.[0]?.campaignId ? (campaignTitleMap.get(o.items[0].campaignId) || o.items[0].campaignId.slice(-8)) : '-'}</td>
+                          <td className="p-5 text-slate-600 text-xs max-w-[160px]"><ExpandableText text={o.items?.[0]?.campaignId ? (campaignTitleMap.get(o.items[0].campaignId) || o.items[0].campaignId.slice(-8)) : '-'} clampClass="truncate" className="text-slate-600 text-xs" as="span">{o.items?.[0]?.campaignId ? (campaignTitleMap.get(o.items[0].campaignId) || o.items[0].campaignId.slice(-8)) : '-'}</ExpandableText></td>
                           <td className="p-5">
                             <button
                               type="button"
                               onClick={() => setProofModal(o)}
-                              className="text-xs font-bold text-indigo-600 hover:text-indigo-800 underline"
+                              className="text-xs font-bold text-zinc-700 hover:text-zinc-900 underline"
                             >
                               View
                             </button>
@@ -2160,9 +2157,9 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         <td className="p-5">
                           <div className="flex items-center gap-3">
                             <ProxiedImage src={p.image} alt={p.title ? String(p.title) : 'Product image'} className="w-8 h-8 rounded-lg object-contain bg-white border border-slate-100 p-1" />
-                            <span className="truncate max-w-[200px] text-slate-900 font-bold">
+                            <ExpandableText text={p.title ? String(p.title) : ''} clampClass="truncate" className="max-w-[200px] text-slate-900 font-bold" as="span">
                               {p.title}
-                            </span>
+                            </ExpandableText>
                           </div>
                         </td>
                         <td className="p-5 text-slate-500 uppercase text-xs font-bold">
@@ -2259,14 +2256,14 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       value={configEmail}
                       onChange={(e) => setConfigEmail(e.target.value)}
                       aria-label="Admin Contact"
-                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-900 focus:outline-none focus:border-lime-500"
                     />
                   </div>
                   <div className="pt-4 border-t border-slate-100">
                     <button
                       type="button"
                       onClick={handleSaveConfig}
-                      className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all active:scale-95 flex items-center justify-center gap-2"
+                      className="w-full py-4 bg-zinc-900 text-white rounded-xl font-bold shadow-lg hover:bg-zinc-800 transition-all active:scale-95 flex items-center justify-center gap-2"
                     >
                       <Save size={18} /> Save Configuration
                     </button>
@@ -2389,8 +2386,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                             <td className="p-4 text-xs font-mono text-slate-500">
                               {log.actorUserId?.slice(-8) || 'System'}
                             </td>
-                            <td className="p-4 text-[10px] text-slate-400 max-w-[200px] truncate">
-                              {log.metadata ? JSON.stringify(log.metadata).slice(0, 80) : '-'}
+                            <td className="p-4 max-w-[200px]">
+                              <ExpandableText text={log.metadata ? JSON.stringify(log.metadata).slice(0, 80) : '-'} clampClass="truncate" className="text-[10px] text-slate-400" as="span">{log.metadata ? JSON.stringify(log.metadata).slice(0, 80) : '-'}</ExpandableText>
                             </td>
                           </tr>
                         ))}
@@ -2422,7 +2419,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
 
       {/* Proof Viewer Modal */}
       {proofModal && (
-        <div className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => { setProofModal(null); }}>
+        <div className="fixed inset-0 z-modal bg-black/50 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => { setProofModal(null); }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90dvh] overflow-y-auto scrollbar-styled" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
               <div>
@@ -2438,7 +2435,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div><span className="text-slate-400 font-bold text-xs uppercase">Buyer</span><p className="font-bold text-slate-900">{proofModal.buyerName}</p></div>
                 <div><span className="text-slate-400 font-bold text-xs uppercase">Amount</span><p className="font-bold text-slate-900">{formatCurrency(proofModal.total)}</p></div>
-                {proofModal.reviewerName && <div><span className="text-indigo-400 font-bold text-xs uppercase">Reviewer Name</span><p className="font-bold text-indigo-700">{proofModal.reviewerName}</p></div>}
+                {proofModal.reviewerName && <div><span className="text-zinc-400 font-bold text-xs uppercase">Reviewer Name</span><p className="font-bold text-zinc-700">{proofModal.reviewerName}</p></div>}
                 <div><span className="text-slate-400 font-bold text-xs uppercase">Status</span><p><StatusBadge status={proofModal.affiliateStatus === 'Unchecked' ? proofModal.paymentStatus : proofModal.affiliateStatus} /></p></div>
                 <div><span className="text-slate-400 font-bold text-xs uppercase">Payment</span><p className="font-bold text-slate-900">{proofModal.paymentStatus}</p></div>
                 {proofModal.soldBy && <div><span className="text-slate-400 font-bold text-xs uppercase">Sold By</span><p className="font-bold text-slate-900">{proofModal.soldBy}</p></div>}
@@ -2458,10 +2455,10 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                     <ProofImage orderId={proofModal.id} proofType="order" existingSrc={proofModal.screenshots.order !== 'exists' ? proofModal.screenshots.order : undefined} alt="Purchase Proof" className="w-full max-h-[300px] object-contain rounded-xl border border-blue-200 bg-blue-50" />
                     {/* AI Verification — stored from buyer's proof submission */}
                     {proofModal.orderAiVerification && (
-                    <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200 mt-3">
+                    <div className="bg-lime-50 p-4 rounded-xl border border-lime-200 mt-3">
                       <div className="flex justify-between items-center mb-2">
-                        <h5 className="font-bold text-indigo-600 flex items-center gap-2 text-[10px] uppercase tracking-widest">
-                          <Sparkles size={12} className="text-indigo-500" /> AI Verification
+                        <h5 className="font-bold text-lime-600 flex items-center gap-2 text-[10px] uppercase tracking-widest">
+                          <Sparkles size={12} className="text-lime-500" /> AI Verification
                         </h5>
                       </div>
                         <div className="space-y-2">
@@ -2473,25 +2470,25 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                               <>
                                 <div className="flex gap-2">
                                   <div className={`flex-1 p-2 rounded-lg border text-center ${aiData?.orderIdMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase">Order ID</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase">Order ID</p>
                                     <p className={`text-xs font-bold ${aiData?.orderIdMatch ? 'text-green-600' : 'text-red-600'}`}>
-                                      {aiData?.orderIdMatch ? '✓ Match' : '✗ Mismatch'}
+                                      {aiData?.orderIdMatch ? '✔ Match' : '✗ Mismatch'}
                                     </p>
-                                    {aiData?.detectedOrderId && <p className="text-[9px] text-slate-500 font-mono mt-0.5">Detected: {aiData.detectedOrderId}</p>}
+                                    {aiData?.detectedOrderId && <p className="text-[10px] text-slate-500 font-mono mt-0.5">Detected: {aiData.detectedOrderId}</p>}
                                   </div>
                                   <div className={`flex-1 p-2 rounded-lg border text-center ${aiData?.amountMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase">Amount</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase">Amount</p>
                                     <p className={`text-xs font-bold ${aiData?.amountMatch ? 'text-green-600' : 'text-red-600'}`}>
-                                      {aiData?.amountMatch ? '✓ Match' : '✗ Mismatch'}
+                                      {aiData?.amountMatch ? '✔ Match' : '✗ Mismatch'}
                                     </p>
-                                    {aiData?.detectedAmount != null && <p className="text-[9px] text-slate-500 font-mono mt-0.5">Detected: {formatCurrency(aiData.detectedAmount)}</p>}
+                                    {aiData?.detectedAmount != null && <p className="text-[10px] text-slate-500 font-mono mt-0.5">Detected: {formatCurrency(aiData.detectedAmount)}</p>}
                                   </div>
                                 </div>
                                 {aiData?.discrepancyNote && (
                                   <p className="text-[10px] text-slate-500 bg-white rounded-lg p-2 border border-slate-100">{aiData.discrepancyNote}</p>
                                 )}
                                 <div className="flex justify-between items-center pt-1">
-                                  <span className="text-[9px] text-indigo-500 font-bold uppercase">Confidence</span>
+                                  <span className="text-[10px] text-lime-600 font-bold uppercase">Confidence</span>
                                   <div className="flex items-center gap-2">
                                     <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden">
                                       <div className={`h-full rounded-full ${score > 80 ? 'bg-green-500' : score > 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${score}%` }} />

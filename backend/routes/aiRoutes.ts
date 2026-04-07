@@ -680,7 +680,7 @@ export function aiRoutes(env: Env): Router {
       if (!reviewerName && payload.orderId && isPrismaAvailable()) {
         try {
           const order = await prisma().order.findFirst({
-            where: { OR: [{ id: payload.orderId }, { mongoId: payload.orderId }], isDeleted: false },
+            where: { id: payload.orderId, isDeleted: false },
             select: { reviewerName: true },
           });
           if (order?.reviewerName) reviewerName = order.reviewerName;
@@ -754,7 +754,7 @@ export function aiRoutes(env: Env): Router {
 
       // If expectedReviewerName not provided, look up from order
       // NOTE: expectedOrderId is the EXTERNAL marketplace order ID (e.g. Amazon "408-xxx"),
-      // NOT a UUID/mongoId. Search by externalOrderId column.
+      // NOT a UUID. Search by externalOrderId column.
       let reviewerName = payload.expectedReviewerName;
       if (!reviewerName && payload.expectedOrderId && isPrismaAvailable()) {
         try {

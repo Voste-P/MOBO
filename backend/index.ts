@@ -9,6 +9,7 @@ import { startupLog, logEvent, getSystemMetrics } from './config/logger.js';
 import { logAvailabilityEvent, logDatabaseEvent, startAvailabilityMonitor, stopAvailabilityMonitor } from './config/appLogs.js';
 import { setReady, setShuttingDown } from './config/lifecycle.js';
 import { startCoolingPeriodSettler, stopCoolingPeriodSettler } from './services/coolingPeriodSettler.js';
+import { terminateOcrPool } from './services/aiService.js';
 
 // ── Lifecycle state ──────────────────────────────────────────────────
 let server: Server | null = null;
@@ -66,6 +67,7 @@ async function shutdown(signal: string) {
     clearTimeout(forceTimer);
     stopAvailabilityMonitor();
     stopCoolingPeriodSettler();
+    await terminateOcrPool();
     logAvailabilityEvent('APPLICATION_SHUTDOWN_COMPLETE', {
       component: 'backend',
       status: 'down',

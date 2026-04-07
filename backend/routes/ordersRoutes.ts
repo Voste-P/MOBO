@@ -27,10 +27,10 @@ export function ordersRoutes(env: Env): Router {
     const auth = req.auth;
     const roles: string[] = auth?.roles ?? [];
     const isPrivileged = roles.some((r: string) => ['admin', 'ops'].includes(r));
-    // requestedUserId may be a mongoId (public API id) while auth.userId is the PG UUID.
+    // requestedUserId is the PG UUID.
     const isOwner = auth?.userId === requestedUserId
       || auth?.pgUserId === requestedUserId
-      || (auth?.mongoId && auth.mongoId === requestedUserId);
+      ;
     if (!isPrivileged && !isOwner) {
       return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Access denied' } });
     }
@@ -59,7 +59,7 @@ export function ordersRoutes(env: Env): Router {
 
   // Signed proof URL generation (authenticated — used by CSV/Excel export)
   router.get('/orders/:orderId/proof-urls', requireAuth(env), orders.getSignedProofUrls);
-  router.post('/orders/proof-urls/batch', requireAuth(env), orders.batchSignedProofUrls);
+  router.post('/orders/proof-urls/batch', requireAuth(env), orderWriteLimiter, orders.batchSignedProofUrls);
 
   // Public signed proof endpoint — validates HMAC token, no auth needed.
   // Used by Excel/Google Sheets HYPERLINK formulas.

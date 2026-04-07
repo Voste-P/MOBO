@@ -12,7 +12,7 @@ import { formatCurrency } from '../utils/formatCurrency';
 import { getPrimaryOrderId } from '../utils/orderHelpers';
 import { csvSafe, downloadCsv } from '../utils/csvHelpers';
 import { Order, Product, Ticket } from '../types';
-import { Button, EmptyState, Spinner } from '../components/ui';
+import { Button, EmptyState, Spinner, ExpandableText } from '../components/ui';
 import { ProofImage } from '../components/ProofImage';
 import { ProxiedImage } from '../components/ProxiedImage';
 import { ReturnWindowVerificationBadge } from '../components/AiVerificationBadge';
@@ -44,7 +44,7 @@ import {
   TicketCheck,
 } from 'lucide-react';
 
-/* ─── Sample Screenshot Guide ───────────────────────────────────────── */
+/* ──Sample Screenshot Guide ────────────────────────────────────────*/
 const SAMPLE_IMAGES: Record<string, string> = {
   order: '/screenshots/sample-order.png',
   rating: '/screenshots/sample-rating.png',
@@ -111,7 +111,7 @@ const SampleScreenshotGuide: React.FC<{
           {/* Sample annotated image */}
           {sampleImg && (
             <div className="mt-2 rounded-lg border border-blue-200 overflow-hidden bg-white">
-              <p className="text-[9px] font-bold text-blue-500 px-2 pt-1.5 pb-0.5">📸 Example — key fields highlighted</p>
+              <p className="text-[10px] font-bold text-blue-500 px-2 pt-1.5 pb-0.5">📸 Example — key fields highlighted</p>
               <img
                 src={sampleImg}
                 alt={`Sample ${g.title}`}
@@ -124,19 +124,19 @@ const SampleScreenshotGuide: React.FC<{
           <ul className="space-y-1.5 mt-2">
             {g.bullets.map((b, i) => (
               <li key={`bullet-${i}`} className="flex items-start gap-1.5 text-[10px] text-slate-600">
-                <span className="w-4 h-4 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-[9px] font-black shrink-0 mt-0.5">{i + 1}</span>
+                <span className="w-4 h-4 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">{i + 1}</span>
                 {b}
               </li>
             ))}
           </ul>
           <div className="flex flex-wrap gap-1 mt-1">
             {g.highlights.map((h) => (
-              <span key={h} className="text-[9px] font-bold bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded">
+              <span key={h} className="text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded">
                 {h}
               </span>
             ))}
           </div>
-          <p className="text-[9px] text-blue-400 font-semibold italic mt-1">
+          <p className="text-[10px] text-blue-400 font-semibold italic mt-1">
             Tip: Use a full-page screenshot in good lighting for best AI detection results.
           </p>
         </div>
@@ -177,6 +177,8 @@ const isValidReviewLink = (value: string) => {
     const url = new URL(trimmed);
     if (url.protocol !== 'https:') return false;
     const host = url.hostname.toLowerCase().replace(/^www\./, '');
+    // Strict match: host must exactly equal the domain or end with '.domain'
+    // Prevents subdomain spoofing like amazon.in.attacker.com
     return KNOWN_REVIEW_DOMAINS.some(d => host === d || host.endsWith('.' + d));
   } catch {
     return false;
@@ -204,6 +206,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
     'Discount'
   );
   const [formSearch, setFormSearch] = useState('');
+  const [debouncedFormSearch, setDebouncedFormSearch] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   const [formScreenshot, setFormScreenshot] = useState<string | null>(null);
@@ -279,7 +282,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
   useEffect(() => {
     return () => {
       ratingAbortRef.current?.abort();
+      ratingAbortRef.current = null;
       rwAbortRef.current?.abort();
+      rwAbortRef.current = null;
     };
   }, []);
 
@@ -305,16 +310,22 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
     return result;
   }, [orders, orderListSearch, orderListStatus]);
 
+  // Debounce product search for performance
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedFormSearch(formSearch), 300);
+    return () => clearTimeout(timer);
+  }, [formSearch]);
+
   // Fixed: Defined filteredProducts logic for the New Order Modal
   const filteredProducts = useMemo(() => {
     return availableProducts.filter((p) => {
       const matchesType = p.dealType === dealTypeFilter;
       const matchesSearch =
-        p.title.toLowerCase().includes(formSearch.toLowerCase()) ||
-        p.brandName.toLowerCase().includes(formSearch.toLowerCase());
+        p.title.toLowerCase().includes(debouncedFormSearch.toLowerCase()) ||
+        p.brandName.toLowerCase().includes(debouncedFormSearch.toLowerCase());
       return matchesType && matchesSearch;
     });
-  }, [availableProducts, dealTypeFilter, formSearch]);
+  }, [availableProducts, dealTypeFilter, debouncedFormSearch]);
 
   const loadedOnceRef = useRef(false);
 
@@ -533,6 +544,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       const raw = reader.result as string;
       setFormScreenshot(raw);
     };
+    reader.onerror = () => toast.error('Failed to read image. Please try again.');
     reader.readAsDataURL(file);
 
     setIsAnalyzing(true);
@@ -577,7 +589,8 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       if (capturedProduct) {
         const hasId = Boolean(safeOrderId);
         const hasAmount = typeof safeAmount === 'number';
-        const amountMatch = hasAmount && Math.abs(safeAmount - capturedProduct.price) < 10;
+        const tolerance = Math.max(10, capturedProduct.price * 0.02); // 2% or ₹10 minimum
+        const amountMatch = hasAmount && Math.abs(safeAmount - capturedProduct.price) < tolerance;
         const idValid = hasId && safeOrderId.length > 5;
 
         // Product name similarity check — strict matching to prevent fraud
@@ -653,6 +666,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
     // Show preview immediately
     const reader = new FileReader();
     reader.onload = () => setRatingPreview(reader.result as string);
+    reader.onerror = () => toast.error('Failed to read image. Please try again.');
     reader.readAsDataURL(file);
 
     setRatingFile(file);
@@ -794,6 +808,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
     // Show preview immediately
     const reader = new FileReader();
     reader.onload = () => setRwPreview(reader.result as string);
+    reader.onerror = () => toast.error('Failed to read image. Please try again.');
     reader.readAsDataURL(file);
 
     setRwFile(file);
@@ -999,7 +1014,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
 
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#f8f9fa]">
+    <div className="flex flex-col h-full min-h-0 bg-slate-50">
       <div className="p-6 pb-4 bg-white shadow-sm z-10 sticky top-0 flex justify-between items-end">
         <div>
           <h1 className="text-2xl font-extrabold text-slate-900">My Orders</h1>
@@ -1079,7 +1094,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-28 scrollbar-styled overscroll-none" {...pullHandlers}>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-styled overscroll-none" style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom, 0px))' }} {...pullHandlers}>
         <PullToRefreshIndicator distance={pullDistance} isRefreshing={isPullRefreshing} />
         {/* Search & Filter */}
         <div className="flex gap-2 items-center">
@@ -1108,8 +1123,19 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
         </div>
 
         {isLoading ? (
-          <div className="flex justify-center py-10 text-lime-500">
-            <Spinner className="w-6 h-6" />
+          <div className="space-y-3 py-2">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-zinc-100 animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-zinc-200 flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-zinc-200 rounded w-2/3" />
+                    <div className="h-3 bg-zinc-100 rounded w-1/3" />
+                  </div>
+                  <div className="h-6 w-16 bg-zinc-100 rounded-full" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : orders.length === 0 ? (
           <EmptyState
@@ -1201,7 +1227,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                 className={`bg-white rounded-[1.5rem] p-5 shadow-sm border relative overflow-hidden group transition-all duration-200 hover:shadow-md ${order.affiliateStatus === 'Frozen_Disputed' ? 'border-red-200' : 'border-slate-100'}`}
               >
                 {order.affiliateStatus === 'Frozen_Disputed' && (
-                  <div className="absolute top-0 left-0 w-full bg-red-500 text-white text-[9px] font-black py-1 text-center uppercase tracking-widest z-20">
+                  <div className="absolute top-0 left-0 w-full bg-red-500 text-white text-[10px] font-black py-1 text-center uppercase tracking-widest z-20">
                     Support Hold Active
                   </div>
                 )}
@@ -1307,7 +1333,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                   <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-bold text-red-700 flex items-start gap-2">
                     <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
                     <div>
-                      <span className="uppercase text-[9px] tracking-wider font-black text-red-500 block mb-0.5">
+                      <span className="uppercase text-[10px] tracking-wider font-black text-red-500 block mb-0.5">
                         {rejectionType === 'order' ? 'Purchase Proof' : rejectionType === 'review' ? 'Review Proof' : rejectionType === 'rating' ? 'Rating Proof' : rejectionType === 'returnWindow' ? 'Return Window Proof' : 'Proof'} Rejected
                       </span>
                       {rejectionReason}
@@ -1319,7 +1345,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                   <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-800 flex items-start gap-2">
                     <Zap size={14} className="flex-shrink-0 mt-0.5 text-amber-500" />
                     <div>
-                      <span className="uppercase text-[9px] tracking-wider font-black text-amber-600 block mb-0.5">
+                      <span className="uppercase text-[10px] tracking-wider font-black text-amber-600 block mb-0.5">
                         Action Required
                       </span>
                       {(order.missingProofRequests ?? []).map((r, i) => (
@@ -1335,7 +1361,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                 {/* STEP PROGRESS INDICATOR — shows buyers what step they're at */}
                 {hasExtraSteps && displayStatus !== 'SETTLED' && displayStatus !== 'FROZEN' && (
                   <div className="mb-3 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-2">Steps to complete</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Steps to complete</p>
                     <div className="flex items-center gap-0.5">
                       {/* Step 1: Purchase */}
                       <div className="flex items-center gap-1 min-w-0 shrink-0">
@@ -1348,7 +1374,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                         }`}>
                           {purchaseVerified ? <Check size={12} strokeWidth={3} /> : '1'}
                         </div>
-                        <span className={`text-[9px] font-bold truncate ${purchaseVerified ? 'text-green-600' : 'text-slate-500'}`}>
+                        <span className={`text-[10px] font-bold truncate ${purchaseVerified ? 'text-green-600' : 'text-slate-500'}`}>
                           Buy
                         </span>
                       </div>
@@ -1371,7 +1397,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                             }`}>
                               {reviewVerified ? <Check size={12} strokeWidth={3} /> : '2'}
                             </div>
-                            <span className={`text-[9px] font-bold truncate ${
+                            <span className={`text-[10px] font-bold truncate ${
                               reviewVerified ? 'text-green-600' : purchaseVerified ? 'text-slate-700' : 'text-slate-400'
                             }`}>
                               Review
@@ -1397,7 +1423,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                             }`}>
                               {ratingVerified ? <Check size={12} strokeWidth={3} /> : requiredSteps.includes('review') ? '3' : '2'}
                             </div>
-                            <span className={`text-[9px] font-bold truncate ${
+                            <span className={`text-[10px] font-bold truncate ${
                               ratingVerified ? 'text-green-600' : purchaseVerified ? 'text-slate-700' : 'text-slate-400'
                             }`}>
                               Rate
@@ -1427,7 +1453,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                                  requiredSteps.includes('review') || requiredSteps.includes('rating') ? '3' : '2')
                               }
                             </div>
-                            <span className={`text-[9px] font-bold truncate ${
+                            <span className={`text-[10px] font-bold truncate ${
                               returnWindowVerified ? 'text-green-600' : purchaseVerified ? 'text-slate-700' : 'text-slate-400'
                             }`}>
                               Return
@@ -1448,7 +1474,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                             ? <Check size={12} strokeWidth={3} />
                             : <Zap size={10} />}
                         </div>
-                        <span className={`text-[9px] font-bold truncate ${
+                        <span className={`text-[10px] font-bold truncate ${
                           order.affiliateStatus === 'Pending_Cooling' || order.paymentStatus === 'Paid'
                             ? 'text-green-600'
                             : 'text-slate-400'
@@ -1500,7 +1526,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           setSelectedOrder(order);
                           setUploadType('order');
                         }}
-                        className="text-[10px] font-bold uppercase text-blue-600"
+                        className="text-[10px] font-bold uppercase text-blue-600 bg-blue-50 border border-blue-200 px-3 py-2 rounded-lg hover:bg-blue-100 transition-colors active:scale-95"
                       >
                         {rejectionType === 'order' ? 'Reupload Purchase' : 'Upload Purchase Proof'}
                       </button>
@@ -1513,7 +1539,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           setUploadType('review');
                           setReviewerNameInput(order.reviewerName || '');
                         }}
-                        className="text-[10px] font-bold uppercase text-purple-600"
+                        className="text-[10px] font-bold uppercase text-purple-600 bg-purple-50 border border-purple-200 px-3 py-2 rounded-lg hover:bg-purple-100 transition-colors active:scale-95"
                       >
                         {rejectionType === 'review' ? 'Reupload Review' : 'Add Review'}
                       </button>
@@ -1526,7 +1552,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           setUploadType('rating');
                           setReviewerNameInput(order.reviewerName || '');
                         }}
-                        className="text-[10px] font-bold uppercase text-purple-600"
+                        className="text-[10px] font-bold uppercase text-purple-600 bg-purple-50 border border-purple-200 px-3 py-2 rounded-lg hover:bg-purple-100 transition-colors active:scale-95"
                       >
                         {rejectionType === 'rating' ? 'Reupload Rating' : 'Add Rating'}
                       </button>
@@ -1542,7 +1568,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           setUploadType('returnWindow');
                           setReviewerNameInput(order.reviewerName || '');
                         }}
-                        className="text-[10px] font-bold uppercase text-teal-600"
+                        className="text-[10px] font-bold uppercase text-teal-600 bg-teal-50 border border-teal-200 px-3 py-2 rounded-lg hover:bg-teal-100 transition-colors active:scale-95"
                       >
                         {rejectionType === 'returnWindow' ? 'Reupload Return Window' : 'Upload Return Window'}
                       </button>
@@ -1550,7 +1576,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                     {/* Raise Ticket for this specific order */}
                     <button
                       onClick={() => { setTicketOrderId(order.externalOrderId || order.id); setTicketModalOpen(true); }}
-                      className="text-[10px] font-bold uppercase text-red-500 hover:text-red-700"
+                      className="text-[10px] font-bold uppercase text-red-500 bg-red-50 border border-red-200 px-3 py-2 rounded-lg hover:bg-red-100 transition-colors active:scale-95"
                     >
                       Raise Ticket
                     </button>
@@ -1562,7 +1588,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
           })
         )}
 
-        {/* ─── My Tickets Section ──────────────────────────── */}
+        {/* ──My Tickets Section ───────────────────────────*/}
         <div className="mt-6">
           <button
             type="button"
@@ -1573,7 +1599,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
               <TicketCheck size={16} className="text-red-500" />
               <span className="text-sm font-bold text-slate-800">My Tickets</span>
               {myTickets.filter(t => t.status === 'Open').length > 0 && (
-                <span className="px-1.5 py-0.5 text-[9px] font-bold bg-red-100 text-red-600 rounded-full">
+                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-red-100 text-red-600 rounded-full">
                   {myTickets.filter(t => t.status === 'Open').length} open
                 </span>
               )}
@@ -1614,7 +1640,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                   const active = ticketStatusFilter === st;
                   return (
                     <button key={st} type="button" onClick={() => setTicketStatusFilter(st)}
-                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all border ${
+                      className={`px-2.5 py-1.5 rounded-full text-[10px] font-bold transition-all border ${
                         active
                           ? st === 'Open' ? 'bg-amber-500 text-white border-amber-500' :
                             st === 'Resolved' ? 'bg-green-500 text-white border-green-500' :
@@ -1637,10 +1663,10 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                 return (
                 <div className="max-h-[50dvh] overflow-y-auto scrollbar-styled space-y-2">
                 {filtered.map((t) => (
-                  <div key={t.id} className="bg-white rounded-xl border border-zinc-200 p-3 space-y-1.5 cursor-pointer hover:border-zinc-400 transition-colors" onClick={() => setSelectedTicket(t)}>
+                  <div key={t.id} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTicket(t); } }} className="bg-white rounded-xl border border-zinc-200 p-3 space-y-1.5 cursor-pointer hover:border-zinc-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400" onClick={() => setSelectedTicket(t)}>
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-800">{t.issueType}</span>
-                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                         t.status === 'Resolved' ? 'bg-green-100 text-green-700' :
                         t.status === 'Rejected' ? 'bg-red-100 text-red-700' :
                         'bg-amber-100 text-amber-700'
@@ -1648,7 +1674,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                         {t.status}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600 line-clamp-2">{t.description}</p>
+                    <ExpandableText text={t.description} clampClass="line-clamp-2" className="text-[11px] text-slate-600" as="p">{t.description}</ExpandableText>
                     {t.orderId && (
                       <p className="text-[10px] text-slate-400"><span className="font-bold">Order:</span> {t.orderId}</p>
                     )}
@@ -1658,14 +1684,14 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       </p>
                     )}
                     {(t.status === 'Resolved' || t.status === 'Rejected') && (t.resolvedByName || t.resolvedAt) && (
-                      <p className="text-[9px] text-slate-500">
+                      <p className="text-[10px] text-slate-500">
                         {t.status === 'Resolved' ? 'Resolved' : 'Rejected'}
                         {t.resolvedByName ? ` by ${t.resolvedByName}` : ''}
                         {t.resolvedAt ? ` on ${new Date(t.resolvedAt).toLocaleDateString('en-GB')}` : ''}
                       </p>
                     )}
                     <div className="flex items-center justify-between">
-                      <span className="text-[9px] text-slate-400">
+                      <span className="text-[10px] text-slate-400">
                         {new Date(t.createdAt).toLocaleDateString('en-GB')}
                       </span>
                       <div className="flex items-center gap-1.5">
@@ -1681,7 +1707,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                                 toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
                               }
                             }}
-                            className="px-2 py-0.5 rounded-lg text-[9px] font-bold bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100"
+                            className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100"
                           >
                             Reopen
                           </button>
@@ -1846,7 +1872,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           alt={p.title || 'Product'}
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-slate-900 truncate">{p.title}</p>
+                          <ExpandableText text={p.title} clampClass="truncate" className="text-sm font-bold text-slate-900" as="p">{p.title}</ExpandableText>
                           <div className="flex items-center justify-between mt-1">
                             <span className="text-[10px] font-bold text-slate-400 uppercase">
                               {p.platform}
@@ -1867,9 +1893,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       alt={selectedProduct.title || 'Product'}
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-slate-900 line-clamp-2">
+                      <ExpandableText text={selectedProduct.title} clampClass="line-clamp-2" className="text-sm font-bold text-slate-900" as="p">
                         {selectedProduct.title}
-                      </p>
+                      </ExpandableText>
                       <p className="text-xs font-bold text-lime-600 mt-1">
                         Target Price: {formatCurrency(selectedProduct.price)}
                       </p>
@@ -1926,7 +1952,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           <span className="text-xs font-bold text-lime-600 animate-pulse motion-reduce:animate-none">
                             AI Extracting Order Details...
                           </span>
-                          <span className="text-[9px] text-slate-400 font-medium">
+                          <span className="text-[10px] text-slate-400 font-medium">
                             Detecting Order ID, Amount, Product &amp; Seller
                           </span>
                         </div>
@@ -2022,10 +2048,10 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           <p className="text-[10px] text-amber-700 font-bold flex items-center gap-1.5 mb-1">
                             <AlertTriangle size={12} /> Could not auto-detect details from this screenshot.
                           </p>
-                          <p className="text-[9px] text-amber-600 leading-relaxed mb-1.5">
+                          <p className="text-[10px] text-amber-600 leading-relaxed mb-1.5">
                             Please type your <strong>Order ID</strong> and <strong>Paid Amount</strong> manually in the fields above.
                           </p>
-                          <details className="text-[9px] text-amber-600">
+                          <details className="text-[10px] text-amber-600">
                             <summary className="font-bold cursor-pointer hover:text-amber-700">Tips for better detection</summary>
                             <ul className="list-disc pl-3 mt-1 space-y-0.5 leading-relaxed">
                               <li>Take a <strong>clear, full-screen screenshot</strong> of the order details page</li>
@@ -2041,7 +2067,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       )}
                       {/* Guidance when only one field is extracted */}
                       {!isAnalyzing && (!!extractedDetails.orderId !== !!extractedDetails.amount) && (
-                        <p className="text-[9px] text-blue-600 font-medium bg-blue-50 p-2 rounded-lg flex items-center gap-1.5">
+                        <p className="text-[10px] text-blue-600 font-medium bg-blue-50 p-2 rounded-lg flex items-center gap-1.5">
                           <AlertTriangle size={10} /> {extractedDetails.orderId ? 'Amount not detected — please enter the Paid Amount manually.' : 'Order ID not detected — please enter the Order ID manually.'}
                         </p>
                       )}
@@ -2056,7 +2082,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                         <ScanLine size={10} /> AI Extracted Details
                       </p>
                       <div className="space-y-0.5">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase ml-0.5">Product Name</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase ml-0.5">Product Name</label>
                         <input
                           type="text"
                           value={extractedDetails.productName || ''}
@@ -2065,13 +2091,13 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           placeholder="Product name"
                         />
                         {selectedProduct && matchStatus.productName === 'mismatch' && (
-                          <p className="text-[9px] text-red-500 mt-0.5 ml-0.5">
+                          <p className="text-[10px] text-red-500 mt-0.5 ml-0.5">
                             <strong>Expected:</strong> {selectedProduct.title}
                           </p>
                         )}
                       </div>
                       <div className="space-y-0.5">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase ml-0.5">Sold By</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase ml-0.5">Sold By</label>
                         <input
                           type="text"
                           value={extractedDetails.soldBy || ''}
@@ -2081,7 +2107,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                         />
                       </div>
                       <div className="space-y-0.5">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase ml-0.5">Order Date</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase ml-0.5">Order Date</label>
                         <input
                           type="text"
                           value={extractedDetails.orderDate || ''}
@@ -2125,7 +2151,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       {matchStatus.reviewerName === 'mismatch' && (
                         <div className="flex items-center gap-1.5 mt-1">
                           <AlertTriangle size={11} className="text-red-500 flex-shrink-0" />
-                          <p className="text-[9px] font-bold text-red-600">
+                          <p className="text-[10px] font-bold text-red-600">
                             Account name mismatch — screenshot shows &quot;{extractedDetails.accountName}&quot;
                           </p>
                         </div>
@@ -2133,12 +2159,12 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       {matchStatus.reviewerName === 'match' && (
                         <div className="flex items-center gap-1.5 mt-1">
                           <CheckCircle2 size={11} className="text-green-500 flex-shrink-0" />
-                          <p className="text-[9px] font-bold text-green-600">
+                          <p className="text-[10px] font-bold text-green-600">
                             Account name matches screenshot
                           </p>
                         </div>
                       )}
-                      <p className="text-[9px] text-zinc-400 ml-1">
+                      <p className="text-[10px] text-zinc-400 ml-1">
                         Enter the name shown on the marketplace account used for this order. If you ordered from someone else's account (e.g. brother, friend), enter their name — your rating/review screenshots will be verified against this name.
                       </p>
                     </div>
@@ -2201,7 +2227,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
 
       {proofToView && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in"
+          className="fixed inset-0 z-modal flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in"
           onClick={() => setProofToView(null)}
         >
           <div
@@ -2221,7 +2247,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                 Order {getPrimaryOrderId(proofToView)}
               </p>
               {proofToView.reviewerName && (
-                <p className="text-[10px] mt-1 text-indigo-600 font-bold flex items-center gap-1">
+                <p className="text-[10px] mt-1 text-zinc-600 font-bold flex items-center gap-1">
                   Reviewer Name: {proofToView.reviewerName}
                 </p>
               )}
@@ -2316,7 +2342,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       {/* ADD REVIEW / RATING MODAL */}
       {selectedOrder && (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
+          className="fixed inset-0 z-modal flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
           onClick={() => {
             setSelectedOrder(null);
             setInputValue('');
@@ -2365,7 +2391,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       <CheckCircle2 size={12} />
                       Reviewer name: <span className="text-green-800">"{selectedOrder.reviewerName}"</span>
                     </p>
-                    <p className="text-[9px] text-green-600 mt-1">
+                    <p className="text-[10px] text-green-600 mt-1">
                       Your review link must be from this marketplace account.
                     </p>
                   </div>
@@ -2397,7 +2423,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       <CheckCircle2 size={12} />
                       Reviewer name: <span className="text-green-800">"{selectedOrder.reviewerName}"</span>
                     </p>
-                    <p className="text-[9px] text-green-600 mt-1">
+                    <p className="text-[10px] text-green-600 mt-1">
                       Your rating screenshot must show this reviewer name to be accepted.
                     </p>
                   </div>
@@ -2447,23 +2473,23 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           {selectedOrder?.reviewerName ? 'Reviewer Name' : 'Account Name'}
                         </div>
                         <div className={`text-xs font-bold ${ratingVerification.accountNameMatch ? 'text-green-600' : 'text-red-600'}`}>
-                          {ratingVerification.accountNameMatch ? '✓ Match' : '✗ Mismatch'}
+                          {ratingVerification.accountNameMatch ? '✔ Match' : '✗ Mismatch'}
                         </div>
                         {ratingVerification.detectedAccountName && (
-                          <div className="text-[10px] text-slate-500 mt-0.5 truncate">
+                          <ExpandableText text={ratingVerification.detectedAccountName} clampClass="truncate" className="text-[10px] text-slate-500 mt-0.5" as="div">
                             Detected: {ratingVerification.detectedAccountName}
-                          </div>
+                          </ExpandableText>
                         )}
                       </div>
                       <div className={`p-2.5 rounded-xl text-center ${ratingVerification.productNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Product Name</div>
                         <div className={`text-xs font-bold ${ratingVerification.productNameMatch ? 'text-green-600' : 'text-red-600'}`}>
-                          {ratingVerification.productNameMatch ? '✓ Match' : '✗ Mismatch'}
+                          {ratingVerification.productNameMatch ? '✔ Match' : '✗ Mismatch'}
                         </div>
                         {ratingVerification.detectedProductName && (
-                          <div className="text-[10px] text-slate-500 mt-0.5 truncate">
+                          <ExpandableText text={ratingVerification.detectedProductName} clampClass="truncate" className="text-[10px] text-slate-500 mt-0.5" as="div">
                             Found: {ratingVerification.detectedProductName}
-                          </div>
+                          </ExpandableText>
                         )}
                       </div>
                     </div>
@@ -2545,7 +2571,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       <CheckCircle2 size={12} />
                       Reviewer name: <span className="text-green-800">"{selectedOrder.reviewerName}"</span>
                     </p>
-                    <p className="text-[9px] text-green-600 mt-1">
+                    <p className="text-[10px] text-green-600 mt-1">
                       Your return window screenshot must show this name to be accepted.
                     </p>
                   </div>
@@ -2593,19 +2619,19 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       <div className={`p-2.5 rounded-xl text-center ${rwVerification.orderIdMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Order ID</div>
                         <div className={`text-xs font-bold ${rwVerification.orderIdMatch ? 'text-green-600' : 'text-red-600'}`}>
-                          {rwVerification.orderIdMatch ? '✓ Match' : '✗ Mismatch'}
+                          {rwVerification.orderIdMatch ? '✔ Match' : '✗ Mismatch'}
                         </div>
                       </div>
                       <div className={`p-2.5 rounded-xl text-center ${rwVerification.productNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Product</div>
                         <div className={`text-xs font-bold ${rwVerification.productNameMatch ? 'text-green-600' : 'text-red-600'}`}>
-                          {rwVerification.productNameMatch ? '✓ Match' : '✗ Mismatch'}
+                          {rwVerification.productNameMatch ? '✔ Match' : '✗ Mismatch'}
                         </div>
                       </div>
                       <div className={`p-2.5 rounded-xl text-center ${rwVerification.returnWindowClosed ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Return Window</div>
                         <div className={`text-xs font-bold ${rwVerification.returnWindowClosed ? 'text-green-600' : 'text-red-600'}`}>
-                          {rwVerification.returnWindowClosed ? '✓ Closed' : '✗ Still Open'}
+                          {rwVerification.returnWindowClosed ? '✔ Closed' : '✗ Still Open'}
                         </div>
                       </div>
                     </div>
@@ -2613,14 +2639,14 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                       <div className={`p-2.5 rounded-xl text-center ${rwVerification.amountMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Amount</div>
                         <div className={`text-xs font-bold ${rwVerification.amountMatch ? 'text-green-600' : 'text-red-600'}`}>
-                          {rwVerification.amountMatch ? '✓ Match' : '✗ Mismatch'}
+                          {rwVerification.amountMatch ? '✔ Match' : '✗ Mismatch'}
                         </div>
                       </div>
                       {selectedOrder?.soldBy && (
                       <div className={`p-2.5 rounded-xl text-center ${rwVerification.soldByMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Seller</div>
                         <div className={`text-xs font-bold ${rwVerification.soldByMatch ? 'text-green-600' : 'text-red-600'}`}>
-                          {rwVerification.soldByMatch ? '✓ Match' : '✗ Mismatch'}
+                          {rwVerification.soldByMatch ? '✔ Match' : '✗ Mismatch'}
                         </div>
                       </div>
                       )}
@@ -2628,7 +2654,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                         <div className={`p-2.5 rounded-xl text-center ${rwVerification.reviewerNameMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                           <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Reviewer</div>
                           <div className={`text-xs font-bold ${rwVerification.reviewerNameMatch ? 'text-green-600' : 'text-red-600'}`}>
-                            {rwVerification.reviewerNameMatch ? '✓ Match' : '✗ Mismatch'}
+                            {rwVerification.reviewerNameMatch ? '✔ Match' : '✗ Mismatch'}
                           </div>
                         </div>
                       )}

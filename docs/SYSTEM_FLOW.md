@@ -28,7 +28,7 @@
 
 ## Ecosystem Overview
 
-```
+```text
 ┌─────────────┐     ┌─────────────┐     ┌──────────────┐     ┌──────────────┐
 │   Brand     │────▶│   Agency    │────▶│   Mediator   │────▶│    Buyer     │
 │  (Supply)   │     │ (Distribute)│     │   (Connect)  │     │  (Purchase)  │
@@ -67,7 +67,7 @@
 
 ## Platform Architecture
 
-```
+```text
 ┌──────────────────────────────────────────────────────────────┐
 │                     Client Layer                              │
 │  ┌────────┐ ┌──────────┐ ┌────────┐ ┌───────┐ ┌───────┐    │
@@ -103,7 +103,7 @@
 
 ### A. Onboarding Flow
 
-```
+```text
 1. User opens portal → Auth page (Mobile + OTP or Username + Password)
 2. First-time users register with name, mobile, role
 3. Backend creates User record + Wallet (balance: 0)
@@ -125,7 +125,7 @@
 
 ### B. Campaign & Deal Pipeline
 
-```
+```text
 Brand                    Agency                   Mediator
   │                        │                         │
   ├─ Create Product        │                         │
@@ -152,7 +152,7 @@ Brand                    Agency                   Mediator
 
 ### C. Buyer Purchase Lifecycle
 
-```
+```text
 Buyer                     Backend                   Mediator/Agency
   │                         │                         │
   ├─ Browse Deals           │                         │
@@ -168,33 +168,35 @@ Buyer                     Backend                   Mediator/Agency
   ├─ Track Order            │                         │
   │  (Orders page)          │                         │
   ├─ Upload Proof ─────────▶│                         │
-  │  (screenshot/receipt)   ├─ AI Extract data ───────▶ Mediator verifies
+  │  (screenshot/receipt)   ├─ AI Extract + Verify ───▶ Auto or Mediator review
   │                         │  (amount, date, UTR)    │
   │                         │                         │
 ```
 
 **Order Status State Machine:**
 
-```
-PLACED → VERIFIED → SETTLED → (complete)
-  │         │          │
-  ├→ CANCELLED    ├→ RETURNED
-  ├→ REJECTED     ├→ DISPUTED
-  └→ FROZEN       └→ REFUNDED
+```text
+PLACED → UNDER_REVIEW → APPROVED → Pending_Cooling → SETTLED → (complete)
+  │         │              │            │                 │
+  ├→ CANCELLED    ├→ REJECTED   │            │                 ├→ RETURNED
+  ├→ FROZEN       └→ DISPUTED   │            └→ auto-settle    ├→ DISPUTED
+  │                              └→ VERIFIED                    └→ REFUNDED
 ```
 
 ### D. Order Verification & Settlement
 
-```
+```text
 Buyer                  Backend AI              Mediator              Agency/Admin
   │                       │                       │                      │
   ├─ Upload proof ───────▶│                       │                      │
   │  (screenshot)         ├─ OCR via Gemini       │                      │
   │                       ├─ Extract: amount,     │                      │
   │                       │  date, UTR/txnId      │                      │
-  │                       ├─ Auto-fill fields     │                      │
+  │                       ├─ Confidence score     │                      │
   │                       │                       │                      │
-  │                       ├─ SSE notification ────▶                      │
+  │                       ├─ Score ≥ threshold? ──┤                      │
+  │                       │  YES: auto-verify ────┼──── (skip mediator) ─▶│
+  │                       │  NO:  SSE notify ─────▶                      │
   │                       │                       ├─ Review proof        │
   │                       │                       ├─ Verify/Reject ─────▶│
   │                       │                       │                      │
@@ -204,17 +206,32 @@ Buyer                  Backend AI              Mediator              Agency/Admi
   │                       │                       │                      │
 ```
 
+**AI Auto-Verification (Bulk Path):**
+
+When ALL required proofs are uploaded and each has AI confidence ≥ `AI_PROOF_CONFIDENCE_THRESHOLD` (default 80%):
+
+1. System bulk-verifies ALL unverified steps at once
+2. Order moves directly to **cooling period** (`Pending_Cooling` status)
+3. No mediator manual review required
+4. After cooling period (`COOLING_PERIOD_DAYS`, default 14), settlement becomes eligible
+
+This path triggers automatically after each proof upload via `autoVerifyStep()` → `attemptBulkAutoVerify()` → `finalizeApprovalIfReady()`.
+
+**Individual Step Auto-Verification:**
+
+If a single proof's AI confidence ≥ `AI_AUTO_VERIFY_THRESHOLD` (default 80%), that individual step is auto-verified immediately. The system then checks if all steps are now verified to trigger the bulk approval.
+
 **AI Extraction:**
 
 - Buyer uploads payment screenshot
 - Gemini Vision API extracts transaction details (amount, date, reference number)
 - Results cached for 15 minutes (prevents duplicate API calls)
-- Fields are auto-filled but mediator must verify manually
+- Fields are auto-filled; if AI confidence is high enough, mediator review is skipped
 - Amount guard: extracted amount must match order total (±tolerance)
 
 ### E. Payout & Money Flow
 
-```
+```text
 ┌──────────┐    Fund Campaign    ┌──────────┐
 │  Brand   │────────────────────▶│  Brand   │
 │ (funds)  │                     │  Wallet  │
@@ -252,7 +269,7 @@ Buyer                  Backend AI              Mediator              Agency/Admi
 
 ### F. Suspension & Cascade
 
-```
+```text
 Admin suspends Agency
   └─▶ All Agency's Mediators → suspended
        └─▶ All Mediator's Buyers → access blocked
@@ -270,7 +287,7 @@ Admin suspends Buyer
 
 ### G. Support Ticket Lifecycle
 
-```
+```text
 Buyer creates ticket          ──▶  targetRole = mediator
   │                                     │
   │                         Mediator manages ticket
@@ -361,7 +378,7 @@ Every significant action in the system is traceable:
 
 **Audit Log Files (Production):**
 
-```
+```text
 logs/
 ├── combined-YYYY-MM-DD.log     # All events (JSON structured)
 ├── error-YYYY-MM-DD.log        # Errors only
@@ -428,7 +445,7 @@ logs/
 
 ## Folder Structure
 
-```
+```text
 MOBO/
 ├── apps/                          # Frontend applications
 │   ├── buyer-app/                 # Buyer PWA (port 3001)

@@ -90,8 +90,8 @@ const variantStyles: Record<ConfirmVariant, { button: string; icon: string }> = 
   },
   default: {
     button:
-      'bg-indigo-600 text-white hover:bg-indigo-500 focus-visible:ring-indigo-400/60',
-    icon: 'bg-indigo-100 text-indigo-600',
+      'bg-zinc-900 text-white hover:bg-zinc-800 focus-visible:ring-zinc-400/60',
+    icon: 'bg-zinc-100 text-zinc-600',
   },
 };
 
@@ -134,7 +134,7 @@ function ConfirmDialog({
       role="dialog"
       aria-modal="true"
       aria-label={title ?? 'Confirmation'}
-      className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-modal flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-150"
       onMouseDown={(e) => {
         if (e.target === overlayRef.current) onCancel();
       }}
@@ -183,7 +183,6 @@ function ConfirmDialog({
           <button
             type="button"
             onClick={onConfirm}
-            autoFocus
             className={cn(
               'flex-1 h-12 rounded-2xl font-bold text-sm transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
               styles.button,

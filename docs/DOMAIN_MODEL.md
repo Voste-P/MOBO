@@ -1,6 +1,6 @@
 # Domain Model (Current Implementation)
 
-> **20 Prisma models, 22 enums** — PostgreSQL via Prisma ORM. Last updated: June 2025.
+> **21 Prisma models, 23 enums** — PostgreSQL via Prisma ORM. Last updated: June 2025.
 
 Source: [backend/prisma/schema.prisma](../backend/prisma/schema.prisma)
 
@@ -19,9 +19,9 @@ This document summarizes the current backend domain entities and how they relate
 | `OrderWorkflowStatus` | CREATED → REDIRECTED → ORDERED → PROOF_SUBMITTED → UNDER_REVIEW → APPROVED → REWARD_PENDING → COMPLETED / REJECTED / FAILED                                                                            |
 | `OrderStatus`         | Ordered, Shipped, Delivered, Cancelled, Returned                                                                                                                                                       |
 | `PaymentStatus`       | Pending, Paid, Refunded, Failed                                                                                                                                                                        |
-| `AffiliateStatus`     | Unchecked, Pending_Cooling, Approved_Settled, Rejected, Cap_Exceeded, Frozen_Disputed                                                                                                                    |
+| `AffiliateStatus`     | Unchecked, Pending_Cooling, Approved_Settled, Rejected, Cap_Exceeded, Frozen_Disputed                                                                                                                  |
 | `SettlementMode`      | wallet, external                                                                                                                                                                                       |
-| `DealType`            | Discount, Review, Rating                                                                                                                                                                               |
+| `DealType`            | Discount, Review (hidden), Rating — Review is kept in the schema but hidden from all campaign-creation UI dropdowns (will be re-enabled later)                                                         |
 | `CampaignStatus`      | draft, active, paused, completed                                                                                                                                                                       |
 | `TransactionType`     | brand_deposit, platform_fee, commission_lock/settle, cashback_lock/settle, order_settlement_debit, commission_reversal, margin_reversal, agency_payout/receipt, payout_request/complete/failed, refund |
 | `TransactionStatus`   | pending, completed, failed, reversed                                                                                                                                                                   |
@@ -145,13 +145,9 @@ Append-only: `actorUserId`, `actorRoles[]`, `action`, `entityType`, `entityId`, 
 
 System key-value config. Unique key (default `"system"`). Fields: `adminContactEmail`.
 
-### MigrationSync (table: `migration_sync`)
-
-Mongo→PG migration tracking. Unique on `collection`. Fields: `status`, `syncedCount`, `errorCount`.
-
 ## Relationship Diagram
 
-```
+```text
 Brand ──────────── Campaign ───── Deal
   │                   │              │
   │ connectedAgencies │ assignments  │ mediatorCode

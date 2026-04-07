@@ -20,7 +20,7 @@ export const Badge = React.memo(function Badge({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-1 rounded-full border uppercase tracking-widest',
+        'inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-1 rounded-full border uppercase tracking-widest transition-colors duration-200',
         variants[variant],
         className
       )}

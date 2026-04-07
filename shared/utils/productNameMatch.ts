@@ -127,7 +127,7 @@ export function checkProductNameMatch(
   return (hasEnoughOverlap || shortNameMatch) ? 'match' : 'mismatch';
 }
 
-// ─── Reviewer / Account Name Matching ────────────────────
+// ──Reviewer / Account Name Matching ────────────────────
 export type ReviewerNameMatchStatus = 'match' | 'mismatch' | 'none';
 
 /**

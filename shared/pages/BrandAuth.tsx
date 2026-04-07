@@ -1,6 +1,8 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Button, Input, Spinner } from '../components/ui';
+import { Button, Input, Spinner, AnimatedView } from '../components/ui';
+import { SecurityQuestionsSetup, type SecurityQA } from '../components/SecurityQuestionsSetup';
+import { ForgotPassword } from './ForgotPassword';
 import {
   Building2,
   ArrowRight,
@@ -21,7 +23,7 @@ interface BrandAuthProps {
 }
 
 export const BrandAuthScreen: React.FC<BrandAuthProps> = ({ onBack }) => {
-  const [view, setView] = useState<'splash' | 'login' | 'register'>('splash');
+  const [view, setView] = useState<'splash' | 'login' | 'register' | 'securityQuestions' | 'forgotPassword'>('splash');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -30,6 +32,8 @@ export const BrandAuthScreen: React.FC<BrandAuthProps> = ({ onBack }) => {
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [brandCode, setBrandCode] = useState('');
+
+  const pendingRegRef = useRef<{ name: string; mobile: string; password: string; brandCode: string } | null>(null);
 
   const { login, registerBrand, logout } = useAuth();
 
@@ -70,22 +74,54 @@ export const BrandAuthScreen: React.FC<BrandAuthProps> = ({ onBack }) => {
       return;
     }
     setError('');
+    pendingRegRef.current = { name, mobile, password, brandCode };
+    setView('securityQuestions');
+  };
+
+  const handleSecurityQuestionsComplete = async (questions: SecurityQA[]) => {
+    const reg = pendingRegRef.current;
+    if (!reg) return;
     setIsLoading(true);
+    setError('');
     try {
-      await registerBrand(name, mobile, password, brandCode);
+      await registerBrand(reg.name, reg.mobile, reg.password, reg.brandCode, questions);
     } catch (err: any) {
       setError(formatErrorMessage(err, 'Registration failed'));
+      setView('register');
       setIsLoading(false);
     }
   };
 
+  if (view === 'forgotPassword') {
+    return (
+      <AnimatedView viewKey="forgotPassword" variant="slideRight">
+        <ForgotPassword
+          onBack={() => { setView('login'); setError(''); }}
+          onSuccess={() => { setView('login'); setError(''); }}
+        />
+      </AnimatedView>
+    );
+  }
+
+  if (view === 'securityQuestions') {
+    return (
+      <AnimatedView viewKey="securityQuestions" variant="slideUp">
+        <SecurityQuestionsSetup
+          onComplete={handleSecurityQuestionsComplete}
+          onBack={() => { setView('register'); setError(''); }}
+        />
+      </AnimatedView>
+    );
+  }
+
   if (view === 'splash') {
     return (
-      <div className="flex min-h-[100dvh] w-full bg-zinc-950 text-white overflow-hidden relative font-sans">
+      <AnimatedView viewKey="splash" variant="fade">
+      <div className="flex w-full bg-zinc-950 text-white overflow-x-hidden relative font-sans" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
         {/* Abstract Background */}
         <div className="absolute inset-0 z-0">
           <div className="absolute top-[-10%] left-[-10%] w-[60vw] h-[60vw] bg-lime-500/10 rounded-full blur-[150px] animate-pulse motion-reduce:animate-none"></div>
-          <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-indigo-600/10 rounded-full blur-[150px]"></div>
+          <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-lime-500/10 rounded-full blur-[150px]"></div>
           <div className="absolute inset-0 opacity-20 brightness-100 contrast-150 mix-blend-overlay" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.7\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\'/%3E%3C/svg%3E")' }} />
         </div>
 
@@ -138,12 +174,14 @@ export const BrandAuthScreen: React.FC<BrandAuthProps> = ({ onBack }) => {
           </div>
         </div>
       </div>
+      </AnimatedView>
     );
   }
 
   // --- SPLIT LAYOUT FOR FORMS ---
   return (
-    <div className="flex min-h-[100dvh] w-full bg-white font-sans">
+    <AnimatedView viewKey={view} variant="slideUp">
+    <div className="flex w-full bg-white font-sans" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
       {/* Left Visual Side */}
       <div className="hidden lg:flex lg:w-1/2 bg-zinc-950 relative overflow-hidden flex-col justify-between p-12 text-white">
         <div className="absolute inset-0 z-0">
@@ -273,6 +311,16 @@ export const BrandAuthScreen: React.FC<BrandAuthProps> = ({ onBack }) => {
             >
               {view === 'login' ? 'Login to Portal' : 'Activate License'}
             </Button>
+
+            {view === 'login' && (
+              <button
+                type="button"
+                className="w-full text-center text-xs text-zinc-500 hover:text-lime-500 mt-2 transition-colors"
+                onClick={() => { setView('forgotPassword'); setError(''); }}
+              >
+                Forgot Password?
+              </button>
+            )}
           </form>
 
           <p className="text-center mt-6 text-xs text-zinc-400 font-medium">
@@ -287,5 +335,6 @@ export const BrandAuthScreen: React.FC<BrandAuthProps> = ({ onBack }) => {
         </div>
       </div>
     </div>
+    </AnimatedView>
   );
 };

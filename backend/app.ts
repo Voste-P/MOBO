@@ -249,7 +249,7 @@ export function createApp(env: Env) {
   // ── Request timeout ────────────────────────────────────────────────
   // Prevents hung handlers from holding connections indefinitely.
   // This is a safety net — individual routes can set shorter timeouts.
-  const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS) || 30_000;
+  const REQUEST_TIMEOUT_MS = env.REQUEST_TIMEOUT_MS;
   app.use((req, res, next) => {
     // Skip SSE streams — they're intentionally long-lived.
     if (req.path.startsWith('/api/realtime/')) return next();
@@ -367,8 +367,12 @@ export function createApp(env: Env) {
   // [PERF] Cache-Control headers for GET endpoints — enables browser & CDN caching.
   // Private: data is user-specific (auth-gated), stale-while-revalidate lets
   // the browser serve stale data while refetching in the background.
+  // IMPORTANT: /auth endpoints are excluded — they return mutable user state
+  // (pendingConnections, walletBalance, connectedAgencies) that changes as a
+  // side-effect of mutations on other resources. Caching /auth/me causes stale
+  // data (e.g. approved connection requests still appearing as pending).
   app.use('/api', (req, res, next) => {
-    if (req.method === 'GET' && !req.path.startsWith('/realtime')) {
+    if (req.method === 'GET' && !req.path.startsWith('/realtime') && !req.path.startsWith('/auth')) {
       res.setHeader('Cache-Control', 'private, max-age=15, stale-while-revalidate=30');
     }
     next();

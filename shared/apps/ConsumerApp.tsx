@@ -85,26 +85,26 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
   if (user.isVerifiedByMediator === false) {
     return (
       <div className="min-h-screen w-full bg-slate-50 relative p-8 flex flex-col items-center justify-center text-center overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-indigo-50 to-transparent pointer-events-none" />
+        <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-lime-50 to-transparent pointer-events-none" />
         <div className="w-full max-w-sm relative z-10">
-          <Card className="shadow-xl border-indigo-50">
+          <Card className="shadow-xl border-lime-100">
             <CardContent className="p-8">
-              <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mb-6 mx-auto">
-                <div className="w-3 h-3 bg-indigo-600 rounded-full animate-ping motion-reduce:animate-none" />
+              <div className="w-20 h-20 bg-[#CCF381]/20 rounded-full flex items-center justify-center mb-6 mx-auto">
+                <div className="w-3 h-3 bg-lime-500 rounded-full animate-ping motion-reduce:animate-none" />
               </div>
               <h1 className="text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">
                 Hang Tight!
               </h1>
               <p className="text-slate-500 mb-8 font-medium">
                 Your request is with Mediator{' '}
-                <span className="text-indigo-600 font-bold font-mono bg-indigo-50 px-2 py-0.5 rounded">
+                <span className="text-zinc-900 font-bold font-mono bg-[#CCF381]/30 px-2 py-0.5 rounded">
                   {user.mediatorCode}
                 </span>
                 .
               </p>
               <div className="space-y-3">
                 <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-indigo-500 w-[60%]" />
+                  <div className="h-full bg-lime-500 w-[60%]" />
                 </div>
                 <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">
                   Verification in Progress
@@ -132,7 +132,7 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
         <CartProvider>
           <ChatProvider>
             <NotificationProvider>
-            <div className="flex flex-col h-full bg-[#F2F2F7] relative overflow-hidden font-sans">
+            <div className="flex flex-col h-full bg-surface relative overflow-hidden font-sans">
               <div className="flex-1 overflow-hidden overscroll-none" {...swipeHandlers}>
                   {visitedTabs.has('explore') && (
                     <div className={`h-full ${activeTab === 'explore' ? '' : 'hidden'}`}>

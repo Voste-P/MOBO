@@ -15,7 +15,7 @@ import { safeIso } from './uiMappers.js';
 // ────────────── generic ──────────────
 
 /** Add `_id = id` for backward compat with legacy API shapes. */
-export function withId<T extends { mongoId?: string | null; id: string }>(raw: T): T & { _id: string } {
+export function withId<T extends { id: string }>(raw: T): T & { _id: string } {
   return { ...raw, _id: raw.id };
 }
 

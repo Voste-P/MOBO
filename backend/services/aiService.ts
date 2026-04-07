@@ -102,7 +102,11 @@ function editDistance(a: string, b: string): number {
 // Product-type words (oil, cream, gel, serum, spray, lotion, perfume, etc.) are intentionally
 // EXCLUDED from stop words because they distinguish different products from the same brand
 // (e.g. "Avimee Herbal Scalptone Hair Growth Serum" vs "Avimee Herbal Keshpallav Hair Oil").
-const PRODUCT_STOP_WORDS = new Set(['the','for','and','with','from','that','this','you','your','was','are','has','have','been','not','but','all','can','had','her','his','one','our','out','use','how','its','may','new','now','old','see','way','who','boy','did','get','him','let','say','she','too','any','per','set','top','end','off','big','own','put','run','two','via','free','pack','item','best','good','great','nice','size','pair','home','made','full','high','low','day','box','buy','kit','men','man','women','woman','long','lasting','100ml','50ml','200ml','ml','gm','kg','ltr','white','black','red','blue','green','pink','gold','silver','natural','pure','premium','original','genuine','quality','gift','type','style','brand','product','online','india','combo','super','ultra','pro','plus','lite','mini','max','extra']);
+const PRODUCT_STOP_WORDS = new Set(['the','for','and','with','from','that','this','you','your','was','are','has','have','been','not','but','all','can','had','her','his','one','our','out','use','how','its','may','new','now','old','see','way','who','boy','did','get','him','let','say','she','too','any','per','set','top','end','off','big','own','put','run','two','via','free','pack','item','best','good','great','nice','size','pair','home','made','full','high','low','day','box','buy','kit','men','man','women','woman','long','lasting','100ml','50ml','200ml','250ml','300ml','500ml','750ml','1000ml','ml','gm','kg','ltr','white','black','red','blue','green','pink','gold','silver','natural','pure','premium','original','genuine','quality','gift','type','style','brand','product','online','india','combo','super','ultra','pro','plus','lite','mini','max','extra']);
+
+// ── Variant / measurement tokens that often differ between product listing and order page ──
+// Pure numeric tokens and measurement units are not product-distinguishing.
+const VARIANT_RE = /^\d+$/;          // Pure numbers like "100", "50", "200"
 
 /**
  * Robust product name token matching.
@@ -116,9 +120,26 @@ const PRODUCT_STOP_WORDS = new Set(['the','for','and','with','from','that','this
  */
 function isProductNameMatch(expected: string, detected: string): boolean {
   if (!expected || !detected) return false;
-  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const norm = (s: string) => s.toLowerCase()
+    .replace(/\((?:\d+\s*(?:ml|gm|g|kg|ltr|l|oz|fl\s*oz|pcs?|pack|count|pieces?|units?|tablets?|capsules?)(?:\s*(?:x|×)\s*\d+)?)\)/gi, '')  // strip variant suffixes like (100 ml), (Pack of 2)
+    .replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   const eNorm = norm(expected);
-  const dNorm = norm(detected);
+  let dNorm = norm(detected);
+
+  // ── Truncation detection ──
+  // Screenshots often show truncated product names ending with "..." or "…".
+  // Strip the trailing ellipsis and the last (likely partial) word so we only
+  // compare complete tokens, then relax the reverse-match threshold.
+  let wasTruncated = false;
+  const ellipsisRe = /^(.*?)\s*(?:\.{2,}|…)\s*$/;
+  const ellipsisMatch = detected.match(ellipsisRe);
+  if (ellipsisMatch) {
+    let cleaned = norm(ellipsisMatch[1]);
+    const lastSpace = cleaned.lastIndexOf(' ');
+    if (lastSpace > 0) cleaned = cleaned.substring(0, lastSpace).trim();
+    if (cleaned.length >= 3) { dNorm = cleaned; wasTruncated = true; }
+  }
+
   // Direct substring: if either fully contains the other.
   // Guard: the shorter string must be at least 40% the length of the longer
   // to prevent short generic words (e.g. "perfume") from matching long product names.
@@ -128,33 +149,41 @@ function isProductNameMatch(expected: string, detected: string): boolean {
     if (shorter / longer >= 0.4 && (eNorm.includes(dNorm) || dNorm.includes(eNorm))) return true;
   }
 
+  // ── Also accept when the detected text is a clear prefix of the expected ──
+  // Handles cases like "Avimee Herbal Keshpalla" matching "Avimee Herbal Keshpallav Hair Oil..."
+  if (wasTruncated && dNorm.length >= 8 && eNorm.startsWith(dNorm)) return true;
+
   const tokenize = (s: string) => {
     const all = [...new Set(s.split(/\s+/).filter(t => t.length >= 2))];
-    const filtered = all.filter(t => !PRODUCT_STOP_WORDS.has(t) && t.length >= 3);
+    const filtered = all.filter(t => !PRODUCT_STOP_WORDS.has(t) && !VARIANT_RE.test(t) && t.length >= 3);
     return filtered.length > 0 ? filtered : all;
   };
   const eTokens = tokenize(eNorm);
   const dTokens = tokenize(dNorm);
   if (eTokens.length === 0 || dTokens.length === 0) return false;
 
-  // Count how many expected tokens appear in the detected string (exact or fuzzy)
-  const matchedCount = eTokens.filter(et =>
-    dTokens.some(dt =>
-      dt === et ||
-      (et.length >= 4 && dt.includes(et)) ||
-      (dt.length >= 4 && et.includes(dt)) ||
-      (et.length >= 5 && dt.length >= 5 && editDistance(et, dt) <= 1)
-    )
-  ).length;
+  const tokenMatch = (a: string, b: string) =>
+    a === b ||
+    (a.length >= 4 && b.includes(a)) ||
+    (b.length >= 4 && a.includes(b)) ||
+    (a.length >= 5 && b.length >= 5 && editDistance(a, b) <= 1);
 
-  // Adaptive match policy: For names with few tokens (≤3), require 100% match
-  // to prevent collisions (e.g. brand names only). For names with 4+ tokens,
-  // require 85% match to handle OCR partial reads while still blocking different
-  // products from the same brand (e.g. "Avimee Herbal Keshpallav Hair Oil" vs
-  // "Avimee Herbal Scalptone Hair Growth Serum" still fails because only 3/5 match = 60%).
-  // Fuzzy matching (edit distance ≤1) handles minor OCR errors like "Keshpallav" → "Keshpalav".
+  // Forward: how many detected tokens appear in expected (100% required)
+  const fwdCount = dTokens.filter(dt => eTokens.some(et => tokenMatch(dt, et))).length;
+  // Reverse: how many expected tokens appear in detected
+  const revCount = eTokens.filter(et => dTokens.some(dt => tokenMatch(et, dt))).length;
+
+  // For truncated names: require ALL detected tokens match expected (forward = 100%)
+  // but relax reverse to 30% (the screenshot simply didn't show the full name).
+  if (wasTruncated && dTokens.length >= 2) {
+    const fwdOk = fwdCount === dTokens.length;
+    const revThreshold = Math.max(1, Math.ceil(eTokens.length * 0.3));
+    return fwdOk && revCount >= revThreshold;
+  }
+
+  // Standard (non-truncated) policy: 85% of expected tokens must appear in detected
   const threshold = eTokens.length <= 3 ? eTokens.length : Math.ceil(eTokens.length * 0.85);
-  return matchedCount >= threshold;
+  return revCount >= threshold;
 }
 
 // ── Confidence Score Constants ──
@@ -186,6 +215,16 @@ export function initAiServiceConfig(env: { AI_OCR_POOL_SIZE?: number; AI_CIRCUIT
   if (env.AI_OCR_POOL_SIZE) OCR_POOL_SIZE = env.AI_OCR_POOL_SIZE;
   if (env.AI_CIRCUIT_BREAKER_THRESHOLD) _circuitBreakerThreshold = env.AI_CIRCUIT_BREAKER_THRESHOLD;
   if (env.AI_CIRCUIT_BREAKER_COOLDOWN_MS) _circuitBreakerCooldownMs = env.AI_CIRCUIT_BREAKER_COOLDOWN_MS;
+}
+
+/** Terminate all OCR workers — call during graceful shutdown. */
+export async function terminateOcrPool(): Promise<void> {
+  for (const worker of _ocrPool) {
+    try { await worker.terminate(); } catch { /* ignore */ }
+  }
+  _ocrPool.length = 0;
+  _ocrPoolReady = null;
+  _ocrPoolInitializing = false;
 }
 
 async function _initOcrPool(): Promise<void> {
@@ -1184,6 +1223,9 @@ async function verifyProofWithOcr(
 }
 
 export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promise<ProofVerificationResult> {
+  // Overall timeout: prevents the entire verification chain (Gemini fallbacks + OCR) from exceeding 50s.
+  // This leaves a ~10s buffer before typical frontend timeouts (60s).
+  const OVERALL_TIMEOUT_MS = 50_000;
   const _aiStart = Date.now();
   const geminiAvailable = isGeminiConfigured(env);
 
@@ -1224,6 +1266,11 @@ export async function verifyProofWithAi(env: Env, payload: ProofPayload): Promis
     let lastError: unknown = null;
 
     for (const model of PROOF_MODEL_FALLBACKS) {
+      // Check overall timeout before attempting next model
+      if (Date.now() - _aiStart > OVERALL_TIMEOUT_MS) {
+        aiLog.warn('[Proof] Overall timeout exceeded before trying next model', { model, elapsedMs: Date.now() - _aiStart });
+        break;
+      }
       try {
         // eslint-disable-next-line no-await-in-loop
         const response = await withModelTimeout(ai.models.generateContent({
@@ -1730,6 +1777,7 @@ export async function verifyRatingScreenshotWithAi(
   env: Env,
   payload: RatingVerificationPayload,
 ): Promise<RatingVerificationResult> {
+  const OVERALL_TIMEOUT_MS = 50_000;
   const _aiStart = Date.now();
   if (payload.imageBase64.length > env.AI_MAX_IMAGE_CHARS) {
     return { accountNameMatch: false, productNameMatch: false, confidenceScore: 0,
@@ -1747,6 +1795,10 @@ export async function verifyRatingScreenshotWithAi(
   try {
     let lastError: unknown = null;
     for (const model of PROOF_MODEL_FALLBACKS) {
+      if (Date.now() - _aiStart > OVERALL_TIMEOUT_MS) {
+        aiLog.warn('[Rating] Overall timeout exceeded before trying next model', { model, elapsedMs: Date.now() - _aiStart });
+        break;
+      }
       try {
         const response = await withModelTimeout(ai.models.generateContent({
           model,
@@ -2216,6 +2268,7 @@ export async function verifyReturnWindowWithAi(
   env: Env,
   payload: ReturnWindowVerificationPayload,
 ): Promise<ReturnWindowVerificationResult> {
+  const OVERALL_TIMEOUT_MS = 50_000;
   const _aiStart = Date.now();
   if (payload.imageBase64.length > env.AI_MAX_IMAGE_CHARS) {
     return { orderIdMatch: false, productNameMatch: false, amountMatch: false, soldByMatch: false,
@@ -2234,6 +2287,10 @@ export async function verifyReturnWindowWithAi(
   try {
     let lastError: unknown = null;
     for (const model of PROOF_MODEL_FALLBACKS) {
+      if (Date.now() - _aiStart > OVERALL_TIMEOUT_MS) {
+        aiLog.warn('[ReturnWindow] Overall timeout exceeded before trying next model', { model, elapsedMs: Date.now() - _aiStart });
+        break;
+      }
       try {
         const response = await withModelTimeout(ai.models.generateContent({
           model,
@@ -2281,12 +2338,13 @@ export async function verifyReturnWindowWithAi(
                 returnWindowClosed: { type: Type.BOOLEAN },
                 reviewerNameMatch: { type: Type.BOOLEAN },
                 confidenceScore: { type: Type.INTEGER },
+                detectedProductName: { type: Type.STRING, description: 'The product name exactly as shown in the screenshot. Return the full visible text of the product name/title.' },
                 detectedReturnWindow: { type: Type.STRING },
                 detectedAccountName: { type: Type.STRING, description: 'Name from the header/greeting area (e.g. "Hello, Ashok" → "Ashok"). Strip greeting prefix. Null if not visible.' },
                 screenshotCropped: { type: Type.BOOLEAN, description: 'true if the screenshot appears cropped, cut off, or incomplete' },
                 discrepancyNote: { type: Type.STRING },
               },
-              required: ['orderIdMatch', 'productNameMatch', 'amountMatch', 'soldByMatch', 'returnWindowClosed', 'reviewerNameMatch', 'confidenceScore', 'screenshotCropped'],
+              required: ['orderIdMatch', 'productNameMatch', 'amountMatch', 'soldByMatch', 'returnWindowClosed', 'reviewerNameMatch', 'confidenceScore', 'screenshotCropped', 'detectedProductName'],
             },
           },
         }));

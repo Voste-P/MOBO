@@ -29,12 +29,19 @@ async function main() {
 
   // Safe, idempotent upsert of E2E test accounts (no deletes).
   await tryRunE2ESeed();
+  startupLog.info('E2E seed completed successfully');
 
   const app = createApp(env);
 
-  app.listen(env.PORT, () => {
+  const server = app.listen(env.PORT, () => {
     setReady(true);
     startupLog.info(`E2E backend listening on :${env.PORT}`);
+  });
+
+  // Surface bind errors immediately so Playwright doesn’t wait 120s on a dead server.
+  server.on('error', (err) => {
+    startupLog.error('E2E server bind error', { error: err });
+    process.exitCode = 1;
   });
 }
 

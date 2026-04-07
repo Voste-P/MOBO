@@ -7,6 +7,7 @@ import { useToast } from '../context/ToastContext';
 import { formatErrorMessage } from '../utils/errors';
 import { ProxiedImage, placeholderImage } from './ProxiedImage';
 import { checkProductNameMatch, checkReviewerNameMatch } from '../utils/productNameMatch';
+import { ExpandableText } from './ui';
 
 interface QuickOrderModalProps {
   open: boolean;
@@ -79,7 +80,13 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
       return;
     }
 
-    const dataUrl = await readFileAsDataUrl(file);
+    let dataUrl: string;
+    try {
+      dataUrl = await readFileAsDataUrl(file);
+    } catch {
+      toast.error('Failed to read file. Please try another image.');
+      return;
+    }
     setScreenshot(dataUrl);
     setPreview(dataUrl);
 
@@ -97,13 +104,13 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
           accountName: result.accountName || undefined,
         });
 
-        // ── Product name matching (shared strict algorithm) ──
+        // —— Product name matching (shared strict algorithm) ——
         const nameMatchResult = checkProductNameMatch(result.productName, product?.title);
         if (nameMatchResult === 'mismatch') {
           setProductNameMismatch(true);
           toast.error('Product name in screenshot does not match this deal. Please upload the correct order screenshot.');
         }
-        // ── Platform matching ──
+        // —— Platform matching ——
         if (result.platform && product?.platform) {
           const extractedPlatform = String(result.platform).toLowerCase().trim();
           const expectedPlatform = String(product.platform).toLowerCase().trim();
@@ -112,7 +119,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
             toast.error(`Screenshot appears to be from ${result.platform}, but this deal is for ${product.platform}. Please upload the correct screenshot.`);
           }
         }
-        // ── Reviewer name matching against extracted account name ──
+        // —— Reviewer name matching against extracted account name ——
         if (result.accountName && reviewerName.trim()) {
           const rnMatch = checkReviewerNameMatch(reviewerName, result.accountName);
           setReviewerNameMismatch(rnMatch === 'mismatch');
@@ -227,7 +234,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
               />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-bold text-sm text-slate-900 line-clamp-2">{product.title}</h3>
+              <ExpandableText text={product.title || ''} clampClass="line-clamp-2" className="font-bold text-sm text-slate-900" as="h3">{product.title}</ExpandableText>
               <p className="text-lg font-extrabold text-lime-600 mt-0.5">₹{product.price.toLocaleString('en-IN')}</p>
               <p className="text-[10px] text-slate-400 uppercase font-bold">{product.platform} &bull; {product.dealType === 'Discount' ? 'Order' : product.dealType} Deal</p>
             </div>
@@ -272,7 +279,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
                   type="button"
                   aria-label="Remove screenshot"
                   onClick={() => { setScreenshot(null); setPreview(null); setExtractedDetails({ orderId: '', amount: '' }); }}
-                  className="absolute top-2 right-2 p-1 bg-white/90 rounded-full shadow hover:bg-red-50 transition"
+                  className="absolute top-2 right-2 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center bg-white/90 rounded-full shadow hover:bg-red-50 transition"
                 >
                   <X size={14} className="text-red-500" />
                 </button>
@@ -316,7 +323,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-[9px] font-bold text-slate-500 uppercase">Order ID *</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Order ID *</label>
                     <input
                       type="text"
                       value={extractedDetails.orderId}
@@ -326,7 +333,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
                     />
                   </div>
                   <div>
-                    <label className="text-[9px] font-bold text-slate-500 uppercase">Amount (₹) *</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Amount (₹) *</label>
                     <input
                       type="text"
                       inputMode="decimal"
@@ -339,7 +346,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
                 </div>
 
                 <div>
-                  <label className="text-[9px] font-bold text-slate-500 uppercase">Product Name</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Product Name</label>
                   <input
                     type="text"
                     readOnly
@@ -371,7 +378,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-[9px] font-bold text-slate-500 uppercase">Seller / Sold By</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Seller / Sold By</label>
                     <input
                       type="text"
                       value={extractedDetails.soldBy || ''}
@@ -381,7 +388,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
                     />
                   </div>
                   <div>
-                    <label className="text-[9px] font-bold text-slate-500 uppercase">Order Date</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Order Date</label>
                     <input
                       type="text"
                       value={extractedDetails.orderDate || ''}
@@ -424,12 +431,12 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
                 {reviewerNameMismatch && (
                   <div className="flex items-center gap-1 mt-0.5">
                     <AlertCircle size={10} className="text-red-500 flex-shrink-0" />
-                    <p className="text-[9px] font-bold text-red-600">
+                    <p className="text-[10px] font-bold text-red-600">
                       Account name mismatch — screenshot shows &quot;{extractedDetails.accountName}&quot;
                     </p>
                   </div>
                 )}
-                <p className="text-[9px] text-zinc-400 ml-0.5">
+                <p className="text-[10px] text-zinc-400 ml-0.5">
                   Enter the name shown on the marketplace account used for this order.
                   {(product.dealType === 'Rating' || product.dealType === 'Review') && <span className="text-red-400 font-bold"> Required</span>}
                 </p>

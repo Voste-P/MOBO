@@ -18,8 +18,8 @@ export const AppSwitchboard: React.FC<{ onSelect: (role: string) => void }> = ({
   <div className="min-h-[100dvh] bg-slate-950 text-white flex flex-col font-sans selection:bg-lime-400 selection:text-black">
     {/* Animated Background */}
     <div className="fixed inset-0 z-0">
-      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_-20%,#312e81,transparent)] opacity-40"></div>
-      <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(circle_at_80%_120%,#1e1b4b,transparent)] opacity-30"></div>
+      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_-20%,theme(colors.zinc.900),transparent)] opacity-40"></div>
+      <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(circle_at_80%_120%,theme(colors.zinc.950),transparent)] opacity-30"></div>
     </div>
 
     <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-6">
@@ -51,7 +51,7 @@ export const AppSwitchboard: React.FC<{ onSelect: (role: string) => void }> = ({
           desc="Manage Buyers & Earn"
           icon={<Users size={28} />}
           type="Mobile"
-          color="indigo"
+          color="lime"
           delay={1}
           onClick={() => onSelect('mediator')}
         />
@@ -91,10 +91,9 @@ export const AppSwitchboard: React.FC<{ onSelect: (role: string) => void }> = ({
   </div>
 );
 
-const SwitchCard = ({ title, desc, icon, type, color, delay = 0, onClick }: any) => {
-  const colors: any = {
+const SwitchCard = ({ title, desc, icon, type, color, delay = 0, onClick }: { title: string; desc: string; icon: React.ReactNode; type: string; color: string; delay?: number; onClick: () => void }) => {
+  const colors: Record<string, string> = {
     lime: 'hover:border-lime-500/50 hover:shadow-lime-500/20 hover:shadow-lg text-lime-400',
-    indigo: 'hover:border-indigo-500/50 hover:shadow-indigo-500/20 hover:shadow-lg text-indigo-400',
     purple: 'hover:border-purple-500/50 hover:shadow-purple-500/20 hover:shadow-lg text-purple-400',
     blue: 'hover:border-blue-500/50 hover:shadow-blue-500/20 hover:shadow-lg text-blue-400',
     rose: 'hover:border-rose-500/50 hover:shadow-rose-500/20 hover:shadow-lg text-rose-400',
@@ -106,7 +105,7 @@ const SwitchCard = ({ title, desc, icon, type, color, delay = 0, onClick }: any)
       style={{ animationDelay: `${delay * 80}ms`, animationFillMode: 'both' }}
       className={`group animate-enter bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-8 text-center flex flex-col items-center transition-all duration-500 hover:-translate-y-2 ${colors[color]}`}
     >
-      <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-slate-500 mb-6 group-hover:text-white transition-colors">
+      <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 mb-6 group-hover:text-white transition-colors">
         {type === 'Mobile' ? (
           <Smartphone size={10} />
         ) : type === 'Web' ? (

@@ -1,5 +1,4 @@
 import request from 'supertest';
-import { randomUUID } from 'node:crypto';
 
 import { createApp } from '../../app.js';
 import { loadEnv } from '../../config/env.js';
@@ -30,7 +29,6 @@ describe('ops deals: publish', () => {
 
     const pgCampaign = await db.campaign.create({
       data: {
-        mongoId: randomUUID(),
         title: 'Publish Campaign (missing allowedAgencyCodes)',
         brandUserId: seeded.agency.id,
         brandName: 'Agency Inventory',
@@ -82,7 +80,6 @@ describe('ops deals: publish', () => {
 
     const pgCampaign = await db.campaign.create({
       data: {
-        mongoId: randomUUID(),
         title: 'Publish Campaign (no commission field)',
         brandUserId: seeded.agency.id,
         brandName: 'Agency Inventory',
@@ -134,7 +131,6 @@ describe('ops deals: publish', () => {
 
     const pgCampaign = await db.campaign.create({
       data: {
-        mongoId: randomUUID(),
         title: 'Publish Campaign (negative commission exceeds agency commission)',
         brandUserId: seeded.agency.id,
         brandName: 'Agency Inventory',
@@ -186,7 +182,6 @@ describe('ops deals: publish', () => {
 
     const pgCampaign = await db.campaign.create({
       data: {
-        mongoId: randomUUID(),
         title: 'Zero Payout Campaign',
         brandUserId: seeded.agency.id,
         brandName: 'Agency Inventory',

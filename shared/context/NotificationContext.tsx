@@ -67,7 +67,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
         timer = setTimeout(() => { timer = null; fetchNotifications(); }, 800);
       }
     });
-    return () => { unsub(); if (timer) clearTimeout(timer); };
+    return () => { if (timer) clearTimeout(timer); unsub(); };
   }, [user?.id, fetchNotifications]);
 
   const inbox = useMemo<AppNotification[]>(() => {

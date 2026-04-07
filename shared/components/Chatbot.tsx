@@ -16,6 +16,7 @@ import { api } from '../services/api';
 import { Ticket, Order, Product, AiNavigateTo } from '../types';
 import { ProductCard } from './ProductCard';
 import { ProxiedImage } from './ProxiedImage';
+import { ExpandableText } from './ui';
 
 interface ChatbotProps {
   isVisible?: boolean;
@@ -94,6 +95,13 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const handleScrollContainer = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setIsAtBottom(distanceFromBottom < 80);
+  }, []);
+
   // Cache for context API calls to avoid fetching on every single message
   const contextCacheRef = useRef<{
     products: Product[];
@@ -153,16 +161,18 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
     if (!isVisible) return;
     // Preserve expected chat behavior: auto-scroll only when already near the bottom.
     if (!isAtBottom) return;
-    requestAnimationFrame(() => {
+    const id = requestAnimationFrame(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     });
+    return () => cancelAnimationFrame(id);
   }, [messages.length, isTyping, isVisible, isAtBottom]);
 
   useEffect(() => {
     if (!isVisible) return;
-    requestAnimationFrame(() => {
+    const id = requestAnimationFrame(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
     });
+    return () => cancelAnimationFrame(id);
   }, [isVisible]);
 
   const handleSendMessage = async (e?: React.FormEvent, overrideText?: string) => {
@@ -281,8 +291,9 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
         VALID_NAV_TARGETS.includes(response.navigateTo as AiNavigateTo)
       ) {
         // Use ref-tracked timeout so it's cancelled if component unmounts
+        if (navTimerRef.current) clearTimeout(navTimerRef.current);
         const navTimer = setTimeout(() => {
-          // Map 'tickets' → 'orders' since tickets live on the Orders tab
+          // Map 'tickets' -> 'orders' since tickets live on the Orders tab
           const mappedTab = response.navigateTo === 'tickets' ? 'orders' : response.navigateTo;
           onNavigate?.(mappedTab as 'home' | 'explore' | 'orders' | 'profile');
         }, 1500);
@@ -375,7 +386,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
   }, [clearChat]);
 
   return (
-    <div className="flex flex-col h-full min-h-0 w-full bg-[#F4F4F5] relative">
+    <div className="flex flex-col h-full min-h-0 w-full bg-surface relative">
       {/* Header */}
       <div className="shrink-0 w-full bg-white border-b border-gray-100 shadow-sm px-5 py-4 safe-top flex justify-between items-center">
         <div className="flex items-center gap-3">
@@ -445,6 +456,8 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                   notifications.map((n) => (
                     <div
                       key={n.id}
+                      role="status"
+                      aria-label={`${n.type} notification: ${n.title}`}
                       className="bg-slate-50 p-3 rounded-[1.2rem] relative group border border-slate-100"
                     >
                       <div className="flex gap-3">
@@ -473,7 +486,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                             {n.message}
                           </div>
                           {n.createdAt && (
-                            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mt-1">
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-1">
                               {new Date(n.createdAt).toLocaleString('en-GB')}
                             </div>
                           )}
@@ -513,12 +526,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
 
       <div
         ref={scrollContainerRef}
-        onScroll={() => {
-          const el = scrollContainerRef.current;
-          if (!el) return;
-          const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-          setIsAtBottom(distanceFromBottom < 80);
-        }}
+        onScroll={handleScrollContainer}
         className="flex-1 min-h-0 overflow-y-auto px-4 py-6 scrollbar-styled"
       >
         <div className="flex flex-col gap-6">
@@ -612,7 +620,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                     {msg.extractedValues.productName && (
                       <div className="flex justify-between items-center">
                         <span className="text-[11px] text-slate-500">Product</span>
-                        <span className="text-[11px] font-semibold text-slate-700 truncate max-w-[180px]">{msg.extractedValues.productName}</span>
+                        <ExpandableText text={msg.extractedValues.productName} clampClass="truncate" className="text-[11px] font-semibold text-slate-700 max-w-[180px]" as="span">{msg.extractedValues.productName}</ExpandableText>
                       </div>
                     )}
                     {msg.extractedValues.platform && (
@@ -624,7 +632,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                     {msg.extractedValues.seller && (
                       <div className="flex justify-between items-center">
                         <span className="text-[11px] text-slate-500">Seller</span>
-                        <span className="text-[11px] font-semibold text-slate-700 truncate max-w-[180px]">{msg.extractedValues.seller}</span>
+                        <ExpandableText text={msg.extractedValues.seller} clampClass="truncate" className="text-[11px] font-semibold text-slate-700 max-w-[180px]" as="span">{msg.extractedValues.seller}</ExpandableText>
                       </div>
                     )}
                     {msg.extractedValues.orderDate && (
@@ -665,9 +673,9 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                           />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-bold text-slate-900 truncate mb-1">
+                          <ExpandableText text={order.items?.[0]?.title || 'Order'} clampClass="truncate" className="text-sm font-bold text-slate-900 mb-1" as="p">
                             {order.items?.[0]?.title || 'Order'}
-                          </p>
+                          </ExpandableText>
                           <div className="flex justify-between items-end">
                             <div className="flex flex-col">
                               <span
@@ -716,7 +724,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
         </div>
       </div>
 
-      <div className="shrink-0 w-full px-4 pb-20 safe-bottom">
+      <div className="shrink-0 w-full px-4 pb-20" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
         <div className="flex flex-nowrap gap-2 justify-center pb-3 overflow-x-auto scrollbar-styled">
           {quickActions.map((action) => (
             <button
@@ -740,6 +748,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
               onFocus={() => setIsInputFocused(true)}
               onBlur={() => setIsInputFocused(false)}
               placeholder={placeholders[placeholderIndex]}
+              aria-label="Type a message to BUZZMA"
               className="w-full bg-transparent border-none outline-none text-sm font-semibold text-slate-900 h-11 placeholder:text-slate-400"
             />
           </form>

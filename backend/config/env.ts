@@ -54,7 +54,7 @@ const envSchema = z.object({
   AI_MAX_OUTPUT_TOKENS_PROOF: z.coerce.number().int().positive().default(256),
   AI_MAX_OUTPUT_TOKENS_EXTRACT: z.coerce.number().int().positive().default(4096),
   AI_MAX_INPUT_CHARS: z.coerce.number().int().positive().default(4000),
-  AI_MAX_IMAGE_CHARS: z.coerce.number().int().positive().default(80_000_000),
+  AI_MAX_IMAGE_CHARS: z.coerce.number().int().positive().default(20_000_000),
   AI_MAX_ESTIMATED_TOKENS: z.coerce.number().int().positive().default(20000),
   AI_MAX_HISTORY_MESSAGES: z.coerce.number().int().positive().default(6),
   AI_HISTORY_SUMMARY_CHARS: z.coerce.number().int().positive().default(400),
@@ -64,15 +64,17 @@ const envSchema = z.object({
   AI_CIRCUIT_BREAKER_THRESHOLD: z.coerce.number().int().min(1).default(3),
   AI_CIRCUIT_BREAKER_COOLDOWN_MS: z.coerce.number().int().min(1000).default(300_000),
 
-  // Minimum AI confidence score (0-100) required for proof verification to pass.
-  // Scores below this threshold will reject the proof. 75 is recommended for production
-  // anti-fraud gating; lower values increase false-positive risk.
-  AI_PROOF_CONFIDENCE_THRESHOLD: z.coerce.number().int().min(0).max(100).default(75),
+  // Minimum AI confidence score (0-100) required for bulk auto-verification.
+  // ALL required proofs must meet this threshold for the order to skip mediator
+  // review entirely. 80 balances throughput with fraud safety; was 70 prior to
+  // April 2026 hardening (raised to reduce the gap between individual 80% auto-verify
+  // and bulk auto-verify thresholds that previously allowed 70-79% proofs through).
+  AI_PROOF_CONFIDENCE_THRESHOLD: z.coerce.number().int().min(0).max(100).default(80),
 
   // AI confidence score (0-100) at or above which a proof step is auto-verified
   // without manual mediator review.  Set to 101 to disable auto-verification.
-  // 90 strikes a good balance between speed and fraud safety.
-  AI_AUTO_VERIFY_THRESHOLD: z.coerce.number().int().min(0).max(101).default(90),
+  // 80 balances speed and fraud safety; more proofs auto-verify without mediator.
+  AI_AUTO_VERIFY_THRESHOLD: z.coerce.number().int().min(0).max(101).default(80),
 
   // Confidence score assigned to review links from recognized marketplace domains.
   // URL validation acts as the "AI" for review proofs — no screenshot analysis needed.
@@ -84,6 +86,10 @@ const envSchema = z.object({
 
   // Maximum number of times a rejected order can be re-submitted for proof.
   MAX_REPROOF_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),
+
+  // Cooling-period settler tuning
+  SETTLER_INTERVAL_MS: z.coerce.number().int().min(60_000).default(900_000), // 15 min
+  SETTLER_TX_TIMEOUT_MS: z.coerce.number().int().min(5000).default(15_000),  // Prisma $transaction timeout
 
   // Wallet safety limits
   WALLET_MAX_BALANCE_PAISE: z.coerce.number().int().positive().default(1_00_00_000), // ₹1,00,000

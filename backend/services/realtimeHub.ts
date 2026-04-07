@@ -30,13 +30,18 @@ type Listener = (evt: RealtimeEvent) => void;
 
 const emitter = new EventEmitter();
 // Allow many SSE clients but cap to prevent resource exhaustion.
-emitter.setMaxListeners(500);
+const MAX_GLOBAL_LISTENERS = 500;
+emitter.setMaxListeners(MAX_GLOBAL_LISTENERS);
 
 /** Track active listener count for monitoring. */
 let _activeListeners = 0;
 
 export function getActiveListenerCount(): number {
   return _activeListeners;
+}
+
+export function isAtCapacity(): boolean {
+  return _activeListeners >= MAX_GLOBAL_LISTENERS;
 }
 
 function normalizeCodeSet(codes?: string[]): Set<string> | undefined {

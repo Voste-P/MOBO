@@ -174,34 +174,43 @@ async function refreshTokens(): Promise<TokenPair | null> {
 
   if (!refreshPromise) {
     refreshPromise = (async () => {
-      try {
-        const res = await fetch(
-          `${API_URL}/auth/refresh`,
-          withRequestId({
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refreshToken }),
-          })
-        );
-        const payload = await readPayloadSafe(res);
-        if (!res.ok) throw toErrorFromPayload(payload, `Refresh failed: ${res.status}`);
+      const MAX_REFRESH_RETRIES = 3;
+      const REFRESH_BASE_DELAY = 300;
 
-        const tokens = payload?.tokens;
-        if (tokens?.accessToken) {
-          writeTokens({
-            accessToken: String(tokens.accessToken),
-            refreshToken: tokens.refreshToken ? String(tokens.refreshToken) : refreshToken,
-          });
+      for (let attempt = 1; attempt <= MAX_REFRESH_RETRIES; attempt++) {
+        try {
+          const res = await fetch(
+            `${API_URL}/auth/refresh`,
+            withRequestId({
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ refreshToken }),
+            })
+          );
+          const payload = await readPayloadSafe(res);
+          if (!res.ok) throw toErrorFromPayload(payload, `Refresh failed: ${res.status}`);
+
+          const tokens = payload?.tokens;
+          if (tokens?.accessToken) {
+            writeTokens({
+              accessToken: String(tokens.accessToken),
+              refreshToken: tokens.refreshToken ? String(tokens.refreshToken) : refreshToken,
+            });
+          }
+          return readTokens();
+        } catch (_err) {
+          if (attempt < MAX_REFRESH_RETRIES) {
+            const delay = REFRESH_BASE_DELAY * Math.pow(2, attempt - 1);
+            await new Promise(r => setTimeout(r, delay));
+            continue;
+          }
+          clearTokens();
+          notifyAuthExpired();
+          return null;
         }
-        return readTokens();
-      } catch {
-        clearTokens();
-        notifyAuthExpired();
-        return null;
-      } finally {
-        refreshPromise = null;
       }
-    })();
+      return null;
+    })().finally(() => { refreshPromise = null; });
   }
 
   return refreshPromise;
@@ -321,11 +330,11 @@ const inflightGets = new Map<string, Promise<any>>();
 
 // --- GET Response Cache with TTL + LRU eviction ---
 // Prevents redundant network calls when switching tabs or rapid navigation.
-// Default TTL: 5 seconds. Automatically invalidated on any mutation.
+// Default TTL: 15 seconds. Automatically invalidated on any mutation.
 // LRU eviction when capacity exceeded (promotes on read, evicts least-recently-accessed).
 interface GETCacheEntry { data: any; expiresAt: number }
 const getCache = new Map<string, GETCacheEntry>();
-const GET_CACHE_TTL_MS = 5_000;
+const GET_CACHE_TTL_MS = 15_000;
 const GET_CACHE_MAX = 200;
 
 function getCachedResponse(path: string): any | undefined {
@@ -382,8 +391,8 @@ function mutationCachePrefixes(path: string): string[] | null {
     auth:          ['/auth'],
     orders:        ['/orders', '/ops', '/brand', '/admin'],
     products:      ['/products'],
-    brand:         ['/brand', '/products'],
-    ops:           ['/ops', '/products', '/orders'],
+    brand:         ['/brand', '/products', '/auth'],
+    ops:           ['/ops', '/products', '/orders', '/auth'],
     admin:         ['/admin', '/auth'],
     tickets:       ['/tickets'],
     invites:       ['/invites'],
@@ -625,20 +634,20 @@ export const api = {
       return unwrapAuthResponse(data);
     },
     /** [FIX] Added missing register method for AuthContext.tsx */
-    register: async (name: string, mobile: string, pass: string, mediatorCode: string) => {
+    register: async (name: string, mobile: string, pass: string, mediatorCode: string, securityQuestions?: { questionId: number; answer: string }[]) => {
       const data = await fetchJson('/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, mobile, password: pass, mediatorCode }),
+        body: JSON.stringify({ name, mobile, password: pass, mediatorCode, securityQuestions }),
       });
       return unwrapAuthResponse(data);
     },
     /** [FIX] Added missing registerOps method for AuthContext.tsx */
-    registerOps: async (name: string, mobile: string, pass: string, role: string, code: string) => {
+    registerOps: async (name: string, mobile: string, pass: string, role: string, code: string, securityQuestions?: { questionId: number; answer: string }[]) => {
       const data = await fetchJson('/auth/register-ops', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, mobile, password: pass, role, code }),
+        body: JSON.stringify({ name, mobile, password: pass, role, code, securityQuestions }),
       });
 
       // Mediator join via agency code returns an accepted-but-pending response.
@@ -652,11 +661,11 @@ export const api = {
       return unwrapAuthResponse(data);
     },
     /** [FIX] Added missing registerBrand method for AuthContext.tsx */
-    registerBrand: async (name: string, mobile: string, pass: string, brandCode: string) => {
+    registerBrand: async (name: string, mobile: string, pass: string, brandCode: string, securityQuestions?: { questionId: number; answer: string }[]) => {
       const data = await fetchJson('/auth/register-brand', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, mobile, password: pass, brandCode }),
+        body: JSON.stringify({ name, mobile, password: pass, brandCode, securityQuestions }),
       });
       return unwrapAuthResponse(data);
     },
@@ -667,6 +676,34 @@ export const api = {
         body: JSON.stringify({ userId, ...updates }),
       });
       return unwrapAuthResponse(data);
+    },
+
+    saveSecurityQuestions: async (questions: { questionId: number; answer: string }[]) => {
+      return fetchJson('/auth/security-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify(questions),
+      });
+    },
+
+    forgotPasswordLookup: async (mobile: string) => {
+      return fetchJson('/auth/forgot-password/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile }),
+      }) as Promise<{ questionIds: number[] }>;
+    },
+
+    forgotPasswordReset: async (
+      mobile: string,
+      answers: { questionId: number; answer: string }[],
+      newPassword: string
+    ) => {
+      return fetchJson('/auth/forgot-password/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile, answers, newPassword }),
+      }) as Promise<{ ok: boolean; message: string }>;
     },
   },
   products: {
@@ -1400,7 +1437,7 @@ export const api = {
     },
   },
 
-  /** ── Google Sheets Export ─────────────────────────────────── */
+  /** ─Google Sheets Export ──────────────────────────────────*/
   sheets: {
     /** Export data to a new Google Spreadsheet. Returns spreadsheet URL. */
     export: async (data: {
@@ -1417,7 +1454,7 @@ export const api = {
     },
   },
 
-  /** ── Google OAuth (for user-level Sheets export to their own Drive) ── */
+  /** ─Google OAuth (for user-level Sheets export to their own Drive) ─*/
   google: {
     /** Get the Google OAuth consent URL. Frontend opens this in a popup. */
     getAuthUrl: async (): Promise<{ url: string }> => {

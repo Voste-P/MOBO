@@ -27,7 +27,6 @@ describe('ops campaigns: assign slots', () => {
 
     const pgCampaign = await db.campaign.create({
       data: {
-        mongoId: randomUUID(),
         title: 'Slots Campaign',
         brandUserId: seeded.agency.id,
         brandName: 'Agency Inventory',
@@ -90,12 +89,11 @@ describe('ops campaigns: assign slots', () => {
     const agency = await login(app, E2E_ACCOUNTS.agency.mobile, E2E_ACCOUNTS.agency.password);
 
     // Create pending mediator in PG (controllers query PG only)
-    const pendingMongoId = randomUUID();
+    const pendingUserId = randomUUID();
     const pendingMobile = `91${Date.now().toString().slice(-8)}`;
     const pendingMedCode = `MED_PEND_${Date.now()}`;
     await db.user.create({
-      data: {
-        mongoId: pendingMongoId,
+      data: { id: pendingUserId,
         name: 'Pending Mediator',
         mobile: pendingMobile,
         passwordHash: 'x',
@@ -103,13 +101,11 @@ describe('ops campaigns: assign slots', () => {
         roles: ['mediator'],
         status: 'pending',
         mediatorCode: pendingMedCode,
-        parentCode: E2E_ACCOUNTS.agency.agencyCode,
-      },
+        parentCode: E2E_ACCOUNTS.agency.agencyCode, },
     });
 
     const pgCampaign = await db.campaign.create({
       data: {
-        mongoId: randomUUID(),
         title: 'Slots Campaign 2',
         brandUserId: seeded.agency.id,
         brandName: 'Agency Inventory',

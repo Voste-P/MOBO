@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useToast } from '../context/ToastContext';
 import { ProductCard } from '../components/ProductCard';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
@@ -57,7 +57,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
     const unsub = subscribeRealtime((msg: any) => {
       if (msg.type === 'deals.changed') {
         if (timer) clearTimeout(timer);
-        timer = setTimeout(() => { timer = null; loadProducts(); }, 1500);
+        timer = setTimeout(() => { timer = null; loadProducts(); }, 500);
       }
     });
     return () => { unsub(); if (timer) clearTimeout(timer); };
@@ -107,16 +107,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
       const selectedLower = selectedCategory.toLowerCase();
       result = result.filter((p) => {
         const category = String(p.category || '').toLowerCase();
-        const dealType = String(p.dealType || '').toLowerCase();
-        const platform = String(p.platform || '').toLowerCase();
-        const title = String(p.title || '').toLowerCase();
-
-        return (
-          category === selectedLower ||
-          dealType === selectedLower ||
-          platform === selectedLower ||
-          title.includes(selectedLower)
-        );
+        return category === selectedLower;
       });
     }
 
@@ -147,12 +138,12 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
   }, [dealTypes, selectedDealType]);
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#F4F4F5]">
+    <div className="flex flex-col h-full min-h-0 bg-mobo-dark-100">
       {/* Header — compact for maximum content visibility */}
       <div className="px-4 pt-10 pb-2 bg-white/95 backdrop-blur-md shadow-sm z-10 border-b border-gray-100 sticky top-0">
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-1.5">
-            <span className="text-[8px] font-black tracking-widest text-lime-600 bg-lime-50 px-1 py-px rounded border border-lime-200">BUZZMA</span>
+            <span className="text-[10px] font-black tracking-widest text-lime-600 bg-lime-50 px-1 py-px rounded border border-lime-200">BUZZMA</span>
             <h1 className="text-sm font-extrabold text-slate-900">Explore Deals</h1>
           </div>
           <button
@@ -185,7 +176,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
                 type="button"
                 onClick={() => setSelectedDealType(dt)}
                 aria-pressed={selectedDealType === dt ? "true" : "false"}
-                className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap ${
+                className={`px-3.5 py-2 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap ${
                   selectedDealType === dt
                     ? 'bg-lime-500 text-white border-lime-500 shadow'
                     : 'bg-white text-slate-600 border-slate-200 hover:border-lime-300'
@@ -205,7 +196,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
               type="button"
               onClick={() => setSelectedCategory(cat)}
               aria-pressed={selectedCategory === cat ? "true" : "false"}
-              className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap ${
+              className={`px-3.5 py-2 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap ${
                 selectedCategory === cat
                   ? 'bg-lime-500 text-white border-lime-500 shadow'
                   : 'bg-white text-slate-600 border-slate-200 hover:border-lime-300'
@@ -218,7 +209,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6 pb-32 scrollbar-styled overscroll-none" {...pullHandlers}>
+      <div className="flex-1 overflow-y-auto p-6 scrollbar-styled overscroll-none" style={{ paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))' }} {...pullHandlers}>
         <PullToRefreshIndicator distance={pullDistance} isRefreshing={isRefreshing} />
         {loading ? (
           <div className="flex flex-col items-center gap-6">
