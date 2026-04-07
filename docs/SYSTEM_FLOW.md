@@ -28,7 +28,7 @@
 
 ## Ecosystem Overview
 
-```
+```text
 ┌─────────────┐     ┌─────────────┐     ┌──────────────┐     ┌──────────────┐
 │   Brand     │────▶│   Agency    │────▶│   Mediator   │────▶│    Buyer     │
 │  (Supply)   │     │ (Distribute)│     │   (Connect)  │     │  (Purchase)  │
@@ -67,7 +67,7 @@
 
 ## Platform Architecture
 
-```
+```text
 ┌──────────────────────────────────────────────────────────────┐
 │                     Client Layer                              │
 │  ┌────────┐ ┌──────────┐ ┌────────┐ ┌───────┐ ┌───────┐    │
@@ -103,7 +103,7 @@
 
 ### A. Onboarding Flow
 
-```
+```text
 1. User opens portal → Auth page (Mobile + OTP or Username + Password)
 2. First-time users register with name, mobile, role
 3. Backend creates User record + Wallet (balance: 0)
@@ -125,7 +125,7 @@
 
 ### B. Campaign & Deal Pipeline
 
-```
+```text
 Brand                    Agency                   Mediator
   │                        │                         │
   ├─ Create Product        │                         │
@@ -152,7 +152,7 @@ Brand                    Agency                   Mediator
 
 ### C. Buyer Purchase Lifecycle
 
-```
+```text
 Buyer                     Backend                   Mediator/Agency
   │                         │                         │
   ├─ Browse Deals           │                         │
@@ -175,7 +175,7 @@ Buyer                     Backend                   Mediator/Agency
 
 **Order Status State Machine:**
 
-```
+```text
 PLACED → UNDER_REVIEW → APPROVED → Pending_Cooling → SETTLED → (complete)
   │         │              │            │                 │
   ├→ CANCELLED    ├→ REJECTED   │            │                 ├→ RETURNED
@@ -185,7 +185,7 @@ PLACED → UNDER_REVIEW → APPROVED → Pending_Cooling → SETTLED → (comple
 
 ### D. Order Verification & Settlement
 
-```
+```text
 Buyer                  Backend AI              Mediator              Agency/Admin
   │                       │                       │                      │
   ├─ Upload proof ───────▶│                       │                      │
@@ -231,7 +231,7 @@ If a single proof's AI confidence ≥ `AI_AUTO_VERIFY_THRESHOLD` (default 80%), 
 
 ### E. Payout & Money Flow
 
-```
+```text
 ┌──────────┐    Fund Campaign    ┌──────────┐
 │  Brand   │────────────────────▶│  Brand   │
 │ (funds)  │                     │  Wallet  │
@@ -269,7 +269,7 @@ If a single proof's AI confidence ≥ `AI_AUTO_VERIFY_THRESHOLD` (default 80%), 
 
 ### F. Suspension & Cascade
 
-```
+```text
 Admin suspends Agency
   └─▶ All Agency's Mediators → suspended
        └─▶ All Mediator's Buyers → access blocked
@@ -287,7 +287,7 @@ Admin suspends Buyer
 
 ### G. Support Ticket Lifecycle
 
-```
+```text
 Buyer creates ticket          ──▶  targetRole = mediator
   │                                     │
   │                         Mediator manages ticket
@@ -378,7 +378,7 @@ Every significant action in the system is traceable:
 
 **Audit Log Files (Production):**
 
-```
+```text
 logs/
 ├── combined-YYYY-MM-DD.log     # All events (JSON structured)
 ├── error-YYYY-MM-DD.log        # Errors only
@@ -445,7 +445,7 @@ logs/
 
 ## Folder Structure
 
-```
+```text
 MOBO/
 ├── apps/                          # Frontend applications
 │   ├── buyer-app/                 # Buyer PWA (port 3001)
