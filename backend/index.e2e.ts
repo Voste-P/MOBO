@@ -28,13 +28,27 @@ async function main() {
   await connectPrisma();
 
   // Safe, idempotent upsert of E2E test accounts (no deletes).
-  await tryRunE2ESeed();
+  // Non-fatal: CI seeds separately; if this fails, tests will report specific errors.
+  try {
+    await tryRunE2ESeed();
+    startupLog.info('E2E seed completed successfully');
+  } catch (err) {
+    startupLog.warn('E2E seed failed (non-fatal — CI seeds separately)', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 
   const app = createApp(env);
 
-  app.listen(env.PORT, () => {
+  const server = app.listen(env.PORT, () => {
     setReady(true);
     startupLog.info(`E2E backend listening on :${env.PORT}`);
+  });
+
+  // Surface bind errors immediately so Playwright doesn’t wait 120s on a dead server.
+  server.on('error', (err) => {
+    startupLog.error('E2E server bind error', { error: err });
+    process.exitCode = 1;
   });
 }
 

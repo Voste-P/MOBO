@@ -6,7 +6,7 @@ import 'dotenv/config';
 
 process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 
-import { connectPrisma } from '../database/prisma.js';
+import { connectPrisma, getPrisma } from '../database/prisma.js';
 import { seedE2E } from './e2e.js';
 
 async function main() {
@@ -17,6 +17,9 @@ async function main() {
     shopper: result.shopper.id,
     mediator: result.mediator.id,
   });
+  // Cleanly disconnect Prisma so the pg Pool is drained before exit.
+  const client = getPrisma();
+  if (client) await client.$disconnect();
 }
 
 main()

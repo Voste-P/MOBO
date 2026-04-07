@@ -29,7 +29,7 @@ export default defineConfig({
         command: 'npm --prefix backend run dev:e2e',
         url: 'http://localhost:8080/api/health/ready',
         reuseExistingServer: false,
-        timeout: 120_000, // 2 min — backend-only cold start
+        timeout: 180_000, // 3 min — backend cold start on 2-core CI runners
         env: {
           ...process.env,
           NODE_ENV: 'test',
