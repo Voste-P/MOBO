@@ -84,7 +84,7 @@ test.describe('Order lifecycle: create → verify → settle → wallet', () => 
         externalOrderId,
         screenshots: {
           order:
-            'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMTAwIj48dGV4dCB4PSIxMCIgeT0iNTAiPkUyRSBQcm9vZjwvdGV4dD48L3N2Zz4=',
+            'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwADhQGAWjR9awAAAABJRU5ErkJggg==',
         },
       },
     });
@@ -135,7 +135,7 @@ test.describe('Order lifecycle: create → verify → settle → wallet', () => 
             data: {
               orderId,
               type: 'returnWindow',
-              data: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMTAwIj48dGV4dCB4PSIxMCIgeT0iNTAiPkUyRSBSZXR1cm4gV2luZG93PC90ZXh0Pjwvc3ZnPg==',
+              data: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwADhQGAWjR9awAAAABJRU5ErkJggg==',
             },
           }),
           'Submit returnWindow proof',
