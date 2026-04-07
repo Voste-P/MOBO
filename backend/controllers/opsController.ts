@@ -1827,6 +1827,14 @@ export function makeOpsController(env: Env) {
           const settleCycle = settleEvents.filter((e: any) => e?.type === 'SETTLED').length;
 
           await db().$transaction(async (tx: any) => {
+            // Optimistic lock: verify order is still APPROVED inside the transaction
+            const guard = await tx.order.updateMany({
+              where: { id: order.id, workflowStatus: 'APPROVED' },
+              data: { workflowStatus: 'APPROVED' }, // no-op write to claim the row
+            });
+            if (guard.count === 0) {
+              throw new AppError(409, 'CONCURRENT_SETTLEMENT', 'Order was already settled or modified');
+            }
             await applyWalletDebit({
               idempotencyKey: `order-settlement-debit-${order.id}-c${settleCycle}`,
               type: 'order_settlement_debit',

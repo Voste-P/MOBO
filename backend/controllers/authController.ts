@@ -29,6 +29,7 @@ import { ensureRoleDocumentsForUser } from '../services/roleDocuments.js';
 import { publishRealtime } from '../services/realtimeHub.js';
 import { getAgencyCodeForMediatorCode } from '../services/lineage.js';
 import { compressImageDataUrl, compressQrCode } from '../utils/imageCompress.js';
+import { authCacheInvalidate } from '../utils/authCache.js';
 
 export function makeAuthController(env: Env) {
   const db = () => prisma();
@@ -978,6 +979,9 @@ export function makeAuthController(env: Env) {
           data: update,
           include: { pendingConnections: { where: { isDeleted: false } } },
         });
+
+        // Invalidate auth cache so subsequent requests see updated profile data
+        authCacheInvalidate(user.id);
 
         // Keep role-specific collections consistent with the canonical User record.
         await ensureRoleDocumentsForUser({ user });

@@ -306,5 +306,14 @@ export async function seedE2E(): Promise<SeededE2E> {
     });
   }
 
+  // Verify seed integrity: confirm the deal is queryable
+  const verifyDeal = await db.deal.findFirst({
+    where: { mediatorCode: E2E_ACCOUNTS.mediator.mediatorCode, title: 'E2E Deal', active: true, isDeleted: false },
+    select: { id: true, mediatorCode: true, commissionPaise: true, active: true },
+  });
+  if (!verifyDeal) {
+    throw new Error('E2E seed verification failed: deal not found after create/update');
+  }
+
   return { admin, agency, mediator, brand, shopper, shopper2 };
 }

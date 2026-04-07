@@ -33,6 +33,7 @@ export const ProofImage: React.FC<{
   const [error, setError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const mountedRef = useRef(true);
+  const blobUrlRef = useRef<string | null>(null);
 
   // If existingSrc is already a loadable data URI or blob, skip the fetch
   const isDirectSrc =
@@ -75,7 +76,9 @@ export const ProofImage: React.FC<{
           setBlobUrl((prev) => {
             // Revoke previous blob URL if any
             if (prev) URL.revokeObjectURL(prev);
-            return URL.createObjectURL(blob);
+            const newUrl = URL.createObjectURL(blob);
+            blobUrlRef.current = newUrl;
+            return newUrl;
           });
           setLoading(false);
         }
@@ -97,7 +100,7 @@ export const ProofImage: React.FC<{
   // Cleanup blob URL on unmount
   useEffect(() => {
     return () => {
-      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
     };
   }, []); // cleanup only on unmount
 

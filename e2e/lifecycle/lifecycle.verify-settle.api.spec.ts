@@ -33,15 +33,20 @@ test.describe('Order lifecycle: create → verify → settle → wallet', () => 
   });
 
   test('full order lifecycle', async ({ request }) => {
-    // 1. Get available products
-    const productsRes = await request.get('/api/products', {
-      headers: authHeaders(buyer.accessToken),
-    });
-    expect(productsRes.ok()).toBeTruthy();
-    const products = await productsRes.json();
-    const deals = products?.data ?? products;
-    if (!Array.isArray(deals) || deals.length === 0) {
-      test.skip(true, 'No deals available in test DB');
+    // 1. Get available products — retry up to 5 times (seed may still be settling)
+    let deals: any[] = [];
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 1000));
+      const productsRes = await request.get('/api/products', {
+        headers: authHeaders(buyer.accessToken),
+      });
+      expect(productsRes.ok()).toBeTruthy();
+      const products = await productsRes.json();
+      const raw = products?.data ?? products;
+      if (Array.isArray(raw) && raw.length > 0) { deals = raw; break; }
+    }
+    if (deals.length === 0) {
+      test.skip(true, 'No deals available in test DB after 5 retries');
       return;
     }
     // Pick the E2E Deal (has valid payout) instead of whatever comes first
