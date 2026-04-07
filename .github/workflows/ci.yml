@@ -292,13 +292,15 @@ jobs:
         run: |
           cd backend && npx tsx -e "
             import { PrismaClient } from './generated/prisma/client.js';
-            const p = new PrismaClient();
-            const users = await p.user.count({ where: { mobile: { in: ['9000000000','9000000001','9000000002','9000000003','9000000004','9000000005'] } } });
-            const deals = await p.deal.count({ where: { active: true, isDeleted: false } });
-            console.log('Seed verification:', { users, deals });
-            if (users < 6) { console.error('ERROR: Expected 6 E2E users'); process.exit(1); }
-            if (deals < 1) { console.error('ERROR: Expected at least 1 deal'); process.exit(1); }
-            await p.\$disconnect();
+            (async () => {
+              const p = new PrismaClient();
+              const users = await p.user.count({ where: { mobile: { in: ['9000000000','9000000001','9000000002','9000000003','9000000004','9000000005'] } } });
+              const deals = await p.deal.count({ where: { active: true, isDeleted: false } });
+              console.log('Seed verification:', { users, deals });
+              if (users < 6) { console.error('ERROR: Expected 6 E2E users'); process.exit(1); }
+              if (deals < 1) { console.error('ERROR: Expected at least 1 deal'); process.exit(1); }
+              await p.\$disconnect();
+            })();
           "
         env:
           NODE_OPTIONS: '--no-deprecation'
