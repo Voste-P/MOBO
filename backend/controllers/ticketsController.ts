@@ -45,7 +45,6 @@ async function enrichTicketsWithExternalOrderIds(tickets: any[]): Promise<any[]>
   for (const o of orders) {
     if (o.externalOrderId) {
       extMap.set(o.id, o.externalOrderId);
-      if (o.id) extMap.set(o.id, o.externalOrderId);
     }
   }
   return tickets.map(t => ({

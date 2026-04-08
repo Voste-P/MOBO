@@ -8,6 +8,7 @@ import { logChangeEvent, logAccessEvent, logPerformance, logErrorEvent } from '.
 import { pgOrder } from '../utils/pgMappers.js';
 import { idWhere } from '../utils/idWhere.js';
 import { createOrderSchema, submitClaimSchema } from '../validations/orders.js';
+import { z } from 'zod';
 import { rupeesToPaise } from '../utils/money.js';
 import { toUiOrder, toUiOrderSummary } from '../utils/uiMappers.js';
 import { orderListSelectLite, orderProofSelect, orderProofExistsSelect, getProofFlags } from '../utils/querySelect.js';
@@ -497,9 +498,10 @@ export function makeOrdersController(env: Env) {
      */
     batchSignedProofUrls: async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const orderIds: string[] = Array.isArray(req.body?.orderIds) ? req.body.orderIds : [];
-        if (orderIds.length === 0) throw new AppError(400, 'MISSING_ORDER_IDS', 'orderIds array required');
-        if (orderIds.length > 500) throw new AppError(400, 'TOO_MANY_ORDERS', 'Max 500 orders per batch');
+        const batchBody = z.object({
+          orderIds: z.array(z.string().min(1).max(100)).min(1).max(500),
+        }).parse(req.body);
+        const orderIds = batchBody.orderIds;
 
         const { roles, user: _user, pgUserId } = getRequester(req);
 
@@ -2137,7 +2139,7 @@ export function makeOrdersController(env: Env) {
           req,
           action: 'order.set_reviewer_name',
           entityType: 'Order',
-          entityId: order.id ?? order.id,
+          entityId: order.id,
           metadata: { reviewerName: rawName },
         });
 

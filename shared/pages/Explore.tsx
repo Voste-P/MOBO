@@ -16,10 +16,17 @@ import { Product } from '../types';
 
 export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) => {
   const { toast } = useToast();
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedDealType, setSelectedDealType] = useState('All');
   const [ticketOpen, setTicketOpen] = useState(false);
+
+  // Debounce search input to avoid re-filtering on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchTerm(searchInput), 250);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +87,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
   }, [fetchError]);
 
   const handlePullRefresh = useCallback(async () => {
+    setSearchInput('');
     setSearchTerm('');
     setSelectedCategory('All');
     setSelectedDealType('All');
@@ -119,7 +127,10 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
       const selectedLower = selectedCategory.toLowerCase();
       result = result.filter((p) => {
         const category = String(p.category || '').toLowerCase();
-        return category === selectedLower;
+        const dealType = String(p.dealType || '').toLowerCase();
+        const platform = String(p.platform || '').toLowerCase();
+        const title = String(p.title || '').toLowerCase();
+        return category === selectedLower || dealType === selectedLower || platform === selectedLower || title.includes(selectedLower);
       });
     }
 
@@ -171,8 +182,8 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
         <div className="mb-2">
           <Input
             placeholder="Search deals, brands, platforms..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             leftIcon={<Search size={16} />}
             aria-label="Search deals"
           />

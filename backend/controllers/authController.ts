@@ -931,8 +931,7 @@ export function makeAuthController(env: Env) {
 
         // Check both UUID formats for identity comparison.
         const isSelf = String(targetUserId) === String(requesterId)
-          || String(targetUserId) === String(requester.id)
-          || String(targetUserId) === String(requester.id ?? '');
+          || String(targetUserId) === String(requester.id);
         const isAdmin = requester.roles?.includes('admin' as any) || requester.roles?.includes('ops' as any);
         if (!isSelf && !isAdmin) {
           throw new AppError(403, 'FORBIDDEN', 'Cannot update other user profile');

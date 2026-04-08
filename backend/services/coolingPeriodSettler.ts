@@ -29,7 +29,7 @@ interface SettlePrefetch {
  * Returns true if settled, false if skipped (disputed/frozen/already settled).
  */
 async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promise<boolean> {
-  const orderDisplayId = order.id ?? order.id;
+  const orderDisplayId = order.id;
 
   // Skip frozen orders
   if (order.frozen) {
@@ -175,8 +175,8 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
       return false;
     }
 
-    await ensureWallet(brandId);
-    await ensureWallet(buyerUserId);
+    // Parallel wallet creation — brand and buyer wallets are independent
+    const walletEnsures: Promise<unknown>[] = [ensureWallet(brandId), ensureWallet(buyerUserId)];
 
     const mediatorMarginPaise = payoutPaise - buyerCommissionPaise;
     let mediatorUserId: string | null = null;
@@ -189,9 +189,10 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
           });
       if (mediator) {
         mediatorUserId = mediator.id;
-        await ensureWallet(mediatorUserId);
+        walletEnsures.push(ensureWallet(mediatorUserId));
       }
     }
+    await Promise.all(walletEnsures);
 
     await db().$transaction(
       async (tx: any) => {
@@ -371,7 +372,7 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
   orderLog.info(`[cooling-settler] Found ${orders.length} orders ready for settlement`);
 
   // ── Batch prefetch: load all related data in parallel to eliminate N+1 queries ──
-  const orderIds = orders.map(o => o.id ?? o.id);
+  const orderIds = orders.map(o => o.id);
   const campaignIds = [...new Set(orders.map(o => o.items?.[0]?.campaignId).filter(Boolean))] as string[];
   const productIds = [...new Set(orders.map(o => String(o.items?.[0]?.productId || '').trim()).filter(Boolean))];
   const userIds = [...new Set(orders.flatMap(o => [o.userId, o.brandUserId].filter(Boolean)))] as string[];
@@ -418,7 +419,7 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
   // Build lookup maps for O(1) access during settlement
   const disputeOrderIds = new Set(disputes.map(t => t.orderId));
   const campaignMap = new Map(campaignsArr.map(c => [c.id, c]));
-  const dealMap = new Map(dealsArr.map(d => [d.id ?? d.id, d]));
+  const dealMap = new Map(dealsArr.map(d => [d.id, d]));
   const userMap = new Map(usersArr.map(u => [u.id, u]));
   const mediatorMap = new Map(mediatorsArr.map(m => [m.mediatorCode!, m]));
 
@@ -453,7 +454,7 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
   const prefetch = { disputeOrderIds, campaignMap, dealMap, userMap, mediatorMap, capCountMap };
 
   for (const order of orders) {
-    const orderId = order.id ?? order.id;
+    const orderId = order.id;
     // Retry up to 2 times on transient DB errors (connection, timeout, deadlock)
     for (let attempt = 0; attempt < 3; attempt++) {
       try {

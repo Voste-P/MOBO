@@ -338,11 +338,11 @@ const inflightGets = new Map<string, Promise<any>>();
 
 // --- GET Response Cache with TTL + LRU eviction ---
 // Prevents redundant network calls when switching tabs or rapid navigation.
-// Default TTL: 15 seconds. Automatically invalidated on any mutation.
+// Default TTL: 5 seconds. Automatically invalidated on any mutation.
 // LRU eviction when capacity exceeded (promotes on read, evicts least-recently-accessed).
 interface GETCacheEntry { data: any; expiresAt: number }
 const getCache = new Map<string, GETCacheEntry>();
-const GET_CACHE_TTL_MS = 15_000;
+const GET_CACHE_TTL_MS = 5_000;
 const GET_CACHE_MAX = 200;
 
 function getCachedResponse(path: string): any | undefined {

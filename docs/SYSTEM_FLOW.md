@@ -56,10 +56,10 @@
 
 | Role         | Portal                 | Purpose                                             | Auth Method         |
 | ------------ | ---------------------- | --------------------------------------------------- | ------------------- |
-| **Brand**    | brand-web (`:3004`)    | Manage products, campaigns, payouts, inventory      | Mobile + OTP        |
-| **Agency**   | agency-web (`:3003`)   | Run campaigns, create deals, manage mediator squads | Mobile + OTP        |
-| **Mediator** | mediator-app (`:3002`) | Share deals, manage buyers, track earnings (PWA)    | Mobile + OTP        |
-| **Buyer**    | buyer-app (`:3001`)    | Browse deals, place orders, track shipments (PWA)   | Mobile + OTP        |
+| **Brand**    | brand-web (`:3004`)    | Manage products, campaigns, payouts, inventory      | Mobile + Password   |
+| **Agency**   | agency-web (`:3003`)   | Run campaigns, create deals, manage mediator squads | Mobile + Password   |
+| **Mediator** | mediator-app (`:3002`) | Share deals, manage buyers, track earnings (PWA)    | Mobile + Password   |
+| **Buyer**    | buyer-app (`:3001`)    | Browse deals, place orders, track shipments (PWA)   | Mobile + Password   |
 | **Admin**    | admin-web (`:3005`)    | Platform governance, user management, financials    | Username + Password |
 | **Ops**      | admin-web (`:3005`)    | Limited admin operations, support                   | Username + Password |
 
@@ -104,7 +104,7 @@
 ### A. Onboarding Flow
 
 ```text
-1. User opens portal → Auth page (Mobile + OTP or Username + Password)
+1. User opens portal → Auth page (Mobile + Password or Username + Password)
 2. First-time users register with name, mobile, role
 3. Backend creates User record + Wallet (balance: 0)
 4. Role-specific setup:
@@ -372,7 +372,7 @@ Every significant action in the system is traceable:
 | **Money trail**                      | `Transaction` table: every credit/debit with `idempotencyKey`, `walletId`, `orderId`, timestamps |
 | **Who verified the order**           | `Order.verifiedAt`, `Order.verifiedBy` fields                                                    |
 | **AI extraction data**               | `Order.extractedData` JSON field (amount, date, UTR from OCR)                                    |
-| **User status changes**              | `User.suspendedAt`, `User.deletedAt` with soft-delete pattern                                    |
+| **User status changes**              | `User.is_deleted` (Boolean) + `Suspension` table for suspension tracking                         |
 | **Login history**                    | Auth logs via Winston structured logging (domain: auth)                                          |
 | **API access**                       | HTTP request logs with userId, role, IP, route, duration                                         |
 | **System errors**                    | Error logs with correlationId, stack traces, memory metrics                                      |
@@ -418,7 +418,7 @@ logs/
 | **XSS**                | React auto-escaping + CSP headers                                 |
 | **Sensitive data**     | Redaction engine masks passwords, tokens, emails, mobiles in logs |
 | **Idempotency**        | Unique keys on financial transactions                             |
-| **Soft delete**        | Data preservation — `deletedAt` timestamp, never hard delete      |
+| **Soft delete**        | Data preservation — `is_deleted` Boolean flag, never hard delete  |
 
 ---
 

@@ -171,4 +171,4 @@ Agency ─── MediatorProfile ─── User ─── ShopperProfile
 
 ## Soft-Delete Rule
 
-Every destructive operation sets `deletedAt` — **no hard deletes in production code**. Only test cleanup scripts use `.delete()`.
+Every destructive operation sets `is_deleted = true` — **no hard deletes in production code**. Only test cleanup scripts use `.delete()`.

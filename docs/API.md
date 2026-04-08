@@ -1,6 +1,6 @@
 ﻿# API Surface (UI Contract)
 
-> **120 endpoints** across 14 route files. Last updated: July 2025.
+> **121 endpoints** across 14 route files. Last updated: April 2026.
 
 All endpoints are rooted at `/api`.
 
@@ -12,7 +12,7 @@ All endpoints are rooted at `/api`.
 - **Roles**: `shopper` (buyer), `mediator`, `agency`, `brand`, `ops`, `admin`.
   - Backend uses `shopper` for buyers; UI may display as `user`.
   - Most authorization checks combine **role gates** + **ownership scoping**.
-- **Soft-delete rule**: every destructive operation sets `deletedAt` — no hard deletes in production.
+- **Soft-delete rule**: every destructive operation sets `is_deleted = true` — no hard deletes in production.
 
 ## Portal Integration (Next.js)
 

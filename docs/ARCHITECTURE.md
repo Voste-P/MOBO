@@ -46,8 +46,8 @@ Roles: `shopper`, `mediator`, `agency`, `brand`, `admin`, `ops`.
 
 All tables implement soft delete:
 
-- Active row means `deletedAt IS NULL`.
-- Uniqueness indexes are partial on `deletedAt IS NULL`.
+- Active row means `is_deleted = false`.
+- Uniqueness indexes are partial on `is_deleted = false`.
 
 ## Core data model (conceptual)
 
@@ -81,7 +81,7 @@ erDiagram
     string mediatorCode
     string parentCode
     string brandCode
-    date deletedAt
+    bool isDeleted
   }
 
   BRAND {
@@ -98,14 +98,14 @@ erDiagram
     string[] allowedAgencyCodes
     map assignments
     bool locked
-    date deletedAt
+    bool isDeleted
   }
 
   DEAL {
     string mediatorCode
     string dealType
     bool active
-    date deletedAt
+    bool isDeleted
   }
 
   ORDER {
@@ -114,7 +114,7 @@ erDiagram
     string managerName
     json events
     bool frozen
-    date deletedAt
+    bool isDeleted
   }
 
   WALLET {
@@ -122,7 +122,7 @@ erDiagram
     int pendingPaise
     int lockedPaise
     int version
-    date deletedAt
+    bool isDeleted
   }
 
   TRANSACTION {
@@ -142,7 +142,7 @@ erDiagram
     string status
     string issueType
     string orderId
-    date deletedAt
+    bool isDeleted
   }
 ```
 
@@ -176,7 +176,7 @@ Orders have a strict state machine (`workflowStatus`), with anti-fraud constrain
 - All proof-download endpoints enforce role-based authorization (brand owner, assigned agency, mediator, or buyer ownership).
 - Proof upload accepts JPEG, PNG, and WebP only (GIF excluded).
 - Token refresh uses retry with exponential backoff (3 attempts, 300/600/1200ms) before expiring the session.
-- All deletion is soft-delete via `deletedAt`/`is_deleted`; no hard deletes in application code.
+- All deletion is soft-delete via `is_deleted` (Boolean); no hard deletes in application code.
 
 ## Error handling
 

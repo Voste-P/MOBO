@@ -4,13 +4,13 @@ This document maps the _current_ money primitives and flows in the backend. It i
 
 ## Primitives
 
-- Wallet ([backend/models/Wallet.ts](../backend/models/Wallet.ts))
+- Wallet (Prisma model `Wallet`)
   - Fields: `availablePaise`, `pendingPaise`, `lockedPaise` (today only `availablePaise` is mutated in code paths found).
-  - Uniqueness: one wallet per user (soft-delete aware unique index).
+  - Uniqueness: one wallet per user (`is_deleted`-aware unique index).
 
-- Transaction ([backend/models/Transaction.ts](../backend/models/Transaction.ts))
+- Transaction (Prisma model `Transaction`)
   - Immutable ledger entry for wallet mutations.
-  - Strong idempotency: `idempotencyKey` is unique (soft-delete aware).
+  - Strong idempotency: `idempotencyKey` is unique (`is_deleted`-aware).
   - Types (enum): `brand_deposit`, `agency_payout`, `agency_receipt`, `commission_settle`, `payout_complete`, ... (many are defined but currently unused).
 
 - Wallet mutation service ([backend/services/walletService.ts](../backend/services/walletService.ts))

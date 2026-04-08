@@ -201,7 +201,7 @@ export function makeInviteController() {
 
         // Allow agencies to generate mediator invites for themselves. Admin/Ops can generate for any agency.
         const isAgencySelf =
-          (requester.roles as string[])?.includes('agency') && (requester.id === body.agencyId || requester.id === body.agencyId);
+          (requester.roles as string[])?.includes('agency') && requester.id === body.agencyId;
         const isPrivileged = (requester.roles as string[])?.includes('admin') || (requester.roles as string[])?.includes('ops');
         if (!isAgencySelf && !isPrivileged) {
           throw new AppError(403, 'FORBIDDEN', 'Cannot generate invites for this agency');

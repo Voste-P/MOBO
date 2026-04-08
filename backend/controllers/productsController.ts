@@ -148,7 +148,7 @@ export function makeProductsController() {
             items: {
               create: [
                 {
-                  productId: deal.id || deal.id,
+                  productId: deal.id,
                   title: String(deal.title),
                   image: String(deal.image ?? ''),
                   priceAtPurchasePaise: Number(deal.pricePaise ?? 0),

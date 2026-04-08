@@ -590,18 +590,18 @@ export function makeAdminController() {
           req,
           action: 'WALLET_DELETED',
           entityType: 'Wallet',
-          entityId: wallet.id || wallet.id,
+          entityId: wallet.id,
           metadata: { ownerUserId: userId },
         });
-        businessLog.info('Wallet deleted by admin', { walletId: wallet.id || wallet.id, ownerUserId: userId });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Wallet', entityId: wallet.id || wallet.id, action: 'WALLET_DELETED', changedFields: ['isDeleted'], before: { isDeleted: false }, after: { isDeleted: new Date().toISOString() } });
+        businessLog.info('Wallet deleted by admin', { walletId: wallet.id, ownerUserId: userId });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Wallet', entityId: wallet.id, action: 'WALLET_DELETED', changedFields: ['isDeleted'], before: { isDeleted: false }, after: { isDeleted: new Date().toISOString() } });
         logAccessEvent('ADMIN_ACTION', {
           userId: req.auth?.userId,
           roles: req.auth?.roles as string[],
           ip: req.ip,
           method: req.method,
           route: req.originalUrl,
-          resource: `Wallet#${wallet.id || wallet.id}`,
+          resource: `Wallet#${wallet.id}`,
           requestId: String(res.locals.requestId || ''),
           metadata: { action: 'WALLET_DELETED', ownerUserId: userId },
         });
@@ -643,7 +643,6 @@ export function makeAdminController() {
 
         // Immediately evict auth cache so suspended users can't act on stale tokens
         if (statusChanged) {
-          authCacheInvalidate(before.id!);
           authCacheInvalidate(before.id);
         }
         const adminUserId = req.auth?.userId;

@@ -788,7 +788,7 @@ export function makeOpsController(env: Env) {
         const mapped = payouts.map((p: any) => {
           const u = p.beneficiary;
           return {
-            id: p.id ?? p.id,
+            id: p.id,
             mediatorName: u?.name ?? 'Mediator',
             mediatorCode: u?.mediatorCode,
             amount: Math.round((p.amountPaise ?? 0) / 100),
@@ -1451,7 +1451,7 @@ export function makeOpsController(env: Env) {
               action: 'CAMPAIGN_SLOT_RELEASED',
               entityType: 'Campaign',
               entityId: String(campaignId),
-              metadata: { orderId: order.id ?? order.id, reason: 'proof_rejected' },
+              metadata: { orderId: order.id, reason: 'proof_rejected' },
             }).catch((err) => { orderLog.warn('Audit log failed (slot release)', { error: err instanceof Error ? err.message : String(err) }); });
           }
         }
@@ -1677,7 +1677,7 @@ export function makeOpsController(env: Env) {
             app: 'buyer',
             payload: {
               title: 'Action required',
-              body: `Please upload your ${body.type} proof for order #${(order.id || order.id).slice(-6)}.`,
+              body: `Please upload your ${body.type} proof for order #${(order.id).slice(-6)}.`,
               url: '/orders',
             },
           });
@@ -1707,7 +1707,7 @@ export function makeOpsController(env: Env) {
         const agencyCode = await assertOrderAccess(order, roles, user);
 
         // Buyer must also be active — order.userId is PG UUID
-        const orderDisplayId = order.id ?? order.id;
+        const orderDisplayId = order.id;
         const campaignId = order.items?.[0]?.campaignId;
         const productId = String(order.items?.[0]?.productId || '').trim();
         const mediatorCode = String(order.managerName || '').trim();
@@ -1775,7 +1775,7 @@ export function makeOpsController(env: Env) {
 
           const payoutPaise = Number(deal.payoutPaise ?? 0);
           const buyerCommissionPaise = Number(order.items?.[0]?.commissionPaise ?? 0);
-          if (payoutPaise < 0) {
+          if (payoutPaise <= 0) {
             throw new AppError(409, 'INVALID_PAYOUT', 'Cannot settle: deal payout is invalid');
           }
           // Negative commission allowed — buyer got discount in deal price,
@@ -2203,15 +2203,15 @@ export function makeOpsController(env: Env) {
             },
           });
 
-          await writeAuditLog({ req, action: 'CAMPAIGN_CREATED', entityType: 'Campaign', entityId: campaign.id ?? campaign.id });
-          businessLog.info('Campaign created (privileged)', { campaignId: campaign.id ?? campaign.id, title: body.title, platform: body.platform, brandUserId: brand.id, totalSlots: body.totalSlots, payoutRupees: body.payout, dealType: body.dealType, createdBy: pgUserId });
-          logChangeEvent({ actorUserId: pgUserId, entityType: 'Campaign', entityId: campaign.id ?? campaign.id, action: 'CAMPAIGN_CREATED', metadata: { title: body.title, platform: body.platform, brandName: brand.name, totalSlots: body.totalSlots, payout: body.payout, dealType: body.dealType, allowedAgencies: allowed } });
-          logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_CREATED', campaignId: campaign.id ?? campaign.id, title: body.title, brandUserId: brand.id } });
+          await writeAuditLog({ req, action: 'CAMPAIGN_CREATED', entityType: 'Campaign', entityId: campaign.id });
+          businessLog.info('Campaign created (privileged)', { campaignId: campaign.id, title: body.title, platform: body.platform, brandUserId: brand.id, totalSlots: body.totalSlots, payoutRupees: body.payout, dealType: body.dealType, createdBy: pgUserId });
+          logChangeEvent({ actorUserId: pgUserId, entityType: 'Campaign', entityId: campaign.id, action: 'CAMPAIGN_CREATED', metadata: { title: body.title, platform: body.platform, brandName: brand.name, totalSlots: body.totalSlots, payout: body.payout, dealType: body.dealType, allowedAgencies: allowed } });
+          logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_CREATED', campaignId: campaign.id, title: body.title, brandUserId: brand.id } });
           const ts = new Date().toISOString();
           publishRealtime({
             type: 'deals.changed',
             ts,
-            payload: { campaignId: campaign.id ?? campaign.id },
+            payload: { campaignId: campaign.id },
             audience: {
               userIds: [brand.id!],
               agencyCodes: allowed.map((c) => String(c).trim()).filter(Boolean),
@@ -2257,15 +2257,15 @@ export function makeOpsController(env: Env) {
           },
         });
 
-        await writeAuditLog({ req, action: 'CAMPAIGN_CREATED', entityType: 'Campaign', entityId: campaign.id ?? campaign.id });
-        businessLog.info('Campaign created (self-service)', { campaignId: campaign.id ?? campaign.id, title: body.title, platform: body.platform, createdBy: req.auth?.userId, allowedCodes: normalizedAllowed, ip: req.ip });
-        logChangeEvent({ actorUserId: req.auth?.userId, actorRoles: req.auth?.roles, actorIp: req.ip, entityType: 'Campaign', entityId: campaign.id ?? campaign.id, action: 'CAMPAIGN_CREATED', requestId: String((res as any).locals?.requestId || ''), metadata: { title: body.title, platform: body.platform, allowedAgencyCodes: normalizedAllowed } });
-        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_CREATED', campaignId: campaign.id ?? campaign.id, title: body.title } });
+        await writeAuditLog({ req, action: 'CAMPAIGN_CREATED', entityType: 'Campaign', entityId: campaign.id });
+        businessLog.info('Campaign created (self-service)', { campaignId: campaign.id, title: body.title, platform: body.platform, createdBy: req.auth?.userId, allowedCodes: normalizedAllowed, ip: req.ip });
+        logChangeEvent({ actorUserId: req.auth?.userId, actorRoles: req.auth?.roles, actorIp: req.ip, entityType: 'Campaign', entityId: campaign.id, action: 'CAMPAIGN_CREATED', requestId: String((res as any).locals?.requestId || ''), metadata: { title: body.title, platform: body.platform, allowedAgencyCodes: normalizedAllowed } });
+        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_CREATED', campaignId: campaign.id, title: body.title } });
         const ts = new Date().toISOString();
         publishRealtime({
           type: 'deals.changed',
           ts,
-          payload: { campaignId: campaign.id ?? campaign.id },
+          payload: { campaignId: campaign.id },
           audience: {
             agencyCodes: normalizedAllowed,
             mediatorCodes: normalizedAllowed,
@@ -2334,7 +2334,7 @@ export function makeOpsController(env: Env) {
         publishRealtime({
           type: 'deals.changed',
           ts,
-          payload: { campaignId: campaign.id ?? campaign.id, status: nextStatus },
+          payload: { campaignId: campaign.id, status: nextStatus },
           audience: {
             userIds: [brandUserId].filter(Boolean),
             agencyCodes: allowed,
@@ -2344,7 +2344,7 @@ export function makeOpsController(env: Env) {
         publishRealtime({
           type: 'notifications.changed',
           ts,
-          payload: { source: 'campaign.status', campaignId: campaign.id ?? campaign.id, status: nextStatus },
+          payload: { source: 'campaign.status', campaignId: campaign.id, status: nextStatus },
           audience: {
             userIds: [brandUserId].filter(Boolean),
             agencyCodes: allowed,
@@ -2356,12 +2356,12 @@ export function makeOpsController(env: Env) {
           req,
           action: 'CAMPAIGN_STATUS_CHANGED',
           entityType: 'Campaign',
-          entityId: campaign.id ?? campaign.id,
+          entityId: campaign.id,
           metadata: { previousStatus, newStatus: nextStatus },
         });
-        businessLog.info('Campaign status changed', { campaignId: campaign.id ?? campaign.id, previousStatus, newStatus: nextStatus });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Campaign', entityId: campaign.id ?? campaign.id, action: 'STATUS_CHANGE', changedFields: ['status'], before: { status: previousStatus }, after: { status: nextStatus } });
-        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_STATUS_CHANGED', campaignId: campaign.id ?? campaign.id, previousStatus, newStatus: nextStatus } });
+        businessLog.info('Campaign status changed', { campaignId: campaign.id, previousStatus, newStatus: nextStatus });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Campaign', entityId: campaign.id, action: 'STATUS_CHANGE', changedFields: ['status'], before: { status: previousStatus }, after: { status: nextStatus } });
+        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_STATUS_CHANGED', campaignId: campaign.id, previousStatus, newStatus: nextStatus } });
 
         res.json(toUiCampaign(pgCampaign(updated)));
       } catch (err) {
@@ -2412,11 +2412,11 @@ export function makeOpsController(env: Env) {
           req,
           action: 'CAMPAIGN_DELETED',
           entityType: 'Campaign',
-          entityId: campaign.id ?? campaign.id,
+          entityId: campaign.id,
         });
-        businessLog.info('Campaign deleted', { campaignId: campaign.id ?? campaign.id, title: campaign.title });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Campaign', entityId: campaign.id ?? campaign.id, action: 'CAMPAIGN_DELETED', changedFields: ['isDeleted'], before: { isDeleted: false }, after: { isDeleted: new Date().toISOString() } });
-        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_DELETED', campaignId: campaign.id ?? campaign.id, title: campaign.title } });
+        businessLog.info('Campaign deleted', { campaignId: campaign.id, title: campaign.title });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Campaign', entityId: campaign.id, action: 'CAMPAIGN_DELETED', changedFields: ['isDeleted'], before: { isDeleted: false }, after: { isDeleted: new Date().toISOString() } });
+        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_DELETED', campaignId: campaign.id, title: campaign.title } });
 
         const allowed = Array.isArray(campaign.allowedAgencyCodes)
           ? campaign.allowedAgencyCodes.map((c: any) => String(c).trim()).filter(Boolean)
@@ -2434,7 +2434,7 @@ export function makeOpsController(env: Env) {
         publishRealtime({
           type: 'deals.changed',
           ts,
-          payload: { campaignId: campaign.id ?? campaign.id },
+          payload: { campaignId: campaign.id },
           audience: {
             userIds: [brandUserId].filter(Boolean),
             agencyCodes: allowed,
@@ -2445,7 +2445,7 @@ export function makeOpsController(env: Env) {
         publishRealtime({
           type: 'notifications.changed',
           ts,
-          payload: { source: 'campaign.deleted', campaignId: campaign.id ?? campaign.id },
+          payload: { source: 'campaign.deleted', campaignId: campaign.id },
           audience: {
             userIds: [brandUserId].filter(Boolean),
             agencyCodes: allowed,
@@ -2619,10 +2619,10 @@ export function makeOpsController(env: Env) {
           throw saveErr;
         }
 
-        await writeAuditLog({ req, action: 'CAMPAIGN_SLOTS_ASSIGNED', entityType: 'Campaign', entityId: campaign.id ?? campaign.id });
-        businessLog.info('Campaign slots assigned', { campaignId: campaign.id ?? campaign.id, totalAssigned, mediators: positiveEntries.map(([c]) => c) });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Campaign', entityId: campaign.id ?? campaign.id, action: 'SLOTS_ASSIGNED', changedFields: ['assignments', 'locked'], before: { locked: campaign.locked }, after: { locked: true, totalAssigned, assignedMediators: positiveEntries.map(([c]) => c) } });
-        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'SLOTS_ASSIGNED', campaignId: campaign.id ?? campaign.id, totalAssigned, mediatorCount: positiveEntries.length } });
+        await writeAuditLog({ req, action: 'CAMPAIGN_SLOTS_ASSIGNED', entityType: 'Campaign', entityId: campaign.id });
+        businessLog.info('Campaign slots assigned', { campaignId: campaign.id, totalAssigned, mediators: positiveEntries.map(([c]) => c) });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Campaign', entityId: campaign.id, action: 'SLOTS_ASSIGNED', changedFields: ['assignments', 'locked'], before: { locked: campaign.locked }, after: { locked: true, totalAssigned, assignedMediators: positiveEntries.map(([c]) => c) } });
+        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'SLOTS_ASSIGNED', campaignId: campaign.id, totalAssigned, mediatorCount: positiveEntries.length } });
 
         const assignmentCodes = positiveEntries.map(([c]) => String(c).trim()).filter(Boolean);
         const agencyCodeMap = await getAgencyCodesForMediatorCodes(assignmentCodes);
@@ -2644,7 +2644,7 @@ export function makeOpsController(env: Env) {
         publishRealtime({
           type: 'deals.changed',
           ts,
-          payload: { campaignId: campaign.id ?? campaign.id },
+          payload: { campaignId: campaign.id },
           audience: {
             userIds: [brandUserId].filter(Boolean),
             agencyCodes,
@@ -2766,7 +2766,7 @@ export function makeOpsController(env: Env) {
           });
         }
 
-        const campaignDisplayId = campaign.id ?? campaign.id;
+        const campaignDisplayId = campaign.id;
         await writeAuditLog({
           req,
           action: 'DEAL_PUBLISHED',
@@ -2877,8 +2877,8 @@ export function makeOpsController(env: Env) {
             });
           }
 
-          const payoutDisplayId = payoutDoc.id ?? payoutDoc.id;
-          const userDisplayId = user.id ?? user.id;
+          const payoutDisplayId = payoutDoc.id;
+          const userDisplayId = user.id;
           await writeAuditLog({ req, action: 'PAYOUT_PROCESSED', entityType: 'Payout', entityId: payoutDisplayId, metadata: { beneficiaryUserId: userDisplayId, amountPaise, recordOnly: canAgency } });
           businessLog.info('Payout processed', { payoutId: payoutDisplayId, beneficiaryId: userDisplayId, amountPaise, mode: canAny ? 'paid' : 'recorded', mediatorCode: user.mediatorCode });
           logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Payout', entityId: payoutDisplayId, action: 'PAYOUT_PROCESSED', changedFields: ['status', 'amountPaise'], before: {}, after: { status: canAny ? 'paid' : 'recorded', amountPaise, beneficiaryUserId: userDisplayId } });
@@ -2934,8 +2934,8 @@ export function makeOpsController(env: Env) {
           throw new AppError(409, 'PAYOUT_ALREADY_DELETED', 'Payout already deleted');
         }
 
-        const payoutDisplayId = payout.id ?? payout.id;
-        const beneficiaryDisplayId = beneficiary.id ?? beneficiary.id;
+        const payoutDisplayId = payout.id;
+        const beneficiaryDisplayId = beneficiary.id;
         await writeAuditLog({
           req,
           action: 'PAYOUT_DELETED',
@@ -3053,7 +3053,7 @@ export function makeOpsController(env: Env) {
           },
         });
 
-        const newDisplayId = newCampaign.id ?? newCampaign.id;
+        const newDisplayId = newCampaign.id;
         await writeAuditLog({
           req,
           action: 'CAMPAIGN_COPIED',
@@ -3120,7 +3120,7 @@ export function makeOpsController(env: Env) {
           data: { allowedAgencyCodes: newCodes },
         });
 
-        const campaignDisplayId = campaign.id ?? campaign.id;
+        const campaignDisplayId = campaign.id;
         await writeAuditLog({
           req,
           action: 'OFFER_DECLINED',
@@ -3318,7 +3318,7 @@ export function makeOpsController(env: Env) {
 
         await writeAuditLog({ req, action: 'ORDER_CANCELLED', entityType: 'Order', entityId: order.id!, metadata: { reason: body.reason } });
         if (campaignId) {
-          writeAuditLog({ req, action: 'CAMPAIGN_SLOT_RELEASED', entityType: 'Campaign', entityId: String(campaignId), metadata: { orderId: order.id ?? order.id, reason: 'order_cancelled' } }).catch((err) => { orderLog.warn('Audit log failed (slot release on cancel)', { error: err instanceof Error ? err.message : String(err) }); });
+          writeAuditLog({ req, action: 'CAMPAIGN_SLOT_RELEASED', entityType: 'Campaign', entityId: String(campaignId), metadata: { orderId: order.id, reason: 'order_cancelled' } }).catch((err) => { orderLog.warn('Audit log failed (slot release on cancel)', { error: err instanceof Error ? err.message : String(err) }); });
         }
         orderLog.info('Order cancelled', { orderId: order.id, reason: body.reason });
         businessLog.info('Order cancelled', { orderId: order.id, cancelledBy: req.auth?.userId, ip: req.ip });

@@ -183,7 +183,7 @@ export async function notifyOrderWorkflowPush(params: {
             where: { mediatorCode, roles: { has: 'mediator' }, isDeleted: false },
             select: { id: true },
           });
-          mediatorIds = pgMediators.map(m => m.id || m.id);
+          mediatorIds = pgMediators.map(m => m.id);
         }
         const payload: PushPayload = {
           title: 'New order to review',

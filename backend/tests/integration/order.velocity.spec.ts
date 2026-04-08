@@ -40,7 +40,7 @@ describe('order velocity limits', () => {
       .send({
         userId: buyerUserId,
         items: [{
-          productId: String(deal.id || deal.id),
+          productId: String(deal.id),
           title: String(deal.title ?? 'Deal'),
           image: String(deal.image ?? 'https://example.com/e2e.png'),
           priceAtPurchase: Number(deal.pricePaise ?? 0) / 100,
@@ -80,7 +80,7 @@ describe('order velocity limits', () => {
     const orderPayload = {
       userId: buyerUserId,
       items: [{
-        productId: String(deal.id || deal.id),
+        productId: String(deal.id),
         title: String(deal.title ?? 'Deal'),
         image: String(deal.image ?? 'https://example.com/e2e.png'),
         priceAtPurchase: Number(deal.pricePaise ?? 0) / 100,
