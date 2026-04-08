@@ -385,23 +385,18 @@ export function makeOpsController(env: Env) {
                 `;
             matchingIds = rows.map((r) => r.id);
           } else {
-            // Lowercase code to match assignment keys (assignSlots lowercases them)
+            // Mediator: only show campaigns where this mediator has an explicit slot assignment.
+            // Agency-level targeting (allowed_agency_codes) is visible to the agency only;
+            // mediators see campaigns after the agency distributes slots to them.
             const codeLower = code.toLowerCase();
-            // Also check parent agency — campaigns targeted to an agency should be visible to its mediators
-            const parentAgency = roles.includes('mediator')
-              ? await getAgencyCodeForMediatorCode(code)
-              : null;
-            const agencyCodes = [code, ...(parentAgency ? [parentAgency] : [])].filter(Boolean);
             const rows = statusFilter
               ? await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false AND status = ${statusFilter}
-                  AND (EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))
-                       OR jsonb_exists(assignments, ${codeLower}))
+                  AND (jsonb_exists(assignments, ${codeLower}) OR "open_to_all" = true)
                 `
               : await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false
-                  AND (EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))
-                       OR jsonb_exists(assignments, ${codeLower}))
+                  AND (jsonb_exists(assignments, ${codeLower}) OR "open_to_all" = true)
                 `;
             matchingIds = rows.map((r) => r.id);
           }
@@ -1774,13 +1769,13 @@ export function makeOpsController(env: Env) {
 
           const payoutPaise = Number(deal.payoutPaise ?? 0);
           const buyerCommissionPaise = Number(order.items?.[0]?.commissionPaise ?? 0);
-          if (payoutPaise <= 0) {
+          if (payoutPaise < 0) {
             throw new AppError(409, 'INVALID_PAYOUT', 'Cannot settle: deal payout is invalid');
           }
-          if (buyerCommissionPaise < 0) {
-            throw new AppError(409, 'INVALID_COMMISSION', 'Cannot settle: commission is invalid');
-          }
-          if (buyerCommissionPaise > payoutPaise) {
+          // Negative commission allowed — buyer got discount in deal price,
+          // so buyer cashback is capped at 0 and mediator keeps full payout.
+          const buyerCashback = Math.max(0, buyerCommissionPaise);
+          if (buyerCashback > payoutPaise) {
             throw new AppError(409, 'INVALID_ECONOMICS', 'Cannot settle: commission exceeds payout');
           }
 
@@ -1797,7 +1792,7 @@ export function makeOpsController(env: Env) {
           await ensureWallet(brandId);
           await ensureWallet(buyerUserId);
 
-          const mediatorMarginPaise = payoutPaise - buyerCommissionPaise;
+          const mediatorMarginPaise = payoutPaise - buyerCashback;
           let mediatorUserId: string | null = null;
           if (mediatorMarginPaise > 0 && mediatorCode) {
             const mediator = await db().user.findFirst({ where: { mediatorCode, isDeleted: false }, select: { id: true } });
@@ -1857,12 +1852,12 @@ export function makeOpsController(env: Env) {
               tx,
             });
 
-            if (buyerCommissionPaise > 0) {
+            if (buyerCashback > 0) {
               await applyWalletCredit({
                 idempotencyKey: `order-commission-${order.id}-c${settleCycle}`,
                 type: 'commission_settle',
                 ownerUserId: buyerUserId,
-                amountPaise: buyerCommissionPaise,
+                amountPaise: buyerCashback,
                 orderId: order.id!,
                 campaignId: campaignId ? String(campaignId) : undefined,
                 metadata: { reason: 'ORDER_COMMISSION', dealId: productId },
@@ -2058,7 +2053,8 @@ export function makeOpsController(env: Env) {
 
           const payoutPaise = Number(deal.payoutPaise ?? 0);
           const buyerCommissionPaise = Number(order.items?.[0]?.commissionPaise ?? 0);
-          const mediatorMarginPaise = payoutPaise - buyerCommissionPaise;
+          const buyerCashback = Math.max(0, buyerCommissionPaise);
+          const mediatorMarginPaise = payoutPaise - buyerCashback;
 
           const buyerUserId = order.userId;
           if (!buyerUserId) {
@@ -2095,14 +2091,14 @@ export function makeOpsController(env: Env) {
               tx,
             });
 
-            if (buyerCommissionPaise > 0) {
+            if (buyerCashback > 0) {
               await applyWalletDebit({
                 idempotencyKey: `order-unsettle-debit-buyer-${order.id}-c${unsettleCycle}`,
                 type: 'commission_reversal',
                 ownerUserId: buyerUserId,
                 fromUserId: buyerUserId,
                 toUserId: brandId,
-                amountPaise: buyerCommissionPaise,
+                amountPaise: buyerCashback,
                 orderId: order.id!,
                 campaignId: campaignId ? String(campaignId) : undefined,
                 metadata: { reason: 'ORDER_UNSETTLE_COMMISSION', dealId: productId },
@@ -2688,20 +2684,11 @@ export function makeOpsController(env: Env) {
             throw new AppError(403, 'FORBIDDEN', 'Cannot publish deals for other mediators');
           }
 
-          const agencyCode = normalizeCode((requester as any)?.parentCode);
-          const allowedCodesRaw = Array.isArray(campaign.allowedAgencyCodes) ? campaign.allowedAgencyCodes : [];
-          const allowedCodes = new Set(
-            allowedCodesRaw
-              .map((c: unknown) => normalizeCode(c))
-              .filter((c: string): c is string => Boolean(c))
-              .map((c: string) => c.toLowerCase())
-          );
-
           const slotAssignment = findAssignmentForMediator(campaign.assignments, requestedCode);
           const hasAssignment = !!slotAssignment && Number((slotAssignment as any)?.limit ?? 0) > 0;
 
-          // "Open to All" campaigns still require agency membership — they just skip per-mediator slot assignment
-          const isAllowed = (agencyCode && allowedCodes.has(agencyCode.toLowerCase())) || allowedCodes.has(selfCode.toLowerCase()) || hasAssignment;
+          // Consistent with getCampaigns: mediator must have explicit slot assignment OR campaign is openToAll
+          const isAllowed = hasAssignment || !!campaign.openToAll;
           if (!isAllowed) {
             throw new AppError(403, 'FORBIDDEN', 'Campaign not assigned to your network');
           }
@@ -2717,10 +2704,8 @@ export function makeOpsController(env: Env) {
           throw new AppError(400, 'INVALID_PAYOUT', 'Cannot publish deal with negative payout.');
         }
 
-        const netEarnings = payoutPaise + commissionPaise;
-        if (netEarnings < 0) {
-          throw new AppError(400, 'INVALID_ECONOMICS', 'Buyer discount cannot exceed your commission from agency');
-        }
+        // Negative commission allowed — mediator can offer a buyer discount
+        // even if it exceeds their payout (marketing cost borne by mediator).
 
         if (String(campaign.status || '').toLowerCase() !== 'active') {
           throw new AppError(409, 'CAMPAIGN_NOT_ACTIVE', 'Campaign is not active; cannot publish deal');

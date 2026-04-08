@@ -117,7 +117,7 @@ describe('ops deals: publish', () => {
     expect(deal?.active).toBe(true);
   });
 
-  it('rejects publishing when buyer discount exceeds agency commission', async () => {
+  it('allows publishing with negative commission (buyer discount)', async () => {
     const env = loadEnv({ NODE_ENV: 'test' });
     const seeded = await seedE2E();
 
@@ -131,7 +131,7 @@ describe('ops deals: publish', () => {
 
     const pgCampaign = await db.campaign.create({
       data: {
-        title: 'Publish Campaign (negative commission exceeds agency commission)',
+        title: 'Publish Campaign (negative commission – buyer discount)',
         brandUserId: seeded.agency.id,
         brandName: 'Agency Inventory',
         platform: 'Amazon',
@@ -156,16 +156,17 @@ describe('ops deals: publish', () => {
       .set('Authorization', `Bearer ${mediator.token}`)
       .send({
         id: pgCampaign.id,
-        commission: -10,  // ₹-10 buyer discount, net = 5 + (-10) = -5 < 0
+        commission: -10,  // ₹-10 buyer discount — now allowed
         mediatorCode,
       });
 
-    // Net earnings (500 paise + (-1000 paise) = -500 paise) is negative; should be rejected.
-    expect(res.status).toBe(400);
-    expect(res.body?.error?.code).toBe('INVALID_ECONOMICS');
+    // Negative commission is allowed — mediator can offer buyer discount
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('ok', true);
 
     const deal = await db.deal.findFirst({ where: { campaignId: pgCampaign.id, mediatorCode, isDeleted: false } });
-    expect(deal).toBeFalsy();
+    expect(deal).toBeTruthy();
+    expect(Number(deal!.commissionPaise)).toBe(-1000);
   });
 
   it('allows publishing when campaign and slot assignment both have zero payout', async () => {

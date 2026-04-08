@@ -5,7 +5,7 @@ export const orderItemSchema = z.object({
   title: z.string().min(1),
   image: z.string().min(1),
   priceAtPurchase: z.number().nonnegative().max(10_00_000),
-  commission: z.number().nonnegative().max(10_00_000),
+  commission: z.number().min(-10_00_000).max(10_00_000),
   campaignId: z.string().min(1),
   dealType: z.string().min(1),
   quantity: z.number().int().min(1),
