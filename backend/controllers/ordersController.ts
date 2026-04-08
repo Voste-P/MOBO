@@ -79,7 +79,7 @@ export function makeOrdersController(env: Env) {
 
     const dataMatch = raw.match(/^data:([^;]+);base64,(.+)$/i);
     if (dataMatch) {
-      const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp'];
+      const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
       const mime = ALLOWED_MIME.includes(dataMatch[1]?.toLowerCase() || '') ? dataMatch[1] : 'image/jpeg';
       const payload = dataMatch[2] || '';
       const buffer = Buffer.from(payload, 'base64');
@@ -1025,7 +1025,7 @@ export function makeOrdersController(env: Env) {
                   type: 'ORDERED',
                   at: new Date(),
                   actorUserId: userDisplayId,
-                  metadata: { campaignId: String(campaign.id ?? campaign.id), mediatorCode: upstreamMediatorCode },
+                  metadata: { campaignId: String(campaign.id), mediatorCode: upstreamMediatorCode },
                 }) as any,
                 updatedBy: userPgId,
               },
@@ -1094,7 +1094,7 @@ export function makeOrdersController(env: Env) {
                 type: 'ORDERED',
                 at: new Date(),
                 actorUserId: userDisplayId,
-                metadata: { campaignId: String(campaign.id ?? campaign.id), mediatorCode: upstreamMediatorCode },
+                metadata: { campaignId: String(campaign.id), mediatorCode: upstreamMediatorCode },
               }) as any,
               createdBy: userPgId,
             },
@@ -1146,11 +1146,9 @@ export function makeOrdersController(env: Env) {
           });
 
           // â”€â”€ Auto-verify by AI confidence â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-          // Invoke for any positive confidence: individual step needs 80%,
-          // but attemptBulkAutoVerify (inside autoVerifyStep) uses 70% baseline
-          // so orders where ALL proofs are uploaded with >=70% can auto-approve.
-          const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 80;
-          if (aiOrderConfidence > 0) {
+          // Only auto-verify when AI confidence meets the threshold.
+          const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
+          if (aiOrderConfidence >= autoThreshold) {
             const freshOrder = await db().order.findFirst({
               where: { id: orderId, isDeleted: false },
               include: { items: { where: { isDeleted: false } } },
@@ -1187,13 +1185,13 @@ export function makeOrdersController(env: Env) {
           entityType: 'Order',
           entityId: orderId,
           metadata: {
-            campaignId: String(campaign.id ?? campaign.id),
+            campaignId: String(campaign.id),
             total: body.items.reduce((a: number, it: any) => a + (Number(it.priceAtPurchase) || 0) * (Number(it.quantity) || 1), 0),
             externalOrderId: resolvedExternalOrderId,
           },
         }).catch((err: unknown) => { orderLog.warn('Audit log failed', { error: err instanceof Error ? err.message : String(err) }); });
 
-        orderLog.info('Order created', { orderId: orderId, userId: req.auth?.userId, campaignId: String(campaign.id ?? campaign.id), externalOrderId: resolvedExternalOrderId, itemCount: body.items.length, ip: req.ip });
+        orderLog.info('Order created', { orderId: orderId, userId: req.auth?.userId, campaignId: String(campaign.id), externalOrderId: resolvedExternalOrderId, itemCount: body.items.length, ip: req.ip });
         logChangeEvent({
           actorUserId: req.auth?.userId,
           actorRoles: req.auth?.roles,
@@ -1203,13 +1201,13 @@ export function makeOrdersController(env: Env) {
           action: 'ORDER_CREATED',
           requestId: String((res as any).locals?.requestId || ''),
           metadata: {
-            campaignId: String(campaign.id ?? campaign.id),
+            campaignId: String(campaign.id),
             itemCount: body.items.length,
             externalOrderId: resolvedExternalOrderId,
           },
         });
 
-        businessLog.info('Order created', { orderId: orderId, userId: req.auth?.userId, campaignId: String(campaign.id ?? campaign.id), itemCount: body.items.length, ip: req.ip });
+        businessLog.info('Order created', { orderId: orderId, userId: req.auth?.userId, campaignId: String(campaign.id), itemCount: body.items.length, ip: req.ip });
         logAccessEvent('RESOURCE_ACCESS', {
           userId: req.auth?.userId,
           roles: req.auth?.roles,
@@ -1884,7 +1882,7 @@ export function makeOrdersController(env: Env) {
         // Also auto-verify the proof step if AI passed hard-block validation.
         if (wf === 'APPROVED') {
           // Auto-verify the submitted proof step for audit trail completeness
-          if (claimAiConfidence > 0) {
+          if (claimAiConfidence >= (env.AI_AUTO_VERIFY_THRESHOLD ?? 90)) {
             const v = (order.verification && typeof order.verification === 'object')
               ? { ...(order.verification as any) } : {} as any;
             const vKey = body.type === 'order' ? 'order' : body.type;
@@ -1943,8 +1941,8 @@ export function makeOrdersController(env: Env) {
           // Individual step auto-verify triggers at AI_AUTO_VERIFY_THRESHOLD (80%).
           // Below that, attemptBulkAutoVerify still runs (threshold 70%) â€” so orders
           // where ALL proofs score 70-79% can auto-approve without mediator review.
-          const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 80;
-          if (claimAiConfidence > 0 && refreshed) {
+          const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
+          if (claimAiConfidence >= autoThreshold && refreshed) {
             refreshed = await autoVerifyStep(refreshed, body.type, claimAiConfidence, autoThreshold, env);
           }
 
@@ -2004,8 +2002,8 @@ export function makeOrdersController(env: Env) {
         // Invoke for any positive confidence: individual step needs 80%, but
         // attemptBulkAutoVerify (inside autoVerifyStep) uses 70% baseline.
         let claimFinalOrder: any = afterReview;
-        const autoThreshold2 = env.AI_AUTO_VERIFY_THRESHOLD ?? 80;
-        if (claimAiConfidence > 0 && afterReview) {
+        const autoThreshold2 = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
+        if (claimAiConfidence >= autoThreshold2 && afterReview) {
           const freshOrder = await db().order.findFirst({
             where: { id: order.id, isDeleted: false },
             include: { items: { where: { isDeleted: false } } },

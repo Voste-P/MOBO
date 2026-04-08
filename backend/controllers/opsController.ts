@@ -1356,10 +1356,11 @@ export function makeOpsController(env: Env) {
           if (!order.screenshotOrder) {
             throw new AppError(409, 'MISSING_PROOF', 'Missing order proof');
           }
-          if (v.order?.verifiedAt) {
-            throw new AppError(409, 'ALREADY_VERIFIED', 'Order proof already verified');
-          }
+          // Allow agency rejection even if AI already auto-verified the proof.
+          // Clear proof data and verification so buyer can re-upload.
           updateData.screenshotOrder = null;
+          updateData.verifiedAt = null;
+          updateData.verifiedBy = null;
           if (v.order) { v.order = undefined; }
         } else {
           if (!v.order?.verifiedAt) {

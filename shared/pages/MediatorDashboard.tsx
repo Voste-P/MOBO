@@ -3135,7 +3135,7 @@ export const MediatorDashboard: React.FC = () => {
                   Base Price
                 </p>
                 <p className="text-2xl font-black text-zinc-900">
-                  {formatCurrency(dealBuilder.price + (dealBuilder.assignmentCommission || 0))}
+                  {formatCurrency(dealBuilder.originalPrice || dealBuilder.price)}
                 </p>
               </div>
               <div className="text-zinc-300 relative z-10">
