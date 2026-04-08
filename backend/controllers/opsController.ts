@@ -387,17 +387,21 @@ export function makeOpsController(env: Env) {
           } else {
             // Lowercase code to match assignment keys (assignSlots lowercases them)
             const codeLower = code.toLowerCase();
-            // Mediators should ONLY see campaigns where they have explicit slot assignments.
-            // Campaigns targeted at their parent agency but without mediator allocation
-            // belong in the agency's "Offers by Brand" view, not the mediator's deal list.
+            // Also check parent agency — campaigns targeted to an agency should be visible to its mediators
+            const parentAgency = roles.includes('mediator')
+              ? await getAgencyCodeForMediatorCode(code)
+              : null;
+            const agencyCodes = [code, ...(parentAgency ? [parentAgency] : [])].filter(Boolean);
             const rows = statusFilter
               ? await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false AND status = ${statusFilter}
-                  AND jsonb_exists(assignments, ${codeLower})
+                  AND (EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))
+                       OR jsonb_exists(assignments, ${codeLower}))
                 `
               : await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false
-                  AND jsonb_exists(assignments, ${codeLower})
+                  AND (EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))
+                       OR jsonb_exists(assignments, ${codeLower}))
                 `;
             matchingIds = rows.map((r) => r.id);
           }
@@ -2707,10 +2711,6 @@ export function makeOpsController(env: Env) {
 
         if (payoutPaise < 0) {
           throw new AppError(400, 'INVALID_PAYOUT', 'Cannot publish deal with negative payout.');
-        }
-
-        if (commissionPaise > payoutPaise) {
-          throw new AppError(400, 'COMMISSION_EXCEEDS_PAYOUT', 'Commission cannot exceed the payout amount.');
         }
 
         const netEarnings = payoutPaise + commissionPaise;
