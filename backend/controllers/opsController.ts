@@ -2709,10 +2709,6 @@ export function makeOpsController(env: Env) {
           throw new AppError(400, 'INVALID_PAYOUT', 'Cannot publish deal with negative payout.');
         }
 
-        if (commissionPaise < 0) {
-          throw new AppError(400, 'INVALID_COMMISSION', 'Commission cannot be negative.');
-        }
-
         if (commissionPaise > payoutPaise) {
           throw new AppError(400, 'COMMISSION_EXCEEDS_PAYOUT', 'Commission cannot exceed the payout amount.');
         }
