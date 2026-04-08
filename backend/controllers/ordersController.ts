@@ -193,18 +193,20 @@ export function makeOrdersController(env: Env) {
     const v = (order.verification && typeof order.verification === 'object')
       ? { ...(order.verification as any) } : {} as any;
 
+    // Bulk verify uses a lower threshold than individual auto-verify:
+    // when ALL proofs are present and each meets this baseline, skip review entirely.
+    const bulkThreshold = envRef.AI_BULK_VERIFY_THRESHOLD ?? 70;
+
     // Purchase proof must be verified (either by AI or mediator)
     if (!v.order?.verifiedAt) {
       // Check if purchase proof has AI confidence data
       const orderAi = order.orderAiVerification as any;
       const rawConfidence = Number(orderAi?.confidenceScore) || 0;
       const orderConfidence = Number.isFinite(rawConfidence) ? Math.max(0, Math.min(100, rawConfidence)) : 0;
-      const baselineThreshold = envRef.AI_PROOF_CONFIDENCE_THRESHOLD ?? 80;
-      if (orderConfidence < baselineThreshold) return order;
+      if (orderConfidence < bulkThreshold) return order;
     }
 
     // Check all required steps have proofs uploaded with sufficient AI confidence
-    const baselineThreshold = envRef.AI_PROOF_CONFIDENCE_THRESHOLD ?? 80;
     const stepsToVerify: Array<{ key: string; confidence: number }> = [];
 
     for (const step of required) {
@@ -223,14 +225,14 @@ export function makeOrdersController(env: Env) {
         if (!order.reviewLink && !order.screenshotReview) confidence = 0;
       }
 
-      if (confidence < baselineThreshold) return order; // insufficient confidence
+      if (confidence < bulkThreshold) return order; // insufficient confidence
       stepsToVerify.push({ key: step, confidence });
     }
 
     // Also check purchase proof if not yet verified
     if (!v.order?.verifiedAt) {
       const orderConfidence = Number((order.orderAiVerification as any)?.confidenceScore) || 0;
-      if (orderConfidence < baselineThreshold) return order;
+      if (orderConfidence < bulkThreshold) return order;
       stepsToVerify.push({ key: 'order', confidence: orderConfidence });
     }
 
@@ -243,7 +245,7 @@ export function makeOrdersController(env: Env) {
     for (const { key, confidence } of stepsToVerify) {
       // Sanitize AI confidence to valid 0-100 range
       const safeConfidence = Number.isFinite(confidence) ? Math.max(0, Math.min(100, confidence)) : 0;
-      if (safeConfidence < baselineThreshold) continue; // skip corrupted scores
+      if (safeConfidence < bulkThreshold) continue; // skip corrupted scores
       v[key] = v[key] ?? {};
       v[key].verifiedAt = now;
       v[key].verifiedBy = 'SYSTEM_AI_BULK';

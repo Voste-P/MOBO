@@ -75,6 +75,7 @@ function withRequestId(init?: RequestInit): RequestInit {
 type TokenPair = { accessToken: string; refreshToken?: string };
 
 let refreshPromise: Promise<TokenPair | null> | null = null;
+let refreshCooldownUntil = 0; // prevents retry storms after refresh failure
 
 const canUseStorage = () => typeof window !== 'undefined' && !!window.localStorage;
 
@@ -172,6 +173,9 @@ async function refreshTokens(): Promise<TokenPair | null> {
   const refreshToken = current?.refreshToken;
   if (!refreshToken) return null;
 
+  // Cooldown: after a failed refresh, avoid retry storms for 5 seconds
+  if (Date.now() < refreshCooldownUntil) return null;
+
   if (!refreshPromise) {
     refreshPromise = (async () => {
       const MAX_REFRESH_RETRIES = 3;
@@ -200,10 +204,14 @@ async function refreshTokens(): Promise<TokenPair | null> {
           return readTokens();
         } catch (_err) {
           if (attempt < MAX_REFRESH_RETRIES) {
-            const delay = REFRESH_BASE_DELAY * Math.pow(2, attempt - 1);
-            await new Promise(r => setTimeout(r, delay));
+            // Exponential backoff with jitter to prevent synchronized retries
+            const baseDelay = REFRESH_BASE_DELAY * Math.pow(2, attempt - 1);
+            const jitter = Math.random() * baseDelay * 0.3;
+            await new Promise(r => setTimeout(r, baseDelay + jitter));
             continue;
           }
+          // All retries exhausted — cooldown to prevent thundering herd
+          refreshCooldownUntil = Date.now() + 5000;
           clearTokens();
           notifyAuthExpired();
           return null;

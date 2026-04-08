@@ -2516,20 +2516,24 @@ export function makeOpsController(env: Env) {
         }
 
         // Security: agency can only assign to active mediators under its own code.
+        // Uses case-insensitive comparison because assignment keys are stored
+        // lowercase in JSONB while User.mediatorCode retains original casing.
         if (agencyCode && !isOpenToAll) {
           const assignmentCodes = positiveEntries.map(([code]) => String(code).trim()).filter(Boolean);
+          const assignmentCodesLower = assignmentCodes.map((c) => c.toLowerCase());
           const mediators = await db().user.findMany({
             where: {
               roles: { has: 'mediator' },
-              mediatorCode: { in: assignmentCodes },
               parentCode: agencyCode,
               status: 'active',
               isDeleted: false,
             },
             select: { mediatorCode: true },
           });
-          const allowedCodes = new Set(mediators.map((m: any) => String(m.mediatorCode || '').trim()).filter(Boolean));
-          const invalid = assignmentCodes.filter((c) => !allowedCodes.has(String(c).trim()));
+          const allowedCodes = new Set(
+            mediators.map((m: any) => String(m.mediatorCode || '').trim().toLowerCase()).filter(Boolean),
+          );
+          const invalid = assignmentCodesLower.filter((c) => !allowedCodes.has(c));
           if (invalid.length) {
             throw new AppError(403, 'INVALID_MEDIATOR_CODE', 'One or more mediators are not active or not in your team');
           }

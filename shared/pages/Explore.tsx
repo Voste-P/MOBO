@@ -24,16 +24,28 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const loadingRef = useRef(false);
+  const pageRef = useRef(1);
+  const PAGE_SIZE = 50;
 
-  const loadProducts = useCallback(async () => {
+  const loadProducts = useCallback(async (reset = true) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
     setLoading(true);
     setFetchError(false);
+    const page = reset ? 1 : pageRef.current;
     try {
-      const data = await api.products.getAll(undefined, 1, 200);
-      setProducts(asArray<Product>(data));
+      const data = await api.products.getAll(undefined, page, PAGE_SIZE);
+      const batch = asArray<Product>(data);
+      if (reset) {
+        setProducts(batch);
+        pageRef.current = 2;
+      } else {
+        setProducts((prev) => [...prev, ...batch]);
+        pageRef.current = page + 1;
+      }
+      setHasMore(batch.length >= PAGE_SIZE);
     } catch {
       setFetchError(true);
     } finally {
@@ -57,7 +69,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
     const unsub = subscribeRealtime((msg: any) => {
       if (msg.type === 'deals.changed') {
         if (timer) clearTimeout(timer);
-        timer = setTimeout(() => { timer = null; loadProducts(); }, 500);
+        timer = setTimeout(() => { timer = null; loadProducts(true); }, 500);
       }
     });
     return () => { unsub(); if (timer) clearTimeout(timer); };
@@ -229,13 +241,13 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
             ))}
           </div>
         ) : fetchError && products.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <div className="flex flex-col items-center justify-center py-20 gap-4" role="alert" aria-live="assertive">
             <AlertTriangle size={40} className="text-red-300" />
             <p className="text-sm font-bold text-zinc-600">Could not load deals</p>
             <p className="text-xs text-zinc-400 max-w-[240px] text-center">Please check your internet connection and try again.</p>
             <button
               type="button"
-              onClick={() => loadProducts()}
+              onClick={() => loadProducts(true)}
               className="px-6 py-2.5 bg-black text-white rounded-full text-xs font-bold hover:bg-zinc-800 transition-colors active:scale-95"
             >
               Try Again
@@ -254,6 +266,15 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
                 <ProductCard product={p} inlineOrder />
               </div>
             ))}
+            {hasMore && !loading && (
+              <button
+                type="button"
+                onClick={() => loadProducts(false)}
+                className="mt-2 px-8 py-3 bg-black text-white rounded-full text-xs font-bold hover:bg-zinc-800 transition-colors active:scale-95"
+              >
+                Load More
+              </button>
+            )}
           </div>
         )}
       </div>

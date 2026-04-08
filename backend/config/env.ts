@@ -71,6 +71,13 @@ const envSchema = z.object({
   // and bulk auto-verify thresholds that previously allowed 70-79% proofs through).
   AI_PROOF_CONFIDENCE_THRESHOLD: z.coerce.number().int().min(0).max(100).default(80),
 
+  // Lower threshold for bulk auto-verification: when ALL required proofs are
+  // present and every one meets this minimum, the order skips mediator review
+  // entirely and goes straight to cooling period. Default 70 allows orders
+  // where every proof is reasonably confident (70-79%) to bypass review even
+  // though no single proof exceeds the individual auto-verify threshold (80).
+  AI_BULK_VERIFY_THRESHOLD: z.coerce.number().int().min(0).max(100).default(70),
+
   // AI confidence score (0-100) at or above which a proof step is auto-verified
   // without manual mediator review.  Set to 101 to disable auto-verification.
   // 80 balances speed and fraud safety; more proofs auto-verify without mediator.

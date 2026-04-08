@@ -1629,11 +1629,12 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
 
   useEffect(() => {
     if (!assignModal) return;
-    // Normalize existing assignments: DB stores either number or {limit, payout} objects
+    // Normalize existing assignments: DB stores either number or {limit, payout} objects.
+    // Keys are lowercased to match backend JSONB storage (code.toLowerCase()).
     const raw = assignModal.assignments || {};
     const normalized: Record<string, number> = {};
     for (const [code, val] of Object.entries(raw)) {
-      normalized[code] = typeof val === 'number' ? val : Number((val as Record<string, unknown>)?.limit ?? 0);
+      normalized[code.toLowerCase()] = typeof val === 'number' ? val : Number((val as Record<string, unknown>)?.limit ?? 0);
     }
     setAssignments(normalized);
     setAssignSearch('');
@@ -1682,33 +1683,33 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     return Array.from(brands).sort();
   }, [campaigns]);
 
-  // Active Inventory = agency-created campaigns OR campaigns with sub-mediator assignments OR openToAll distributed
+  // Active Inventory = drafts (for editing) OR campaigns with sub-mediator assignments OR openToAll distributed
+  // Agency-created campaigns without assignments appear in "Offered by Brands" first for allocation.
   const activeInventory = useMemo(() => {
     const base = campaigns.filter(
       (c: Campaign) =>
         c.allowedAgencies.includes(user.mediatorCode ?? '') &&
         (
           c.status === 'Draft' ||
-          String(c.brandId || '') === String(user.id || '') ||
           c.openToAll ||
           Object.keys(c.assignments || {}).some((code) => myMediatorCodes.includes(code.toLowerCase()))
         )
     );
     return applyFilters(base);
-  }, [campaigns, user.mediatorCode, user.id, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
+  }, [campaigns, user.mediatorCode, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
 
-  // Offered by Brands = external brand campaigns without assignments, not self-created, not openToAll distributed
+  // Offered by Brands = published campaigns without sub-mediator assignments, not openToAll.
+  // Includes agency-created campaigns before they are allocated to mediators.
   const offeredCampaigns = useMemo(() => {
     const base = campaigns.filter(
       (c: Campaign) =>
         c.allowedAgencies.includes(user.mediatorCode ?? '') &&
         c.status !== 'Draft' &&
-        String(c.brandId || '') !== String(user.id || '') &&
         !c.openToAll &&
         !Object.keys(c.assignments || {}).some((code) => myMediatorCodes.includes(code.toLowerCase()))
     );
     return applyFilters(base);
-  }, [campaigns, user.mediatorCode, user.id, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
+  }, [campaigns, user.mediatorCode, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
 
   // New Campaign Form
   const [newCampaign, setNewCampaign] = useState({
@@ -1885,7 +1886,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     active.forEach((m: User, index: number) => {
       let amount = perUser;
       if (index < remainder) amount += 1;
-      newAssignments[m.mediatorCode!] = amount;
+      newAssignments[m.mediatorCode!.toLowerCase()] = amount;
     });
     setAssignments(newAssignments);
     // Reset per-mediator overrides so everyone uses the global commission
@@ -2880,17 +2881,17 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                             step={1}
                             className={`w-20 p-2 text-center bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none transition-all group-hover/input:shadow-md ${isActive ? 'focus:border-purple-500 focus:bg-white focus:ring-4 focus:ring-purple-100' : 'cursor-not-allowed'}`}
                             placeholder={commissionToMediator || '0'}
-                            value={mediatorPayouts[m.mediatorCode!] ?? ''}
+                            value={mediatorPayouts[m.mediatorCode!.toLowerCase()] ?? ''}
                             disabled={!isActive}
                             onChange={(e) =>
                               setMediatorPayouts({
                                 ...mediatorPayouts,
-                                [m.mediatorCode!]: e.target.value,
+                                [m.mediatorCode!.toLowerCase()]: e.target.value,
                               })
                             }
                           />
                         </div>
-                        {mediatorPayouts[m.mediatorCode!]?.trim() && (
+                        {mediatorPayouts[m.mediatorCode!.toLowerCase()]?.trim() && (
                           <span className="text-[10px] text-purple-500 font-bold mt-0.5">Override</span>
                         )}
                       </div>
@@ -2905,12 +2906,13 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                             step={1}
                             className={`w-36 p-2 text-center bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none transition-all group-hover/input:shadow-md ${isActive ? 'focus:border-purple-500 focus:bg-white focus:ring-4 focus:ring-purple-100' : 'cursor-not-allowed'}`}
                             placeholder="0"
-                            value={assignments[m.mediatorCode!] || ''}
+                            value={assignments[m.mediatorCode!.toLowerCase()] || ''}
                             disabled={!isActive}
                             onChange={(e) =>
                               {
                                 const nextRaw = parseInt(e.target.value) || 0;
-                                const currentVal = Number(assignments[m.mediatorCode!] || 0);
+                                const mKey = m.mediatorCode!.toLowerCase();
+                                const currentVal = Number(assignments[mKey] || 0);
                                 const remaining = Math.max(0, availableForAssign - (assignedTotal - currentVal));
                                 const nextVal = Math.max(0, Math.min(nextRaw, remaining));
                                 if (nextRaw > nextVal) {
@@ -2918,26 +2920,27 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                                 }
                                 setAssignments({
                                   ...assignments,
-                                  [m.mediatorCode!]: nextVal,
+                                  [mKey]: nextVal,
                                 });
                               }
                             }
                             onBlur={(e) => {
                               const nextRaw = parseInt(e.target.value) || 0;
-                              const currentVal = Number(assignments[m.mediatorCode!] || 0);
+                              const mKey = m.mediatorCode!.toLowerCase();
+                              const currentVal = Number(assignments[mKey] || 0);
                               const remaining = Math.max(0, availableForAssign - (assignedTotal - currentVal));
                               const nextVal = Math.max(0, Math.min(nextRaw, remaining));
                               if (nextVal !== currentVal) {
                                 setAssignments({
                                   ...assignments,
-                                  [m.mediatorCode!]: nextVal,
+                                  [mKey]: nextVal,
                                 });
                               }
                             }}
                           />
                         </div>
                         <span className="text-[10px] text-slate-400 font-bold mt-1">
-                          Current: {assignModal?.assignments?.[m.mediatorCode!] || 0}
+                          Current: {assignModal?.assignments?.[m.mediatorCode!.toLowerCase()] || assignModal?.assignments?.[m.mediatorCode!] || 0}
                         </span>
                       </div>
                     </div>
