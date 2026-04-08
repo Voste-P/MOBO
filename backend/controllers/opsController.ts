@@ -385,18 +385,23 @@ export function makeOpsController(env: Env) {
                 `;
             matchingIds = rows.map((r) => r.id);
           } else {
-            // Mediator: only show campaigns where this mediator has an explicit slot assignment.
-            // Agency-level targeting (allowed_agency_codes) is visible to the agency only;
-            // mediators see campaigns after the agency distributes slots to them.
+            // Lowercase code to match assignment keys (assignSlots lowercases them)
             const codeLower = code.toLowerCase();
+            // Also check parent agency — campaigns targeted to an agency should be visible to its mediators
+            const parentAgency = roles.includes('mediator')
+              ? await getAgencyCodeForMediatorCode(code)
+              : null;
+            const agencyCodes = [code, ...(parentAgency ? [parentAgency] : [])].filter(Boolean);
             const rows = statusFilter
               ? await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false AND status = ${statusFilter}
-                  AND (jsonb_exists(assignments, ${codeLower}) OR "open_to_all" = true)
+                  AND (EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))
+                       OR jsonb_exists(assignments, ${codeLower}))
                 `
               : await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false
-                  AND (jsonb_exists(assignments, ${codeLower}) OR "open_to_all" = true)
+                  AND (EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))
+                       OR jsonb_exists(assignments, ${codeLower}))
                 `;
             matchingIds = rows.map((r) => r.id);
           }
@@ -2687,8 +2692,17 @@ export function makeOpsController(env: Env) {
           const slotAssignment = findAssignmentForMediator(campaign.assignments, requestedCode);
           const hasAssignment = !!slotAssignment && Number((slotAssignment as any)?.limit ?? 0) > 0;
 
-          // Consistent with getCampaigns: mediator must have explicit slot assignment OR campaign is openToAll
-          const isAllowed = hasAssignment || !!campaign.openToAll;
+          const agencyCode = normalizeCode((requester as any)?.parentCode);
+          const allowedCodesRaw = Array.isArray(campaign.allowedAgencyCodes) ? campaign.allowedAgencyCodes : [];
+          const allowedCodes = new Set(
+            allowedCodesRaw
+              .map((c: unknown) => normalizeCode(c))
+              .filter((c: string): c is string => Boolean(c))
+              .map((c: string) => c.toLowerCase())
+          );
+
+          // "Open to All" campaigns still require agency membership — they just skip per-mediator slot assignment
+          const isAllowed = (agencyCode && allowedCodes.has(agencyCode.toLowerCase())) || allowedCodes.has(selfCode.toLowerCase()) || hasAssignment;
           if (!isAllowed) {
             throw new AppError(403, 'FORBIDDEN', 'Campaign not assigned to your network');
           }
