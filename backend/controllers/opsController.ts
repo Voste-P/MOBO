@@ -387,21 +387,17 @@ export function makeOpsController(env: Env) {
           } else {
             // Lowercase code to match assignment keys (assignSlots lowercases them)
             const codeLower = code.toLowerCase();
-            // Also check parent agency — campaigns targeted to an agency should be visible to its mediators
-            const parentAgency = roles.includes('mediator')
-              ? await getAgencyCodeForMediatorCode(code)
-              : null;
-            const agencyCodes = [code, ...(parentAgency ? [parentAgency] : [])].filter(Boolean);
+            // Mediators should ONLY see campaigns where they have explicit slot assignments.
+            // Campaigns targeted at their parent agency but without mediator allocation
+            // belong in the agency's "Offers by Brand" view, not the mediator's deal list.
             const rows = statusFilter
               ? await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false AND status = ${statusFilter}
-                  AND (EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))
-                       OR jsonb_exists(assignments, ${codeLower}))
+                  AND jsonb_exists(assignments, ${codeLower})
                 `
               : await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false
-                  AND (EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))
-                       OR jsonb_exists(assignments, ${codeLower}))
+                  AND jsonb_exists(assignments, ${codeLower})
                 `;
             matchingIds = rows.map((r) => r.id);
           }
@@ -1748,33 +1744,21 @@ export function makeOpsController(env: Env) {
           throw new AppError(409, 'INVALID_WORKFLOW_STATE', `Cannot settle in state ${wf}`);
         }
 
-        let isOverLimit = false;
-        if (campaignId && mediatorCode) {
-          if (campaign) {
-            const assignmentsObj = campaign.assignments && typeof campaign.assignments === 'object'
-              ? campaign.assignments as any
-              : {};
-            const rawAssigned = assignmentsObj?.[mediatorCode];
-            const assignedLimit =
-              typeof rawAssigned === 'number' ? rawAssigned : Number(rawAssigned?.limit ?? 0);
-
-            if (assignedLimit > 0) {
-              const settledCount = await db().order.count({
-                where: {
-                  managerName: mediatorCode,
-                  items: { some: { campaignId } },
-                  OR: [{ affiliateStatus: 'Approved_Settled' }, { paymentStatus: 'Paid' }],
-                  id: { not: order.id },
-                  isDeleted: false,
-                },
-              });
-              if (settledCount >= assignedLimit) isOverLimit = true;
-            }
-          }
+        // Compute the assigned cap limit for this mediator (checked atomically inside transaction)
+        let assignedLimit = 0;
+        if (campaignId && mediatorCode && campaign) {
+          const assignmentsObj = campaign.assignments && typeof campaign.assignments === 'object'
+            ? campaign.assignments as any
+            : {};
+          const rawAssigned = assignmentsObj?.[mediatorCode];
+          assignedLimit =
+            typeof rawAssigned === 'number' ? rawAssigned : Number(rawAssigned?.limit ?? 0);
         }
 
+        let isOverLimit = false;
+
         // Money movements (wallet mode only)
-        if (!isOverLimit && settlementMode === 'wallet') {
+        if (settlementMode === 'wallet') {
           if (!productId) {
             throw new AppError(409, 'MISSING_DEAL_ID', 'Order is missing deal reference');
           }
@@ -1835,6 +1819,27 @@ export function makeOpsController(env: Env) {
             if (guard.count === 0) {
               throw new AppError(409, 'CONCURRENT_SETTLEMENT', 'Order was already settled or modified');
             }
+
+            // Settlement cap check INSIDE transaction to prevent TOCTOU race.
+            // Two concurrent settlements could both pass a pre-transaction count check,
+            // exceeding the mediator's assigned limit. Checking inside the serialized
+            // transaction guarantees atomicity.
+            if (assignedLimit > 0 && campaignId && mediatorCode) {
+              const settledCount = await tx.order.count({
+                where: {
+                  managerName: mediatorCode,
+                  items: { some: { campaignId } },
+                  OR: [{ affiliateStatus: 'Approved_Settled' }, { paymentStatus: 'Paid' }],
+                  id: { not: order.id },
+                  isDeleted: false,
+                },
+              });
+              if (settledCount >= assignedLimit) {
+                isOverLimit = true;
+                return; // exit transaction — no wallet movements
+              }
+            }
+
             await applyWalletDebit({
               idempotencyKey: `order-settlement-debit-${order.id}-c${settleCycle}`,
               type: 'order_settlement_debit',
@@ -2702,6 +2707,14 @@ export function makeOpsController(env: Env) {
 
         if (payoutPaise < 0) {
           throw new AppError(400, 'INVALID_PAYOUT', 'Cannot publish deal with negative payout.');
+        }
+
+        if (commissionPaise < 0) {
+          throw new AppError(400, 'INVALID_COMMISSION', 'Commission cannot be negative.');
+        }
+
+        if (commissionPaise > payoutPaise) {
+          throw new AppError(400, 'COMMISSION_EXCEEDS_PAYOUT', 'Commission cannot exceed the payout amount.');
         }
 
         const netEarnings = payoutPaise + commissionPaise;

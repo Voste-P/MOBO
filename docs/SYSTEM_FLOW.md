@@ -149,6 +149,8 @@ Brand                    Agency                   Mediator
 - Deals have limited slots per mediator
 - One active deal per product per agency at a time
 - Campaigns can be paused/resumed by Brand or Admin
+- **Mediators only see campaigns where they have explicit slot assignments** — agency-level access alone is not sufficient for visibility
+- Commission cannot exceed the payout amount when publishing a deal
 
 ### C. Buyer Purchase Lifecycle
 
@@ -408,7 +410,7 @@ logs/
 | **Authorization**      | Role-based access control (RBAC) on every route                   |
 | **Zero-trust tokens**  | Role verified from DB on every request (not just JWT claims)      |
 | **Cascade suspension** | Upstream suspension blocks downstream access                      |
-| **Rate limiting**      | Per-IP and per-user rate limits on sensitive endpoints            |
+| **Rate limiting**      | Per-IP and per-user rate limits; stricter per-user financial rate limit on settlement/payout endpoints |
 | **CORS**               | Strict origin whitelist                                           |
 | **Helmet**             | Security headers (CSP, HSTS, X-Frame-Options)                     |
 | **Input validation**   | Zod schemas on all request bodies                                 |

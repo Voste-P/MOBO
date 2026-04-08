@@ -218,7 +218,8 @@ export function optionalAuth(env: Env) {
 
 export function requireRoles(...required: Role[]) {
   return (req: Request, _res: Response, next: NextFunction) => {
-    const roles = req.auth?.roles || [];
+    const rawRoles = req.auth?.roles || [];
+    const roles = rawRoles.map((r) => String(r).toLowerCase() as Role);
     const ok = required.some((r) => roles.includes(r));
     if (!ok) {
       logAccessEvent('RESOURCE_DENIED', {

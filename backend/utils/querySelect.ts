@@ -318,13 +318,18 @@ export async function getProofFlags(
 ): Promise<Map<string, { hasOrderProof: boolean; hasReviewProof: boolean; hasRatingProof: boolean; hasReturnWindowProof: boolean }>> {
   if (orderIds.length === 0) return new Map();
 
+  // Guard against unbounded arrays — callers should never pass more than 10 000 IDs
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const validIds = orderIds.filter((id) => UUID_RE.test(id)).slice(0, 10_000);
+  if (validIds.length === 0) return new Map();
+
   const rows: Array<{ id: string; hop: boolean; hrp: boolean; hrap: boolean; hrwp: boolean }> =
     await prisma.$queryRaw`SELECT id,
         (screenshot_order IS NOT NULL OR screenshot_payment IS NOT NULL) AS hop,
         (review_link IS NOT NULL OR screenshot_review IS NOT NULL) AS hrp,
         (screenshot_rating IS NOT NULL) AS hrap,
         (screenshot_return_window IS NOT NULL) AS hrwp
-       FROM orders WHERE id = ANY(${orderIds}::uuid[])`;
+       FROM orders WHERE id = ANY(${validIds}::uuid[])`;
 
   const map = new Map<string, { hasOrderProof: boolean; hasReviewProof: boolean; hasRatingProof: boolean; hasReturnWindowProof: boolean }>();
   for (const r of rows) {
