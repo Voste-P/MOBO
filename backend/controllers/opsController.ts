@@ -1359,8 +1359,7 @@ export function makeOpsController(env: Env) {
           // Allow agency rejection even if AI already auto-verified the proof.
           // Clear proof data and verification so buyer can re-upload.
           updateData.screenshotOrder = null;
-          updateData.verifiedAt = null;
-          updateData.verifiedBy = null;
+          updateData.orderAiVerification = null;
           if (v.order) { v.order = undefined; }
         } else {
           if (!v.order?.verifiedAt) {
