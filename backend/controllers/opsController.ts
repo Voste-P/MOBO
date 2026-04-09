@@ -507,7 +507,7 @@ export function makeOpsController(env: Env) {
         }
 
         const { limit: dLimit, skip: dSkip, page: dPage, isPaginated: dIsPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
-        const dealWhere = { mediatorCode: { in: mediatorCodes }, isDeleted: false as const };
+        const dealWhere = { mediatorCode: { in: mediatorCodes }, isDeleted: false as const, campaign: { isDeleted: false } };
         const [deals, dealTotal] = await Promise.all([
           db().deal.findMany({
             where: dealWhere,

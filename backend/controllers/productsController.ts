@@ -36,6 +36,7 @@ export function makeProductsController() {
           mediatorCode: { equals: mediatorCode, mode: 'insensitive' as const },
           active: true,
           isDeleted: false,
+          campaign: { isDeleted: false },
         };
 
         const [deals, total, mediatorUser] = await Promise.all([
