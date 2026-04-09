@@ -33,8 +33,8 @@ test.describe('Google OAuth & Sheets export API', () => {
     const res = await request.get('/api/google/auth', {
       headers: authHeaders(shopperToken),
     });
-    // Returns auth URL or error if Google not configured
-    expect(res.status()).toBeLessThan(500);
+    // Returns auth URL or 503 if Google not configured
+    expect(res.status() < 500 || res.status() === 503).toBeTruthy();
   });
 
   test('Google status requires auth', async ({ request }) => {

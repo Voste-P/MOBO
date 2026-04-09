@@ -28,7 +28,7 @@ test.describe('AI verification endpoints', () => {
     const res = await request.get('/api/ai/status');
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
-    expect(body).toHaveProperty('status');
+    expect(body).toHaveProperty('configured');
   });
 
   // ── Chat endpoint requires auth or is optional ────────────────
@@ -37,8 +37,8 @@ test.describe('AI verification endpoints', () => {
       headers: authHeaders(buyerToken),
       data: { message: '' },
     });
-    // Should reject with 400 or return validation error
-    expect([400, 422].includes(res.status()) || res.ok()).toBeTruthy();
+    // Should reject with 400/422 or 503 (AI not configured) or return validation error
+    expect([400, 422, 503].includes(res.status()) || res.ok()).toBeTruthy();
   });
 
   // ── Verify proof requires auth ────────────────────────────────
