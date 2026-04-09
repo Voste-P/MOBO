@@ -1149,7 +1149,7 @@ export function makeOrdersController(env: Env) {
 
           // â”€â”€ Auto-verify by AI confidence â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           // Only auto-verify when AI confidence meets the threshold.
-          const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
+          const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 80;
           if (aiOrderConfidence >= autoThreshold) {
             const freshOrder = await db().order.findFirst({
               where: { id: orderId, isDeleted: false },
@@ -1884,7 +1884,7 @@ export function makeOrdersController(env: Env) {
         // Also auto-verify the proof step if AI passed hard-block validation.
         if (wf === 'APPROVED') {
           // Auto-verify the submitted proof step for audit trail completeness
-          if (claimAiConfidence >= (env.AI_AUTO_VERIFY_THRESHOLD ?? 90)) {
+          if (claimAiConfidence >= (env.AI_AUTO_VERIFY_THRESHOLD ?? 80)) {
             const v = (order.verification && typeof order.verification === 'object')
               ? { ...(order.verification as any) } : {} as any;
             const vKey = body.type === 'order' ? 'order' : body.type;
@@ -1943,7 +1943,7 @@ export function makeOrdersController(env: Env) {
           // Individual step auto-verify triggers at AI_AUTO_VERIFY_THRESHOLD (80%).
           // Below that, attemptBulkAutoVerify still runs (threshold 70%) â€” so orders
           // where ALL proofs score 70-79% can auto-approve without mediator review.
-          const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
+          const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 80;
           if (claimAiConfidence >= autoThreshold && refreshed) {
             refreshed = await autoVerifyStep(refreshed, body.type, claimAiConfidence, autoThreshold, env);
           }
@@ -2004,7 +2004,7 @@ export function makeOrdersController(env: Env) {
         // Invoke for any positive confidence: individual step needs 80%, but
         // attemptBulkAutoVerify (inside autoVerifyStep) uses 70% baseline.
         let claimFinalOrder: any = afterReview;
-        const autoThreshold2 = env.AI_AUTO_VERIFY_THRESHOLD ?? 90;
+        const autoThreshold2 = env.AI_AUTO_VERIFY_THRESHOLD ?? 80;
         if (claimAiConfidence >= autoThreshold2 && afterReview) {
           const freshOrder = await db().order.findFirst({
             where: { id: order.id, isDeleted: false },
