@@ -49,7 +49,7 @@ test.describe('Admin configuration & invite management API', () => {
   test('admin can create an invite', async ({ request }) => {
     const res = await request.post('/api/admin/invites', {
       headers: authHeaders(adminToken),
-      data: { type: 'agency' },
+      data: { role: 'agency' },
     });
     // May succeed or need different params — but no 500
     expect(res.status()).toBeLessThan(500);

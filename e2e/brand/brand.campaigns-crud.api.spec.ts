@@ -53,8 +53,15 @@ test.describe('Brand campaign & payout management API', () => {
       headers: authHeaders(brandToken),
       data: {
         title: `E2E Brand Campaign ${Date.now()}`,
+        platform: 'Amazon',
         dealType: 'Discount',
-        budget: 5000,
+        price: 999,
+        originalPrice: 1200,
+        payout: 100,
+        image: 'https://placehold.co/600x400',
+        productUrl: 'https://example.com/product',
+        totalSlots: 10,
+        allowedAgencies: ['AG_TEST'],
       },
     });
     // May need agency association — but should not 500
@@ -64,7 +71,7 @@ test.describe('Brand campaign & payout management API', () => {
   test('brand can copy a campaign', async ({ request }) => {
     const res = await request.post('/api/brand/campaigns/copy', {
       headers: authHeaders(brandToken),
-      data: { campaignId: 'nonexistent-id' },
+      data: { id: 'nonexistent-id' },
     });
     expect(res.status()).toBeLessThan(500);
   });

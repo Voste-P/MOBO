@@ -36,12 +36,17 @@ test.describe('Ops campaign & deal management API', () => {
       headers: authHeaders(agencyToken),
       data: {
         title: `E2E Campaign ${Date.now()}`,
-        brandId: 'e2e-brand-placeholder',
-        budget: 10000,
+        platform: 'Amazon',
         dealType: 'Discount',
+        price: 999,
+        originalPrice: 1200,
+        payout: 100,
+        image: 'https://placehold.co/600x400',
+        productUrl: 'https://example.com/product',
+        totalSlots: 10,
       },
     });
-    // May succeed or fail if brandId doesn't exist — but should not be 500
+    // May succeed or fail based on business rules — but should not be 500
     if (res.ok()) {
       const body = await res.json();
       _createdCampaignId = body.campaign?.id ?? body.id;

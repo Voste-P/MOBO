@@ -30,13 +30,10 @@ test.describe('Wallet & financial operations', () => {
     });
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
-    const wallet = body.user?.wallet;
-    // wallet may be null for fresh users, but the field should exist
-    expect(body.user).toHaveProperty('wallet');
-    if (wallet) {
-      expect(typeof wallet.balancePaise).toBe('number');
-      expect(wallet.balancePaise).toBeGreaterThanOrEqual(0);
-    }
+    // /api/auth/me returns flat walletBalance (rupees) and walletPending (rupees)
+    expect(body.user).toHaveProperty('walletBalance');
+    expect(typeof body.user.walletBalance).toBe('number');
+    expect(body.user.walletBalance).toBeGreaterThanOrEqual(0);
   });
 
   // ── Admin can view financial summary ──────────────────────────
