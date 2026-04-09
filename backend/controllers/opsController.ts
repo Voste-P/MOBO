@@ -1922,6 +1922,26 @@ export function makeOpsController(env: Env) {
               },
             });
           }, { timeout: 15000 });
+
+          // If cap was exceeded inside the wallet transaction, the tx exited early
+          // without updating order status. Handle it here to keep order consistent.
+          if (isOverLimit) {
+            const capEvents = pushOrderEvent(order.events as any, {
+              type: 'CAP_EXCEEDED',
+              at: new Date(),
+              actorUserId: req.auth?.userId,
+              metadata: { settlementMode },
+            });
+            await db().order.update({
+              where: { id: order.id },
+              data: {
+                paymentStatus: 'Failed',
+                affiliateStatus: 'Cap_Exceeded',
+                settlementMode,
+                events: capEvents as any,
+              },
+            });
+          }
         } else {
           // Cap-exceeded or external: no wallet movement, just update order status
           const newEvents1 = pushOrderEvent(order.events as any, {

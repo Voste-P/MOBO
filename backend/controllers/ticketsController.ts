@@ -71,7 +71,7 @@ async function enrichTickets(tickets: any[]): Promise<any[]> {
 async function buildTicketAudience(ticket: any) {
   const privilegedRoles: Role[] = ['admin', 'ops'];
   const userIds = new Set<string>();
-  const ticketOwnerId = String(ticket?.id || '').trim();
+  const ticketOwnerId = String(ticket?.userId || '').trim();
 
   let mediatorCodes: string[] | undefined;
   let agencyCodes: string[] | undefined;

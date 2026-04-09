@@ -220,15 +220,16 @@ export function makeAdminController() {
         }
 
         const fetchStats = async () => {
-        // Set a 10-second statement timeout to prevent slow queries from blocking
-        await db().$executeRaw`SET LOCAL statement_timeout = '10s'`;
-        const [roleCounts, orderStats] = await Promise.all([
-          db().$queryRaw<Array<{ role: string; count: number }>>`
+        // Wrap in a transaction so SET LOCAL statement_timeout applies to all queries
+        const [roleCounts, orderStats] = await db().$transaction(async (tx) => {
+          await tx.$executeRaw`SET LOCAL statement_timeout = '10s'`;
+          return Promise.all([
+            tx.$queryRaw<Array<{ role: string; count: number }>>`
             SELECT r AS role, COUNT(*)::int AS count
             FROM "users", UNNEST(roles) AS r
             WHERE "is_deleted" = false
             GROUP BY r`,
-          db().$queryRaw<Array<{ total_orders: number; total_revenue_paise: number; pending_revenue_paise: number; risk_orders: number }>>`
+            tx.$queryRaw<Array<{ total_orders: number; total_revenue_paise: number; pending_revenue_paise: number; risk_orders: number }>>`
             SELECT
               COUNT(*)::int AS total_orders,
               COALESCE(SUM("total_paise"), 0)::int AS total_revenue_paise,
@@ -236,7 +237,8 @@ export function makeAdminController() {
               COALESCE(SUM(CASE WHEN "affiliate_status"::text = 'Unchecked' THEN 1 ELSE 0 END), 0)::int AS risk_orders
             FROM "orders"
             WHERE "is_deleted" = false`,
-        ]);
+          ]);
+        });
 
         const counts: any = { total: 0, user: 0, mediator: 0, agency: 0, brand: 0 };
         for (const rc of roleCounts) {
