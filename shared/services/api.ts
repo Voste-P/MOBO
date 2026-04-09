@@ -813,14 +813,14 @@ export const api = {
       // First attempt: 60s timeout
       try {
         return await attemptExtraction(60_000);
-      } catch (err: any) {
-        const isTimeout = err?.name === 'AbortError' || /timed?\s*out|took too long/i.test(err?.message || '');
+      } catch (err: unknown) {
+        const isTimeout = err instanceof Error && (err.name === 'AbortError' || /timed?\s*out|took too long/i.test(err.message));
         if (!isTimeout) throw err;
         // Auto-retry once on timeout (server may have just finished cold-starting)
         try {
           return await attemptExtraction(60_000);
-        } catch (retryErr: any) {
-          const isRetryTimeout = retryErr?.name === 'AbortError' || /timed?\s*out|took too long/i.test(retryErr?.message || '');
+        } catch (retryErr: unknown) {
+          const isRetryTimeout = retryErr instanceof Error && (retryErr.name === 'AbortError' || /timed?\s*out|took too long/i.test(retryErr.message));
           if (isRetryTimeout) {
             throw new Error('Screenshot analysis timed out after retrying. The server may be under heavy load — please try again in a minute.');
           }

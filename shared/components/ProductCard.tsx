@@ -210,7 +210,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
       setSubmitted(true);
       toast.success('Order submitted! Track it in the Orders tab.');
       setTimeout(resetForm, 1500);
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(formatErrorMessage(err, 'Failed to submit order. Try again.'));
     } finally {
       setSubmitting(false);
@@ -265,13 +265,13 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                 <Star
                   key={`star-${i}`}
                   size={12}
-                  fill={i < Math.floor(product.rating || 5) ? 'currentColor' : 'none'}
-                  strokeWidth={i < Math.floor(product.rating || 5) ? 0 : 1.5}
-                  className={i < Math.floor(product.rating || 5) ? '' : 'text-slate-200'}
+                  fill={i < Math.floor(product.rating ?? 5) ? 'currentColor' : 'none'}
+                  strokeWidth={i < Math.floor(product.rating ?? 5) ? 0 : 1.5}
+                  className={i < Math.floor(product.rating ?? 5) ? '' : 'text-slate-200'}
                 />
               ))}
             </div>
-            <span className="text-[10px] font-bold text-slate-400">({product.rating || 5})</span>
+            <span className="text-[10px] font-bold text-slate-400">({product.rating ?? 5})</span>
           </div>
 
           <div>

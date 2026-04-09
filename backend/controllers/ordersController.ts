@@ -836,13 +836,13 @@ export function makeOrdersController(env: Env) {
               );
             }
             aiOrderConfidence = verification?.confidenceScore ?? 0;
-          } catch (aiErr: any) {
+          } catch (aiErr: unknown) {
             // Re-throw validation errors (422s) — those are intentional user-facing blocks
             if (aiErr instanceof AppError) throw aiErr;
             // Infrastructure failure (Gemini down, OCR crash, timeout) — let order proceed
             // for manual review instead of blocking the buyer
             orderLog.warn('[createOrder] AI verification unavailable, proceeding for manual review', {
-              error: aiErr?.message,
+              error: aiErr instanceof Error ? aiErr.message : String(aiErr),
               orderId: resolvedExternalOrderId,
             });
             aiUnavailable = true;
@@ -1516,13 +1516,13 @@ export function makeOrdersController(env: Env) {
                   'Please upload a FULL screenshot showing the complete review page including the page header and account name. ' +
                   (ratingAiResult.discrepancyNote || ''));
               }
-              } catch (aiErr: any) {
+              } catch (aiErr: unknown) {
                 // Re-throw user-facing validation errors (422s)
                 if (aiErr instanceof AppError) throw aiErr;
                 // Infrastructure failure (OCR capacity, Gemini down, timeout) — accept proof
                 // for manual mediator review instead of blocking the buyer
                 orderLog.warn('[submitClaim] Rating AI verification unavailable, proceeding for manual review', {
-                  error: aiErr?.message, orderId: order.id,
+                  error: aiErr instanceof Error ? aiErr.message : String(aiErr), orderId: order.id,
                 });
               }
             }
@@ -1657,13 +1657,13 @@ export function makeOrdersController(env: Env) {
                     ` [Server: Return window should not be closed yet — ${daysRemaining} day(s) remaining per order records.]`;
                 }
               }
-              } catch (aiErr: any) {
+              } catch (aiErr: unknown) {
                 // Re-throw user-facing validation errors (422s)
                 if (aiErr instanceof AppError) throw aiErr;
                 // Infrastructure failure (OCR capacity, Gemini down, timeout) — accept proof
                 // for manual mediator review instead of blocking the buyer
                 orderLog.warn('[submitClaim] Return window AI verification unavailable, proceeding for manual review', {
-                  error: aiErr?.message, orderId: order.id,
+                  error: aiErr instanceof Error ? aiErr.message : String(aiErr), orderId: order.id,
                 });
               }
             }
@@ -1757,13 +1757,13 @@ export function makeOrdersController(env: Env) {
                   'Please upload a FULL screenshot showing the complete order page including the page header. ' +
                   (aiOrderVerification.discrepancyNote || ''));
               }
-              } catch (aiErr: any) {
+              } catch (aiErr: unknown) {
                 // Re-throw user-facing validation errors (422s)
                 if (aiErr instanceof AppError) throw aiErr;
                 // Infrastructure failure (OCR capacity, Gemini down, timeout) — accept proof
                 // for manual mediator review instead of blocking the buyer
                 orderLog.warn('[submitClaim] Order re-upload AI verification unavailable, proceeding for manual review', {
-                  error: aiErr?.message, orderId: order.id,
+                  error: aiErr instanceof Error ? aiErr.message : String(aiErr), orderId: order.id,
                 });
               }
             }

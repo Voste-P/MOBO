@@ -105,8 +105,8 @@ export async function sendPushToUser(params: {
           },
           payload
         );
-      } catch (err: any) {
-        const status = Number(err?.statusCode || err?.status || 0);
+      } catch (err: unknown) {
+        const status = Number((err as { statusCode?: number; status?: number })?.statusCode || (err as { status?: number })?.status || 0);
         if (status === 404 || status === 410) {
           await removeInvalidSubscription(String(sub.endpoint || ''));
         }

@@ -2610,9 +2610,9 @@ export function makeOpsController(env: Env) {
           if (updated.count === 0) {
             throw new AppError(409, 'CONCURRENT_MODIFICATION', 'Campaign was modified concurrently, please retry');
           }
-        } catch (saveErr: any) {
+        } catch (saveErr: unknown) {
           if (saveErr instanceof AppError) throw saveErr;
-          if (saveErr?.code === 'P2025') {
+          if ((saveErr as { code?: string })?.code === 'P2025') {
             throw new AppError(409, 'CONCURRENT_MODIFICATION', 'Campaign was modified concurrently, please retry');
           }
           throw saveErr;

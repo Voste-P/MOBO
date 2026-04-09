@@ -192,7 +192,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
       toast.success('Order submitted! Track it in the Orders tab.');
       onSuccess?.();
       setTimeout(handleClose, 1200);
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(formatErrorMessage(err, 'Failed to submit order. Please try again.'));
     } finally {
       setSubmitting(false);

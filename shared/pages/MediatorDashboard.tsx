@@ -293,7 +293,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                         await api.ops.approveUser(u.id);
                         if (setPendingUsers) setPendingUsers(prev => prev.filter(p => p.id !== u.id));
                         onRefresh(['pending', 'verified']);
-                      } catch (e: any) { toast.error(formatErrorMessage(e, 'Failed to approve user')); }
+                      } catch (e: unknown) { toast.error(formatErrorMessage(e, 'Failed to approve user')); }
                     }}
                     className="w-10 h-10 rounded-lg bg-zinc-900 text-white flex items-center justify-center hover:bg-mobo-accent hover:text-black transition-all shadow-md active:scale-90"
                   >
@@ -308,7 +308,7 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                         await api.ops.rejectUser(u.id);
                         if (setPendingUsers) setPendingUsers(prev => prev.filter(p => p.id !== u.id));
                         onRefresh(['pending']);
-                      } catch (e: any) { toast.error(formatErrorMessage(e, 'Failed to reject user')); }
+                      } catch (e: unknown) { toast.error(formatErrorMessage(e, 'Failed to reject user')); }
                     }}
                     className="w-10 h-10 rounded-lg bg-zinc-50 text-zinc-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all active:scale-90"
                   >

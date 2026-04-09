@@ -1132,13 +1132,13 @@ const BrandsView = () => {
       setSuccessMsg(`Request sent to Brand ${code}.`);
       setBrandCode('');
       await refreshSession();
-    } catch (e: any) {
+    } catch (e: unknown) {
       // Idempotent UX: if it's already connected/pending, treat as success.
-      if (e?.code === 'ALREADY_REQUESTED') {
+      if ((e as { code?: string })?.code === 'ALREADY_REQUESTED') {
         setSuccessMsg(`Already connected or already pending for ${code}.`);
         setBrandCode('');
       } else {
-        setErrorMsg(String(e?.message || 'Failed to send request.'));
+        setErrorMsg(e instanceof Error ? e.message : 'Failed to send request.');
       }
     } finally {
       setLoading(false);
@@ -3052,7 +3052,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
       setRejectModal(null);
       setRejectReason('');
       onRefresh(['orders']);
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error(formatErrorMessage(e, 'Failed to reject proof'));
     } finally {
       setRejecting(false);
@@ -3065,7 +3065,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
       await api.ops.forceApproveOrder(order.id, 'Agency approved');
       toast.success('Order approved — moved to cooling period');
       onRefresh(['orders']);
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error(formatErrorMessage(e, 'Failed to approve order'));
     } finally {
       setApprovingId(null);

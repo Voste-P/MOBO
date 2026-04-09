@@ -120,10 +120,10 @@ export function sheetsRoutes(env: Env): Router {
       });
 
       return res.json(result);
-    } catch (err: any) {
+    } catch (err: unknown) {
       logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'EXTERNAL_SERVICE', severity: 'medium', userId: (req as any).auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'sheets/export' } });
       // Surface a clear error when Service Account auth is not configured
-      if (err?.message?.includes('GOOGLE_SHEETS_AUTH_MISSING')) {
+      if (err instanceof Error && err.message?.includes('GOOGLE_SHEETS_AUTH_MISSING')) {
         return res.status(503).json({
           error: {
             code: 'SHEETS_AUTH_NOT_CONFIGURED',

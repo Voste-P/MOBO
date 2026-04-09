@@ -598,8 +598,8 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
         logout();
         setAuthError('This account is not an admin. Please use the correct portal.');
       }
-    } catch (err: any) {
-      const msg = String(err?.message || '').trim();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message.trim() : '';
       setAuthError(msg || 'Invalid Admin Credentials');
     } finally {
       setIsAuthLoading(false);
@@ -661,7 +661,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       const updated = await api.admin.getUsers('all', { page: usersPage, limit: PAGE_SIZE });
       setUsers(asArray(updated));
       setUsersPagination(extractPaginationMeta(updated));
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error(formatErrorMessage(e, 'Failed to delete wallet'));
     } finally {
       setDeletingWalletId(null);
@@ -680,7 +680,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       const updated = await api.admin.getUsers('all', { page: usersPage, limit: PAGE_SIZE });
       setUsers(asArray(updated));
       setUsersPagination(extractPaginationMeta(updated));
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error(formatErrorMessage(e, 'Failed to delete user'));
     } finally {
       setDeletingUserId(null);
@@ -698,7 +698,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       const updated = await api.admin.getProducts({ page: productsPage, limit: PAGE_SIZE });
       setProducts(asArray(updated));
       setProductsPagination(extractPaginationMeta(updated));
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error(formatErrorMessage(e, 'Failed to delete product'));
     } finally {
       setDeletingProductId(null);
@@ -712,7 +712,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       toast.success(`Ticket ${status.toLowerCase()} successfully`);
       setResolvingTicketId(null);
       setResolutionNote('');
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error(formatErrorMessage(e, `Failed to ${status.toLowerCase()} ticket`));
     }
   };
@@ -730,7 +730,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       await api.tickets.delete(id);
       setTickets(tickets.filter((x) => x.id !== id));
       toast.success('Ticket deleted');
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error(formatErrorMessage(e, 'Failed to delete ticket'));
     }
   };
@@ -740,7 +740,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       await api.tickets.update(id, 'Open');
       setTickets(tickets.map((t) => (t.id === id ? { ...t, status: 'Open' as const } : t)));
       toast.success('Ticket reopened');
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error(formatErrorMessage(e, 'Failed to reopen ticket'));
     }
   };
@@ -781,7 +781,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       await api.admin.deleteInvite(code);
       setInvites(invites.filter((x) => x.code !== code));
       toast.success('Access code deleted');
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error(formatErrorMessage(e, 'Failed to delete access code'));
     }
   };
@@ -792,7 +792,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       const saved = await api.admin.updateConfig({ adminContactEmail: configEmail });
       if (saved?.adminContactEmail) setConfigEmail(String(saved.adminContactEmail));
       toast.success('System configuration saved');
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error(formatErrorMessage(e, 'Failed to save system configuration'));
     } finally {
       setIsLoading(false);

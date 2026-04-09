@@ -168,6 +168,16 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
       return false;
     }
 
+    // Guard: buyer commission must never exceed payout — prevents negative mediator margin
+    if (buyerCommissionPaise > payoutPaise) {
+      orderLog.error('[cooling-settler] Commission exceeds payout — data integrity issue, skipping', {
+        orderId: orderDisplayId,
+        payoutPaise,
+        buyerCommissionPaise,
+      });
+      return false;
+    }
+
     const buyerUserId = order.userId;
     const brandId = String(order.brandUserId || campaign?.brandUserId || '').trim();
     if (!buyerUserId || !brandId) {
@@ -463,10 +473,10 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
         if (didSettle) settled++;
         else skipped++;
         break;
-      } catch (err: any) {
-        const code = err?.code ?? '';
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code ?? '';
         const isTransient = code === 'P1017' || code === 'P1001' || code === 'P1008' || code === 'P2034'
-          || (err?.message && /deadlock|timeout|connection/i.test(err.message));
+          || (err instanceof Error && /deadlock|timeout|connection/i.test(err.message));
         if (isTransient && attempt < 2) {
           // eslint-disable-next-line no-await-in-loop
           await new Promise(r => setTimeout(r, 500 * (attempt + 1)));

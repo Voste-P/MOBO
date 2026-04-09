@@ -51,9 +51,9 @@ export async function ensureWallet(ownerUserId: string) {
       },
       select: { id: true, ownerUserId: true, availablePaise: true, pendingPaise: true, lockedPaise: true, currency: true, version: true },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Handle P2002 (unique constraint violation)
-    if (err?.code === 'P2002') {
+    if (err instanceof Error && 'code' in err && (err as { code?: string }).code === 'P2002') {
       const existing = await db.wallet.findUnique({ where: { ownerUserId }, select: { id: true, ownerUserId: true, availablePaise: true, pendingPaise: true, lockedPaise: true, currency: true, version: true } });
       if (existing) return existing;
     }
