@@ -2074,7 +2074,7 @@ export const MediatorDashboard: React.FC = () => {
       if (process.env.NODE_ENV !== 'production') console.error(e);
       if (!silent) {
         const msg = (e as Error)?.message ? String((e as Error).message) : 'Failed to refresh dashboard.';
-        toast.error(msg.includes('fetch') || msg.includes('network') ? 'Network error. Please check your connection.' : msg);
+        toast.error(msg.includes('fetch') || msg.includes('network') ? 'Network error. Check your connection and try again.' : msg);
       }
     } finally {
       for (const k of needed) inFlightRef.current.delete(k);

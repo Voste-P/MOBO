@@ -81,7 +81,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
         }
         return;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (mountedRef.current) setError(formatErrorMessage(err, 'Authentication failed'));
     } finally {
       if (mountedRef.current) setIsLoading(false);
@@ -96,7 +96,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
     setError('');
     try {
       await register(reg.name, reg.mobile, reg.password, reg.mediatorCode, questions);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (mountedRef.current) {
         setError(formatErrorMessage(err, 'Registration failed'));
         setView('register');

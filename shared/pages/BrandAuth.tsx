@@ -58,7 +58,7 @@ export const BrandAuthScreen: React.FC<BrandAuthProps> = ({ onBack }) => {
         setIsLoading(false);
         return;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(formatErrorMessage(err, 'Login failed'));
       setIsLoading(false);
     }
@@ -84,7 +84,7 @@ export const BrandAuthScreen: React.FC<BrandAuthProps> = ({ onBack }) => {
     setError('');
     try {
       await registerBrand(reg.name, reg.mobile, reg.password, reg.brandCode, questions);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(formatErrorMessage(err, 'Registration failed'));
       setView('register');
       setIsLoading(false);

@@ -310,11 +310,11 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
         relatedOrders: response.uiType === 'order_card' ? response.data : undefined,
         extractedValues: response.extractedValues,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       // If the request was aborted (user sent a new message), silently bail
-      if (err?.name === 'AbortError') return;
+      if (err instanceof Error && err.name === 'AbortError') return;
 
-      const code = String(err?.code || '').toUpperCase();
+      const code = String((err as { code?: string })?.code || '').toUpperCase();
       const isRate = code === 'RATE_LIMITED' || code === 'DAILY_LIMIT_REACHED' || code === 'TOO_FREQUENT';
       const lowerText = safeText.toLowerCase();
       if (lowerText.includes('deals')) {
@@ -669,7 +669,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                           <ProxiedImage loading="lazy"
                             src={order.items?.[0]?.image || ''}
                             className="w-full h-full object-contain mix-blend-multiply"
-                            alt=""
+                            alt={order.items?.[0]?.title || 'Order product image'}
                           />
                         </div>
                         <div className="min-w-0 flex-1">

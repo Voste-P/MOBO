@@ -47,8 +47,8 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
         setIsLoading(false);
         return;
       }
-    } catch (err: any) {
-      const code = (err as any)?.code;
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
       if (code === 'USER_NOT_ACTIVE') {
         setPendingMessage(
           'Your account is not active yet. If you joined using an agency code, please wait for agency approval.'
@@ -88,7 +88,7 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
       const result = await registerOps(reg.name, reg.mobile, reg.password, 'mediator', reg.agencyCode.toUpperCase(), questions);
 
       if (result && typeof result === 'object' && 'pendingApproval' in result && result.pendingApproval) {
-        const msg = (result as any)?.message;
+        const msg = (result as { message?: string })?.message;
         setPendingMessage(
           typeof msg === 'string' && msg.trim().length
             ? msg
@@ -98,7 +98,7 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
         setIsLoading(false);
         return;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(formatErrorMessage(err, 'Registration failed'));
       setView('register');
     } finally {

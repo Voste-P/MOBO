@@ -72,7 +72,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
 
   // Realtime: refresh products on deals.changed (debounce 1.5s to batch rapid changes)
   useEffect(() => {
-    let timer: any = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const unsub = subscribeRealtime((msg: any) => {
       if (msg.type === 'deals.changed') {
         if (timer) clearTimeout(timer);
@@ -83,7 +83,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
   }, [loadProducts]);
 
   useEffect(() => {
-    if (fetchError) toast.error('Failed to load deals. Please try again.');
+    if (fetchError) toast.error('Could not load deals. Check your connection and pull to refresh.');
   }, [fetchError]);
 
   const handlePullRefresh = useCallback(async () => {
@@ -232,7 +232,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6 scrollbar-styled overscroll-none" style={{ paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))' }} {...pullHandlers}>
+      <div className="flex-1 overflow-y-auto p-6 scrollbar-styled overscroll-none" style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom, 0px))' }} {...pullHandlers}>
         <PullToRefreshIndicator distance={pullDistance} isRefreshing={isRefreshing} />
         {loading ? (
           <div className="flex flex-col items-center gap-6">

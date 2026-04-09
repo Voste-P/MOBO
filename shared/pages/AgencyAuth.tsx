@@ -58,7 +58,7 @@ export const AgencyAuthScreen: React.FC<AgencyAuthProps> = ({ onBack }) => {
         setIsLoading(false);
         return;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(formatErrorMessage(err, 'Login failed'));
       setIsLoading(false);
     }
@@ -84,7 +84,7 @@ export const AgencyAuthScreen: React.FC<AgencyAuthProps> = ({ onBack }) => {
     setError('');
     try {
       await registerOps(reg.name, reg.mobile, reg.password, 'agency', reg.adminCode.toUpperCase(), questions);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(formatErrorMessage(err, 'Registration failed'));
       setView('register');
       setIsLoading(false);
