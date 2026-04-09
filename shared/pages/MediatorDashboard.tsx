@@ -1368,7 +1368,7 @@ const MediatorProfileView = () => {
       toast.error('Please enter a valid bank account number (9-18 digits)');
       return;
     }
-    if (upiId && !/^[\w.\-]+@[\w.\-]+$/.test(upiId)) {
+    if (upiId && !/^[\w.-]+@[\w.-]+$/.test(upiId)) {
       toast.error('Please enter a valid UPI ID (e.g. name@upi)');
       return;
     }

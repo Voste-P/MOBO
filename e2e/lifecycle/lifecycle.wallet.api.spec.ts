@@ -6,7 +6,6 @@ const authHeaders = (token: string) => ({ Authorization: `Bearer ${token}` });
 
 test.describe('Wallet & financial operations', () => {
   let buyerToken: string;
-  let buyerUser: any;
   let adminToken: string;
 
   test.beforeAll(async ({ request }) => {
@@ -21,7 +20,6 @@ test.describe('Wallet & financial operations', () => {
       }),
     ]);
     buyerToken = buyer.accessToken;
-    buyerUser = buyer.user;
     adminToken = admin.accessToken;
   });
 

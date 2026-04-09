@@ -8,7 +8,7 @@ test.describe('Ops order operations API', () => {
   let agencyToken: string;
   let mediatorToken: string;
   let buyerToken: string;
-  let adminToken: string;
+  let _adminToken: string;
 
   test.beforeAll(async ({ request }) => {
     const [agency, mediator, buyer, admin] = await Promise.all([
@@ -32,7 +32,7 @@ test.describe('Ops order operations API', () => {
     agencyToken = agency.accessToken;
     mediatorToken = mediator.accessToken;
     buyerToken = buyer.accessToken;
-    adminToken = admin.accessToken;
+    _adminToken = admin.accessToken;
   });
 
   // ── Order verification ────────────────────────────────────────

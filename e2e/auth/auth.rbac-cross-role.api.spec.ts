@@ -164,15 +164,7 @@ test.describe('Cross-role RBAC enforcement', () => {
   });
 
   // ── All roles can access their /me ────────────────────────────
-  const roleTokenMap = () => [
-    { role: 'admin', token: adminToken },
-    { role: 'agency', token: agencyToken },
-    { role: 'mediator', token: mediatorToken },
-    { role: 'brand', token: brandToken },
-    { role: 'buyer', token: buyerToken },
-  ];
-
-  for (const { role, token } of [
+  for (const { role } of [
     { role: 'admin', token: '' },
     { role: 'agency', token: '' },
     { role: 'mediator', token: '' },

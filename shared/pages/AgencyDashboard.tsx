@@ -166,7 +166,7 @@ const AgencyProfile = ({ user }: { user: User }) => {
       toast.error('Please enter a valid bank account number (9-18 digits)');
       return;
     }
-    if (form.upiId && !/^[\w.\-]+@[\w.\-]+$/.test(form.upiId)) {
+    if (form.upiId && !/^[\w.-]+@[\w.-]+$/.test(form.upiId)) {
       toast.error('Please enter a valid UPI ID (e.g. name@upi)');
       return;
     }

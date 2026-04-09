@@ -8,7 +8,7 @@ test.describe('Ops campaign & deal management API', () => {
   let agencyToken: string;
   let mediatorToken: string;
   let buyerToken: string;
-  let createdCampaignId: string | undefined;
+  let _createdCampaignId: string | undefined;
 
   test.beforeAll(async ({ request }) => {
     const [agency, mediator, buyer] = await Promise.all([
@@ -44,7 +44,7 @@ test.describe('Ops campaign & deal management API', () => {
     // May succeed or fail if brandId doesn't exist — but should not be 500
     if (res.ok()) {
       const body = await res.json();
-      createdCampaignId = body.campaign?.id ?? body.id;
+      _createdCampaignId = body.campaign?.id ?? body.id;
     }
     expect(res.status()).toBeLessThan(500);
   });
