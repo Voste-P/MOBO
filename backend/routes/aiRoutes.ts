@@ -295,6 +295,7 @@ export function aiRoutes(env: Env): Router {
                   mediatorCode: { equals: mediatorCode, mode: 'insensitive' },
                   active: true,
                   isDeleted: false,
+                  campaign: { isDeleted: false },
                 },
                 orderBy: { createdAt: 'desc' },
                 take: 50,

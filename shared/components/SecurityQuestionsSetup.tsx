@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { ShieldQuestion, ArrowLeft, CheckCircle } from 'lucide-react';
 import { Button, Input } from './ui';
 import { api } from '../services/api';
+import { SECURITY_QUESTIONS } from '../utils/securityQuestions';
 
 export interface SecurityQA {
   questionId: number;
@@ -26,12 +27,13 @@ export const SecurityQuestionsSetup: React.FC<SecurityQuestionsSetupProps> = ({ 
     let cancelled = false;
     api.auth.getSecurityQuestionTemplates()
       .then((res) => {
-        if (!cancelled && res?.templates) {
-          setQuestions(res.templates.map((t) => ({ id: t.questionId, label: t.label })));
+        if (!cancelled) {
+          const list = res?.templates?.map((t) => ({ id: t.questionId, label: t.label })) ?? [];
+          setQuestions(list.length > 0 ? list : SECURITY_QUESTIONS);
         }
       })
       .catch(() => {
-        if (!cancelled) setError('Failed to load security questions. Please try again.');
+        if (!cancelled) setQuestions(SECURITY_QUESTIONS);
       })
       .finally(() => { if (!cancelled) setLoadingQuestions(false); });
     return () => { cancelled = true; };

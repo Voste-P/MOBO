@@ -1048,11 +1048,23 @@ export function makeAuthController(env: Env) {
     // ─── Security Question Templates: public read ────────────────
     getSecurityQuestionTemplates: async (_req: Request, res: Response, next: NextFunction) => {
       try {
-        const templates = await db().securityQuestionTemplate.findMany({
+        let templates = await db().securityQuestionTemplate.findMany({
           where: { isActive: true },
           select: { questionId: true, label: true },
           orderBy: { sortOrder: 'asc' },
         });
+        // Fallback to hardcoded defaults if table is empty
+        if (!templates.length) {
+          templates = [
+            { questionId: 1, label: 'What was your childhood nickname?' },
+            { questionId: 2, label: 'What is the name of your first school?' },
+            { questionId: 3, label: 'What was the name of your first best friend?' },
+            { questionId: 4, label: 'What is your favorite childhood food?' },
+            { questionId: 5, label: 'What was your first mobile phone model?' },
+            { questionId: 6, label: 'What is your favorite childhood game?' },
+            { questionId: 7, label: 'What was the name of your first teacher?' },
+          ];
+        }
         res.json({ templates });
       } catch (err) {
         next(err);

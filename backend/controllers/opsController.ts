@@ -514,12 +514,25 @@ export function makeOpsController(env: Env) {
             orderBy: { createdAt: 'desc' },
             skip: dSkip,
             take: dLimit,
-            select: dealListSelect,
+            select: { ...dealListSelect, campaign: { select: { totalSlots: true, usedSlots: true, createdAt: true } } },
           }),
           db().deal.count({ where: dealWhere }),
         ]);
 
-        const dealList = deals.map((d: any) => toUiDeal(pgDeal(d)));
+        const enrichedDeals = deals.map((d: any) => {
+          const campaign = d.campaign;
+          const totalSlots = campaign?.totalSlots || 0;
+          const usedSlots = campaign?.usedSlots || 0;
+          const remainingSlots = Math.max(0, totalSlots - usedSlots);
+          let sellingSpeed = 0;
+          if (campaign?.createdAt && usedSlots > 0) {
+            const daysSinceCreation = Math.max(1, (Date.now() - new Date(campaign.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+            sellingSpeed = Math.round((usedSlots / daysSinceCreation) * 10) / 10;
+          }
+          const { campaign: _c, ...rest } = d;
+          return { ...rest, totalSlots, usedSlots, remainingSlots, sellingSpeed };
+        });
+        const dealList = enrichedDeals.map((d: any) => toUiDeal(pgDeal(d)));
         res.json(paginatedResponse(dealList, dealTotal, dPage, dLimit, dIsPaginated));
 
         businessLog.info('Deals listed', { userId: req.auth?.userId, resultCount: dealList.length, ip: req.ip });

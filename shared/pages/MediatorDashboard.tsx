@@ -254,18 +254,18 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
         <section>
           <div className="flex items-center justify-between mb-3 px-1">
             <h3 className="font-bold text-base text-zinc-900 tracking-tight">New Joiners</h3>
-            <span className="bg-orange-100 text-orange-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+            <span className="bg-orange-100 text-orange-700 text-xs font-bold px-2.5 py-1 rounded-full">
               {pendingUsers.length} requests
             </span>
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-styled px-1 snap-x">
+          <div className="flex flex-col gap-3 px-1">
             {pendingUsers.map((u: User) => (
               <div
                 key={u.id}
-                className="min-w-[220px] bg-white p-3 rounded-[1.2rem] border border-zinc-100 shadow-sm flex items-center justify-between snap-center"
+                className="w-full bg-white p-4 rounded-2xl border border-zinc-100 shadow-sm flex items-center justify-between"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-[0.8rem] flex items-center justify-center font-black text-sm shadow-inner overflow-hidden">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-12 h-12 shrink-0 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center font-black text-base shadow-inner overflow-hidden">
                     {u.avatar ? (
                       <ProxiedImage
                         src={u.avatar}
@@ -276,14 +276,12 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                       (u.name || '?').charAt(0)
                     )}
                   </div>
-                  <div>
-                    <ExpandableText text={u.name || 'Unknown'} clampClass="line-clamp-1" className="font-bold text-zinc-900 text-xs" as="h4">
-                      {u.name || 'Unknown'}
-                    </ExpandableText>
-                    <p className="text-[10px] text-zinc-400 font-mono tracking-wide">{maskMobile(u.mobile)}</p>
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-zinc-900 text-sm truncate">{u.name || 'Unknown'}</h4>
+                    <p className="text-xs text-zinc-400 font-mono tracking-wide">{maskMobile(u.mobile)}</p>
                   </div>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex gap-2 shrink-0 ml-3">
                   <button
                     type="button"
                     aria-label={`Approve ${u.name}`}
@@ -295,9 +293,10 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                         onRefresh(['pending', 'verified']);
                       } catch (e: unknown) { toast.error(formatErrorMessage(e, 'Failed to approve user')); }
                     }}
-                    className="w-10 h-10 rounded-lg bg-zinc-900 text-white flex items-center justify-center hover:bg-mobo-accent hover:text-black transition-all shadow-md active:scale-90"
+                    className="h-10 px-4 rounded-xl bg-zinc-900 text-white flex items-center justify-center gap-1.5 hover:bg-mobo-accent hover:text-black transition-all shadow-md active:scale-95 text-xs font-semibold"
                   >
-                    <Check size={14} strokeWidth={3} />
+                    <Check size={16} strokeWidth={3} />
+                    <span>Approve</span>
                   </button>
                   <button
                     type="button"
@@ -310,9 +309,9 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                         onRefresh(['pending']);
                       } catch (e: unknown) { toast.error(formatErrorMessage(e, 'Failed to reject user')); }
                     }}
-                    className="w-10 h-10 rounded-lg bg-zinc-50 text-zinc-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all active:scale-90"
+                    className="h-10 px-3 rounded-xl bg-zinc-50 text-zinc-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all active:scale-95"
                   >
-                    <X size={14} strokeWidth={3} />
+                    <X size={16} strokeWidth={3} />
                   </button>
                 </div>
               </div>
