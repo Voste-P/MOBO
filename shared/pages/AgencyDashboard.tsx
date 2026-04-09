@@ -1605,7 +1605,7 @@ const DashboardView = ({ stats, revenueTrendData, brandPerfData, onRangeChange }
 const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrders, setCampaigns }: { campaigns: Campaign[]; user: User; loading: boolean; onRefresh: (keys?: string[]) => void; mediators: User[]; allOrders: Order[]; setCampaigns: React.Dispatch<React.SetStateAction<Campaign[]>> }) => {
   const { toast } = useToast();
   const { confirm, ConfirmDialogElement: InventoryConfirmDialog } = useConfirm();
-  const [subTab, setSubTab] = useState<'inventory' | 'offered'>('inventory');
+  const [subTab, setSubTab] = useState<'inventory' | 'offered' | 'myCampaigns'>('inventory');
   const [assignModal, setAssignModal] = useState<Campaign | null>(null);
   const [createModal, setCreateModal] = useState(false);
   const [assignments, setAssignments] = useState<Record<string, number>>({});
@@ -1684,7 +1684,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
   }, [campaigns]);
 
   // Active Inventory = drafts (for editing) OR campaigns with sub-mediator assignments OR openToAll distributed
-  // Agency-created campaigns without assignments appear in "Offered by Brands" first for allocation.
+  // Agency-created campaigns without assignments appear in "My Campaigns" tab for allocation.
   const activeInventory = useMemo(() => {
     const base = campaigns.filter(
       (c: Campaign) =>
@@ -1698,18 +1698,32 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     return applyFilters(base);
   }, [campaigns, user.mediatorCode, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
 
-  // Offered by Brands = published campaigns without sub-mediator assignments, not openToAll.
-  // Includes agency-created campaigns before they are allocated to mediators.
-  const offeredCampaigns = useMemo(() => {
+  // My Campaigns = agency-created campaigns (brandId matches current user) without sub-mediator assignments yet.
+  // These are campaigns the agency created themselves and needs to distribute to mediators.
+  const myCampaigns = useMemo(() => {
     const base = campaigns.filter(
       (c: Campaign) =>
         c.allowedAgencies.includes(user.mediatorCode ?? '') &&
+        String(c.brandId || '') === String(user?.id || '') &&
         c.status !== 'Draft' &&
         !c.openToAll &&
         !Object.keys(c.assignments || {}).some((code) => myMediatorCodes.includes(code.toLowerCase()))
     );
     return applyFilters(base);
-  }, [campaigns, user.mediatorCode, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
+  }, [campaigns, user.mediatorCode, user?.id, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
+
+  // Offered by Brands = published campaigns from brands (NOT created by this agency), without sub-mediator assignments, not openToAll.
+  const offeredCampaigns = useMemo(() => {
+    const base = campaigns.filter(
+      (c: Campaign) =>
+        c.allowedAgencies.includes(user.mediatorCode ?? '') &&
+        String(c.brandId || '') !== String(user?.id || '') &&
+        c.status !== 'Draft' &&
+        !c.openToAll &&
+        !Object.keys(c.assignments || {}).some((code) => myMediatorCodes.includes(code.toLowerCase()))
+    );
+    return applyFilters(base);
+  }, [campaigns, user.mediatorCode, user?.id, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
 
   // New Campaign Form
   const [newCampaign, setNewCampaign] = useState({
@@ -1989,6 +2003,15 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
             className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${subTab === 'inventory' ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
           >
             <Layers size={14} /> Active Inventory
+          </button>
+          <button
+            onClick={() => setSubTab('myCampaigns')}
+            className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${subTab === 'myCampaigns' ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+          >
+            <Package size={14} /> My Campaigns{' '}
+            {myCampaigns.length > 0 && (
+              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
+            )}
           </button>
           <button
             onClick={() => setSubTab('offered')}
@@ -2283,6 +2306,93 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                 )}
               </tbody>
             </table>
+          ) : subTab === 'myCampaigns' ? (
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-enter">
+              {myCampaigns.length === 0 ? (
+                <div className="col-span-full">
+                  {loading ? (
+                    <EmptyState
+                      title="Loading campaigns"
+                      description="Fetching your agency campaigns."
+                      icon={<Spinner className="w-5 h-5 text-slate-400" />}
+                      className="bg-slate-50 border-slate-200 rounded-[2.5rem] py-20"
+                    />
+                  ) : (
+                    <EmptyState
+                      title="No undistributed campaigns"
+                      description="Create a campaign and distribute it to your mediators."
+                      icon={<Package size={22} className="text-slate-400" />}
+                      className="bg-slate-50 border-slate-200 rounded-[2.5rem] py-20"
+                    />
+                  )}
+                </div>
+              ) : (
+                myCampaigns.map((c: Campaign) => (
+                  <div
+                    key={c.id}
+                    className="bg-white rounded-3xl border border-blue-100 shadow-sm p-5 hover:shadow-xl transition-all group flex flex-col"
+                  >
+                    <div className="flex gap-4 mb-5">
+                      <div className="w-20 h-20 bg-blue-50 rounded-2xl p-2 border border-blue-100 flex-shrink-0 flex items-center justify-center">
+                        <ProxiedImage
+                          src={c.image}
+                          alt={c.title || 'Campaign'}
+                          className="w-full h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            {c.platform}
+                          </span>
+                          <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                            {c.dealType || 'Discount'}
+                          </span>
+                        </div>
+                        <ExpandableText text={c.title || ''} clampClass="line-clamp-2" className="font-bold text-slate-900 text-sm leading-tight mb-2" as="h4">
+                          {c.title}
+                        </ExpandableText>
+                        <p className="text-[10px] font-bold text-blue-500 flex items-center gap-1">
+                          <Package size={10} /> Agency Campaign
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mb-5">
+                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">Price</p>
+                        <p className="text-sm font-black text-slate-900">{formatCurrency(c.price)}</p>
+                      </div>
+                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">Payout</p>
+                        <p className="text-sm font-black text-slate-900">{formatCurrency(c.payout)}</p>
+                      </div>
+                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">Slots</p>
+                        <p className="text-sm font-black text-slate-900">{c.totalSlots}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-auto">
+                      <button
+                        onClick={() => handleClaimOffered(c)}
+                        className="flex-1 py-3.5 bg-blue-600 text-white rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-blue-700 transition-all shadow-lg active:scale-95"
+                      >
+                        <Users size={16} /> Distribute to Mediators
+                      </button>
+                      <button
+                        onClick={() => handleDelete(c)}
+                        disabled={deletingId === c.id}
+                        className={`px-4 py-3.5 bg-red-50 text-red-600 border border-red-200 rounded-2xl font-bold text-xs flex items-center justify-center gap-1 hover:bg-red-100 transition-all active:scale-95 ${
+                          deletingId === c.id ? 'opacity-60 cursor-not-allowed' : ''
+                        }`}
+                        title="Delete this campaign"
+                      >
+                        {deletingId === c.id ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           ) : (
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-enter">
               {offeredCampaigns.length === 0 ? (

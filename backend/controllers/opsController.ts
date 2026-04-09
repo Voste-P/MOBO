@@ -387,7 +387,9 @@ export function makeOpsController(env: Env) {
           } else {
             // Lowercase code to match assignment keys (assignSlots lowercases them)
             const codeLower = code.toLowerCase();
-            // Also check parent agency — campaigns targeted to an agency should be visible to its mediators
+            // Also check parent agency — but ONLY for openToAll campaigns.
+            // Mediators must be explicitly assigned via the assignments JSONB key,
+            // otherwise they see campaigns that the agency hasn't distributed to them.
             const parentAgency = roles.includes('mediator')
               ? await getAgencyCodeForMediatorCode(code)
               : null;
@@ -395,13 +397,13 @@ export function makeOpsController(env: Env) {
             const rows = statusFilter
               ? await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false AND status = ${statusFilter}
-                  AND (EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))
-                       OR jsonb_exists(assignments, ${codeLower}))
+                  AND (jsonb_exists(assignments, ${codeLower})
+                       OR (open_to_all = true AND EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))))
                 `
               : await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false
-                  AND (EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))
-                       OR jsonb_exists(assignments, ${codeLower}))
+                  AND (jsonb_exists(assignments, ${codeLower})
+                       OR (open_to_all = true AND EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))))
                 `;
             matchingIds = rows.map((r) => r.id);
           }
