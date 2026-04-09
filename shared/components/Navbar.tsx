@@ -21,7 +21,7 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
       <div className="container mx-auto px-4 h-14 flex items-center justify-between">
         {/* Branding */}
         <div className="flex items-center gap-2">
-          <div className="bg-mobo-accent text-zinc-900 p-1.5 rounded-lg shadow-sm">
+          <div className="bg-[#CCF381] text-zinc-900 p-1.5 rounded-lg shadow-sm">
             <Package size={20} />
           </div>
           <span className="font-extrabold text-lg tracking-tight text-slate-900">BUZZMA</span>
