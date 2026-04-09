@@ -188,6 +188,9 @@ export async function applyWalletDebit(input: WalletMutationInput) {
       if (existingTx.type !== input.type) {
         throw new AppError(409, 'IDEMPOTENCY_CONFLICT', `Idempotency key already used for a different transaction type (${existingTx.type})`);
       }
+      if (existingTx.amountPaise !== input.amountPaise) {
+        throw new AppError(409, 'IDEMPOTENCY_CONFLICT', `Idempotency key already used with a different amount (${existingTx.amountPaise} vs ${input.amountPaise})`);
+      }
       walletLog.info('Wallet debit idempotency hit (duplicate key)', { userId: input.ownerUserId, type: input.type, key: input.idempotencyKey });
       return existingTx;
     }
