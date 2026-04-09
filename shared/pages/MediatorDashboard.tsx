@@ -1356,6 +1356,22 @@ const MediatorProfileView = () => {
   const qrInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = async () => {
+    if (mobile && !/^\d{10}$/.test(mobile.replace(/\D/g, ''))) {
+      toast.error('Please enter a valid 10-digit mobile number');
+      return;
+    }
+    if (bankDetails.ifsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bankDetails.ifsc.toUpperCase())) {
+      toast.error('Please enter a valid IFSC code (e.g. SBIN0001234)');
+      return;
+    }
+    if (bankDetails.accountNumber && (bankDetails.accountNumber.length < 9 || bankDetails.accountNumber.length > 18 || !/^\d+$/.test(bankDetails.accountNumber))) {
+      toast.error('Please enter a valid bank account number (9-18 digits)');
+      return;
+    }
+    if (upiId && !/^[\w.\-]+@[\w.\-]+$/.test(upiId)) {
+      toast.error('Please enter a valid UPI ID (e.g. name@upi)');
+      return;
+    }
     setLoading(true);
     try {
       await updateUser({

@@ -143,6 +143,9 @@ export async function finalizeApprovalIfReady(order: any, actorUserId: string, e
   const wf = String(order.workflowStatus || 'CREATED');
   if (wf !== 'UNDER_REVIEW') return { approved: false, reason: 'NOT_UNDER_REVIEW' };
 
+  // Block approval of frozen orders
+  if (order.frozen) return { approved: false, reason: 'ORDER_FROZEN' };
+
   const verification = (order.verification && typeof order.verification === 'object') ? order.verification as any : {};
   if (!verification.order?.verifiedAt) {
     return { approved: false, reason: 'PURCHASE_NOT_VERIFIED' };

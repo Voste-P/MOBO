@@ -176,6 +176,8 @@ const isValidReviewLink = (value: string) => {
   try {
     const url = new URL(trimmed);
     if (url.protocol !== 'https:') return false;
+    // Reject non-standard ports (only 443 or default allowed)
+    if (url.port && url.port !== '443') return false;
     const host = url.hostname.toLowerCase().replace(/^www\./, '');
     // Strict match: host must exactly equal the domain or end with '.domain'
     // Prevents subdomain spoofing like amazon.in.attacker.com
@@ -1525,6 +1527,8 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                         onClick={() => {
                           setSelectedOrder(order);
                           setUploadType('order');
+                          setReviewLinkInput('');
+                          setReviewerNameInput('');
                         }}
                         className="text-[10px] font-bold uppercase text-blue-600 bg-blue-50 border border-blue-200 px-3 py-2 rounded-lg hover:bg-blue-100 transition-colors active:scale-95"
                       >
@@ -1537,6 +1541,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                         onClick={() => {
                           setSelectedOrder(order);
                           setUploadType('review');
+                          setReviewLinkInput('');
                           setReviewerNameInput(order.reviewerName || '');
                         }}
                         className="text-[10px] font-bold uppercase text-purple-600 bg-purple-50 border border-purple-200 px-3 py-2 rounded-lg hover:bg-purple-100 transition-colors active:scale-95"

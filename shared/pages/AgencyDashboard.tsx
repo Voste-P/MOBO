@@ -158,6 +158,18 @@ const AgencyProfile = ({ user }: { user: User }) => {
       toast.error('Please enter a valid 10-digit mobile number');
       return;
     }
+    if (form.ifsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.ifsc.toUpperCase())) {
+      toast.error('Please enter a valid IFSC code (e.g. SBIN0001234)');
+      return;
+    }
+    if (form.accountNumber && (form.accountNumber.length < 9 || form.accountNumber.length > 18 || !/^\d+$/.test(form.accountNumber))) {
+      toast.error('Please enter a valid bank account number (9-18 digits)');
+      return;
+    }
+    if (form.upiId && !/^[\w.\-]+@[\w.\-]+$/.test(form.upiId)) {
+      toast.error('Please enter a valid UPI ID (e.g. name@upi)');
+      return;
+    }
     setLoading(true);
     try {
       await updateUser({

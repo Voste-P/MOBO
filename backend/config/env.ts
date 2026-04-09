@@ -83,6 +83,13 @@ const envSchema = z.object({
   // 80 balances speed and fraud safety; more proofs auto-verify without mediator.
   AI_AUTO_VERIFY_THRESHOLD: z.coerce.number().int().min(0).max(101).default(80),
 
+  // High-confidence threshold for individual proof fast-path auto-approval.
+  // When a single proof exceeds this score, it is auto-verified immediately
+  // even if it doesn't meet the standard auto-verify threshold in edge cases.
+  // 85 provides extra safety headroom over the default 80 while enabling
+  // faster approval for clearly genuine proofs.
+  AI_HIGH_CONFIDENCE_THRESHOLD: z.coerce.number().int().min(0).max(100).default(85),
+
   // Confidence score assigned to review links from recognized marketplace domains.
   // URL validation acts as the "AI" for review proofs — no screenshot analysis needed.
   AI_REVIEW_LINK_CONFIDENCE: z.coerce.number().int().min(0).max(100).default(95),

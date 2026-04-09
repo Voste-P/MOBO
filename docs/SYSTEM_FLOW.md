@@ -210,7 +210,7 @@ Buyer                  Backend AI              Mediator              Agency/Admi
 
 **AI Auto-Verification (Bulk Path):**
 
-When ALL required proofs are uploaded and each has AI confidence ≥ `AI_PROOF_CONFIDENCE_THRESHOLD` (default 80%):
+When ALL required proofs are uploaded and each has AI confidence ≥ `AI_BULK_VERIFY_THRESHOLD` (default 70%):
 
 1. System bulk-verifies ALL unverified steps at once
 2. Order moves directly to **cooling period** (`Pending_Cooling` status)
@@ -222,6 +222,17 @@ This path triggers automatically after each proof upload via `autoVerifyStep()` 
 **Individual Step Auto-Verification:**
 
 If a single proof's AI confidence ≥ `AI_AUTO_VERIFY_THRESHOLD` (default 80%), that individual step is auto-verified immediately. The system then checks if all steps are now verified to trigger the bulk approval.
+
+**High-Confidence Fast Path:**
+
+If a single proof's AI confidence ≥ `AI_HIGH_CONFIDENCE_THRESHOLD` (default 85%), it is auto-verified immediately regardless of other thresholds. This allows clearly genuine proofs to bypass review faster while maintaining safety. The tiered confidence system:
+
+| Threshold                        | Default | Effect                                                     |
+| -------------------------------- | ------- | ---------------------------------------------------------- |
+| `AI_BULK_VERIFY_THRESHOLD`       | 70%     | Bulk auto-verify all proofs when ALL meet this minimum     |
+| `AI_AUTO_VERIFY_THRESHOLD`       | 80%     | Individual proof auto-verified without mediator            |
+| `AI_HIGH_CONFIDENCE_THRESHOLD`   | 85%     | Fast-path auto-verify for high-confidence proofs           |
+| `AI_REVIEW_LINK_CONFIDENCE`      | 95%     | Confidence assigned to validated marketplace review links  |
 
 **AI Extraction:**
 
@@ -393,12 +404,15 @@ logs/
 
 ## AI Integration Points
 
-| Feature               | Technology            | Purpose                                                     |
-| --------------------- | --------------------- | ----------------------------------------------------------- |
-| **Payment Proof OCR** | Google Gemini Vision  | Extract amount, date, UTR from payment screenshots          |
-| **AI Chatbot**        | Google Gemini         | Buyer assistance — product search, order status, FAQ        |
-| **Extraction Cache**  | In-memory (15min TTL) | Prevent duplicate Gemini API calls for same proof           |
-| **Smart Field Lock**  | Frontend logic        | Lock extracted fields to prevent manual override of AI data |
+| Feature                   | Technology            | Purpose                                                              |
+| ------------------------- | --------------------- | -------------------------------------------------------------------- |
+| **Payment Proof OCR**     | Google Gemini Vision  | Extract amount, date, UTR from payment screenshots                   |
+| **Rating Verification**   | Google Gemini Vision  | Verify reviewer name, product name, star rating from screenshot      |
+| **Return Window Check**   | Google Gemini Vision  | Verify return window status from marketplace screenshot              |
+| **AI Auto-Verify**        | Backend logic         | Auto-approve proofs at configurable confidence thresholds (70/80/85) |
+| **AI Chatbot**            | Google Gemini         | Buyer assistance — product search, order status, FAQ                 |
+| **Extraction Cache**      | In-memory (15min TTL) | Prevent duplicate Gemini API calls for same proof                    |
+| **Smart Field Lock**      | Frontend logic        | Lock extracted fields to prevent manual override of AI data          |
 
 ---
 
@@ -417,7 +431,8 @@ logs/
 | **SQL injection**      | Prisma parameterized queries                                                                           |
 | **XSS**                | React auto-escaping + CSP headers                                                                      |
 | **Sensitive data**     | Redaction engine masks passwords, tokens, emails, mobiles in logs                                      |
-| **Idempotency**        | Unique keys on financial transactions                                                                  |
+| **Idempotency**        | Unique keys on financial transactions (validated: 1-128 chars, alphanumeric)                          |
+| **Frozen orders**      | Admin-frozen orders blocked from auto-approval in all verification paths                             |
 | **Soft delete**        | Data preservation — `is_deleted` Boolean flag, never hard delete                                       |
 
 ---
