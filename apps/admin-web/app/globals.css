@@ -219,7 +219,7 @@ label,
 
 /* ── Text selection ── */
 ::selection {
-  background-color: rgba(132, 204, 22, 0.2);
+  background-color: rgba(99, 102, 241, 0.2);
   color: inherit;
 }
 
@@ -235,7 +235,7 @@ label,
 }
 
 :focus-visible {
-  outline: 2px solid rgba(132, 204, 22, 0.5);
+  outline: 2px solid rgba(99, 102, 241, 0.5);
   outline-offset: 2px;
 }
 
@@ -324,6 +324,24 @@ input:-webkit-autofill:focus {
 
 /* -- Improved focus visibility -- */
 :focus-visible {
-  outline: 2px solid #84cc16;
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* -- Reduced motion: respect user preference -- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* -- Improved focus visibility -- */
+:focus-visible {
+  outline: 2px solid #6366f1;
   outline-offset: 2px;
 }
