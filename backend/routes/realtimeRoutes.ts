@@ -52,7 +52,7 @@ export function realtimeRoutes(env: Env) {
 
   /** Per-user SSE connection tracker — prevents a single user from exhausting server resources. */
   const userConnections = new Map<string, number>();
-  const MAX_SSE_PER_USER = 5;
+  const MAX_SSE_PER_USER = 2;
 
   // Lightweight health check for the realtime subsystem.
   // Does not require auth and does not open a long-lived SSE stream.
