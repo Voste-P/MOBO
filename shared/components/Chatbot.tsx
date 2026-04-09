@@ -511,7 +511,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                           removeNotification(n.id);
                         }}
                         aria-label="Dismiss notification"
-                        className="absolute -top-1 -right-1 bg-white border border-gray-100 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-all"
+                        className="absolute -top-1 -right-1 bg-white border border-gray-100 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <X size={10} />
                       </button>
@@ -756,7 +756,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
             onClick={(e) => handleSendMessage(e)}
             disabled={!inputText.trim()}
             aria-label="Send message"
-            className={`w-11 h-11 rounded-full flex items-center justify-center shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${!inputText.trim() ? 'bg-slate-100 text-slate-300 shadow-none cursor-not-allowed' : 'bg-black text-white hover:bg-lime-300 hover:text-black'}`}
+            className={`w-11 h-11 rounded-full flex items-center justify-center shadow-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${!inputText.trim() ? 'bg-slate-100 text-slate-300 shadow-none cursor-not-allowed' : 'bg-black text-white hover:bg-lime-300 hover:text-black'}`}
           >
             <ArrowRight size={20} strokeWidth={3} />
           </button>

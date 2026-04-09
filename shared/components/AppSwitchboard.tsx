@@ -103,7 +103,7 @@ const SwitchCard = ({ title, desc, icon, type, color, delay = 0, onClick }: { ti
     <button
       onClick={onClick}
       style={{ animationDelay: `${delay * 80}ms`, animationFillMode: 'both' }}
-      className={`group animate-enter bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-8 text-center flex flex-col items-center transition-all duration-500 hover:-translate-y-2 ${colors[color]}`}
+      className={`group animate-enter bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-8 text-center flex flex-col items-center transition-[transform,box-shadow] duration-500 hover:-translate-y-2 ${colors[color]}`}
     >
       <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 mb-6 group-hover:text-white transition-colors">
         {type === 'Mobile' ? (
@@ -115,7 +115,7 @@ const SwitchCard = ({ title, desc, icon, type, color, delay = 0, onClick }: { ti
         )}{' '}
         {type}
       </div>
-      <div className="w-16 h-16 bg-white/5 rounded-3xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-white group-hover:text-black transition-all duration-500">
+      <div className="w-16 h-16 bg-white/5 rounded-3xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-white group-hover:text-black transition-[transform,background-color,color] duration-500">
         {icon}
       </div>
       <h3 className="text-xl font-bold text-white mb-2">{title}</h3>

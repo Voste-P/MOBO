@@ -60,14 +60,21 @@ export function Modal({
     [onClose],
   );
 
+  // Restore focus to trigger element when modal closes
+  const triggerRef = useRef<Element | null>(null);
+
   useEffect(() => {
     if (open) {
+      triggerRef.current = document.activeElement;
       document.addEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'hidden';
     }
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
+      if (triggerRef.current instanceof HTMLElement) {
+        triggerRef.current.focus();
+      }
     };
   }, [open, handleKeyDown]);
 

@@ -35,7 +35,7 @@ export const Input = React.forwardRef<HTMLInputElement, Props>(function Input(
       )}
       <div
         className={cn(
-          'relative rounded-2xl transition-all',
+          'relative rounded-2xl transition-colors',
           isDark
             ? 'bg-slate-900 border border-slate-700 focus-within:ring-2 focus-within:ring-lime-400/50 focus-within:border-lime-400'
             : 'bg-zinc-50 border border-zinc-200 focus-within:bg-white focus-within:ring-2 focus-within:ring-lime-400/40 focus-within:border-lime-300',

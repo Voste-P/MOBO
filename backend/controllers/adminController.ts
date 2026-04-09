@@ -220,6 +220,8 @@ export function makeAdminController() {
         }
 
         const fetchStats = async () => {
+        // Set a 10-second statement timeout to prevent slow queries from blocking
+        await db().$executeRaw`SET LOCAL statement_timeout = '10s'`;
         const [roleCounts, orderStats] = await Promise.all([
           db().$queryRaw<Array<{ role: string; count: number }>>`
             SELECT r AS role, COUNT(*)::int AS count

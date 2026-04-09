@@ -27,7 +27,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, Props>(function Ic
       disabled={disabled}
       className={cn(
         'inline-flex items-center justify-center',
-        'h-11 w-11 rounded-full transition-all',
+        'h-11 w-11 rounded-full transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
         'disabled:opacity-60 disabled:cursor-not-allowed',
         variants[variant],

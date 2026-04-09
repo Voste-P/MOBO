@@ -224,7 +224,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
   };
 
   return (
-    <div className="flex-shrink-0 w-full max-w-[300px] bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-100 snap-center flex flex-col relative overflow-hidden group transition-all duration-300 hover:shadow-xl hover:-translate-y-1 active:scale-[0.98]">
+    <div className="flex-shrink-0 w-full max-w-[300px] bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-100 snap-center flex flex-col relative overflow-hidden group transition-[box-shadow,transform] duration-300 hover:shadow-xl hover:-translate-y-1 active:scale-[0.98]">
       {/* Platform Tag (Top Right) */}
       <div className="absolute top-4 right-4 bg-zinc-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm uppercase tracking-wider z-10">
         {platformLabel}
@@ -314,7 +314,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
       {/* Action Buttons */}
       <button
         onClick={handleLinkClick}
-        className="w-full py-3.5 bg-black text-white font-extrabold rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-zinc-900/10 active:scale-95 transition-all flex items-center justify-center gap-2 group-hover:bg-zinc-800"
+        className="w-full py-3.5 bg-black text-white font-extrabold rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-zinc-900/10 active:scale-95 transition-[transform,background-color] flex items-center justify-center gap-2 group-hover:bg-zinc-800"
       >
         <ExternalLink size={14} className="stroke-[3]" /> GET DEAL LINK
       </button>
