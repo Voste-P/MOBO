@@ -45,7 +45,7 @@ export function Modal({
         const focusable = panelRef.current.querySelectorAll<HTMLElement>(
           'a[href]:not([hidden]):not([aria-hidden="true"]), button:not([disabled]):not([hidden]):not([aria-hidden="true"]), textarea:not([disabled]):not([hidden]):not([aria-hidden="true"]), input:not([disabled]):not([hidden]):not([aria-hidden="true"]), select:not([disabled]):not([hidden]):not([aria-hidden="true"]), [tabindex]:not([tabindex="-1"]):not([hidden]):not([aria-hidden="true"])',
         );
-        if (focusable.length === 0) return;
+        if (focusable.length === 0) { panelRef.current?.focus(); return; }
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
         if (e.shiftKey && document.activeElement === first) {
