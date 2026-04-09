@@ -138,10 +138,10 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
       const lower = searchTerm.toLowerCase();
       result = result.filter(
         (p) =>
-          p.title.toLowerCase().includes(lower) ||
-          p.description.toLowerCase().includes(lower) ||
-          p.platform.toLowerCase().includes(lower) ||
-          p.brandName.toLowerCase().includes(lower)
+          String(p.title || '').toLowerCase().includes(lower) ||
+          String(p.description || '').toLowerCase().includes(lower) ||
+          String(p.platform || '').toLowerCase().includes(lower) ||
+          String(p.brandName || '').toLowerCase().includes(lower)
       );
     }
 

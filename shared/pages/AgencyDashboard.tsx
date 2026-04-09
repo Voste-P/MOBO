@@ -154,6 +154,10 @@ const AgencyProfile = ({ user }: { user: User }) => {
   }, [user?.id]);
 
   const handleSave = async () => {
+    if (form.mobile && !/^\d{10}$/.test(form.mobile.replace(/\D/g, ''))) {
+      toast.error('Please enter a valid 10-digit mobile number');
+      return;
+    }
     setLoading(true);
     try {
       await updateUser({
@@ -181,6 +185,7 @@ const AgencyProfile = ({ user }: { user: User }) => {
   const handleFile = (e: any) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (!file.type.startsWith('image/')) { toast.error('Please upload an image file'); return; }
       if (file.size > 2 * 1024 * 1024) { toast.error('Avatar must be under 2 MB'); return; }
       if (!isEditing) setIsEditing(true);
       const reader = new FileReader();
