@@ -22,7 +22,7 @@ async function enrichTicketsWithResolverNames(tickets: any[]): Promise<any[]> {
   const resolverIds = [...new Set(tickets.map(t => t.resolvedBy).filter(Boolean))];
   if (!resolverIds.length) return tickets;
   const resolvers = await db.user.findMany({
-    where: { id: { in: resolverIds } },
+    where: { id: { in: resolverIds.slice(0, 500) } },
     select: { id: true, name: true },
   });
   const nameMap = new Map(resolvers.map(r => [r.id, r.name]));
@@ -71,7 +71,7 @@ async function enrichTickets(tickets: any[]): Promise<any[]> {
 async function buildTicketAudience(ticket: any) {
   const privilegedRoles: Role[] = ['admin', 'ops'];
   const userIds = new Set<string>();
-  const ticketOwnerId = String(ticket?._id || ticket?.id || '').trim();
+  const ticketOwnerId = String(ticket?.id || '').trim();
 
   let mediatorCodes: string[] | undefined;
   let agencyCodes: string[] | undefined;

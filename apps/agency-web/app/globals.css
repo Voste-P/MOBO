@@ -219,7 +219,7 @@ label,
 
 /* ── Text selection ── */
 ::selection {
-  background-color: rgba(147, 51, 234, 0.2);
+  background-color: rgba(132, 204, 22, 0.2);
   color: inherit;
 }
 
@@ -235,7 +235,7 @@ label,
 }
 
 :focus-visible {
-  outline: 2px solid rgba(147, 51, 234, 0.4);
+  outline: 2px solid rgba(132, 204, 22, 0.5);
   outline-offset: 2px;
 }
 
@@ -307,30 +307,6 @@ input:-webkit-autofill:focus {
   animation: fadeIn 0.2s ease forwards;
 }
 
-/* ── Subtle pulse for loading states ── */
-@keyframes subtlePulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-.animate-subtle-pulse {
-  animation: subtlePulse 2s ease-in-out infinite;
-}
-
-/* ── Stagger children animation ── */
-.stagger-children > * {
-  opacity: 0;
-  animation: enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
-.stagger-children > *:nth-child(2) { animation-delay: 50ms; }
-.stagger-children > *:nth-child(3) { animation-delay: 100ms; }
-.stagger-children > *:nth-child(4) { animation-delay: 150ms; }
-.stagger-children > *:nth-child(5) { animation-delay: 200ms; }
-.stagger-children > *:nth-child(6) { animation-delay: 250ms; }
-.stagger-children > *:nth-child(7) { animation-delay: 300ms; }
-.stagger-children > *:nth-child(8) { animation-delay: 350ms; }
-.stagger-children > *:nth-child(n+9) { animation-delay: 400ms; }
-
 /* ── Scroll shadow indicators ── */
 .scroll-shadow-top {
   box-shadow: inset 0 8px 6px -6px rgba(0, 0, 0, 0.06);
@@ -353,24 +329,6 @@ input:-webkit-autofill:focus {
 
 /* -- Improved focus visibility -- */
 :focus-visible {
-  outline: 2px solid #6366f1;
-  outline-offset: 2px;
-}
-
-/* -- Reduced motion: respect user preference -- */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-
-/* -- Improved focus visibility -- */
-:focus-visible {
-  outline: 2px solid #6366f1;
+  outline: 2px solid #84cc16;
   outline-offset: 2px;
 }
