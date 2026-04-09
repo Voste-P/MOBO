@@ -70,7 +70,7 @@ export const SidebarItem: React.FC<SidebarItemProps> = ({
       type="button"
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
-      className={`w-full flex items-center justify-between ${isAdmin ? 'px-4 py-3' : 'px-5 py-4'} ${isAdmin ? 'rounded-xl' : 'rounded-2xl'} transition-all duration-200 group relative overflow-hidden focus-visible:outline-none focus-visible:ring-2 ${t.ring} motion-reduce:transition-none motion-reduce:transform-none ${
+      className={`w-full flex items-center justify-between ${isAdmin ? 'px-4 py-3' : 'px-5 py-4'} ${isAdmin ? 'rounded-xl' : 'rounded-2xl'} transition-colors duration-200 group relative overflow-hidden focus-visible:outline-none focus-visible:ring-2 ${t.ring} motion-reduce:transition-none motion-reduce:transform-none ${
         active ? t.active : t.inactive
       } ${!isAdmin ? 'mb-1' : ''}`}
     >

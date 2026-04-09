@@ -1602,7 +1602,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
       setCampaigns((prev: any[]) => prev.filter(c => c.id !== campaign.id));
       toast.success('Campaign deleted');
       onRefresh(['campaigns']);
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(formatErrorMessage(err, 'Failed to delete campaign'));
     } finally {
       setDeletingId(null);
@@ -2703,7 +2703,7 @@ export const BrandDashboard: React.FC = () => {
                                 await api.tickets.escalate(t.id);
                                 toast.success('Ticket escalated to admin.');
                                 fetchData({ keys: ['tickets'] });
-                              } catch (err: any) {
+                              } catch (err: unknown) {
                                 toast.error(formatErrorMessage(err, 'Failed to escalate ticket.'));
                               }
                             }}
@@ -2719,10 +2719,10 @@ export const BrandDashboard: React.FC = () => {
                             className="w-full px-2 py-1.5 text-xs rounded-lg border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-lime-300 resize-none" />
                           <div className="flex items-center gap-2">
                             <button type="button" onClick={async () => {
-                              try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
+                              try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: unknown) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
                             }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✓ Resolve</button>
                             <button type="button" onClick={async () => {
-                              try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
+                              try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: unknown) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
                             }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
                             <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
                               className="px-3 py-1 rounded-lg text-xs font-bold bg-zinc-100 text-zinc-500 hover:bg-zinc-200">Cancel</button>
@@ -2738,7 +2738,7 @@ export const BrandDashboard: React.FC = () => {
                                 await api.tickets.update(t.id, 'Open');
                                 toast.success('Ticket reopened.');
                                 fetchData({ keys: ['tickets'] });
-                              } catch (err: any) {
+                              } catch (err: unknown) {
                                 toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
                               }
                             }}
@@ -2753,7 +2753,7 @@ export const BrandDashboard: React.FC = () => {
                                 await api.tickets.delete(t.id);
                                 toast.success('Ticket deleted.');
                                 fetchData({ keys: ['tickets'] });
-                              } catch (err: any) {
+                              } catch (err: unknown) {
                                 toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
                               }
                             }}

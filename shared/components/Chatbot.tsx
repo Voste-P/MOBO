@@ -310,11 +310,11 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
         relatedOrders: response.uiType === 'order_card' ? response.data : undefined,
         extractedValues: response.extractedValues,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       // If the request was aborted (user sent a new message), silently bail
-      if (err?.name === 'AbortError') return;
+      if (err instanceof Error && err.name === 'AbortError') return;
 
-      const code = String(err?.code || '').toUpperCase();
+      const code = String((err as { code?: string })?.code || '').toUpperCase();
       const isRate = code === 'RATE_LIMITED' || code === 'DAILY_LIMIT_REACHED' || code === 'TOO_FREQUENT';
       const lowerText = safeText.toLowerCase();
       if (lowerText.includes('deals')) {
@@ -511,7 +511,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                           removeNotification(n.id);
                         }}
                         aria-label="Dismiss notification"
-                        className="absolute -top-1 -right-1 bg-white border border-gray-100 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-all"
+                        className="absolute -top-1 -right-1 bg-white border border-gray-100 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <X size={10} />
                       </button>
@@ -669,7 +669,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
                           <ProxiedImage loading="lazy"
                             src={order.items?.[0]?.image || ''}
                             className="w-full h-full object-contain mix-blend-multiply"
-                            alt=""
+                            alt={order.items?.[0]?.title || 'Order product image'}
                           />
                         </div>
                         <div className="min-w-0 flex-1">
@@ -756,7 +756,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
             onClick={(e) => handleSendMessage(e)}
             disabled={!inputText.trim()}
             aria-label="Send message"
-            className={`w-11 h-11 rounded-full flex items-center justify-center shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${!inputText.trim() ? 'bg-slate-100 text-slate-300 shadow-none cursor-not-allowed' : 'bg-black text-white hover:bg-lime-300 hover:text-black'}`}
+            className={`w-11 h-11 rounded-full flex items-center justify-center shadow-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${!inputText.trim() ? 'bg-slate-100 text-slate-300 shadow-none cursor-not-allowed' : 'bg-black text-white hover:bg-lime-300 hover:text-black'}`}
           >
             <ArrowRight size={20} strokeWidth={3} />
           </button>

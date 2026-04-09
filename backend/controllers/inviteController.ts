@@ -50,9 +50,12 @@ export function makeInviteController() {
               },
             });
             break; // success
-          } catch (err: any) {
+          } catch (err: unknown) {
             // P2002 = unique-constraint violation → code collision, retry
-            const isUniqueViolation = err?.code === 'P2002' || err?.meta?.target?.includes('code');
+            const isUniqueViolation =
+              err instanceof Error && 'code' in err &&
+              ((err as { code?: string }).code === 'P2002' ||
+               (err as { meta?: { target?: string[] } }).meta?.target?.includes('code'));
             if (!isUniqueViolation) throw err;
             // last attempt → surface the error
             if (attempt === 9) throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique invite code; please retry');

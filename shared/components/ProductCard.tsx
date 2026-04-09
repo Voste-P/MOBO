@@ -210,7 +210,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
       setSubmitted(true);
       toast.success('Order submitted! Track it in the Orders tab.');
       setTimeout(resetForm, 1500);
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(formatErrorMessage(err, 'Failed to submit order. Try again.'));
     } finally {
       setSubmitting(false);
@@ -224,7 +224,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
   };
 
   return (
-    <div className="flex-shrink-0 w-full max-w-[300px] bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-100 snap-center flex flex-col relative overflow-hidden group transition-all duration-300 hover:shadow-xl hover:-translate-y-1 active:scale-[0.98]">
+    <div className="flex-shrink-0 w-full max-w-[300px] bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-100 snap-center flex flex-col relative overflow-hidden group transition-[box-shadow,transform] duration-300 hover:shadow-xl hover:-translate-y-1 active:scale-[0.98]">
       {/* Platform Tag (Top Right) */}
       <div className="absolute top-4 right-4 bg-zinc-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm uppercase tracking-wider z-10">
         {platformLabel}
@@ -265,13 +265,13 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                 <Star
                   key={`star-${i}`}
                   size={12}
-                  fill={i < Math.floor(product.rating || 5) ? 'currentColor' : 'none'}
-                  strokeWidth={i < Math.floor(product.rating || 5) ? 0 : 1.5}
-                  className={i < Math.floor(product.rating || 5) ? '' : 'text-slate-200'}
+                  fill={i < Math.floor(product.rating ?? 5) ? 'currentColor' : 'none'}
+                  strokeWidth={i < Math.floor(product.rating ?? 5) ? 0 : 1.5}
+                  className={i < Math.floor(product.rating ?? 5) ? '' : 'text-slate-200'}
                 />
               ))}
             </div>
-            <span className="text-[10px] font-bold text-slate-400">({product.rating || 5})</span>
+            <span className="text-[10px] font-bold text-slate-400">({product.rating ?? 5})</span>
           </div>
 
           <div>
@@ -314,7 +314,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
       {/* Action Buttons */}
       <button
         onClick={handleLinkClick}
-        className="w-full py-3.5 bg-black text-white font-extrabold rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-zinc-900/10 active:scale-95 transition-all flex items-center justify-center gap-2 group-hover:bg-zinc-800"
+        className="w-full py-3.5 bg-black text-white font-extrabold rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-zinc-900/10 active:scale-95 transition-[transform,background-color] flex items-center justify-center gap-2 group-hover:bg-zinc-800"
       >
         <ExternalLink size={14} className="stroke-[3]" /> GET DEAL LINK
       </button>

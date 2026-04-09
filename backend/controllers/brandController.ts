@@ -421,8 +421,8 @@ export function makeBrandController() {
               tx,
             });
           }, { timeout: 15000 });
-        } catch (e: any) {
-          const code = String(e?.code || e?.error?.code || '');
+        } catch (e: unknown) {
+          const code = String((e as { code?: string })?.code || (e as { error?: { code?: string } })?.error?.code || '');
           if (code !== 'INSUFFICIENT_FUNDS' && code !== 'WALLET_NOT_FOUND') throw e;
           await recordManualPayoutLedger({
             idempotencyKey: idKey,

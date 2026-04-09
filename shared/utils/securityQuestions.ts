@@ -1,4 +1,9 @@
-/** Predefined security questions for password recovery. IDs 1–7 are stable. */
+/**
+ * @deprecated Security questions are now fetched from the database via
+ * `GET /auth/security-question-templates`. This file exists only as a
+ * backward-compat fallback for any code that hasn't been migrated yet.
+ * Do not add new usages — use `api.auth.getSecurityQuestionTemplates()`.
+ */
 export const SECURITY_QUESTIONS: { id: number; label: string }[] = [
   { id: 1, label: 'What was your childhood nickname?' },
   { id: 2, label: 'What is the name of your first school?' },
@@ -12,6 +17,7 @@ export const SECURITY_QUESTIONS: { id: number; label: string }[] = [
 /** Pre-computed map for O(1) lookup by question ID. */
 const QUESTION_MAP = new Map(SECURITY_QUESTIONS.map(q => [q.id, q.label]));
 
+/** @deprecated Use question labels from API response instead. */
 export function getQuestionLabel(id: number): string {
   return QUESTION_MAP.get(id) ?? `Question #${id}`;
 }

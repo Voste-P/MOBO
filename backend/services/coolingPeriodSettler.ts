@@ -94,7 +94,18 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
         select: { id: true, status: true, isDeleted: true },
       });
   if (!buyer || buyer.isDeleted || buyer.status !== 'active') {
-    orderLog.warn('[cooling-settler] Buyer not active, skipping settlement', {
+    // Freeze: prevents perpetual retry loop — admin must investigate
+    const freezeEvents = pushOrderEvent(order.events as any, {
+      type: 'FROZEN_DISPUTED',
+      at: new Date(),
+      actorUserId: SYSTEM_ACTOR,
+      metadata: { reason: 'buyer_not_active', buyerStatus: buyer?.status ?? 'not_found', source: 'cooling-settler' },
+    });
+    await db().order.update({
+      where: { id: order.id },
+      data: { frozen: true, events: freezeEvents as any },
+    });
+    orderLog.warn('[cooling-settler] Buyer not active, order frozen', {
       orderId: orderDisplayId,
       buyerStatus: buyer?.status,
     });
@@ -151,27 +162,55 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
           select: { id: true, payoutPaise: true },
         });
     if (!deal) {
-      orderLog.warn('[cooling-settler] Deal not found, skipping', {
-        orderId: orderDisplayId,
-        productId,
+      const evts = pushOrderEvent(order.events as any, {
+        type: 'FROZEN_DISPUTED',
+        at: new Date(),
+        actorUserId: SYSTEM_ACTOR,
+        metadata: { reason: 'deal_not_found', productId, source: 'cooling-settler' },
       });
+      await db().order.update({ where: { id: order.id }, data: { frozen: true, events: evts as any } });
+      orderLog.warn('[cooling-settler] Deal not found, order frozen', { orderId: orderDisplayId, productId });
       return false;
     }
 
     const payoutPaise = Number(deal.payoutPaise ?? 0);
     const buyerCommissionPaise = Number(order.items?.[0]?.commissionPaise ?? 0);
     if (payoutPaise <= 0) {
-      orderLog.warn('[cooling-settler] Invalid payout, skipping', {
-        orderId: orderDisplayId,
-        payoutPaise,
+      const evts = pushOrderEvent(order.events as any, {
+        type: 'FROZEN_DISPUTED',
+        at: new Date(),
+        actorUserId: SYSTEM_ACTOR,
+        metadata: { reason: 'invalid_payout', payoutPaise, source: 'cooling-settler' },
       });
+      await db().order.update({ where: { id: order.id }, data: { frozen: true, events: evts as any } });
+      orderLog.warn('[cooling-settler] Invalid payout, order frozen', { orderId: orderDisplayId, payoutPaise });
+      return false;
+    }
+
+    // Guard: buyer commission must never exceed payout — prevents negative mediator margin
+    if (buyerCommissionPaise > payoutPaise) {
+      const evts = pushOrderEvent(order.events as any, {
+        type: 'FROZEN_DISPUTED',
+        at: new Date(),
+        actorUserId: SYSTEM_ACTOR,
+        metadata: { reason: 'commission_exceeds_payout', payoutPaise, buyerCommissionPaise, source: 'cooling-settler' },
+      });
+      await db().order.update({ where: { id: order.id }, data: { frozen: true, events: evts as any } });
+      orderLog.error('[cooling-settler] Commission exceeds payout — order frozen', { orderId: orderDisplayId, payoutPaise, buyerCommissionPaise });
       return false;
     }
 
     const buyerUserId = order.userId;
     const brandId = String(order.brandUserId || campaign?.brandUserId || '').trim();
     if (!buyerUserId || !brandId) {
-      orderLog.warn('[cooling-settler] Missing buyer/brand, skipping', { orderId: orderDisplayId });
+      const evts = pushOrderEvent(order.events as any, {
+        type: 'FROZEN_DISPUTED',
+        at: new Date(),
+        actorUserId: SYSTEM_ACTOR,
+        metadata: { reason: 'missing_buyer_or_brand', source: 'cooling-settler' },
+      });
+      await db().order.update({ where: { id: order.id }, data: { frozen: true, events: evts as any } });
+      orderLog.warn('[cooling-settler] Missing buyer/brand, order frozen', { orderId: orderDisplayId });
       return false;
     }
 
@@ -463,10 +502,10 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
         if (didSettle) settled++;
         else skipped++;
         break;
-      } catch (err: any) {
-        const code = err?.code ?? '';
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code ?? '';
         const isTransient = code === 'P1017' || code === 'P1001' || code === 'P1008' || code === 'P2034'
-          || (err?.message && /deadlock|timeout|connection/i.test(err.message));
+          || (err instanceof Error && /deadlock|timeout|connection/i.test(err.message));
         if (isTransient && attempt < 2) {
           // eslint-disable-next-line no-await-in-loop
           await new Promise(r => setTimeout(r, 500 * (attempt + 1)));

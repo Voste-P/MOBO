@@ -1,4 +1,4 @@
-﻿import { Prisma as _Prisma } from '../generated/prisma/client.js';
+import { Prisma as _Prisma } from '../generated/prisma/client.js';
 
 /**
  * Reusable Prisma `select` configurations for list queries.
@@ -74,7 +74,7 @@ export const userAdminListSelect = {
   bankIfsc: true,
   bankName: true,
   bankHolderName: true,
-  // avatar included â€” typically 5-20KB compressed JPEG; needed for profile photos in lists
+  // avatar included — typically 5-20KB compressed JPEG; needed for profile photos in lists
   avatar: true,
   createdAt: true,
   // EXCLUDED: passwordHash, googleRefreshToken, fcmTokens, isDeleted
@@ -107,7 +107,7 @@ export const userListSelect = {
   isVerifiedByMediator: true,
   upiId: true,
   // qrCode excluded from list queries (50-500KB blobs, only needed in pay/detail views)
-  // avatar included â€” typically 5-20KB compressed JPEG; needed for profile photos in lists
+  // avatar included — typically 5-20KB compressed JPEG; needed for profile photos in lists
   avatar: true,
   bankAccountNumber: true,
   bankIfsc: true,
@@ -280,7 +280,7 @@ export const orderListSelectLite = {
   extractedProductName: true,
   settlementRef: true,
   settlementMode: true,
-  // Screenshot columns EXCLUDED â€” use getProofFlags() helper instead
+  // Screenshot columns EXCLUDED — use getProofFlags() helper instead
   reviewLink: true,
   returnWindowDays: true,
   // Rejection flat fields
@@ -301,7 +301,7 @@ export const orderListSelectLite = {
   expectedSettlementDate: true,
   createdAt: true,
   updatedAt: true,
-  // Relations â€” items only need deal type / platform info for list view
+  // Relations — items only need deal type / platform info for list view
   items: { select: { dealType: true, platform: true, brandName: true, title: true, image: true, quantity: true, priceAtPurchasePaise: true } },
   // missingProofRequests: small JSONB array needed for "Action Required" banners
   missingProofRequests: true,

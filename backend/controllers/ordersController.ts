@@ -25,7 +25,7 @@ import { createProofToken, verifyProofToken } from '../utils/signedProofUrl.js';
 import { writeAuditLog } from '../services/audit.js';
 
 export function makeOrdersController(env: Env) {
-  const MAX_PROOF_BYTES = 10 * 1024 * 1024; // 10MB â€” must fit within EXPRESS body limit (12MB)
+  const MAX_PROOF_BYTES = 10 * 1024 * 1024; // 10MB — must fit within EXPRESS body limit (12MB)
   const MIN_PROOF_BYTES = (env.NODE_ENV !== 'production') ? 1 : 10 * 1024;
 
   const getDataUrlByteSize = (raw: string) => {
@@ -36,7 +36,7 @@ export function makeOrdersController(env: Env) {
   };
 
   const assertProofImageSize = (raw: string, label: string) => {
-    // Validate MIME type â€” only accept actual image formats
+    // Validate MIME type — only accept actual image formats
     const mimeMatch = raw.match(/^data:(image\/(?:jpeg|jpg|png|gif|webp|bmp|heic|heif));base64,/i);
     if (!mimeMatch) {
       throw new AppError(400, 'INVALID_PROOF_FORMAT', `${label} must be a valid image (JPEG, PNG, GIF, or WebP).`);
@@ -108,7 +108,7 @@ export function makeOrdersController(env: Env) {
    * Enhanced: After verifying the current step, checks if ALL required proofs
    * are present with AI confidence >= AI_PROOF_CONFIDENCE_THRESHOLD. If so,
    * bulk-verifies ALL remaining unverified steps and goes directly to cooling
-   * period â€” no mediator manual check needed.
+   * period — no mediator manual check needed.
    */
   const autoVerifyStep = async (
     freshOrder: any,
@@ -239,7 +239,7 @@ export function makeOrdersController(env: Env) {
 
     if (stepsToVerify.length === 0) return order; // nothing to bulk-verify
 
-    // All proofs present, all AI confidence above threshold â€” bulk verify!
+    // All proofs present, all AI confidence above threshold — bulk verify!
     const now = new Date().toISOString();
     let events = Array.isArray(order.events) ? [...(order.events as any[])] : [];
 
@@ -274,7 +274,7 @@ export function makeOrdersController(env: Env) {
     if (!updated) return order;
 
     const finalize = await finalizeApprovalIfReady(updated, 'SYSTEM_AI', envRef);
-    orderLog.info('Bulk auto-verified all steps â€” direct to cooling period', {
+    orderLog.info('Bulk auto-verified all steps — direct to cooling period', {
       orderId: order.id,
       steps: stepsToVerify.map(s => s.key),
       confidences: stepsToVerify.map(s => s.confidence),
@@ -376,7 +376,7 @@ export function makeOrdersController(env: Env) {
 
     getOrderProofPublic: async (req: Request, res: Response, next: NextFunction) => {
       try {
-        // Require authentication â€” prevents unauthenticated enumeration of proof images.
+        // Require authentication — prevents unauthenticated enumeration of proof images.
         const requesterId = req.auth?.userId;
         if (!requesterId) throw new AppError(401, 'UNAUTHENTICATED', 'Authentication required');
 
@@ -392,7 +392,7 @@ export function makeOrdersController(env: Env) {
         const order = await findOrderForProof(orderId);
         if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
 
-        // Authorization: same checks as getOrderProof â€” prevent cross-user proof access
+        // Authorization: same checks as getOrderProof — prevent cross-user proof access
         const { roles, user, pgUserId } = getRequester(req);
         if (!isPrivileged(roles)) {
           let allowed = false;
@@ -463,7 +463,7 @@ export function makeOrdersController(env: Env) {
     },
     /**
      * Generate signed proof URLs for an order (used by CSV/Excel export).
-     * Authenticated endpoint â€” returns signed tokens that can be opened without auth.
+     * Authenticated endpoint — returns signed tokens that can be opened without auth.
      */
     getSignedProofUrls: async (req: Request, res: Response, next: NextFunction) => {
       try {
@@ -508,7 +508,7 @@ export function makeOrdersController(env: Env) {
         const proofTypes = ['order', 'payment', 'rating', 'review', 'returnwindow'] as const;
         const tokens: Record<string, Record<string, string | null>> = {};
 
-        // Fetch all orders in one query â€” lightweight select (no base64 blobs)
+        // Fetch all orders in one query — lightweight select (no base64 blobs)
         const orders = await db().order.findMany({
           where: {
             OR: orderIds.map(id => idWhere(id)),
@@ -586,7 +586,7 @@ export function makeOrdersController(env: Env) {
       }
     },
     /**
-     * Serve proof by signed token â€” no auth required.
+     * Serve proof by signed token — no auth required.
      * Used by Excel/Google Sheets HYPERLINK formulas.
      */
     getProofBySigned: async (req: Request, res: Response, next: NextFunction) => {
@@ -804,7 +804,7 @@ export function makeOrdersController(env: Env) {
             });
 
             const confidenceThreshold = env.AI_PROOF_CONFIDENCE_THRESHOLD ?? 80;
-            // Amount mismatch is expected (shipping, discounts, taxes) â€” don't hard-block.
+            // Amount mismatch is expected (shipping, discounts, taxes) — don't hard-block.
             // Only require orderIdMatch + confidence threshold.
             if (!verification?.orderIdMatch || (verification?.confidenceScore ?? 0) < confidenceThreshold) {
               throw new AppError(
@@ -814,7 +814,7 @@ export function makeOrdersController(env: Env) {
               );
             }
             // Hard-block: product name must POSITIVELY match when expected product name is available.
-            // Use !== true (not === false) so undefined/null also blocks â€” safety first.
+            // Use !== true (not === false) so undefined/null also blocks — safety first.
             if (expectedProductName && verification?.productNameMatch !== true) {
               throw new AppError(
                 422,
@@ -836,19 +836,19 @@ export function makeOrdersController(env: Env) {
               );
             }
             aiOrderConfidence = verification?.confidenceScore ?? 0;
-          } catch (aiErr: any) {
-            // Re-throw validation errors (422s) â€” those are intentional user-facing blocks
+          } catch (aiErr: unknown) {
+            // Re-throw validation errors (422s) — those are intentional user-facing blocks
             if (aiErr instanceof AppError) throw aiErr;
-            // Infrastructure failure (Gemini down, OCR crash, timeout) â€” let order proceed
+            // Infrastructure failure (Gemini down, OCR crash, timeout) — let order proceed
             // for manual review instead of blocking the buyer
             orderLog.warn('[createOrder] AI verification unavailable, proceeding for manual review', {
-              error: aiErr?.message,
+              error: aiErr instanceof Error ? aiErr.message : String(aiErr),
               orderId: resolvedExternalOrderId,
             });
             aiUnavailable = true;
           }
         } else {
-          // AI not configured â€” proceed for manual review instead of hard-blocking
+          // AI not configured — proceed for manual review instead of hard-blocking
           orderLog.warn('[createOrder] AI not configured, order will require manual review');
           aiUnavailable = true;
         }
@@ -886,7 +886,7 @@ export function makeOrdersController(env: Env) {
           ? campaign.assignments as Record<string, any>
           : {};
 
-        // Case-insensitive assignment lookup â€” keys are stored lowercase by assignSlots.
+        // Case-insensitive assignment lookup — keys are stored lowercase by assignSlots.
         const findAssignment = (code: string) => {
           if (!code) return undefined;
           if (Object.prototype.hasOwnProperty.call(assignmentsRaw, code)) return assignmentsRaw[code];
@@ -923,7 +923,7 @@ export function makeOrdersController(env: Env) {
         let commissionPaise = rupeesToPaise(item.commission);
         // [PERF] Parallel fetch: mediatorSales + maybeDeal are independent
         const [mediatorSales, maybeDeal] = await Promise.all([
-          // For "Open to All" campaigns, skip per-mediator limit check â€” only global slot limit applies
+          // For "Open to All" campaigns, skip per-mediator limit check — only global slot limit applies
           (!campaignIsOpenToAll && upstreamMediatorCode && assigned > 0)
             ? db().order.count({
                 where: {
@@ -957,7 +957,7 @@ export function makeOrdersController(env: Env) {
             RETURNING id
           `;
           if (!claimed.length) {
-            throw new AppError(409, 'SOLD_OUT', 'Sold Out â€” another buyer claimed the last slot');
+            throw new AppError(409, 'SOLD_OUT', 'Sold Out — another buyer claimed the last slot');
           }
         };
 
@@ -974,7 +974,7 @@ export function makeOrdersController(env: Env) {
               throw new AppError(409, 'ORDER_STATE_MISMATCH', 'Pre-order is not in REDIRECTED state');
             }
 
-            // Slot consumption happens on ORDERED â€” use atomic claim to prevent overselling.
+            // Slot consumption happens on ORDERED — use atomic claim to prevent overselling.
             await claimSlot(tx);
 
             // Soft-delete old items, then recreate with new data
@@ -1147,7 +1147,7 @@ export function makeOrdersController(env: Env) {
             env,
           });
 
-          // â”€â”€ Auto-verify by AI confidence â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // ── Auto-verify by AI confidence ──────────────────────────────
           // Only auto-verify when AI confidence meets the threshold.
           const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 80;
           if (aiOrderConfidence >= autoThreshold) {
@@ -1179,7 +1179,7 @@ export function makeOrdersController(env: Env) {
           }
         }
 
-        // Audit trail â€” write BEFORE sending response so the audit entry is guaranteed
+        // Audit trail — write BEFORE sending response so the audit entry is guaranteed
         // even if the client disconnects or the response write fails.
         await writeAuditLog({
           req,
@@ -1347,7 +1347,7 @@ export function makeOrdersController(env: Env) {
           ].filter(s => {
             if (s.field === body.type) return false; // skip self
             if (!s.value) return false;
-            // Allow order â†” returnWindow to be the same screenshot
+            // Allow order ↔ returnWindow to be the same screenshot
             if ((s.field === 'order' && body.type === 'returnWindow') ||
                 (s.field === 'returnWindow' && body.type === 'order')) return false;
             return true;
@@ -1388,7 +1388,7 @@ export function makeOrdersController(env: Env) {
                 throw new AppError(400, 'UNKNOWN_REVIEW_PLATFORM',
                   'Review link must be from a recognized marketplace (Amazon, Flipkart, Myntra, etc.)');
               }
-              // Validate review link domain matches the order's platform (e.g. Amazon deal â†’ amazon.in link)
+              // Validate review link domain matches the order's platform (e.g. Amazon deal → amazon.in link)
               const orderPlatform = String((order.items?.[0] as any)?.platform || '').trim().toLowerCase();
               if (orderPlatform) {
                 const PLATFORM_DOMAIN_MAP: Record<string, string[]> = {
@@ -1438,20 +1438,20 @@ export function makeOrdersController(env: Env) {
                 signal: AbortSignal.timeout(8000),
               });
               if (headResp.ok || headResp.status === 405 || headResp.status === 403) {
-                // 200/405 (method not allowed but URL exists)/403 (auth-gated) â€” link exists
+                // 200/405 (method not allowed but URL exists)/403 (auth-gated) — link exists
                 claimAiConfidence = env.AI_REVIEW_LINK_CONFIDENCE ?? 95;
               } else if ([301, 302, 303, 307, 308, 429].includes(headResp.status)) {
-                // Redirects or rate-limited â€” URL exists but server didn't cooperate with HEAD
+                // Redirects or rate-limited — URL exists but server didn't cooperate with HEAD
                 claimAiConfidence = Math.max(80, (env.AI_REVIEW_LINK_CONFIDENCE ?? 95) - 10);
               } else {
                 orderLog.warn('Review link HEAD returned non-OK status', {
                   orderId: order.id, status: headResp.status, url: reviewUrl,
                 });
-                // Domain-validated link from known platform â€” moderate confidence
+                // Domain-validated link from known platform — moderate confidence
                 claimAiConfidence = 70;
               }
             } catch {
-              // Network error / timeout â€” domain was validated, assign moderate confidence
+              // Network error / timeout — domain was validated, assign moderate confidence
               orderLog.warn('Review link HEAD request failed', { orderId: order.id, url: reviewUrl });
               claimAiConfidence = 70;
             }
@@ -1501,7 +1501,7 @@ export function makeOrdersController(env: Env) {
                   'Please upload a screenshot from the correct marketplace account. ' +
                   (ratingAiResult.discrepancyNote || ''));
               }
-              // Block submission if product name alone mismatches (strict â€” any confidence > 0)
+              // Block submission if product name alone mismatches (strict — any confidence > 0)
               if (ratingAiResult && !ratingAiResult.productNameMatch
                 && ratingAiResult.confidenceScore > 0) {
                 throw new AppError(422, 'RATING_VERIFICATION_FAILED',
@@ -1516,13 +1516,13 @@ export function makeOrdersController(env: Env) {
                   'Please upload a FULL screenshot showing the complete review page including the page header and account name. ' +
                   (ratingAiResult.discrepancyNote || ''));
               }
-              } catch (aiErr: any) {
+              } catch (aiErr: unknown) {
                 // Re-throw user-facing validation errors (422s)
                 if (aiErr instanceof AppError) throw aiErr;
-                // Infrastructure failure (OCR capacity, Gemini down, timeout) â€” accept proof
+                // Infrastructure failure (OCR capacity, Gemini down, timeout) — accept proof
                 // for manual mediator review instead of blocking the buyer
                 orderLog.warn('[submitClaim] Rating AI verification unavailable, proceeding for manual review', {
-                  error: aiErr?.message, orderId: order.id,
+                  error: aiErr instanceof Error ? aiErr.message : String(aiErr), orderId: order.id,
                 });
               }
             }
@@ -1636,9 +1636,9 @@ export function makeOrdersController(env: Env) {
                   'Please upload a FULL screenshot showing the complete delivery/return page including the page header. ' +
                   (returnWindowResult.discrepancyNote || ''));
               }
-              // Return window open/closed, amount â€” stored for mediator review, NOT blocking
+              // Return window open/closed, amount — stored for mediator review, NOT blocking
 
-              // â”€â”€ Server-side return window timing validation â”€â”€
+              // ── Server-side return window timing validation ──
               // Cross-reference the order's creation date and returnWindowDays to verify
               // whether the return window should realistically be closed.
               // This prevents accepting a "return window closed" screenshot uploaded
@@ -1654,16 +1654,16 @@ export function makeOrdersController(env: Env) {
                   const daysRemaining = Math.ceil((expectedReturnWindowEnd.getTime() - now.getTime()) / 86400000);
                   returnWindowResult.confidenceScore = Math.min(returnWindowResult.confidenceScore, 50);
                   returnWindowResult.discrepancyNote = (returnWindowResult.discrepancyNote || '') +
-                    ` [Server: Return window should not be closed yet â€” ${daysRemaining} day(s) remaining per order records.]`;
+                    ` [Server: Return window should not be closed yet — ${daysRemaining} day(s) remaining per order records.]`;
                 }
               }
-              } catch (aiErr: any) {
+              } catch (aiErr: unknown) {
                 // Re-throw user-facing validation errors (422s)
                 if (aiErr instanceof AppError) throw aiErr;
-                // Infrastructure failure (OCR capacity, Gemini down, timeout) â€” accept proof
+                // Infrastructure failure (OCR capacity, Gemini down, timeout) — accept proof
                 // for manual mediator review instead of blocking the buyer
                 orderLog.warn('[submitClaim] Return window AI verification unavailable, proceeding for manual review', {
-                  error: aiErr?.message, orderId: order.id,
+                  error: aiErr instanceof Error ? aiErr.message : String(aiErr), orderId: order.id,
                 });
               }
             }
@@ -1741,7 +1741,7 @@ export function makeOrdersController(env: Env) {
                   'Please upload the correct order screenshot. ' +
                   (aiOrderVerification.discrepancyNote || ''));
               }
-              // Block re-upload if platform doesn't match (fraud prevention â€” e.g. Amazon deal with Flipkart screenshot)
+              // Block re-upload if platform doesn't match (fraud prevention — e.g. Amazon deal with Flipkart screenshot)
               if (aiOrderVerification && expectedPlatform
                 && aiOrderVerification.platformMatch === false
                 && aiOrderVerification.confidenceScore > 0) {
@@ -1757,13 +1757,13 @@ export function makeOrdersController(env: Env) {
                   'Please upload a FULL screenshot showing the complete order page including the page header. ' +
                   (aiOrderVerification.discrepancyNote || ''));
               }
-              } catch (aiErr: any) {
+              } catch (aiErr: unknown) {
                 // Re-throw user-facing validation errors (422s)
                 if (aiErr instanceof AppError) throw aiErr;
-                // Infrastructure failure (OCR capacity, Gemini down, timeout) â€” accept proof
+                // Infrastructure failure (OCR capacity, Gemini down, timeout) — accept proof
                 // for manual mediator review instead of blocking the buyer
                 orderLog.warn('[submitClaim] Order re-upload AI verification unavailable, proceeding for manual review', {
-                  error: aiErr?.message, orderId: order.id,
+                  error: aiErr instanceof Error ? aiErr.message : String(aiErr), orderId: order.id,
                 });
               }
             }
@@ -1823,7 +1823,7 @@ export function makeOrdersController(env: Env) {
         );
 
         // Persist marketplace reviewer/profile name if provided alongside any proof upload.
-        // Lock the name after first submission â€” buyer cannot change it between proof uploads
+        // Lock the name after first submission — buyer cannot change it between proof uploads
         // to prevent using different accounts for different proofs.
         // Uses atomic conditional update to prevent race conditions from concurrent uploads.
         if (body.reviewerName) {
@@ -1834,14 +1834,14 @@ export function makeOrdersController(env: Env) {
               data: { reviewerName: body.reviewerName },
             });
             if (atomicResult.count === 0) {
-              // Another request set it first â€” re-fetch and verify it matches
+              // Another request set it first — re-fetch and verify it matches
               const freshOrder = await db().order.findUnique({ where: { id: order.id }, select: { reviewerName: true } });
               if (freshOrder?.reviewerName && body.reviewerName.trim().toLowerCase() !== String(freshOrder.reviewerName).trim().toLowerCase()) {
                 throw new AppError(409, 'REVIEWER_NAME_LOCKED',
                   `Reviewer name is locked to "${freshOrder.reviewerName}" from your first proof upload. Use the same marketplace account for all proofs.`);
               }
             }
-            // Don't set updateData.reviewerName â€” already persisted atomically above
+            // Don't set updateData.reviewerName — already persisted atomically above
           } else if (body.reviewerName.trim().toLowerCase() !== String(order.reviewerName).trim().toLowerCase()) {
             orderLog.warn('Reviewer name change attempt blocked', {
               orderId: order.id,
@@ -1939,9 +1939,9 @@ export function makeOrdersController(env: Env) {
         if (wf === 'UNDER_REVIEW') {
           let refreshed = await db().order.findFirst({ where: { id: order.id, isDeleted: false }, include: { items: { where: { isDeleted: false } } } });
 
-          // â”€â”€ Auto-verify by AI confidence (submitClaim, already UNDER_REVIEW) â”€â”€
+          // ── Auto-verify by AI confidence (submitClaim, already UNDER_REVIEW) ──
           // Individual step auto-verify triggers at AI_AUTO_VERIFY_THRESHOLD (80%).
-          // Below that, attemptBulkAutoVerify still runs (threshold 70%) â€” so orders
+          // Below that, attemptBulkAutoVerify still runs (threshold 70%) — so orders
           // where ALL proofs score 70-79% can auto-approve without mediator review.
           const autoThreshold = env.AI_AUTO_VERIFY_THRESHOLD ?? 80;
           if (claimAiConfidence >= autoThreshold && refreshed) {
@@ -2000,7 +2000,7 @@ export function makeOrdersController(env: Env) {
           env,
         });
 
-        // â”€â”€ Auto-verify by AI confidence (submitClaim, new UNDER_REVIEW) â”€â”€
+        // ── Auto-verify by AI confidence (submitClaim, new UNDER_REVIEW) ──
         // Invoke for any positive confidence: individual step needs 80%, but
         // attemptBulkAutoVerify (inside autoVerifyStep) uses 70% baseline.
         let claimFinalOrder: any = afterReview;
@@ -2021,7 +2021,7 @@ export function makeOrdersController(env: Env) {
         try {
         const privilegedRoles: Role[] = ['admin', 'ops'];
         const managerCode = String(order.managerName || '').trim();
-        // Parallelize all user lookups â€” mediator, order owner, brand user
+        // Parallelize all user lookups — mediator, order owner, brand user
         const [mediatorUser, orderUser, brandUser] = await Promise.all([
           managerCode
             ? db().user.findFirst({

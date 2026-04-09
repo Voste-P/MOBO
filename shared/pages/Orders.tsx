@@ -2183,6 +2183,15 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
             </div>
 
             <div className="mt-6 pt-4 border-t border-gray-100">
+              {!selectedProduct && (
+                <p className="text-[10px] text-zinc-500 font-bold text-center mb-2">Select a product to continue.</p>
+              )}
+              {selectedProduct && !formScreenshot && (
+                <p className="text-[10px] text-zinc-500 font-bold text-center mb-2">Upload an order screenshot to continue.</p>
+              )}
+              {formScreenshot && (!extractedDetails.orderId || !extractedDetails.amount) && matchStatus.productName !== 'mismatch' && matchStatus.productName !== 'none' && (
+                <p className="text-[10px] text-amber-600 font-bold text-center mb-2">Could not extract order details from screenshot. Please upload a clearer image.</p>
+              )}
               {(matchStatus.productName === 'mismatch' || matchStatus.productName === 'none') && formScreenshot && (
                 <p className="text-[10px] text-red-600 font-bold text-center mb-2">
                   {matchStatus.productName === 'mismatch'

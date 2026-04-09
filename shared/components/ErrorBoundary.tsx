@@ -102,7 +102,7 @@ export class ErrorBoundary extends Component<Props, State> {
             type="button"
             onClick={this.handleReload}
             disabled={this.state.reloading}
-            className="px-8 py-3 rounded-xl border-none bg-lime-400 text-lime-950 font-bold text-sm cursor-pointer hover:bg-lime-500 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-8 py-3 rounded-xl border-none bg-lime-400 text-lime-950 font-bold text-sm cursor-pointer hover:bg-lime-500 active:scale-95 transition-[background-color,transform] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {this.state.reloading ? 'Reloading…' : exhausted ? 'Force Reload' : 'Reload'}
           </button>

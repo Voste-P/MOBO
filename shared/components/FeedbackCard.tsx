@@ -31,7 +31,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({ role }) => {
       });
       setSent(true);
       toast.success('Feedback submitted — thank you!');
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(formatErrorMessage(err, 'Failed to send feedback'));
     } finally {
       setSubmitting(false);

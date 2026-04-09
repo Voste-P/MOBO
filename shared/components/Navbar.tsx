@@ -33,7 +33,7 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
           {onNotificationClick && (
             <button
               onClick={onNotificationClick}
-              className="relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-100 active:bg-zinc-200 transition-colors text-zinc-600"
+              className="relative w-11 h-11 flex items-center justify-center rounded-full hover:bg-zinc-100 active:bg-zinc-200 transition-colors text-zinc-600"
               aria-label={notificationCount > 0 ? `${notificationCount} unread notifications` : 'Notifications'}
             >
               <Bell size={20} strokeWidth={2} />

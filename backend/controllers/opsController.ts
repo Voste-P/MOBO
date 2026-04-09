@@ -1359,8 +1359,7 @@ export function makeOpsController(env: Env) {
           // Allow agency rejection even if AI already auto-verified the proof.
           // Clear proof data and verification so buyer can re-upload.
           updateData.screenshotOrder = null;
-          updateData.verifiedAt = null;
-          updateData.verifiedBy = null;
+          updateData.orderAiVerification = null;
           if (v.order) { v.order = undefined; }
         } else {
           if (!v.order?.verifiedAt) {
@@ -2611,9 +2610,9 @@ export function makeOpsController(env: Env) {
           if (updated.count === 0) {
             throw new AppError(409, 'CONCURRENT_MODIFICATION', 'Campaign was modified concurrently, please retry');
           }
-        } catch (saveErr: any) {
+        } catch (saveErr: unknown) {
           if (saveErr instanceof AppError) throw saveErr;
-          if (saveErr?.code === 'P2025') {
+          if ((saveErr as { code?: string })?.code === 'P2025') {
             throw new AppError(409, 'CONCURRENT_MODIFICATION', 'Campaign was modified concurrently, please retry');
           }
           throw saveErr;

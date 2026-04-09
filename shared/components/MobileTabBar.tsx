@@ -78,14 +78,14 @@ export const MobileTabBar = React.memo(function MobileTabBar({
               aria-label={item.ariaLabel || item.label}
               aria-selected={active ? "true" : "false"}
               className={cn(
-                'flex flex-col items-center gap-1 min-w-[50px] transition-all duration-300 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-mobo-dark-900 rounded-xl motion-reduce:transition-none motion-reduce:transform-none',
+                'flex flex-col items-center gap-1 min-w-[50px] transition-transform duration-300 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-mobo-dark-900 rounded-xl motion-reduce:transition-none motion-reduce:transform-none',
                 active ? '-translate-y-1' : 'hover:-translate-y-0.5'
               )}
               type="button"
             >
               <div
                 className={cn(
-                  'p-2.5 rounded-[1rem] transition-all relative',
+                  'p-2.5 rounded-[1rem] transition-[transform,background-color,color,box-shadow] duration-300 relative',
                   active
                     ? 'bg-lime-500 text-zinc-900 shadow-[0_6px_18px_-8px_rgba(163,230,53,0.65)] scale-105'
                     : 'bg-transparent text-zinc-500 hover:text-zinc-300'
@@ -100,7 +100,7 @@ export const MobileTabBar = React.memo(function MobileTabBar({
               </div>
               <span
                 className={cn(
-                  'text-[10px] font-bold tracking-wide transition-all duration-300',
+                  'text-[10px] font-bold tracking-wide transition-[color,opacity,transform] duration-300',
                   active
                     ? 'text-lime-300 opacity-100'
                     : 'text-zinc-500 opacity-0 scale-0 group-hover:opacity-100 group-hover:scale-100'
@@ -121,7 +121,7 @@ export const MobileTabBar = React.memo(function MobileTabBar({
               aria-label={item.ariaLabel || item.label}
               aria-selected={active ? "true" : "false"}
               className={cn(
-                'relative p-3 rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-400/70 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:transform-none',
+                'relative p-3 rounded-full transition-[transform,background-color,color,box-shadow] duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-400/70 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:transform-none',
                 ringOffsetClass,
                 active
                   ? variant === 'darkGlass'
@@ -137,6 +137,8 @@ export const MobileTabBar = React.memo(function MobileTabBar({
               {item.icon}
               {(item.badge ?? 0) > 0 ? (
                 <span
+                  role="status"
+                  aria-label={`${item.badge} notifications`}
                   className={cn(
                     'absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2',
                     variant === 'darkGlass' ? 'border-[#18181B]' : 'border-white'

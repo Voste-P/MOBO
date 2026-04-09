@@ -707,7 +707,9 @@ model Transaction {
   @@index([campaignId])
   @@index([payoutId])
   @@index([fromUserId])
+  @@index([fromUserId, status, createdAt(sort: Desc)])
   @@index([toUserId])
+  @@index([toUserId, status, createdAt(sort: Desc)])
   @@map("transactions")
 }
 
@@ -920,6 +922,22 @@ model SecurityQuestion {
   @@unique([userId, questionId])
   @@index([userId])
   @@map("security_questions")
+}
+
+/// Security question templates — admin-managed question bank.
+/// Users pick from active templates when setting up recovery questions.
+model SecurityQuestionTemplate {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  questionId Int    @unique @map("question_id")  /// Stable numeric ID referenced by SecurityQuestion rows
+  label     String  @db.VarChar(300)              /// The question text shown to users
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive, sortOrder])
+  @@map("security_question_templates")
 }
 
 /// System configuration key-value (mirrors SystemConfig.ts)

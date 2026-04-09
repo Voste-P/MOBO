@@ -4,7 +4,7 @@ import { idWhere } from '../utils/idWhere.js';
 import { prisma } from '../database/prisma.js';
 import { orderLog, businessLog, securityLog } from '../config/logger.js';
 import { logChangeEvent, logAccessEvent, logErrorEvent } from '../config/appLogs.js';
-import { adminUsersQuerySchema, adminFinancialsQuerySchema, adminProductsQuerySchema, adminAuditLogsQuerySchema, reactivateOrderSchema, updateUserStatusSchema } from '../validations/admin.js';
+import { adminUsersQuerySchema, adminFinancialsQuerySchema, adminProductsQuerySchema, adminAuditLogsQuerySchema, reactivateOrderSchema, updateUserStatusSchema, createSecurityQuestionTemplateSchema, updateSecurityQuestionTemplateSchema } from '../validations/admin.js';
 import { toUiOrderSummary, toUiUser, toUiRole, toUiDeal } from '../utils/uiMappers.js';
 import { orderListSelectLite, getProofFlags, userAdminListSelect, dealListSelect } from '../utils/querySelect.js';
 import { parsePagination, paginatedResponse } from '../utils/pagination.js';
@@ -220,6 +220,8 @@ export function makeAdminController() {
         }
 
         const fetchStats = async () => {
+        // Set a 10-second statement timeout to prevent slow queries from blocking
+        await db().$executeRaw`SET LOCAL statement_timeout = '10s'`;
         const [roleCounts, orderStats] = await Promise.all([
           db().$queryRaw<Array<{ role: string; count: number }>>`
             SELECT r AS role, COUNT(*)::int AS count
@@ -889,6 +891,142 @@ export function makeAdminController() {
         });
       } catch (err) {
         logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'BUSINESS_LOGIC', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'admin/getAuditLogs' } });
+        next(err);
+      }
+    },
+
+    // ─── Security Question Templates CRUD ──────────────────────────
+
+    getSecurityQuestionTemplates: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const templates = await db().securityQuestionTemplate.findMany({
+          orderBy: { sortOrder: 'asc' },
+        });
+        res.json({ templates });
+      } catch (err) {
+        logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'BUSINESS_LOGIC', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'admin/getSecurityQuestionTemplates' } });
+        next(err);
+      }
+    },
+
+    createSecurityQuestionTemplate: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = createSecurityQuestionTemplateSchema.parse(req.body);
+
+        // Auto-assign next questionId
+        const maxRow = await db().securityQuestionTemplate.findFirst({
+          orderBy: { questionId: 'desc' },
+          select: { questionId: true },
+        });
+        const nextQuestionId = (maxRow?.questionId ?? 0) + 1;
+
+        const template = await db().securityQuestionTemplate.create({
+          data: {
+            questionId: nextQuestionId,
+            label: body.label.trim(),
+            isActive: body.isActive ?? true,
+            sortOrder: body.sortOrder ?? nextQuestionId,
+          },
+        });
+
+        await writeAuditLog({
+          req,
+          action: 'SECURITY_QUESTION_TEMPLATE_CREATED',
+          entityType: 'SecurityQuestionTemplate',
+          entityId: template.id,
+          metadata: { questionId: template.questionId, label: template.label },
+        });
+
+        businessLog.info('Security question template created', { userId: req.auth?.userId, questionId: template.questionId, ip: req.ip });
+        res.status(201).json({ template });
+      } catch (err) {
+        logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'BUSINESS_LOGIC', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'admin/createSecurityQuestionTemplate' } });
+        next(err);
+      }
+    },
+
+    updateSecurityQuestionTemplate: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const questionId = Number(req.params.questionId);
+        if (!Number.isInteger(questionId) || questionId < 1) {
+          throw new AppError(400, 'INVALID_QUESTION_ID', 'questionId must be a positive integer');
+        }
+
+        const body = updateSecurityQuestionTemplateSchema.parse(req.body);
+
+        const existing = await db().securityQuestionTemplate.findUnique({ where: { questionId } });
+        if (!existing) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Security question template not found');
+
+        const updated = await db().securityQuestionTemplate.update({
+          where: { questionId },
+          data: {
+            ...(body.label !== undefined ? { label: body.label.trim() } : {}),
+            ...(body.isActive !== undefined ? { isActive: body.isActive } : {}),
+            ...(body.sortOrder !== undefined ? { sortOrder: body.sortOrder } : {}),
+          },
+        });
+
+        await writeAuditLog({
+          req,
+          action: 'SECURITY_QUESTION_TEMPLATE_UPDATED',
+          entityType: 'SecurityQuestionTemplate',
+          entityId: updated.id,
+          metadata: { questionId, changes: body },
+        });
+
+        businessLog.info('Security question template updated', { userId: req.auth?.userId, questionId, ip: req.ip });
+        res.json({ template: updated });
+      } catch (err) {
+        logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'BUSINESS_LOGIC', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'admin/updateSecurityQuestionTemplate' } });
+        next(err);
+      }
+    },
+
+    deleteSecurityQuestionTemplate: async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const questionId = Number(req.params.questionId);
+        if (!Number.isInteger(questionId) || questionId < 1) {
+          throw new AppError(400, 'INVALID_QUESTION_ID', 'questionId must be a positive integer');
+        }
+
+        const existing = await db().securityQuestionTemplate.findUnique({ where: { questionId } });
+        if (!existing) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Security question template not found');
+
+        // Check if any users have answers referencing this questionId
+        const usageCount = await db().securityQuestion.count({ where: { questionId } });
+        if (usageCount > 0) {
+          // Soft-deactivate instead of hard delete to preserve referential integrity
+          await db().securityQuestionTemplate.update({
+            where: { questionId },
+            data: { isActive: false },
+          });
+
+          await writeAuditLog({
+            req,
+            action: 'SECURITY_QUESTION_TEMPLATE_DEACTIVATED',
+            entityType: 'SecurityQuestionTemplate',
+            entityId: existing.id,
+            metadata: { questionId, reason: 'In use by ' + usageCount + ' users — deactivated instead of deleted' },
+          });
+
+          businessLog.info('Security question template deactivated (in use)', { userId: req.auth?.userId, questionId, usageCount, ip: req.ip });
+          return res.json({ ok: true, deactivated: true, message: `Template is in use by ${usageCount} user(s) — deactivated instead of deleted` });
+        }
+
+        await db().securityQuestionTemplate.delete({ where: { questionId } });
+
+        await writeAuditLog({
+          req,
+          action: 'SECURITY_QUESTION_TEMPLATE_DELETED',
+          entityType: 'SecurityQuestionTemplate',
+          entityId: existing.id,
+          metadata: { questionId },
+        });
+
+        businessLog.info('Security question template deleted', { userId: req.auth?.userId, questionId, ip: req.ip });
+        res.json({ ok: true });
+      } catch (err) {
+        logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'BUSINESS_LOGIC', severity: 'medium', userId: req.auth?.userId, requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'admin/deleteSecurityQuestionTemplate' } });
         next(err);
       }
     },

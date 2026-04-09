@@ -3,10 +3,10 @@
 import React, { useState } from 'react';
 import { Phone, ArrowRight, Lock, ShieldQuestion, CheckCircle, KeyRound, ArrowLeft } from 'lucide-react';
 import { Button, Input } from '../components/ui';
-import { getQuestionLabel } from '../utils/securityQuestions';
 import { api } from '../services/api';
 import { normalizeMobileTo10Digits } from '../utils/mobiles';
 import { formatErrorMessage } from '../utils/errors';
+import { validatePassword } from '../utils/passwordValidation';
 
 interface ForgotPasswordProps {
   onBack: () => void;
@@ -22,6 +22,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSucces
   const [step, setStep] = useState<Step>('mobile');
   const [mobile, setMobile] = useState('');
   const [questionIds, setQuestionIds] = useState<number[]>([]);
+  const [questionLabels, setQuestionLabels] = useState<Record<number, string>>({});
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -40,6 +41,12 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSucces
       const result = await api.auth.forgotPasswordLookup(mobile);
       if (result?.questionIds?.length >= 3) {
         setQuestionIds(result.questionIds);
+        // Use labels from API response (DB-backed) with fallback
+        if (result.questions?.length) {
+          const labels: Record<number, string> = {};
+          for (const q of result.questions) labels[q.id] = q.label;
+          setQuestionLabels(labels);
+        }
         setStep('answers');
       } else {
         setError('Security questions not set for this account. Please contact support.');
@@ -67,30 +74,8 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSucces
     e.preventDefault();
     setError('');
 
-    if (!newPassword || newPassword.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return;
-    }
-    if (newPassword.length > 200) {
-      setError('Password must not exceed 200 characters.');
-      return;
-    }
-    if (!/[A-Z]/.test(newPassword)) {
-      setError('Password must contain at least one uppercase letter.');
-      return;
-    }
-    if (!/[a-z]/.test(newPassword)) {
-      setError('Password must contain at least one lowercase letter.');
-      return;
-    }
-    if (!/[0-9]/.test(newPassword)) {
-      setError('Password must contain at least one number.');
-      return;
-    }
-    if (!/[^A-Za-z0-9]/.test(newPassword)) {
-      setError('Password must contain at least one special character.');
-      return;
-    }
+    const pwErr = validatePassword(newPassword);
+    if (pwErr) { setError(pwErr); return; }
     if (newPassword !== confirmPassword) {
       setError('Passwords do not match.');
       return;
@@ -121,7 +106,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSucces
   /* ─Success Screen ─*/
   if (step === 'done') {
     return (
-      <div className="flex-1 flex flex-col bg-white relative px-6 py-12 overflow-y-auto scrollbar-styled items-center justify-center text-center" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
+      <div className="flex-1 flex flex-col bg-white relative px-6 py-12 overflow-y-auto scrollbar-styled items-center justify-center text-center" style={{ minHeight: '100dvh' }}>
         <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6 ring-4 ring-emerald-50">
           <CheckCircle size={40} className="text-emerald-600" />
         </div>
@@ -143,7 +128,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSucces
 
   /* ─Main Form ─*/
   return (
-    <div className="flex-1 flex flex-col bg-white relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
+    <div className="flex-1 flex flex-col bg-white relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled" style={{ minHeight: '100dvh' }}>
       {/* Back button */}
       <button
         type="button"
@@ -239,7 +224,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSucces
                   <div className="flex-1 min-w-0">
                     <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Question {idx + 1}</p>
                     <p className="text-[15px] font-bold text-gray-900 leading-snug">
-                      {getQuestionLabel(qid)}
+                      {questionLabels[qid] || `Question #${qid}`}
                     </p>
                   </div>
                 </div>

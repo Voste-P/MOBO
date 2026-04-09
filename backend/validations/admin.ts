@@ -63,3 +63,17 @@ export const adminAuditLogsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
 });
+
+// ─── Security Question Template CRUD ───
+
+export const createSecurityQuestionTemplateSchema = z.object({
+  label: z.string().min(5, 'Question must be at least 5 characters').max(300),
+  isActive: z.boolean().optional(),
+  sortOrder: z.number().int().min(0).max(9999).optional(),
+});
+
+export const updateSecurityQuestionTemplateSchema = z.object({
+  label: z.string().min(5).max(300).optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.number().int().min(0).max(9999).optional(),
+}).refine((data) => Object.keys(data).length > 0, { message: 'At least one field must be provided' });
