@@ -1,7 +1,7 @@
-# BUZZMA — Complete System Flow
+# MOBO — Complete System Flow
 
-> **What is BUZZMA?**
-> BUZZMA is a multi-stakeholder commerce ecosystem connecting **Brands**, **Agencies**, **Mediators**, and **Buyers** in a structured deal-driven marketplace. Brands list products via campaigns, Agencies manage regional distribution through Mediator networks, Mediators connect Buyers to deals, and Buyers purchase through their assigned Mediator. An Admin panel governs the entire platform.
+> **What is MOBO?**
+> MOBO is a multi-stakeholder commerce ecosystem connecting **Brands**, **Agencies**, **Mediators**, and **Buyers** in a structured deal-driven marketplace. Brands list products via campaigns, Agencies manage regional distribution through Mediator networks, Mediators connect Buyers to deals, and Buyers purchase through their assigned Mediator. An Admin panel governs the entire platform.
 
 ---
 
