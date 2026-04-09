@@ -1,4 +1,4 @@
-﻿# API Surface (UI Contract)
+# API Surface (UI Contract)
 
 > **121 endpoints** across 14 route files. Last updated: April 2026.
 
@@ -60,42 +60,47 @@ Events: `ready`, `ping`, `deals.changed`, `users.changed`, `orders.changed`, `wa
 
 ## Auth — `/api/auth` (10 endpoints)
 
-| Method | Path                              | Auth | Description                                          |
-| ------ | --------------------------------- | ---- | ---------------------------------------------------- |
-| POST   | `/api/auth/register`              | No   | Buyer registration (invite-based via `mediatorCode`) |
-| POST   | `/api/auth/login`                 | No   | Login → `{ user, tokens }`                           |
-| POST   | `/api/auth/refresh`               | No   | Refresh access token                                 |
-| GET    | `/api/auth/me`                    | Yes  | Current user profile                                 |
-| POST   | `/api/auth/register-ops`          | No   | Agency/mediator registration (invite-based)          |
-| POST   | `/api/auth/register-brand`        | No   | Brand registration (invite-based)                    |
-| PATCH  | `/api/auth/profile`               | Yes  | Update profile (RBAC/ownership enforced)             |
-| POST   | `/api/auth/security-questions`    | Yes  | Set security questions                               |
-| POST   | `/api/auth/forgot-password/lookup`| No   | Look up account for password reset                   |
-| POST   | `/api/auth/forgot-password/reset` | No   | Reset password via security questions                |
+| Method | Path                                     | Auth | Description                                          |
+| ------ | ---------------------------------------- | ---- | ---------------------------------------------------- |
+| POST   | `/api/auth/register`                     | No   | Buyer registration (invite-based via `mediatorCode`) |
+| POST   | `/api/auth/login`                        | No   | Login → `{ user, tokens }`                           |
+| POST   | `/api/auth/refresh`                      | No   | Refresh access token                                 |
+| GET    | `/api/auth/me`                           | Yes  | Current user profile                                 |
+| POST   | `/api/auth/register-ops`                 | No   | Agency/mediator registration (invite-based)          |
+| POST   | `/api/auth/register-brand`               | No   | Brand registration (invite-based)                    |
+| PATCH  | `/api/auth/profile`                      | Yes  | Update profile (RBAC/ownership enforced)             |
+| POST   | `/api/auth/security-questions`           | Yes  | Set security questions                               |
+| GET    | `/api/auth/security-question-templates`  | No   | Fetch active question templates                      |
+| POST   | `/api/auth/forgot-password/lookup`       | No   | Look up account for password reset                   |
+| POST   | `/api/auth/forgot-password/reset`        | No   | Reset password via security questions                |
 
 **AuthResponse**: `{ user: { id, role, name, ... }, tokens: { accessToken, refreshToken } }`
 
-## Admin — `/api/admin` (17 endpoints) — role: `admin`
+## Admin — `/api/admin` (21 endpoints) — role: `admin`
 
-| Method | Path                           | Description                                                                 |
-| ------ | ------------------------------ | --------------------------------------------------------------------------- |
-| GET    | `/api/admin/invites`           | List all invites                                                            |
-| POST   | `/api/admin/invites`           | Create invite                                                               |
-| POST   | `/api/admin/invites/revoke`    | Revoke invite                                                               |
-| DELETE | `/api/admin/invites/:code`     | Delete invite (soft)                                                        |
-| GET    | `/api/admin/config`            | System config                                                               |
-| PATCH  | `/api/admin/config`            | Update system config                                                        |
-| GET    | `/api/admin/users`             | List users (filter: `role`)                                                 |
-| GET    | `/api/admin/financials`        | Platform financials                                                         |
-| GET    | `/api/admin/stats`             | Dashboard stats                                                             |
-| GET    | `/api/admin/growth`            | Growth metrics                                                              |
-| GET    | `/api/admin/products`          | All products/deals                                                          |
-| PATCH  | `/api/admin/users/status`      | Suspend/activate user                                                       |
-| DELETE | `/api/admin/products/:dealId`  | Soft-delete deal                                                            |
-| DELETE | `/api/admin/users/:userId`     | Soft-delete user                                                            |
-| DELETE | `/api/admin/wallets/:userId`   | Soft-delete wallet                                                          |
-| POST   | `/api/admin/orders/reactivate` | Reactivate order                                                            |
-| GET    | `/api/admin/audit-logs`        | Audit logs (filters: `action`, `entityType`, `limit`, `page`, `from`, `to`) |
+| Method | Path                                                   | Description                                                                 |
+| ------ | ------------------------------------------------------ | --------------------------------------------------------------------------- |
+| GET    | `/api/admin/invites`                                   | List all invites                                                            |
+| POST   | `/api/admin/invites`                                   | Create invite                                                               |
+| POST   | `/api/admin/invites/revoke`                            | Revoke invite                                                               |
+| DELETE | `/api/admin/invites/:code`                             | Delete invite (soft)                                                        |
+| GET    | `/api/admin/config`                                    | System config                                                               |
+| PATCH  | `/api/admin/config`                                    | Update system config                                                        |
+| GET    | `/api/admin/users`                                     | List users (filter: `role`)                                                 |
+| GET    | `/api/admin/financials`                                | Platform financials                                                         |
+| GET    | `/api/admin/stats`                                     | Dashboard stats                                                             |
+| GET    | `/api/admin/growth`                                    | Growth metrics                                                              |
+| GET    | `/api/admin/products`                                  | All products/deals                                                          |
+| PATCH  | `/api/admin/users/status`                              | Suspend/activate user                                                       |
+| DELETE | `/api/admin/products/:dealId`                          | Soft-delete deal                                                            |
+| DELETE | `/api/admin/users/:userId`                             | Soft-delete user                                                            |
+| DELETE | `/api/admin/wallets/:userId`                           | Soft-delete wallet                                                          |
+| POST   | `/api/admin/orders/reactivate`                         | Reactivate order                                                            |
+| GET    | `/api/admin/audit-logs`                                | Audit logs (filters: `action`, `entityType`, `limit`, `page`, `from`, `to`) |
+| GET    | `/api/admin/security-question-templates`               | List all question templates                                                 |
+| POST   | `/api/admin/security-question-templates`               | Create question template                                                    |
+| PATCH  | `/api/admin/security-question-templates/:questionId`   | Update question template                                                    |
+| DELETE | `/api/admin/security-question-templates/:questionId`   | Delete/deactivate question template                                         |
 
 ## Ops — `/api/ops` (36 endpoints) — roles: `agency|mediator|ops|admin`
 

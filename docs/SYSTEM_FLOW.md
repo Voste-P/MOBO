@@ -404,21 +404,21 @@ logs/
 
 ## Security Model
 
-| Layer                  | Implementation                                                    |
-| ---------------------- | ----------------------------------------------------------------- |
-| **Authentication**     | JWT access + refresh tokens, bcrypt password hashing              |
-| **Authorization**      | Role-based access control (RBAC) on every route                   |
-| **Zero-trust tokens**  | Role verified from DB on every request (not just JWT claims)      |
-| **Cascade suspension** | Upstream suspension blocks downstream access                      |
+| Layer                  | Implementation                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Authentication**     | JWT access + refresh tokens, bcrypt password hashing                                                   |
+| **Authorization**      | Role-based access control (RBAC) on every route                                                        |
+| **Zero-trust tokens**  | Role verified from DB on every request (not just JWT claims)                                           |
+| **Cascade suspension** | Upstream suspension blocks downstream access                                                           |
 | **Rate limiting**      | Per-IP and per-user rate limits; stricter per-user financial rate limit on settlement/payout endpoints |
-| **CORS**               | Strict origin whitelist                                           |
-| **Helmet**             | Security headers (CSP, HSTS, X-Frame-Options)                     |
-| **Input validation**   | Zod schemas on all request bodies                                 |
-| **SQL injection**      | Prisma parameterized queries                                      |
-| **XSS**                | React auto-escaping + CSP headers                                 |
-| **Sensitive data**     | Redaction engine masks passwords, tokens, emails, mobiles in logs |
-| **Idempotency**        | Unique keys on financial transactions                             |
-| **Soft delete**        | Data preservation — `is_deleted` Boolean flag, never hard delete  |
+| **CORS**               | Strict origin whitelist                                                                                |
+| **Helmet**             | Security headers (CSP, HSTS, X-Frame-Options)                                                          |
+| **Input validation**   | Zod schemas on all request bodies                                                                      |
+| **SQL injection**      | Prisma parameterized queries                                                                           |
+| **XSS**                | React auto-escaping + CSP headers                                                                      |
+| **Sensitive data**     | Redaction engine masks passwords, tokens, emails, mobiles in logs                                      |
+| **Idempotency**        | Unique keys on financial transactions                                                                  |
+| **Soft delete**        | Data preservation — `is_deleted` Boolean flag, never hard delete                                       |
 
 ---
 

@@ -694,12 +694,16 @@ export const api = {
       });
     },
 
+    getSecurityQuestionTemplates: async () => {
+      return fetchJson('/auth/security-question-templates') as Promise<{ templates: { questionId: number; label: string }[] }>;
+    },
+
     forgotPasswordLookup: async (mobile: string) => {
       return fetchJson('/auth/forgot-password/lookup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mobile }),
-      }) as Promise<{ questionIds: number[] }>;
+      }) as Promise<{ questionIds: number[]; questions?: { id: number; label: string }[] }>;
     },
 
     forgotPasswordReset: async (

@@ -23,7 +23,7 @@ export function BetaBanner() {
   if (dismissed) return null;
 
   return (
-    <div className="w-full bg-yellow-50 border-b border-yellow-300 text-yellow-900 z-50 px-3 py-1.5">
+    <div role="banner" className="w-full bg-yellow-50 border-b border-yellow-300 text-yellow-900 z-50 px-3 py-1.5">
       <div className="flex items-start gap-2">
         <span className="shrink-0 mt-px font-extrabold tracking-wider text-[9px] sm:text-[10px] bg-yellow-400 text-yellow-950 px-1.5 py-0.5 rounded leading-none uppercase select-none animate-beta-pulse motion-reduce:animate-none">
           Beta

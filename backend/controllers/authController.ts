@@ -1045,6 +1045,20 @@ export function makeAuthController(env: Env) {
       }
     },
 
+    // ─── Security Question Templates: public read ────────────────
+    getSecurityQuestionTemplates: async (_req: Request, res: Response, next: NextFunction) => {
+      try {
+        const templates = await db().securityQuestionTemplate.findMany({
+          where: { isActive: true },
+          select: { questionId: true, label: true },
+          orderBy: { sortOrder: 'asc' },
+        });
+        res.json({ templates });
+      } catch (err) {
+        next(err);
+      }
+    },
+
     // ─── Security Questions: save during registration ──────────────
     saveSecurityQuestions: async (req: Request, res: Response, next: NextFunction) => {
       try {
@@ -1060,6 +1074,18 @@ export function makeAuthController(env: Env) {
         const existing = await db().securityQuestion.count({ where: { userId: user.id } });
         if (existing > 0) {
           throw new AppError(409, 'SECURITY_QUESTIONS_ALREADY_SET', 'Security questions are already configured');
+        }
+
+        // Validate submitted questionIds against active templates in the database
+        const submittedIds = body.map((q) => q.questionId);
+        const activeTemplates = await db().securityQuestionTemplate.findMany({
+          where: { questionId: { in: submittedIds }, isActive: true },
+          select: { questionId: true },
+        });
+        const activeIds = new Set(activeTemplates.map((t: { questionId: number }) => t.questionId));
+        const invalidIds = submittedIds.filter((id) => !activeIds.has(id));
+        if (invalidIds.length > 0) {
+          throw new AppError(400, 'INVALID_QUESTION_IDS', `Invalid or inactive question IDs: ${invalidIds.join(', ')}`);
         }
 
         // Hash all answers (lowercase + trimmed) and store
@@ -1125,13 +1151,24 @@ export function makeAuthController(env: Env) {
           throw new AppError(400, 'NO_SECURITY_QUESTIONS', 'Security questions are not configured for this account. Please contact support.');
         }
 
+        // Fetch labels from templates table so frontend doesn't need hardcoded questions
+        const qIds = questions.map((q) => q.questionId);
+        const templates = await db().securityQuestionTemplate.findMany({
+          where: { questionId: { in: qIds } },
+          select: { questionId: true, label: true },
+        });
+        const labelMap = new Map(templates.map((t: { questionId: number; label: string }) => [t.questionId, t.label]));
+
         logAuthEvent('FORGOT_PASSWORD_LOOKUP', {
           identifier: body.mobile,
           ip: req.ip,
           requestId: String(res.locals.requestId || ''),
         });
 
-        res.json({ questionIds: questions.map((q) => q.questionId) });
+        res.json({
+          questionIds: qIds,
+          questions: qIds.map((id) => ({ id, label: labelMap.get(id) ?? `Question #${id}` })),
+        });
       } catch (err) {
         logErrorEvent({
           message: 'Forgot password lookup failed',

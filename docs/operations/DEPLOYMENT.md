@@ -1,4 +1,4 @@
-﻿# Deployment
+# Deployment
 
 This doc is the minimal, copy/paste oriented setup.
 
