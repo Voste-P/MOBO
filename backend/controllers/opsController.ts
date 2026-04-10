@@ -2671,6 +2671,14 @@ export function makeOpsController(env: Env) {
           if (typeof commissionPaise !== 'undefined') {
             (assignmentObj as any).commissionPaise = commissionPaise;
           }
+          // ADDITIVE: add new limit on top of existing allocation
+          const existingEntry = current[normCode];
+          if (existingEntry) {
+            const existingLimit = Number(
+              typeof existingEntry === 'number' ? existingEntry : existingEntry?.limit ?? 0,
+            );
+            assignmentObj.limit = existingLimit + assignmentObj.limit;
+          }
           current[normCode] = assignmentObj;
         }
 

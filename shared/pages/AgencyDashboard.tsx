@@ -1646,17 +1646,21 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
 
   useEffect(() => {
     if (!assignModal) return;
-    // Normalize existing assignments: DB stores either number or {limit, payout} objects.
-    // Keys are lowercased to match backend JSONB storage (code.toLowerCase()).
-    const raw = assignModal.assignments || {};
-    const normalized: Record<string, number> = {};
-    for (const [code, val] of Object.entries(raw)) {
-      normalized[code.toLowerCase()] = typeof val === 'number' ? val : Number((val as Record<string, unknown>)?.limit ?? 0);
-    }
-    setAssignments(normalized);
+    // Start inputs at 0 — values represent ADDITIONAL slots to add on top of existing.
+    // Existing allocations are shown via "Current:" label beneath each input.
+    setAssignments({});
     setAssignSearch('');
     setMediatorPayouts({});
     setOpenToAll(assignModal.openToAll ?? false);
+  }, [assignModal]);
+
+  // Sum of already-assigned slots in the DB (existing allocations)
+  const existingAssignedTotal = useMemo(() => {
+    if (!assignModal?.assignments) return 0;
+    const raw = assignModal.assignments as Record<string, any>;
+    return Object.values(raw).reduce((sum: number, v: any) => {
+      return sum + Number(typeof v === 'number' ? v : v?.limit ?? 0);
+    }, 0);
   }, [assignModal]);
 
   // Get list of mediator codes for this agency (lowercase for case-insensitive matching with assignment keys)
@@ -1991,8 +1995,9 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
 
   const availableForAssign = useMemo(() => {
     if (!assignModal) return 0;
-    return Math.max(0, assignModal.totalSlots - assignModal.usedSlots);
-  }, [assignModal]);
+    // Available = totalSlots minus slots already assigned to mediators in DB
+    return Math.max(0, assignModal.totalSlots - existingAssignedTotal);
+  }, [assignModal, existingAssignedTotal]);
 
   const remainingForAssign = useMemo(() => {
     return Math.max(0, availableForAssign - assignedTotal);
@@ -2738,8 +2743,11 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                     <span className="text-[10px] font-bold text-slate-500 bg-white px-2 py-1 rounded-lg border border-slate-200 shadow-sm">
                       Total Stock: {assignModal.totalSlots}
                     </span>
+                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100 shadow-sm">
+                      Already Assigned: {existingAssignedTotal}
+                    </span>
                     <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100 shadow-sm">
-                      Available: {assignModal.totalSlots - assignModal.usedSlots}
+                      Available: {availableForAssign}
                     </span>
                     <span
                       className={`text-[10px] font-bold px-2 py-1 rounded-lg border shadow-sm ${
@@ -3067,7 +3075,7 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                           />
                         </div>
                         <span className="text-[10px] text-slate-400 font-bold mt-1">
-                          Current: {assignModal?.assignments?.[m.mediatorCode!.toLowerCase()] || assignModal?.assignments?.[m.mediatorCode!] || 0}
+                          Current: {(() => { const raw = assignModal?.assignments?.[m.mediatorCode!.toLowerCase()] ?? assignModal?.assignments?.[m.mediatorCode!]; if (!raw) return 0; return typeof raw === 'number' ? raw : (raw as any)?.limit ?? 0; })()}
                         </span>
                       </div>
                     </div>
