@@ -5,21 +5,13 @@ import { E2E_ACCOUNTS } from '../helpers/accounts';
 const authHeaders = (token: string) => ({ Authorization: `Bearer ${token}` });
 
 test.describe('Security hardening — large payload & injection', () => {
-  let adminToken: string;
   let buyerToken: string;
 
   test.beforeAll(async ({ request }) => {
-    const [admin, buyer] = await Promise.all([
-      loginAndGetAccessToken(request, {
-        username: E2E_ACCOUNTS.admin.username,
-        password: E2E_ACCOUNTS.admin.password,
-      }),
-      loginAndGetAccessToken(request, {
-        mobile: E2E_ACCOUNTS.shopper.mobile,
-        password: E2E_ACCOUNTS.shopper.password,
-      }),
-    ]);
-    adminToken = admin.accessToken;
+    const buyer = await loginAndGetAccessToken(request, {
+      mobile: E2E_ACCOUNTS.shopper.mobile,
+      password: E2E_ACCOUNTS.shopper.password,
+    });
     buyerToken = buyer.accessToken;
   });
 
