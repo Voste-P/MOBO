@@ -1295,7 +1295,7 @@ export function makeOrdersController(env: Env) {
 
         const wf = String(order.workflowStatus || 'CREATED');
         if (wf !== 'ORDERED' && wf !== 'UNDER_REVIEW' && wf !== 'PROOF_SUBMITTED' && wf !== 'APPROVED') {
-          throw new AppError(409, 'INVALID_WORKFLOW_STATE', `Cannot submit proof in state ${wf}`);
+          throw new AppError(409, 'INVALID_WORKFLOW_STATE', 'Proof cannot be submitted for this order right now. Please check the order status and try again.');
         }
 
         // verification is JSONB

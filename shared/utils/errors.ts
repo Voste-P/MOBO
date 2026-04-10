@@ -91,6 +91,11 @@ export function formatErrorMessage(err: unknown, fallback: string): string {
     if (statusMatch) {
       return httpStatusToFriendlyMessage(Number(statusMatch[1]));
     }
+    // Catch raw UPPER_CASE_SNAKE codes (e.g. "SLOT_ASSIGNMENT") that
+    // leak through and replace with a generic message.
+    if (/^[A-Z][A-Z0-9_]+$/.test(err.message.trim())) {
+      return fallback;
+    }
     return err.message;
   }
 

@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useMemo, Suspense, useCallback } from 'react';
+﻿import React, { useState, useMemo, Suspense, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { CartProvider } from '../context/CartContext';
 import { ChatProvider } from '../context/ChatContext';
@@ -30,16 +30,8 @@ interface ConsumerAppProps {
 export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'home' | 'explore' | 'orders' | 'profile'>('explore');
-  const [_slideDir, setSlideDir] = useState<'left' | 'right'>('right');
-  const prevTabIdx = useRef(0);
-
-  const TAB_ORDER = ['explore', 'home', 'orders', 'profile'] as const;
 
   const handleTabChange = (tab: typeof activeTab) => {
-    const newIdx = TAB_ORDER.indexOf(tab);
-    const oldIdx = TAB_ORDER.indexOf(activeTab);
-    setSlideDir(newIdx > oldIdx ? 'left' : 'right');
-    prevTabIdx.current = oldIdx;
     setActiveTab(tab);
   };
 
