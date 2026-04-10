@@ -491,11 +491,14 @@ export function makeBrandController() {
 
         const brand = await db().user.findFirst({
           where: { id: pgUserId, isDeleted: false },
-          select: { id: true, roles: true, connectedAgencies: true },
+          select: { id: true, roles: true, status: true, connectedAgencies: true },
         });
         if (!brand) throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
         if (!isPrivileged(roles) && !(brand.roles as string[])?.includes('brand')) {
           throw new AppError(403, 'FORBIDDEN', 'Only brands can approve requests');
+        }
+        if (!isPrivileged(roles) && String((brand as any).status || '') !== 'active') {
+          throw new AppError(409, 'BRAND_NOT_ACTIVE', 'Brand is not active');
         }
 
         // Soft-delete the pending connection
@@ -569,10 +572,13 @@ export function makeBrandController() {
         const { roles } = getRequester(req);
         const pgUserId = (req.auth as any)?.pgUserId as string;
 
-        const brand = await db().user.findFirst({ where: { id: pgUserId, isDeleted: false }, select: { id: true, roles: true, connectedAgencies: true } });
+        const brand = await db().user.findFirst({ where: { id: pgUserId, isDeleted: false }, select: { id: true, roles: true, status: true, connectedAgencies: true } });
         if (!brand) throw new AppError(401, 'UNAUTHENTICATED', 'User not found');
         if (!isPrivileged(roles) && !(brand.roles as string[])?.includes('brand')) {
           throw new AppError(403, 'FORBIDDEN', 'Only brands can remove agencies');
+        }
+        if (!isPrivileged(roles) && String((brand as any).status || '') !== 'active') {
+          throw new AppError(409, 'BRAND_NOT_ACTIVE', 'Brand is not active');
         }
 
         // Remove from connectedAgencies array
@@ -654,11 +660,19 @@ export function makeBrandController() {
         let brandPgId: string;
         let brandUserId: string;
         if (isPrivileged(roles) && body?.brandId) {
-          const brandUser = await db().user.findFirst({ where: { ...idWhere(String(body.brandId)), isDeleted: false }, select: { id: true } });
+          const brandUser = await db().user.findFirst({ where: { ...idWhere(String(body.brandId)), isDeleted: false }, select: { id: true, status: true } });
           if (!brandUser) throw new AppError(404, 'BRAND_NOT_FOUND', 'Brand not found');
+          if (String((brandUser as any).status || '') !== 'active') {
+            throw new AppError(409, 'BRAND_NOT_ACTIVE', 'Brand is not active');
+          }
           brandPgId = brandUser.id;
           brandUserId = brandUser.id;
         } else {
+          const brandUser = await db().user.findFirst({ where: { id: pgUserId, isDeleted: false }, select: { id: true, status: true } });
+          if (!brandUser) throw new AppError(404, 'BRAND_NOT_FOUND', 'Brand not found');
+          if (String((brandUser as any).status || '') !== 'active') {
+            throw new AppError(409, 'BRAND_NOT_ACTIVE', 'Brand is not active');
+          }
           brandPgId = pgUserId;
           brandUserId = userId;
         }
@@ -778,6 +792,10 @@ export function makeBrandController() {
         if (!isPrivileged(roles)) {
           // Ownership check: compare PG UUIDs directly (brandUserId stored in campaign vs pgUserId from JWT)
           if (existing.brandUserId !== pgUserId) throw new AppError(403, 'FORBIDDEN', 'Cannot modify campaigns outside your brand');
+          const brandUser = await db().user.findFirst({ where: { id: pgUserId, isDeleted: false }, select: { id: true, status: true } });
+          if (!brandUser || String((brandUser as any).status || '') !== 'active') {
+            throw new AppError(409, 'BRAND_NOT_ACTIVE', 'Brand is not active');
+          }
 
           if (typeof body.allowedAgencies !== 'undefined') {
             const allowed = body.allowedAgencies ?? [];
@@ -933,6 +951,12 @@ export function makeBrandController() {
         if (!isPrivileged(roles) && campaign.brandUserId !== pgUserId) {
           throw new AppError(403, 'FORBIDDEN', 'Not authorized to copy this campaign');
         }
+        if (!isPrivileged(roles)) {
+          const brandUser = await db().user.findFirst({ where: { id: pgUserId, isDeleted: false }, select: { id: true, status: true } });
+          if (!brandUser || String((brandUser as any).status || '') !== 'active') {
+            throw new AppError(409, 'BRAND_NOT_ACTIVE', 'Brand is not active');
+          }
+        }
 
         const newCampaign = await db().campaign.create({
           data: {
@@ -1008,6 +1032,12 @@ export function makeBrandController() {
         // Ownership check: compare PG UUIDs directly
         if (!isPrivileged(roles) && campaign.brandUserId !== pgUserId) {
           throw new AppError(403, 'FORBIDDEN', 'Cannot delete campaigns outside your ownership');
+        }
+        if (!isPrivileged(roles)) {
+          const brandUser = await db().user.findFirst({ where: { id: pgUserId, isDeleted: false }, select: { id: true, status: true } });
+          if (!brandUser || String((brandUser as any).status || '') !== 'active') {
+            throw new AppError(409, 'BRAND_NOT_ACTIVE', 'Brand is not active');
+          }
         }
 
         const hasOrders = await db().orderItem.findFirst({

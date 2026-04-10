@@ -39,14 +39,14 @@ Before deploying, verify locally from repo root:
 
 ### Production
 
-| Service  | URL                           | Branch |
-| -------- | ----------------------------- | ------ |
-| Backend  | _(your server URL)_           | `main` |
-| Buyer    | https://www.buzzma.in         | `main` |
-| Mediator | https://www.mediatorbuzzma.in | `main` |
-| Agency   | https://www.agencybuzzma.in   | `main` |
-| Brand    | https://www.brandbuzzma.in    | `main` |
-| Admin    | https://moboadmin.vercel.app  | `main` |
+| Service  | URL                             | Branch |
+| -------- | ------------------------------- | ------ |
+| Backend  | _(your server URL)_             | `main` |
+| Buyer    | <https://www.buzzma.in>         | `main` |
+| Mediator | <https://www.mediatorbuzzma.in> | `main` |
+| Agency   | <https://www.agencybuzzma.in>   | `main` |
+| Brand    | <https://www.brandbuzzma.in>    | `main` |
+| Admin    | <https://moboadmin.vercel.app>  | `main` |
 
 ### Database Naming
 
@@ -130,12 +130,12 @@ Each portal must set:
 
 Current production portal URLs:
 
-| Portal   | Vercel URL                    |
-| -------- | ----------------------------- |
-| Buyer    | https://www.buzzma.in         |
-| Mediator | https://www.mediatorbuzzma.in |
-| Agency   | https://www.agencybuzzma.in   |
-| Brand    | https://www.brandbuzzma.in    |
-| Admin    | https://moboadmin.vercel.app  |
+| Portal   | Vercel URL                      |
+| -------- | ------------------------------- |
+| Buyer    | <https://www.buzzma.in>         |
+| Mediator | <https://www.mediatorbuzzma.in> |
+| Agency   | <https://www.agencybuzzma.in>   |
+| Brand    | <https://www.brandbuzzma.in>    |
+| Admin    | <https://moboadmin.vercel.app>  |
 
 That keeps the UI contract stable (`/api/*` on the client, rewritten server-side to the backend).
