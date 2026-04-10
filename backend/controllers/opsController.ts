@@ -977,7 +977,6 @@ export function makeOpsController(env: Env) {
         });
 
         // Evict auth cache so the suspended mediator can't act on stale tokens
-        authCacheInvalidate(mediator.id!);
         authCacheInvalidate(mediator.id);
 
         // Invalidate lineage cache so downstream lookups reflect the status change

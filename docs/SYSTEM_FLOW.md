@@ -431,8 +431,8 @@ logs/
 | **SQL injection**      | Prisma parameterized queries                                                                           |
 | **XSS**                | React auto-escaping + CSP headers                                                                      |
 | **Sensitive data**     | Redaction engine masks passwords, tokens, emails, mobiles in logs                                      |
-| **Idempotency**        | Unique keys on financial transactions (validated: 1-128 chars, alphanumeric)                          |
-| **Frozen orders**      | Admin-frozen orders blocked from auto-approval in all verification paths                             |
+| **Idempotency**        | Unique keys on financial transactions (validated: 1-128 chars, alphanumeric)                           |
+| **Frozen orders**      | Admin-frozen orders blocked from auto-approval in all verification paths                               |
 | **Soft delete**        | Data preservation — `is_deleted` Boolean flag, never hard delete                                       |
 
 ---
