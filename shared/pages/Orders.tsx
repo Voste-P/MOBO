@@ -2762,6 +2762,23 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
               </div>
             ) : (
               <div className="space-y-3">
+                {/* Reviewer Name input — shown on re-upload after rejection so buyer can correct it */}
+                {selectedOrder?.rejection?.type === 'order' && (
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1">
+                      Reviewer / Profile Name
+                    </label>
+                    <input
+                      value={reviewerNameInput}
+                      onChange={(e) => setReviewerNameInput(e.target.value)}
+                      placeholder="Enter your marketplace reviewer name"
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1 ml-1">
+                      Enter the reviewer / profile name you use on the marketplace.
+                    </p>
+                  </div>
+                )}
                 <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">
                   Proof
                 </label>

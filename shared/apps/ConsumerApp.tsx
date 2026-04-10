@@ -31,6 +31,8 @@ export const ConsumerApp: React.FC<ConsumerAppProps> = ({ onBack }) => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'home' | 'explore' | 'orders' | 'profile'>('explore');
 
+  const TAB_ORDER = ['explore', 'home', 'orders', 'profile'] as const;
+
   const handleTabChange = (tab: typeof activeTab) => {
     setActiveTab(tab);
   };
