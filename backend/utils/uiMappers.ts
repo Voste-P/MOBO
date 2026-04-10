@@ -127,17 +127,8 @@ export function toUiCampaign(c: any) {
 }
 
 export function toUiDeal(d: any, mediatorName?: string) {
-  const placeholderImage =
-    'data:image/svg+xml;utf8,' +
-    encodeURIComponent(
-      '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">' +
-        '<rect width="160" height="160" rx="24" fill="#F3F4F6"/>' +
-        '<circle cx="80" cy="64" r="24" fill="#E5E7EB"/>' +
-        '<rect x="32" y="104" width="96" height="16" rx="8" fill="#E5E7EB"/>' +
-      '</svg>'
-    );
   const safeText = (value: unknown) => String(value || '').replace(/["\\]/g, '').trim();
-  const image = safeText(d.image) || placeholderImage;
+  const image = safeText(d.image);
 
   return {
     id: String(d._id ?? d.id),

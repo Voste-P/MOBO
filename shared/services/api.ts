@@ -365,11 +365,12 @@ function cacheResponse(path: string, data: any) {
 }
 
 // Periodic cleanup of expired entries (every 30s)
-// Guard against HMR creating duplicate intervals in development
-let _cacheCleanupTimer: ReturnType<typeof setInterval> | undefined;
+// Guard against HMR creating duplicate intervals via globalThis
+const CACHE_TIMER_KEY = '__mobo_cache_cleanup_timer';
 if (typeof window !== 'undefined') {
-  if (_cacheCleanupTimer) clearInterval(_cacheCleanupTimer);
-  _cacheCleanupTimer = setInterval(() => {
+  const prev = (globalThis as Record<string, unknown>)[CACHE_TIMER_KEY] as ReturnType<typeof setInterval> | undefined;
+  if (prev) clearInterval(prev);
+  (globalThis as Record<string, unknown>)[CACHE_TIMER_KEY] = setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of getCache) {
       if (now > entry.expiresAt) getCache.delete(key);

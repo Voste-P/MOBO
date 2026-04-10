@@ -133,6 +133,54 @@ test.describe('Brand campaign & payout management API', () => {
     expect(res.status()).toBeLessThan(500);
   });
 
+  // ── Validation: image & productUrl must be valid URLs ─────────
+  test('campaign creation rejects invalid image URL', async ({ request }) => {
+    const res = await request.post('/api/brand/campaigns', {
+      headers: authHeaders(brandToken),
+      data: {
+        title: 'Validation Test',
+        platform: 'Amazon',
+        dealType: 'Discount',
+        price: 100,
+        originalPrice: 200,
+        payout: 50,
+        image: 'not-a-url',
+        productUrl: 'https://example.com/product',
+        totalSlots: 5,
+        allowedAgencies: ['AG_TEST'],
+      },
+    });
+    expect([400, 422]).toContain(res.status());
+  });
+
+  test('campaign creation rejects invalid productUrl', async ({ request }) => {
+    const res = await request.post('/api/brand/campaigns', {
+      headers: authHeaders(brandToken),
+      data: {
+        title: 'Validation Test',
+        platform: 'Amazon',
+        dealType: 'Discount',
+        price: 100,
+        originalPrice: 200,
+        payout: 50,
+        image: 'https://placehold.co/600x400',
+        productUrl: 'just-text',
+        totalSlots: 5,
+        allowedAgencies: ['AG_TEST'],
+      },
+    });
+    expect([400, 422]).toContain(res.status());
+  });
+
+  test('campaign update rejects invalid image URL', async ({ request }) => {
+    const res = await request.patch('/api/brand/campaigns/nonexistent-id', {
+      headers: authHeaders(brandToken),
+      data: { image: 'not-a-valid-url' },
+    });
+    // Should reject with validation error (400/422), not 500
+    expect(res.status()).toBeLessThan(500);
+  });
+
   // ── RBAC: buyer blocked ───────────────────────────────────────
   test('buyer cannot access brand dashboard', async ({ request }) => {
     const res = await request.get('/api/brand/dashboard-stats', {
