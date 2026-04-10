@@ -139,8 +139,8 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
 
   const makeMessageId = () => {
     try {
-      if (globalThis.crypto?.randomUUID) {
-        return crypto.randomUUID();
+      if (typeof globalThis.crypto?.randomUUID === 'function') {
+        return globalThis.crypto.randomUUID();
       }
     } catch {
       // ignore
