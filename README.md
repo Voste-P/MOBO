@@ -172,7 +172,7 @@ npm run db:reset-admin
 Windows PowerShell one-liner example:
 
 ```powershell
-$env:ADMIN_SEED_USERNAME='chetan'; $env:ADMIN_SEED_PASSWORD='chetan789'; $env:ADMIN_SEED_MOBILE='9000000000'; $env:ADMIN_SEED_NAME='Chetan Admin'; $env:WIPE_DB='true'; $env:WIPE_DB_CONFIRM='WIPE'; npm run db:reset-admin
+$env:ADMIN_SEED_USERNAME='******'; $env:ADMIN_SEED_PASSWORD='*********'; $env:ADMIN_SEED_MOBILE='9000000000'; $env:ADMIN_SEED_NAME='Chetan Admin'; $env:WIPE_DB='true'; $env:WIPE_DB_CONFIRM='WIPE'; npm run db:reset-admin
 ```
 
 ## Environment variables
