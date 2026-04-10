@@ -1460,6 +1460,8 @@ export function makeOpsController(env: Env) {
         updateData.ratingAiVerification = null;
         updateData.returnWindowAiVerification = null;
         updateData.missingProofRequests = [];
+        // Reset reviewer name so buyer can correct it on re-upload
+        updateData.reviewerName = null;
 
         updateData.rejectionType = body.type;
         updateData.rejectionReason = body.reason;
