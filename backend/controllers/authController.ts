@@ -417,7 +417,7 @@ export function makeAuthController(env: Env) {
           ? db().user.update({
               where: { id: authUser.id },
               data: { failedLoginAttempts: 0, lockoutUntil: null },
-            })
+            }).catch((err: any) => { businessLog.warn('Failed to reset login lockout', { userId: authUser.id, error: err?.message }); })
           : null;
 
         const [user, wallet] = await Promise.all([

@@ -80,6 +80,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         variant,
       };
 
+      let added = false;
       setToasts((prev) => {
         // Deduplicate: only skip if same message+variant is STILL visible and not yet expired.
         if (prev.some((x) => x.message === message && x.variant === variant)) {
@@ -93,11 +94,14 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }
           return prev;
         }
+        added = true;
         return [item, ...prev].slice(0, 4);
       });
 
-      const timeout = window.setTimeout(() => dismiss(id), durationMs);
-      timersRef.current.set(id, timeout);
+      if (added) {
+        const timeout = window.setTimeout(() => dismiss(id), durationMs);
+        timersRef.current.set(id, timeout);
+      }
     },
     [dismiss]
   );
