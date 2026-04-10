@@ -314,6 +314,7 @@ Guard: `requireAuth` + `requireRoles('brand','admin','ops')`
     - Enforces per-buyer velocity limits
     - Blocks duplicate externalOrderId
     - Blocks duplicate deal orders per buyer
+    - Blocks orders on locked campaigns (409 `CAMPAIGN_LOCKED`)
     - Enforces campaign availability to buyer lineage (agency allow-list OR mediator assignment)
     - Supports upgrading a redirect pre-order via `preOrderId`.
 
