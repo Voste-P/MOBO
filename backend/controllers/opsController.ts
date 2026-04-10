@@ -3375,28 +3375,29 @@ export function makeOpsController(env: Env) {
           throw new AppError(409, 'ALREADY_CANCELLED', 'This order is already cancelled');
         }
 
-        // Release campaign slot
+        // Release campaign slot + update order atomically
         const campaignId = order.items?.[0]?.campaignId;
-        if (campaignId) {
-          await db().$executeRaw`UPDATE "campaigns" SET "used_slots" = GREATEST("used_slots" - 1, 0) WHERE id = ${campaignId}::uuid AND "is_deleted" = false`;
-        }
-
         const currentEvents = Array.isArray(order.events) ? (order.events as any[]) : [];
-        await db().order.update({
-          where: { id: order.id },
-          data: {
-            affiliateStatus: 'Rejected',
-            rejectionType: 'order',
-            rejectionReason: body.reason,
-            rejectionAt: new Date(),
-            rejectionBy: req.auth?.userId,
-            events: pushOrderEvent(currentEvents, {
-              type: 'REJECTED',
-              at: new Date(),
-              actorUserId: req.auth?.userId,
-              metadata: { step: 'order_cancelled', reason: body.reason },
-            }),
-          },
+        await db().$transaction(async (tx: any) => {
+          await tx.order.update({
+            where: { id: order.id },
+            data: {
+              affiliateStatus: 'Rejected',
+              rejectionType: 'order',
+              rejectionReason: body.reason,
+              rejectionAt: new Date(),
+              rejectionBy: req.auth?.userId,
+              events: pushOrderEvent(currentEvents, {
+                type: 'REJECTED',
+                at: new Date(),
+                actorUserId: req.auth?.userId,
+                metadata: { step: 'order_cancelled', reason: body.reason },
+              }),
+            },
+          });
+          if (campaignId) {
+            await tx.$executeRaw`UPDATE "campaigns" SET "used_slots" = GREATEST("used_slots" - 1, 0) WHERE id = ${campaignId}::uuid AND "is_deleted" = false`;
+          }
         });
 
         if (!['REJECTED', 'FAILED', 'COMPLETED'].includes(wf)) {
