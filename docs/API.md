@@ -58,7 +58,7 @@ Statuses: `400` validation, `401` unauthenticated, `403` forbidden, `404` not fo
 
 Events: `ready`, `ping`, `deals.changed`, `users.changed`, `orders.changed`, `wallets.changed`, `tickets.changed`, `notifications.changed`. See `docs/REALTIME.md`.
 
-## Auth — `/api/auth` (10 endpoints)
+## Auth — `/api/auth` (11 endpoints)
 
 | Method | Path                                     | Auth | Description                                          |
 | ------ | ---------------------------------------- | ---- | ---------------------------------------------------- |

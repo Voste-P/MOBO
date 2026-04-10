@@ -1,7 +1,7 @@
 // ──────────────────────────────────────────────────────────
 // MOBO – Prisma Schema (PostgreSQL)
 // PostgreSQL is the primary and only database.
-// 17 models covering the full MOBO domain.
+// 22 models covering the full MOBO domain.
 // ──────────────────────────────────────────────────────────
 
 generator client {
