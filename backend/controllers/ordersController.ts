@@ -874,6 +874,10 @@ export function makeOrdersController(env: Env) {
           throw new AppError(409, 'CAMPAIGN_NOT_ACTIVE', 'Campaign is not active');
         }
 
+        if ((campaign as any).locked) {
+          throw new AppError(409, 'CAMPAIGN_LOCKED', (campaign as any).lockedReason || 'Campaign is currently locked');
+        }
+
         const upstreamAgencyCode = String((mediatorUser as any)?.parentCode || '').trim();
 
         // Resolve actual agency name for the order record
