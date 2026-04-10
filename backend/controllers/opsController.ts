@@ -1431,25 +1431,15 @@ export function makeOpsController(env: Env) {
           throw new AppError(409, 'INVALID_WORKFLOW_STATE', `Cannot reject in state ${wf}`);
         }
 
-        const wasApproved = wf === 'APPROVED';
-
         const pgMapped = pgOrder(order);
-        const v = (order.verification && typeof order.verification === 'object') ? { ...(order.verification as any) } : {} as any;
         const updateData: any = {};
 
+        // Validate the specific proof type being rejected exists
         if (body.type === 'order') {
           if (!order.screenshotOrder) {
             throw new AppError(409, 'MISSING_PROOF', 'Missing order proof');
           }
-          // Allow agency rejection even if AI already auto-verified the proof.
-          // Clear proof data and verification so buyer can re-upload.
-          updateData.screenshotOrder = null;
-          updateData.orderAiVerification = null;
-          if (v.order) { v.order = undefined; }
         } else {
-          if (!v.order?.verifiedAt) {
-            throw new AppError(409, 'PURCHASE_NOT_VERIFIED', 'Purchase proof must be verified first');
-          }
           const required = getRequiredStepsForOrder(pgMapped);
           if (!required.includes(body.type)) {
             throw new AppError(409, 'NOT_REQUIRED', `This order does not require ${body.type} verification`);
@@ -1457,33 +1447,27 @@ export function makeOpsController(env: Env) {
           if (!hasProofForRequirement(pgMapped, body.type)) {
             throw new AppError(409, 'MISSING_PROOF', `Missing ${body.type} proof`);
           }
-          if (body.type === 'review') {
-            updateData.reviewLink = null;
-            updateData.screenshotReview = null;
-            if (v.review) { v.review = undefined; }
-          }
-          if (body.type === 'rating') {
-            updateData.screenshotRating = null;
-            if (v.rating) { v.rating = undefined; }
-            updateData.ratingAiVerification = null;
-          }
-          if (body.type === 'returnWindow') {
-            updateData.screenshotReturnWindow = null;
-            if (v.returnWindow) { v.returnWindow = undefined; }
-          }
         }
+
+        // Clear ALL proofs so buyer must re-upload everything from scratch
+        updateData.screenshotOrder = null;
+        updateData.screenshotRating = null;
+        updateData.screenshotReview = null;
+        updateData.screenshotReturnWindow = null;
+        updateData.reviewLink = null;
+        updateData.verification = {};
+        updateData.orderAiVerification = null;
+        updateData.ratingAiVerification = null;
+        updateData.returnWindowAiVerification = null;
+        updateData.missingProofRequests = [];
 
         updateData.rejectionType = body.type;
         updateData.rejectionReason = body.reason;
         updateData.rejectionAt = new Date();
         updateData.rejectionBy = req.auth?.userId;
-        // When rejecting from APPROVED, reset to Unchecked so buyer can re-upload;
-        // from UNDER_REVIEW the status is terminal Rejected (mediator can still cancel later).
-        updateData.affiliateStatus = wasApproved ? 'Unchecked' : 'Rejected';
-        if (wasApproved) {
-          updateData.expectedSettlementDate = null;
-        }
-        updateData.verification = v;
+        // Always reset to Unchecked so buyer can re-upload all proofs
+        updateData.affiliateStatus = 'Unchecked';
+        updateData.expectedSettlementDate = null;
 
         const newEvents = pushOrderEvent(order.events as any, {
           type: 'REJECTED',
@@ -1503,17 +1487,15 @@ export function makeOpsController(env: Env) {
           }
         });
 
-        // When rejecting from APPROVED, transition back to ORDERED so buyer can re-upload
-        if (wasApproved) {
-          await transitionOrderWorkflow({
-            orderId: order.id!,
-            from: 'APPROVED' as any,
-            to: 'ORDERED' as any,
-            actorUserId: String(req.auth?.userId || ''),
-            metadata: { source: 'rejectOrderProof', reason: body.reason, proofType: body.type },
-            env,
-          });
-        }
+        // Always transition back to ORDERED so buyer can re-upload all proofs
+        await transitionOrderWorkflow({
+          orderId: order.id!,
+          from: wf as any,
+          to: 'ORDERED' as any,
+          actorUserId: String(req.auth?.userId || ''),
+          metadata: { source: 'rejectOrderProof', reason: body.reason, proofType: body.type },
+          env,
+        });
 
         await writeAuditLog({
           req,
@@ -1524,7 +1506,7 @@ export function makeOpsController(env: Env) {
         });
         orderLog.info('Order proof rejected', { orderId: order.id, proofType: body.type, reason: body.reason });
         businessLog.info('Order proof rejected', { orderId: order.id, proofType: body.type, reason: body.reason, rejectedBy: req.auth?.userId, ip: req.ip });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Order', entityId: order.id!, action: 'PROOF_REJECTED', changedFields: ['affiliateStatus', 'rejectionType', 'rejectionReason'], before: { affiliateStatus: order.affiliateStatus }, after: { affiliateStatus: wasApproved ? 'Unchecked' : 'Rejected', rejectionType: body.type, rejectionReason: body.reason } });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Order', entityId: order.id!, action: 'PROOF_REJECTED', changedFields: ['affiliateStatus', 'rejectionType', 'rejectionReason'], before: { affiliateStatus: order.affiliateStatus }, after: { affiliateStatus: 'Unchecked', rejectionType: body.type, rejectionReason: body.reason } });
         logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Order', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'REJECT_ORDER_PROOF', orderId: order.id, proofType: body.type } });
 
         if (body.type === 'order') {
@@ -1551,23 +1533,23 @@ export function makeOpsController(env: Env) {
             userId: buyerId,
             app: 'buyer',
             payload: {
-              title: wasApproved ? 'Proof recalled — re-upload needed' : 'Proof rejected',
-              body: body.reason || 'Please re-upload the required proof.',
+              title: 'Proof rejected — re-upload all proofs',
+              body: body.reason || 'Please re-upload all required proofs.',
               url: '/orders',
             },
           }).catch((err: unknown) => { pushLog.warn('Push failed for rejectProof', { err, buyerId }); });
         }
 
-        // Notify mediator when proof is rejected from APPROVED state
-        if (wasApproved && audience.mediatorCodes?.length) {
+        // Notify mediator when proof is rejected
+        if (audience.mediatorCodes?.length) {
           for (const code of audience.mediatorCodes) {
             sendPushToUser({
               env,
               userId: code,
               app: 'mediator',
               payload: {
-                title: 'Approved order recalled',
-                body: `Proof rejected after approval: ${body.reason || 'Re-upload requested'}`,
+                title: 'Order proof rejected',
+                body: `Proof rejected — buyer must re-upload all proofs: ${body.reason || 'Re-upload requested'}`,
                 url: '/orders',
               },
             }).catch((err: unknown) => { pushLog.warn('Push failed for mediator rejectProof', { err, mediatorCode: code }); });

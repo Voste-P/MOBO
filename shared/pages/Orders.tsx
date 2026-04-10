@@ -1336,7 +1336,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                     <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
                     <div>
                       <span className="uppercase text-[10px] tracking-wider font-black text-red-500 block mb-0.5">
-                        {rejectionType === 'order' ? 'Purchase Proof' : rejectionType === 'review' ? 'Review Proof' : rejectionType === 'rating' ? 'Rating Proof' : rejectionType === 'returnWindow' ? 'Return Window Proof' : 'Proof'} Rejected
+                        {rejectionType === 'order' ? 'Purchase Proof' : rejectionType === 'review' ? 'Review Proof' : rejectionType === 'rating' ? 'Rating Proof' : rejectionType === 'returnWindow' ? 'Return Window Proof' : 'Proof'} Rejected — Re-upload All Proofs
                       </span>
                       {rejectionReason}
                     </div>
