@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../components/ui/ConfirmDialog';
@@ -46,6 +46,10 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
   const [orders, setOrders] = useState<Order[]>([]);
   const [totalSpent, setTotalSpent] = useState(0);
   const [isStatsLoading, setIsStatsLoading] = useState(false);
+
+  // Memoize payment status counts to avoid re-filtering each render
+  const settledCount = useMemo(() => orders.filter((o) => o.paymentStatus === 'Paid').length, [orders]);
+  const pendingCount = useMemo(() => orders.filter((o) => o.paymentStatus === 'Pending').length, [orders]);
   const statsLoadingRef = useRef(false);
   const mountedRef = useRef(true);
 
@@ -426,7 +430,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
             <div className="grid grid-cols-2 gap-3 pt-2">
               <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 text-center">
                 <p className="text-xl font-black text-zinc-900">
-                  {orders.filter((o) => o.paymentStatus === 'Paid').length}
+                  {settledCount}
                 </p>
                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
                   Settled
@@ -434,7 +438,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
               </div>
               <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 text-center">
                 <p className="text-xl font-black text-zinc-900">
-                  {orders.filter((o) => o.paymentStatus === 'Pending').length}
+                  {pendingCount}
                 </p>
                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
                   Pending

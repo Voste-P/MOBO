@@ -155,6 +155,15 @@ erDiagram
 
 ## Order workflow
 
+State machine: `CREATED → REDIRECTED → ORDERED → PROOF_SUBMITTED → UNDER_REVIEW → APPROVED → REWARD_PENDING → COMPLETED`.
+Transitions are enforced by `assertTransition()` in `orderWorkflow.ts` with an atomic `updateMany` conditional on `workflowStatus = :from` to prevent TOCTOU races.
+
+## Quality & Performance
+
+- **Memoization**: Order filter counts in Profile page are memoized with `useMemo` to avoid redundant array traversals per render.
+- **Accessibility**: Modal backdrops use `role="presentation"` and support Escape key dismissal. Focus management follows WAI-ARIA dialog patterns.
+- **E2E tests**: Smoke tests use exact placeholder selectors matching the real UI (`"Mobile Number"`, `"Password"`, `"root"`) instead of loose regexes, preventing silent failures when UI text changes.
+
 Orders have a strict state machine (`workflowStatus`), with anti-fraud constraints:
 
 - A buyer cannot have more than one active order per deal.

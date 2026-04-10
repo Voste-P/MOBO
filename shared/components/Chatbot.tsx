@@ -139,8 +139,8 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
 
   const makeMessageId = () => {
     try {
-      if (typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function') {
-        return (crypto as any).randomUUID() as string;
+      if (globalThis.crypto?.randomUUID) {
+        return crypto.randomUUID();
       }
     } catch {
       // ignore
@@ -423,7 +423,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
       </div>
 
       {showNotifications && (
-        <div className="absolute inset-x-0 top-[72px] bottom-0 z-30 bg-black/20 backdrop-blur-[2px]" onClick={() => setShowNotifications(false)}>
+        <div className="absolute inset-x-0 top-[72px] bottom-0 z-30 bg-black/20 backdrop-blur-[2px]" role="presentation" onClick={() => setShowNotifications(false)} onKeyDown={(e) => { if (e.key === 'Escape') setShowNotifications(false); }}>
           <div className="flex justify-end px-5 pt-2" onClick={(e) => e.stopPropagation()}>
             <div className="w-[78vw] max-w-[340px] bg-white rounded-[2rem] shadow-2xl border border-gray-100 p-2 animate-enter">
               <div className="px-4 py-3 flex justify-between items-center border-b border-gray-50 mb-1">

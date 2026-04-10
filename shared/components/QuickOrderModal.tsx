@@ -208,7 +208,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = React.memo(functi
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onKeyDown={handleEscape} role="dialog" aria-modal="true" aria-label="Order form">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleClose} />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" role="presentation" onClick={handleClose} />
 
       {/* Modal */}
       <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[90dvh] overflow-y-auto scrollbar-styled animate-enter">

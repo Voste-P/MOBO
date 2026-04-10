@@ -10,16 +10,15 @@ test.describe('Admin portal smoke', () => {
 
   test('admin can log in', async ({ page }) => {
     await page.goto('/');
-    // Fill admin credentials
-    const usernameField = page.getByPlaceholder(/username|email/i).first();
-    const passwordField = page.getByPlaceholder(/password/i).first();
+    // Admin portal uses placeholder="root" for username and "••••••••" for password
+    const usernameField = page.getByPlaceholder('root').first();
+    const passwordField = page.getByLabel(/security key/i).first();
 
-    if (await usernameField.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await usernameField.fill(E2E_ACCOUNTS.admin.username);
-      await passwordField.fill(E2E_ACCOUNTS.admin.password);
-      await page.getByRole('button', { name: /login|sign in|submit/i }).first().click();
-      // Should navigate away from login
-      await page.waitForURL((url) => !url.pathname.includes('login'), { timeout: 15_000 }).catch(() => {});
-    }
+    await expect(usernameField).toBeVisible({ timeout: 10_000 });
+    await usernameField.fill(E2E_ACCOUNTS.admin.username);
+    await passwordField.fill(E2E_ACCOUNTS.admin.password);
+    await page.getByRole('button', { name: /enter|sign in|submit/i }).first().click();
+    // Should navigate away from login
+    await expect(page.getByRole('heading').first()).toBeVisible({ timeout: 15_000 });
   });
 });
