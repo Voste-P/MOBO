@@ -11,6 +11,7 @@ import { pgDeal } from '../utils/pgMappers.js';
 import { idWhere } from '../utils/idWhere.js';
 import { orderLog, businessLog } from '../config/logger.js';
 import { logChangeEvent, logAccessEvent, logErrorEvent } from '../config/appLogs.js';
+import { getAgencyCodeForMediatorCode } from '../services/lineage.js';
 
 function db() { return prisma(); }
 
@@ -36,23 +37,39 @@ export function makeProductsController() {
           mediatorCode: { equals: mediatorCode, mode: 'insensitive' as const },
           active: true,
           isDeleted: false,
-          campaign: { isDeleted: false },
+          campaign: { isDeleted: false, status: 'active' as any },
         };
 
-        const [deals, total, mediatorUser] = await Promise.all([
+        const [rawDeals, total, mediatorUser, agencyCode] = await Promise.all([
           db().deal.findMany({
             where,
             orderBy: { createdAt: 'desc' },
             skip,
             take: limit,
-            include: { campaign: { select: { totalSlots: true, usedSlots: true, openToAll: true, assignments: true, createdAt: true } } },
+            include: { campaign: { select: { totalSlots: true, usedSlots: true, openToAll: true, assignments: true, allowedAgencyCodes: true, createdAt: true } } },
           }),
           db().deal.count({ where }),
           db().user.findFirst({
             where: { mediatorCode: { equals: mediatorCode, mode: 'insensitive' }, isDeleted: false },
             select: { name: true },
           }),
+          getAgencyCodeForMediatorCode(mediatorCode),
         ]);
+
+        // Filter out deals where the mediator's agency no longer has campaign access
+        const deals = rawDeals.filter((d: any) => {
+          const campaign = d.campaign;
+          if (!campaign) return false;
+          if (campaign.openToAll) return true;
+          const medCodeLwr = mediatorCode.toLowerCase();
+          const assignments = campaign.assignments && typeof campaign.assignments === 'object' && !Array.isArray(campaign.assignments) ? campaign.assignments as Record<string, any> : {};
+          if (assignments[medCodeLwr]) return true;
+          if (agencyCode) {
+            const allowed = Array.isArray(campaign.allowedAgencyCodes) ? campaign.allowedAgencyCodes.map((c: any) => String(c).trim().toUpperCase()) : [];
+            if (allowed.includes(agencyCode.toUpperCase())) return true;
+          }
+          return false;
+        });
 
         // For non-openToAll campaigns, count per-mediator order consumption
         const perMedCounts = new Map<string, number>();

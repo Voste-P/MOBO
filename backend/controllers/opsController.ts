@@ -510,17 +510,40 @@ export function makeOpsController(env: Env) {
         }
 
         const { limit: dLimit, skip: dSkip, page: dPage, isPaginated: dIsPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
-        const dealWhere = { mediatorCode: { in: mediatorCodes }, isDeleted: false as const, campaign: { isDeleted: false } };
-        const [deals, dealTotal] = await Promise.all([
+        const dealWhere = { mediatorCode: { in: mediatorCodes }, isDeleted: false as const, campaign: { isDeleted: false, status: 'active' as any } };
+        const [rawDeals, dealTotal] = await Promise.all([
           db().deal.findMany({
             where: dealWhere,
             orderBy: { createdAt: 'desc' },
             skip: dSkip,
             take: dLimit,
-            select: { ...dealListSelect, campaign: { select: { totalSlots: true, usedSlots: true, openToAll: true, assignments: true, createdAt: true } } },
+            select: { ...dealListSelect, campaign: { select: { totalSlots: true, usedSlots: true, openToAll: true, assignments: true, allowedAgencyCodes: true, createdAt: true } } },
           }),
           db().deal.count({ where: dealWhere }),
         ]);
+
+        // Filter out deals where the mediator's agency no longer has campaign access.
+        // Privileged users (admin/ops) see all; mediators/agencies see only authorized deals.
+        let deals = rawDeals;
+        if (!isPrivileged(roles)) {
+          const agencyMap = await getAgencyCodesForMediatorCodes(mediatorCodes);
+          deals = rawDeals.filter((d: any) => {
+            const campaign = d.campaign;
+            if (!campaign) return false;
+            if (campaign.openToAll) return true;
+            const medCode = String(d.mediatorCode || '').toLowerCase();
+            // Mediator has an explicit slot assignment → show
+            const assignments = campaign.assignments && typeof campaign.assignments === 'object' && !Array.isArray(campaign.assignments) ? campaign.assignments as Record<string, any> : {};
+            if (assignments[medCode]) return true;
+            // Mediator's agency is in allowedAgencyCodes → show
+            const agencyCode = agencyMap.get(d.mediatorCode) || agencyMap.get(medCode);
+            if (agencyCode) {
+              const allowed = Array.isArray(campaign.allowedAgencyCodes) ? campaign.allowedAgencyCodes.map((c: any) => String(c).trim().toUpperCase()) : [];
+              if (allowed.includes(agencyCode.toUpperCase())) return true;
+            }
+            return false;
+          });
+        }
 
         // For non-openToAll campaigns, count per-mediator order consumption
         // so the progress bar shows the mediator's assigned limit, not global stock.

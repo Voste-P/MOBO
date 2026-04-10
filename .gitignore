@@ -54,6 +54,7 @@ backend/stderr.log
 test-results
 playwright-report
 playwright-results.json
+e2e-ci-logs.txt
 vitest-*.txt
 vitest-*.json
 vitest-*.log
