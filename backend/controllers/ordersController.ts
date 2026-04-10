@@ -874,9 +874,8 @@ export function makeOrdersController(env: Env) {
           throw new AppError(409, 'CAMPAIGN_NOT_ACTIVE', 'Campaign is not active');
         }
 
-        if ((campaign as any).locked) {
-          throw new AppError(409, 'CAMPAIGN_LOCKED', (campaign as any).lockedReason || 'Campaign is currently locked');
-        }
+        // NOTE: campaign.locked prevents *editing* financial terms (price, payout, slots).
+        // It does NOT prevent order creation — orders are expected on locked campaigns.
 
         const upstreamAgencyCode = String((mediatorUser as any)?.parentCode || '').trim();
 
