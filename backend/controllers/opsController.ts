@@ -517,15 +517,58 @@ export function makeOpsController(env: Env) {
             orderBy: { createdAt: 'desc' },
             skip: dSkip,
             take: dLimit,
-            select: { ...dealListSelect, campaign: { select: { totalSlots: true, usedSlots: true, createdAt: true } } },
+            select: { ...dealListSelect, campaign: { select: { totalSlots: true, usedSlots: true, openToAll: true, assignments: true, createdAt: true } } },
           }),
           db().deal.count({ where: dealWhere }),
         ]);
 
+        // For non-openToAll campaigns, count per-mediator order consumption
+        // so the progress bar shows the mediator's assigned limit, not global stock.
+        const perMediatorCounts = new Map<string, number>();
+        const nonOpenCampaignIds = deals
+          .filter((d: any) => d.campaign && !d.campaign.openToAll)
+          .map((d: any) => d.campaignId as string);
+        if (nonOpenCampaignIds.length > 0) {
+          const uniqueCampaignIds = [...new Set(nonOpenCampaignIds)];
+          const orderCounts: Array<{ campaign_id: string; manager_name: string; cnt: bigint }> =
+            await db().$queryRawUnsafe(
+              `SELECT oi.campaign_id, o.manager_name, COUNT(*)::bigint AS cnt
+               FROM order_items oi
+               JOIN orders o ON o.id = oi.order_id AND o.is_deleted = false
+               WHERE oi.campaign_id = ANY($1::uuid[])
+                 AND oi.is_deleted = false
+                 AND o.manager_name = ANY($2::text[])
+               GROUP BY oi.campaign_id, o.manager_name`,
+              uniqueCampaignIds,
+              mediatorCodes,
+            );
+          for (const row of orderCounts) {
+            perMediatorCounts.set(`${row.campaign_id}::${String(row.manager_name).toLowerCase()}`, Number(row.cnt));
+          }
+        }
+
         const enrichedDeals = deals.map((d: any) => {
           const campaign = d.campaign;
-          const totalSlots = campaign?.totalSlots || 0;
-          const usedSlots = campaign?.usedSlots || 0;
+          const isOpen = campaign?.openToAll ?? false;
+          const assignments = campaign?.assignments && typeof campaign.assignments === 'object' && !Array.isArray(campaign.assignments)
+            ? campaign.assignments as Record<string, any>
+            : {};
+          const medCode = String(d.mediatorCode || '').toLowerCase();
+
+          let totalSlots: number;
+          let usedSlots: number;
+
+          if (!isOpen && assignments[medCode]) {
+            // Per-mediator view: show assigned limit + mediator-specific consumption
+            const assignment = assignments[medCode];
+            totalSlots = Number(typeof assignment === 'number' ? assignment : assignment?.limit ?? 0);
+            usedSlots = perMediatorCounts.get(`${d.campaignId}::${medCode}`) ?? 0;
+          } else {
+            // Open-to-all or no specific assignment: use global counters
+            totalSlots = campaign?.totalSlots || 0;
+            usedSlots = campaign?.usedSlots || 0;
+          }
+
           const remainingSlots = Math.max(0, totalSlots - usedSlots);
           let sellingSpeed = 0;
           if (campaign?.createdAt && usedSlots > 0) {

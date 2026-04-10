@@ -45,7 +45,7 @@ export function makeProductsController() {
             orderBy: { createdAt: 'desc' },
             skip,
             take: limit,
-            include: { campaign: { select: { totalSlots: true, usedSlots: true, createdAt: true } } },
+            include: { campaign: { select: { totalSlots: true, usedSlots: true, openToAll: true, assignments: true, createdAt: true } } },
           }),
           db().deal.count({ where }),
           db().user.findFirst({
@@ -54,11 +54,51 @@ export function makeProductsController() {
           }),
         ]);
 
+        // For non-openToAll campaigns, count per-mediator order consumption
+        const perMedCounts = new Map<string, number>();
+        const nonOpenIds = deals
+          .filter((d: any) => d.campaign && !d.campaign.openToAll)
+          .map((d: any) => d.campaignId as string);
+        if (nonOpenIds.length > 0) {
+          const uniqueIds = [...new Set(nonOpenIds)];
+          const rows: Array<{ campaign_id: string; cnt: bigint }> =
+            await db().$queryRawUnsafe(
+              `SELECT oi.campaign_id, COUNT(*)::bigint AS cnt
+               FROM order_items oi
+               JOIN orders o ON o.id = oi.order_id AND o.is_deleted = false
+               WHERE oi.campaign_id = ANY($1::uuid[])
+                 AND oi.is_deleted = false
+                 AND LOWER(o.manager_name) = LOWER($2)
+               GROUP BY oi.campaign_id`,
+              uniqueIds,
+              mediatorCode,
+            );
+          for (const row of rows) {
+            perMedCounts.set(row.campaign_id, Number(row.cnt));
+          }
+        }
+
         const mediatorName = mediatorUser?.name || '';
+        const medCodeLower = mediatorCode.toLowerCase();
         const enrichedDeals = deals.map((d: any) => {
           const campaign = d.campaign;
-          const totalSlots = campaign?.totalSlots || 0;
-          const usedSlots = campaign?.usedSlots || 0;
+          const isOpen = campaign?.openToAll ?? false;
+          const assignments = campaign?.assignments && typeof campaign.assignments === 'object' && !Array.isArray(campaign.assignments)
+            ? campaign.assignments as Record<string, any>
+            : {};
+
+          let totalSlots: number;
+          let usedSlots: number;
+
+          if (!isOpen && assignments[medCodeLower]) {
+            const assignment = assignments[medCodeLower];
+            totalSlots = Number(typeof assignment === 'number' ? assignment : assignment?.limit ?? 0);
+            usedSlots = perMedCounts.get(d.campaignId) ?? 0;
+          } else {
+            totalSlots = campaign?.totalSlots || 0;
+            usedSlots = campaign?.usedSlots || 0;
+          }
+
           const remainingSlots = Math.max(0, totalSlots - usedSlots);
           let sellingSpeed = 0;
           if (campaign?.createdAt && usedSlots > 0) {
