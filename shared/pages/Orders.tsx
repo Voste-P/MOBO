@@ -1529,6 +1529,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           setUploadType('order');
                           setReviewLinkInput('');
                           setReviewerNameInput('');
+                          setRatingFile(null); setRatingPreview(null); setRatingVerification(null);
+                          setRwFile(null); setRwPreview(null); setRwVerification(null);
+                          ratingAbortRef.current?.abort(); rwAbortRef.current?.abort();
                         }}
                         className="text-[10px] font-bold uppercase text-blue-600 bg-blue-50 border border-blue-200 px-3 py-2 rounded-lg hover:bg-blue-100 transition-colors active:scale-95"
                       >
@@ -1543,6 +1546,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           setUploadType('review');
                           setReviewLinkInput('');
                           setReviewerNameInput(order.reviewerName || '');
+                          setRatingFile(null); setRatingPreview(null); setRatingVerification(null);
+                          setRwFile(null); setRwPreview(null); setRwVerification(null);
+                          ratingAbortRef.current?.abort(); rwAbortRef.current?.abort();
                         }}
                         className="text-[10px] font-bold uppercase text-purple-600 bg-purple-50 border border-purple-200 px-3 py-2 rounded-lg hover:bg-purple-100 transition-colors active:scale-95"
                       >
@@ -1556,6 +1562,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           setSelectedOrder(order);
                           setUploadType('rating');
                           setReviewerNameInput(order.reviewerName || '');
+                          setRatingFile(null); setRatingPreview(null); setRatingVerification(null);
+                          setRwFile(null); setRwPreview(null); setRwVerification(null);
+                          ratingAbortRef.current?.abort(); rwAbortRef.current?.abort();
                         }}
                         className="text-[10px] font-bold uppercase text-purple-600 bg-purple-50 border border-purple-200 px-3 py-2 rounded-lg hover:bg-purple-100 transition-colors active:scale-95"
                       >
@@ -1572,6 +1581,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           setSelectedOrder(order);
                           setUploadType('returnWindow');
                           setReviewerNameInput(order.reviewerName || '');
+                          setRatingFile(null); setRatingPreview(null); setRatingVerification(null);
+                          setRwFile(null); setRwPreview(null); setRwVerification(null);
+                          ratingAbortRef.current?.abort(); rwAbortRef.current?.abort();
                         }}
                         className="text-[10px] font-bold uppercase text-teal-600 bg-teal-50 border border-teal-200 px-3 py-2 rounded-lg hover:bg-teal-100 transition-colors active:scale-95"
                       >
@@ -2006,6 +2018,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           <div className="relative">
                             <input
                               type="number"
+                              min="0"
                               value={extractedDetails.amount}
                               onChange={(e) =>
                                 setExtractedDetails({ ...extractedDetails, amount: e.target.value })
@@ -2358,6 +2371,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
         <div
           className="fixed inset-0 z-modal flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
           onClick={() => {
+            ratingAbortRef.current?.abort(); rwAbortRef.current?.abort();
             setSelectedOrder(null);
             setInputValue('');
             setRatingPreview(null);
@@ -2374,6 +2388,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
           >
             <button
               onClick={() => {
+                ratingAbortRef.current?.abort(); rwAbortRef.current?.abort();
                 setSelectedOrder(null);
                 setInputValue('');
                 setRatingPreview(null);
