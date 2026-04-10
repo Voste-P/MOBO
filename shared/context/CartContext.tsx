@@ -33,7 +33,8 @@ function getCartStorageKey(): string {
         const parts = String(parsed.accessToken).split('.');
         if (parts.length === 3) {
           try {
-            const payload = JSON.parse(atob(parts[1]));
+            const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            const payload = JSON.parse(atob(b64));
             if (payload?.sub) return `${CART_STORAGE_PREFIX}_${payload.sub}`;
           } catch { /* fall through */ }
         }
