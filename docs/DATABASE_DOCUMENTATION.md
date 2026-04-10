@@ -2,7 +2,7 @@
 
 > **Production-level database documentation for the MOBO multi-stakeholder commerce platform.**
 >
-> Last updated: June 2025 | Schema version: PostgreSQL via Prisma ORM | 21 models, 23 enums.
+> Last updated: April 2026 | Schema version: PostgreSQL via Prisma ORM | 22 models, 23 enums.
 
 ---
 

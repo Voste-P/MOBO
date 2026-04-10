@@ -10,7 +10,7 @@ export const updateUserStatusSchema = z.object({
 );
 
 export const reactivateOrderSchema = z.object({
-  orderId: z.string().min(1),
+  orderId: z.string().uuid(),
   reason: z.string().min(1).max(500).optional(),
 });
 

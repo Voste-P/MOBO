@@ -75,7 +75,7 @@ export const Input = React.forwardRef<HTMLInputElement, Props>(function Input(
         {isPasswordType && (
           <button
             type="button"
-            onClick={() => setShowPassword((v) => !v)}
+            onMouseDown={(e) => { e.preventDefault(); setShowPassword((v) => !v); }}
             className={cn(
               'absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-xl transition-colors',
               isDark

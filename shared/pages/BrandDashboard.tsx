@@ -1518,6 +1518,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
     const originalPrice = Number(form.originalPrice);
 
     if (!form.title.trim()) { toast.error('Title is required'); return; }
+    if (!form.platform) { toast.error('Platform is required'); return; }
     if (!Number.isFinite(price) || price < 0) { toast.error('Deal price must be 0 or more'); return; }
     if (!Number.isFinite(originalPrice) || originalPrice < 0) { toast.error('Original price must be 0 or more'); return; }
     if (!Number.isFinite(payout) || payout < 0) { toast.error('Payout must be 0 or more'); return; }

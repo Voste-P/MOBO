@@ -154,6 +154,22 @@ const AgencyProfile = ({ user }: { user: User }) => {
   }, [user?.id]);
 
   const handleSave = async () => {
+    if (form.mobile && !/^\d{10}$/.test(form.mobile.replace(/\D/g, ''))) {
+      toast.error('Please enter a valid 10-digit mobile number');
+      return;
+    }
+    if (form.ifsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.ifsc.toUpperCase())) {
+      toast.error('Please enter a valid IFSC code (e.g. SBIN0001234)');
+      return;
+    }
+    if (form.accountNumber && (form.accountNumber.length < 9 || form.accountNumber.length > 18 || !/^\d+$/.test(form.accountNumber))) {
+      toast.error('Please enter a valid bank account number (9-18 digits)');
+      return;
+    }
+    if (form.upiId && !/^[\w.-]+@[\w.-]+$/.test(form.upiId)) {
+      toast.error('Please enter a valid UPI ID (e.g. name@upi)');
+      return;
+    }
     setLoading(true);
     try {
       await updateUser({
@@ -181,6 +197,7 @@ const AgencyProfile = ({ user }: { user: User }) => {
   const handleFile = (e: any) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (!file.type.startsWith('image/')) { toast.error('Please upload an image file'); return; }
       if (file.size > 2 * 1024 * 1024) { toast.error('Avatar must be under 2 MB'); return; }
       if (!isEditing) setIsEditing(true);
       const reader = new FileReader();

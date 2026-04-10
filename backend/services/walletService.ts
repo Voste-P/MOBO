@@ -62,6 +62,9 @@ export async function ensureWallet(ownerUserId: string) {
 }
 
 export async function applyWalletCredit(input: WalletMutationInput) {
+  if (!input.idempotencyKey || typeof input.idempotencyKey !== 'string' || input.idempotencyKey.length > 255 || !/^[\w\-:.]+$/.test(input.idempotencyKey)) {
+    throw new AppError(400, 'INVALID_IDEMPOTENCY_KEY', 'Idempotency key must be 1-255 alphanumeric/dash/dot/colon characters');
+  }
   if (input.amountPaise <= 0) throw new AppError(400, 'INVALID_AMOUNT', 'Amount must be positive');
   if (!Number.isInteger(input.amountPaise)) throw new AppError(400, 'INVALID_AMOUNT', 'Amount must be an integer (paise)');
   if (input.amountPaise > Number.MAX_SAFE_INTEGER) throw new AppError(400, 'INVALID_AMOUNT', 'Amount exceeds safe integer limit');
@@ -170,6 +173,9 @@ export async function applyWalletCredit(input: WalletMutationInput) {
 }
 
 export async function applyWalletDebit(input: WalletMutationInput) {
+  if (!input.idempotencyKey || typeof input.idempotencyKey !== 'string' || input.idempotencyKey.length > 255 || !/^[\w\-:.]+$/.test(input.idempotencyKey)) {
+    throw new AppError(400, 'INVALID_IDEMPOTENCY_KEY', 'Idempotency key must be 1-255 alphanumeric/dash/dot/colon characters');
+  }
   if (input.amountPaise <= 0) throw new AppError(400, 'INVALID_AMOUNT', 'Amount must be positive');
   if (!Number.isInteger(input.amountPaise)) throw new AppError(400, 'INVALID_AMOUNT', 'Amount must be an integer (paise)');
   if (input.amountPaise > Number.MAX_SAFE_INTEGER) throw new AppError(400, 'INVALID_AMOUNT', 'Amount exceeds safe integer limit');

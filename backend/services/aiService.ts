@@ -272,7 +272,9 @@ async function acquireOcrWorker(): Promise<Awaited<ReturnType<typeof createWorke
     const retryW = _ocrPool.pop();
     if (retryW) { _activeOcrWorkerCount++; return retryW; }
     // Hard-reject instead of creating overflow workers — prevents OOM on Render
-    throw new Error('OCR_CAPACITY_EXCEEDED: All OCR workers are busy. Please try again shortly.');
+    const err: any = new Error('OCR_CAPACITY_EXCEEDED: All OCR workers are busy. Please try again shortly.');
+    err.status = 503;
+    throw err;
   }
 
   _activeOcrWorkerCount++;

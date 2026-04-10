@@ -311,6 +311,22 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
         <div className="absolute top-3 right-3 w-2 h-2 rounded-full bg-lime-500 animate-pulse shadow-lg shadow-lime-500/50"></div>
       </div>
 
+      {/* Slot Availability */}
+      {(product.totalSlots != null && product.totalSlots > 0) && (() => {
+        const remaining = product.remainingSlots ?? (product.totalSlots! - (product.usedSlots || 0));
+        const pct = Math.min(100, ((product.usedSlots || 0) / product.totalSlots!) * 100);
+        return (
+          <div className="flex items-center gap-2 mb-3 px-1">
+            <div className="flex-1 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+              <div className="h-full bg-lime-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+            </div>
+            <span className={`text-[10px] font-bold whitespace-nowrap ${remaining <= 3 ? 'text-red-500' : 'text-zinc-500'}`}>
+              {remaining} left
+            </span>
+          </div>
+        );
+      })()}
+
       {/* Action Buttons */}
       <button
         onClick={handleLinkClick}

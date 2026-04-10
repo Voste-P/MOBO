@@ -479,16 +479,22 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                   )}
                   <div className="p-2 pb-0 flex gap-3 mb-3">
                     <div className="w-14 h-14 bg-mobo-dark-100 rounded-[1rem] p-1.5 flex-shrink-0 relative overflow-hidden">
-                      <ProxiedImage
-                        src={o.items?.[0]?.image}
-                        alt={o.items?.[0]?.title || 'Order item'}
-                        className="w-full h-full object-contain mix-blend-multiply relative z-10"
-                      />
+                      {o.items?.[0]?.image ? (
+                        <ProxiedImage
+                          src={o.items[0].image}
+                          alt={o.items[0].title || 'Order item'}
+                          className="w-full h-full object-contain mix-blend-multiply relative z-10"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-zinc-300">
+                          <ShoppingBag size={20} />
+                        </div>
+                      )}
                     </div>
                     <div className="min-w-0 flex-1 py-0.5">
                       <div className="flex justify-between items-start">
-                        <ExpandableText text={o.items?.[0]?.title || ''} clampClass="line-clamp-1" className="font-bold text-zinc-900 text-sm pr-2" as="h4">
-                          {o.items?.[0]?.title}
+                        <ExpandableText text={o.items?.[0]?.title || 'Untitled Item'} clampClass="line-clamp-1" className="font-bold text-zinc-900 text-sm pr-2" as="h4">
+                          {o.items?.[0]?.title || 'Untitled Item'}
                         </ExpandableText>
                         <span
                           className={`text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap uppercase border ${getDealTypeBadge(dealType)}`}
@@ -934,23 +940,29 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                 >
                   <div className="flex gap-4 mb-4">
                     <div className="w-16 h-16 bg-mobo-dark-100 rounded-[1rem] p-2 flex-shrink-0">
+                      {d.image ? (
                         <ProxiedImage
                           src={d.image}
-                          alt={d.title}
+                          alt={d.title || 'Deal'}
                           className="w-full h-full object-contain mix-blend-multiply"
                         />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-zinc-300">
+                          <Tag size={20} />
+                        </div>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0 py-0.5">
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border border-zinc-100 px-1.5 py-0.5 rounded-md">
-                          {d.platform}
+                          {d.platform || 'N/A'}
                         </span>
                         <span className="bg-emerald-500/10 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide">
                           Published
                         </span>
                       </div>
-                      <ExpandableText text={d.title || ''} clampClass="line-clamp-1" className="font-bold text-zinc-900 text-base leading-tight mb-1" as="h4">
-                        {d.title}
+                      <ExpandableText text={d.title || 'Untitled Deal'} clampClass="line-clamp-1" className="font-bold text-zinc-900 text-base leading-tight mb-1" as="h4">
+                        {d.title || 'Untitled Deal'}
                       </ExpandableText>
                       {d.campaignId && (
                         <span
@@ -983,6 +995,20 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                           </div>
                         )}
                       </div>
+                      {/* Slot availability */}
+                      {(d.totalSlots != null && d.totalSlots > 0) && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <div className="flex-1 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-emerald-500 rounded-full transition-all"
+                              style={{ width: `${Math.min(100, ((d.usedSlots || 0) / d.totalSlots) * 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] font-bold text-zinc-500 whitespace-nowrap">
+                            {d.remainingSlots ?? (d.totalSlots - (d.usedSlots || 0))} / {d.totalSlots} left
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1330,6 +1356,22 @@ const MediatorProfileView = () => {
   const qrInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = async () => {
+    if (mobile && !/^\d{10}$/.test(mobile.replace(/\D/g, ''))) {
+      toast.error('Please enter a valid 10-digit mobile number');
+      return;
+    }
+    if (bankDetails.ifsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bankDetails.ifsc.toUpperCase())) {
+      toast.error('Please enter a valid IFSC code (e.g. SBIN0001234)');
+      return;
+    }
+    if (bankDetails.accountNumber && (bankDetails.accountNumber.length < 9 || bankDetails.accountNumber.length > 18 || !/^\d+$/.test(bankDetails.accountNumber))) {
+      toast.error('Please enter a valid bank account number (9-18 digits)');
+      return;
+    }
+    if (upiId && !/^[\w.-]+@[\w.-]+$/.test(upiId)) {
+      toast.error('Please enter a valid UPI ID (e.g. name@upi)');
+      return;
+    }
     setLoading(true);
     try {
       await updateUser({

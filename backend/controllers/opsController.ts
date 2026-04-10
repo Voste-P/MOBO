@@ -143,6 +143,9 @@ export async function finalizeApprovalIfReady(order: any, actorUserId: string, e
   const wf = String(order.workflowStatus || 'CREATED');
   if (wf !== 'UNDER_REVIEW') return { approved: false, reason: 'NOT_UNDER_REVIEW' };
 
+  // Block approval of frozen orders
+  if (order.frozen) return { approved: false, reason: 'ORDER_FROZEN' };
+
   const verification = (order.verification && typeof order.verification === 'object') ? order.verification as any : {};
   if (!verification.order?.verifiedAt) {
     return { approved: false, reason: 'PURCHASE_NOT_VERIFIED' };
@@ -1919,6 +1922,26 @@ export function makeOpsController(env: Env) {
               },
             });
           }, { timeout: 15000 });
+
+          // If cap was exceeded inside the wallet transaction, the tx exited early
+          // without updating order status. Handle it here to keep order consistent.
+          if (isOverLimit) {
+            const capEvents = pushOrderEvent(order.events as any, {
+              type: 'CAP_EXCEEDED',
+              at: new Date(),
+              actorUserId: req.auth?.userId,
+              metadata: { settlementMode },
+            });
+            await db().order.update({
+              where: { id: order.id },
+              data: {
+                paymentStatus: 'Failed',
+                affiliateStatus: 'Cap_Exceeded',
+                settlementMode,
+                events: capEvents as any,
+              },
+            });
+          }
         } else {
           // Cap-exceeded or external: no wallet movement, just update order status
           const newEvents1 = pushOrderEvent(order.events as any, {

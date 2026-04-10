@@ -120,7 +120,15 @@ export function makeOrdersController(env: Env) {
     // Sanitize AI confidence to valid 0-100 range
     const safeConfidence = Number.isFinite(aiConfidence) ? Math.max(0, Math.min(100, aiConfidence)) : 0;
     if (String(freshOrder.workflowStatus) !== 'UNDER_REVIEW') return freshOrder;
-    if (safeConfidence < threshold) {
+
+    // High-confidence fast-path: If AI is very confident (≥85%), auto-verify
+    // without requiring bulk threshold. This allows individual steps that pass
+    // with high confidence to be approved immediately, speeding up the flow.
+    const highConfidenceThreshold = envRef.AI_HIGH_CONFIDENCE_THRESHOLD ?? 85;
+    const meetsThreshold = safeConfidence >= threshold;
+    const meetsHighConfidence = safeConfidence >= highConfidenceThreshold;
+
+    if (!meetsThreshold && !meetsHighConfidence) {
       // Even below auto-verify threshold, attempt bulk auto-verify:
       // If ALL proofs are uploaded and ALL have AI confidence >= the baseline
       // confidence threshold, auto-verify everything and go to cooling period.

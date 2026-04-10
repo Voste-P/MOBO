@@ -168,14 +168,14 @@ class RealtimeClient {
                 break;
               }
               await this.sleep(Math.min(3000 * Math.pow(2, this.authFailures - 1), this.maxBackoffMs));
+              continue;
             } else {
-              // Refresh succeeded — reset auth failure counter so we don't give up prematurely
+              // Refresh succeeded — reset auth failure counter and retry immediately
               this.authFailures = 0;
+              continue;
             }
-          } else {
-            await this.sleep(this.backoffMs);
           }
-          // Add jitter to avoid reconnect stampedes (randomize cap to prevent thundering herd).
+          // Non-auth errors: backoff with jitter to avoid reconnect stampedes
           this.backoffMs = Math.min(Math.floor(this.backoffMs * 1.8 + Math.random() * 250), this.maxBackoffMs);
           await this.sleep(this.backoffMs + Math.floor(Math.random() * 500));
           continue;
@@ -272,6 +272,7 @@ class RealtimeClient {
           }
         } finally {
           clearInterval(idleTimer);
+          try { reader.cancel(); } catch { /* ignore if already released */ }
           this._connected = false;
         }
       } catch (e) {
