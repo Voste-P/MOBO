@@ -730,7 +730,7 @@ export function makeOrdersController(env: Env) {
         const userPgId = user.id;
         const userDisplayId = user.id!;
 
-        // Abuse prevention: basic velocity limits (per buyer).
+        // Abuse prevention: basic velocity limits (per buyer) — fast-fail pre-check.
         const now = new Date();
         const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
         const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -741,6 +741,17 @@ export function makeOrdersController(env: Env) {
         if (hourly >= 10 || daily >= 30) {
           throw new AppError(429, 'VELOCITY_LIMIT', 'Too many orders created. Please try later.');
         }
+
+        // Velocity re-check closure: run inside transaction to prevent race condition
+        const velocityGuard = async (tx: any) => {
+          const [h, d] = await Promise.all([
+            tx.order.count({ where: { userId: userPgId, createdAt: { gte: oneHourAgo }, isDeleted: false } }),
+            tx.order.count({ where: { userId: userPgId, createdAt: { gte: oneDayAgo }, isDeleted: false } }),
+          ]);
+          if (h >= 10 || d >= 30) {
+            throw new AppError(429, 'VELOCITY_LIMIT', 'Too many orders created. Please try later.');
+          }
+        };
 
         const allowE2eBypass = env.NODE_ENV === 'test';
         const resolvedExternalOrderId = body.externalOrderId || (allowE2eBypass ? `E2E-${Date.now()}` : undefined);
@@ -973,6 +984,9 @@ export function makeOrdersController(env: Env) {
         };
 
         const created = await db().$transaction(async (tx) => {
+          // Re-check velocity inside transaction to prevent concurrent bypass
+          await velocityGuard(tx);
+
           // If this is an upgrade from a redirect-tracked pre-order, update that order instead of creating a new one.
           if (body.preOrderId) {
             const existing = await tx.order.findFirst({

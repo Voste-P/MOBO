@@ -379,7 +379,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     const params: any = { limit: PAGE_SIZE, page: auditPage };
     if (auditActionFilter) params.action = auditActionFilter;
     if (auditDateFrom) params.from = new Date(auditDateFrom).toISOString();
-    if (auditDateTo) params.to = new Date(auditDateTo + 'T23:59:59').toISOString();
+    if (auditDateTo) params.to = new Date(auditDateTo + 'T23:59:59Z').toISOString();
     api.admin
       .getAuditLogs(params)
       .then((res) => {
@@ -456,7 +456,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
       setProofModal((prev) => {
         if (!prev) return prev;
         const updated = safeOrders.find((ord: Order) => ord.id === prev.id);
-        return updated || prev;
+        return updated ?? null;
       });
     }).catch((e) => { if (viewSeqRef.current === seq && !controller.signal.aborted) { if (process.env.NODE_ENV !== 'production') console.error('Admin Orders Fetch Error:', e); toast.error(formatErrorMessage(e, 'Failed to refresh orders.')); } });
     return () => { controller.abort(); };
@@ -537,7 +537,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
             setProofModal((prev) => {
               if (!prev) return prev;
               const updated = safeOrders.find((ord: Order) => ord.id === prev.id);
-              return updated || prev; // Keep modal open with previous data
+              return updated ?? null;
             });
           }).catch(() => {});
           break;
@@ -2287,7 +2287,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                         const params: any = { limit: PAGE_SIZE, page: auditPage };
                         if (auditActionFilter) params.action = auditActionFilter;
                         if (auditDateFrom) params.from = new Date(auditDateFrom).toISOString();
-                        if (auditDateTo) params.to = new Date(auditDateTo + 'T23:59:59').toISOString();
+                        if (auditDateTo) params.to = new Date(auditDateTo + 'T23:59:59Z').toISOString();
                         const res = await api.admin.getAuditLogs(params);
                         setAuditLogs(asArray(res));
                         setAuditPagination(extractPaginationMeta(res));

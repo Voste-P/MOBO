@@ -619,7 +619,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
     const external = String(o.externalOrderId || '').toLowerCase();
     const textMatch = internal.includes(q) || external.includes(q) || title.includes(q);
     if (statusFilter !== 'All') {
-      const st = String(o.affiliateStatus === 'Unchecked' ? o.paymentStatus : o.affiliateStatus || '').toLowerCase();
+      const st = String(o.affiliateStatus === 'Unchecked' ? o.paymentStatus : o.affiliateStatus || 'unknown').toLowerCase();
       if (st !== statusFilter.toLowerCase()) return false;
     }
     if (dealTypeFilter !== 'All') {

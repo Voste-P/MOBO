@@ -1919,9 +1919,10 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
 
     const newAssignments: Record<string, number> = {};
     active.forEach((m: User, index: number) => {
+      if (!m.mediatorCode) return;
       let amount = perUser;
       if (index < remainder) amount += 1;
-      newAssignments[m.mediatorCode!.toLowerCase()] = amount;
+      newAssignments[m.mediatorCode.toLowerCase()] = amount;
     });
     setAssignments(newAssignments);
     // Reset per-mediator overrides so everyone uses the global commission

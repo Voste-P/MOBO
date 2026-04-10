@@ -1044,7 +1044,6 @@ export function makeOpsController(env: Env) {
         });
 
         authCacheInvalidate(buyerBefore.id);
-        authCacheInvalidate(buyerBefore.id!);
 
         const userDisplayId = user.id ?? '';
         await writeAuditLog({ req, action: 'BUYER_APPROVED', entityType: 'User', entityId: userDisplayId });
@@ -1113,7 +1112,6 @@ export function makeOpsController(env: Env) {
 
         // Evict auth cache so the rejected buyer can't act on stale tokens
         authCacheInvalidate(buyerBefore.id!);
-        authCacheInvalidate(buyerBefore.id);
 
         const userDisplayId = user.id ?? '';
         await writeAuditLog({ req, action: 'USER_REJECTED', entityType: 'User', entityId: userDisplayId });
@@ -2166,9 +2164,9 @@ export function makeOpsController(env: Env) {
             }
           }
 
-          // Cycle counter for unsettle: count past UNSETTLED events
+          // Cycle counter for unsettle: count SETTLED events (stable across retries, unlike UNSETTLED count which changes during this operation)
           const unsettleEvents = Array.isArray(order.events) ? order.events as any[] : [];
-          const unsettleCycle = unsettleEvents.filter((e: any) => e?.type === 'UNSETTLED').length;
+          const unsettleCycle = unsettleEvents.filter((e: any) => e?.type === 'SETTLED').length;
 
           // Atomic unsettlement using Prisma transaction
           await db().$transaction(async (tx: any) => {

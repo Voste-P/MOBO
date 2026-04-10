@@ -127,13 +127,14 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
 
   // Cap check
   let isOverLimit = false;
+  let assignedLimit = 0;
   if (campaignId && mediatorCode && campaign) {
     const assignmentsObj =
       campaign.assignments && typeof campaign.assignments === 'object'
         ? (campaign.assignments as any)
         : {};
     const rawAssigned = assignmentsObj?.[mediatorCode];
-    const assignedLimit =
+    assignedLimit =
       typeof rawAssigned === 'number' ? rawAssigned : Number(rawAssigned?.limit ?? 0);
 
     if (assignedLimit > 0) {
@@ -188,7 +189,7 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
     }
 
     // Guard: buyer commission must never exceed payout — prevents negative mediator margin
-    if (buyerCommissionPaise > payoutPaise) {
+    if (buyerCommissionPaise >= payoutPaise) {
       const evts = pushOrderEvent(order.events as any, {
         type: 'FROZEN_DISPUTED',
         at: new Date(),
@@ -235,6 +236,22 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
 
     await db().$transaction(
       async (tx: any) => {
+        // Re-check settlement cap inside transaction to prevent concurrent overcount
+        if (assignedLimit > 0 && mediatorCode && campaignId) {
+          const txSettledCount = await tx.order.count({
+            where: {
+              managerName: mediatorCode,
+              items: { some: { campaignId } },
+              OR: [{ affiliateStatus: 'Approved_Settled' }, { paymentStatus: 'Paid' }],
+              id: { not: order.id },
+              isDeleted: false,
+            },
+          });
+          if (txSettledCount >= assignedLimit) {
+            throw new Error('CAP_EXCEEDED_IN_TX');
+          }
+        }
+
         await applyWalletDebit({
           idempotencyKey: `order-settlement-debit-${order.id}`,
           type: 'order_settlement_debit',
@@ -296,8 +313,16 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
         });
       },
       { timeout: env.SETTLER_TX_TIMEOUT_MS },
-    );
-  } else {
+    ).catch((txErr: any) => {
+      if (txErr?.message === 'CAP_EXCEEDED_IN_TX') {
+        isOverLimit = true; // Fall through to cap-exceeded path below
+        return;
+      }
+      throw txErr;
+    });
+  }
+
+  if (isOverLimit || (!productId && !isOverLimit)) {
     // Cap-exceeded or missing product: update status without wallet movement
     const newEvents = pushOrderEvent(order.events as any, {
       type: isOverLimit ? 'CAP_EXCEEDED' : 'SETTLED',
