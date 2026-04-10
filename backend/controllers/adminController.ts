@@ -10,7 +10,7 @@ import { orderListSelectLite, getProofFlags, userAdminListSelect, dealListSelect
 import { parsePagination, paginatedResponse } from '../utils/pagination.js';
 import { writeAuditLog } from '../services/audit.js';
 import { freezeOrders, reactivateOrder as reactivateOrderWorkflow } from '../services/orderWorkflow.js';
-import { getAgencyCodeForMediatorCode, listMediatorCodesForAgency } from '../services/lineage.js';
+import { getAgencyCodeForMediatorCode, listMediatorCodesForAgency, clearLineageCache } from '../services/lineage.js';
 import { updateSystemConfigSchema } from '../validations/systemConfig.js';
 import type { Role } from '../middleware/auth.js';
 import { publishRealtime } from '../services/realtimeHub.js';
@@ -515,6 +515,8 @@ export function makeAdminController() {
           });
         });
 
+        clearLineageCache();
+
         await writeAuditLog({
           req,
           action: 'USER_DELETED',
@@ -648,6 +650,7 @@ export function makeAdminController() {
         // Immediately evict auth cache so suspended users can't act on stale tokens
         if (statusChanged) {
           authCacheInvalidate(before.id);
+          clearLineageCache();
         }
         const adminUserId = req.auth?.userId;
         const adminPgId = (req.auth as any)?.pgUserId as string | undefined;

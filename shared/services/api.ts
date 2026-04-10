@@ -411,7 +411,7 @@ function mutationCachePrefixes(path: string): string[] | null {
     google:        [],
     media:         [],
   };
-  return scopeMap[seg] ?? null; // null = unknown → clear all
+  return scopeMap[seg] ?? [`/${seg}`]; // unknown segment → only invalidate its own prefix
 }
 
 async function fetchJson(path: string, init?: RequestInit): Promise<any> {

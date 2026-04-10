@@ -85,6 +85,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
     setReviewerName('');
     setFieldsLocked(false);
     setProductNameMismatch(false);
+    setPlatformMismatch(false);
     setReviewerNameMismatch(false);
     setFormOpen(false);
   }, []);

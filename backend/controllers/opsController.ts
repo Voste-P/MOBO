@@ -38,7 +38,7 @@ import { orderListSelectLite, getProofFlags, userListSelect, campaignListSelect,
 import { idWhere } from '../utils/idWhere.js';
 import { ensureWallet, applyWalletDebit, applyWalletCredit } from '../services/walletService.js';
 import { getRequester, isPrivileged, requireAnyRole } from '../services/authz.js';
-import { listMediatorCodesForAgency, getAgencyCodeForMediatorCode, getAgencyCodesForMediatorCodes, isAgencyActive, isMediatorActive } from '../services/lineage.js';
+import { listMediatorCodesForAgency, getAgencyCodeForMediatorCode, getAgencyCodesForMediatorCodes, isAgencyActive, isMediatorActive, clearLineageCache } from '../services/lineage.js';
 import { pushOrderEvent } from '../services/orderEvents.js';
 import { writeAuditLog } from '../services/audit.js';
 import { requestBrandConnectionSchema } from '../validations/connections.js';
@@ -854,7 +854,8 @@ export function makeOpsController(env: Env) {
           data: { kycStatus: 'verified', status: 'active' },
         });
 
-        await writeAuditLog({ req, action: 'MEDIATOR_APPROVED', entityType: 'User', entityId: mediator.id! });
+        // Invalidate lineage cache so downstream lookups reflect the new status
+        clearLineageCache();
         businessLog.info('Mediator approved', { mediatorId: mediator.id, mediatorCode: mediator.mediatorCode, agencyCode: String(mediator.parentCode || ''), approvedBy: req.auth?.userId });
         logChangeEvent({ actorUserId: String(req.auth?.userId || ''), entityType: 'User', entityId: mediator.id!, action: 'STATUS_CHANGE', changedFields: ['kycStatus', 'status'], before: { kycStatus: mediator.kycStatus, status: mediator.status }, after: { kycStatus: 'verified', status: 'active' }, metadata: { role: 'mediator' } });
         logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'User', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'MEDIATOR_APPROVED', mediatorId: mediator.id } });
@@ -913,7 +914,8 @@ export function makeOpsController(env: Env) {
         authCacheInvalidate(mediator.id!);
         authCacheInvalidate(mediator.id);
 
-        await writeAuditLog({ req, action: 'MEDIATOR_REJECTED', entityType: 'User', entityId: mediator.id! });
+        // Invalidate lineage cache so downstream lookups reflect the status change
+        clearLineageCache();
         businessLog.info('Mediator rejected', { mediatorId: mediator.id, kycStatus: 'rejected', status: 'suspended' });
         logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'User', entityId: mediator.id!, action: 'MEDIATOR_REJECTED', changedFields: ['kycStatus', 'status'], before: { kycStatus: mediator.kycStatus, status: mediator.status }, after: { kycStatus: 'rejected', status: 'suspended' } });
         logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'User', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'MEDIATOR_REJECTED', mediatorId: mediator.id } });

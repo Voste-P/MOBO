@@ -177,6 +177,10 @@ Orders have a strict state machine (`workflowStatus`), with anti-fraud constrain
 - Proof upload accepts JPEG, PNG, and WebP only (GIF excluded).
 - Token refresh uses retry with exponential backoff (3 attempts, 300/600/1200ms) before expiring the session.
 - All deletion is soft-delete via `is_deleted` (Boolean); no hard deletes in application code.
+- **Request scanning**: Security middleware blocks unambiguously malicious patterns (SQL injection, path traversal, null bytes, XSS) and logs suspicious-but-not-conclusive patterns for audit trail. Deep scanning is skipped for payloads >512 KB (typically image uploads) to prevent CPU abuse.
+- **Lineage cache coherence**: The mediator↔agency lookup cache (`lineage.ts`, 60 s TTL) is explicitly invalidated on admin user status changes, user deletion, mediator approval, and mediator rejection — ensuring downstream authorization checks reflect the latest state immediately.
+- **Cart isolation**: Frontend cart storage keys are scoped per authenticated user (`mobo_cart_v2_{userId}`). Unauthenticated sessions use a dedicated anonymous key (`mobo_cart_v2_anon`) to prevent cross-user cart leakage on shared devices.
+- **Error boundary loop protection**: The global `ErrorBoundary` limits hard reloads to 3 consecutive attempts (tracked via `sessionStorage`) to prevent infinite reload loops.
 
 ## Error handling
 

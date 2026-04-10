@@ -41,7 +41,8 @@ function getCartStorageKey(): string {
       }
     }
   } catch { /* fall through */ }
-  return CART_STORAGE_PREFIX;
+  // No valid user session — use anonymous-scoped key to prevent cross-user leakage
+  return `${CART_STORAGE_PREFIX}_anon`;
 }
 
 /** Validate that a parsed item looks like a valid CartItem to guard against corrupted localStorage. */
