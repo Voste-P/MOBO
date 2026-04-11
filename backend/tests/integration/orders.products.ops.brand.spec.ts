@@ -206,6 +206,13 @@ describe('core flows: products -> redirect -> order -> claim -> ops verify/settl
     expect(verifyReturnWindowRes.body).toHaveProperty('ok', true);
     expect(verifyReturnWindowRes.body).toHaveProperty('approved', true);
 
+    // Fast-forward the cooling period so the settle call is not blocked.
+    // In production, the coolingPeriodSettler cron handles this automatically.
+    await db.order.update({
+      where: { id: orderId },
+      data: { expectedSettlementDate: new Date(Date.now() - 86_400_000) },
+    });
+
     // Force-reset brand wallet to a known balance right before settlement to
     // avoid contamination from other test files sharing the same database.
     await db.wallet.updateMany({
