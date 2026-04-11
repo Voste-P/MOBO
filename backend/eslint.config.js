@@ -10,6 +10,11 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   {
     files: ['**/*.ts'],
+    languageOptions: {
+      parserOptions: {
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
     rules: {
       // TypeScript handles undefined globals/types at build-time.
       'no-undef': 'off',

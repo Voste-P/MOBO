@@ -63,7 +63,10 @@ export function makeProductsController() {
           if (campaign.openToAll) return true;
           const medCodeLwr = mediatorCode.toLowerCase();
           const assignments = campaign.assignments && typeof campaign.assignments === 'object' && !Array.isArray(campaign.assignments) ? campaign.assignments as Record<string, any> : {};
-          if (assignments[medCodeLwr]) return true;
+          // Case-insensitive key lookup: assignSlots stores lowercase keys but
+          // legacy data may have mixed-case keys.
+          const assignmentMatch = assignments[medCodeLwr] || Object.keys(assignments).some(k => k.toLowerCase() === medCodeLwr && assignments[k]);
+          if (assignmentMatch) return true;
           if (agencyCode) {
             const allowed = Array.isArray(campaign.allowedAgencyCodes) ? campaign.allowedAgencyCodes.map((c: any) => String(c).trim().toUpperCase()) : [];
             if (allowed.includes(agencyCode.toUpperCase())) return true;
