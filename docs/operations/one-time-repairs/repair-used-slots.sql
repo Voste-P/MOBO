@@ -6,6 +6,11 @@
 --
 -- Run once against the production database after deploying the code fix.
 -- Safe to re-run — it is idempotent.
+--
+-- IMPORTANT: Set the search_path to match your Prisma DATABASE_URL schema.
+-- Your pgAdmin schemas: buzzma_dev, buzzma_production, buzzma_test.
+-- Change the line below to target the correct environment.
+SET search_path TO buzzma_production;
 
 UPDATE campaigns c
 SET used_slots = COALESCE(sub.cnt, 0)

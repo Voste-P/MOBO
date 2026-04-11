@@ -80,6 +80,20 @@ export const createOrderSchema = z
         message: 'Review proof must be a valid image data URL',
       });
     }
+    if (value.screenshots?.payment && !isImageDataUrl(value.screenshots.payment)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['screenshots', 'payment'],
+        message: 'Payment proof must be a valid image data URL',
+      });
+    }
+    if (value.screenshots?.returnWindow && !isImageDataUrl(value.screenshots.returnWindow)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['screenshots', 'returnWindow'],
+        message: 'Return window proof must be a valid image data URL',
+      });
+    }
   });
 
 export const submitClaimSchema = z

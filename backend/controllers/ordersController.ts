@@ -1459,7 +1459,7 @@ export function makeOrdersController(env: Env) {
             try {
               const headResp = await fetch(reviewUrl, {
                 method: 'HEAD',
-                redirect: 'follow',
+                redirect: 'manual',
                 signal: AbortSignal.timeout(8000),
               });
               if (headResp.ok || headResp.status === 405 || headResp.status === 403) {

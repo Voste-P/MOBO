@@ -1081,7 +1081,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                           <div className="text-[10px] text-zinc-400">Qty: {o.items?.[0]?.quantity || 1}</div>
                         </td>
                         <td className="p-6 text-right font-bold text-zinc-900">{formatCurrency(o.total)}</td>
-                        <td className="p-6 text-right font-mono font-bold text-green-600">{formatCurrency(o.commission || 0)}</td>
+                        <td className="p-6 text-right font-mono font-bold text-green-600">{formatCurrency(o.items?.[0]?.commission || 0)}</td>
                         <td className="p-6 text-right">
                           <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
                             o.dealType === 'Rating' ? 'bg-orange-50 text-orange-600' :
@@ -1143,7 +1143,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                           <span className="text-xs font-bold text-zinc-600">{o.items?.[0]?.quantity || 1}</span>
                         </td>
                         <td className="p-6 text-right font-bold text-zinc-900">{formatCurrency(o.total)}</td>
-                        <td className="p-6 text-right font-mono font-bold text-green-600">{formatCurrency(o.commission || 0)}</td>
+                        <td className="p-6 text-right font-mono font-bold text-green-600">{formatCurrency(o.items?.[0]?.commission || 0)}</td>
                         <td className="p-6 text-right">
                           <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
                             o.dealType === 'Rating' ? 'bg-orange-50 text-orange-600' :
@@ -1161,7 +1161,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                     <tr className="bg-zinc-50 border-t-2 border-zinc-200">
                       <td colSpan={5} className="p-6 text-xs font-extrabold text-zinc-700 uppercase">Total Payable</td>
                       <td className="p-6 text-right font-mono font-extrabold text-zinc-900">{formatCurrency(filtered.reduce((s, o) => s + (o.total || 0), 0))}</td>
-                      <td className="p-6 text-right font-mono font-extrabold text-lg text-green-600">{formatCurrency(filtered.reduce((s, o) => s + (o.commission || 0), 0))}</td>
+                      <td className="p-6 text-right font-mono font-extrabold text-lg text-green-600">{formatCurrency(filtered.reduce((s, o) => s + (o.items?.[0]?.commission || 0), 0))}</td>
                       <td className="p-6"></td>
                     </tr>
                   </tfoot>

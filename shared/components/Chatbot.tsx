@@ -375,7 +375,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
     if (lastFailedText) {
       handleSendMessage(undefined, lastFailedText);
     }
-  }, [lastFailedText]);
+  }, [lastFailedText, handleSendMessage]);
 
   const handleClearChat = useCallback(() => {
     abortRef.current?.abort();

@@ -234,16 +234,29 @@ export function makeInviteController() {
           throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique invite code; please retry');
         }
 
-        const invite = await db().invite.create({
-          data: {
-            code,
-            role: 'mediator' as any,
-            parentUserId: agency.id,
-            parentCode: agency.mediatorCode,
-            createdBy: requester.id,
-            expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14),
-          },
-        });
+        const invite = await (async () => {
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              return await db().invite.create({
+                data: {
+                  code,
+                  role: 'mediator' as any,
+                  parentUserId: agency.id,
+                  parentCode: agency.mediatorCode,
+                  createdBy: requester.id,
+                  expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14),
+                },
+              });
+            } catch (e: any) {
+              if (e?.code === 'P2002' && attempt < 2) {
+                code = generateHumanCode('INV');
+                continue;
+              }
+              throw e;
+            }
+          }
+          throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique invite code; please retry');
+        })();
 
         await writeAuditLog({
           req,
@@ -302,16 +315,29 @@ export function makeInviteController() {
           throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique invite code; please retry');
         }
 
-        const invite = await db().invite.create({
-          data: {
-            code,
-            role: 'shopper' as any,
-            parentUserId: mediator.id,
-            parentCode: mediator.mediatorCode,
-            createdBy: requester.id,
-            expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14),
-          },
-        });
+        const invite = await (async () => {
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              return await db().invite.create({
+                data: {
+                  code,
+                  role: 'shopper' as any,
+                  parentUserId: mediator.id,
+                  parentCode: mediator.mediatorCode,
+                  createdBy: requester.id,
+                  expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14),
+                },
+              });
+            } catch (e: any) {
+              if (e?.code === 'P2002' && attempt < 2) {
+                code = generateHumanCode('INV');
+                continue;
+              }
+              throw e;
+            }
+          }
+          throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique invite code; please retry');
+        })();
 
         await writeAuditLog({
           req,

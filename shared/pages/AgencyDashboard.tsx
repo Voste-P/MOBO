@@ -990,11 +990,11 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
                         </div>
                       </td>
                       <td className="p-4">
-                        <ExpandableText text={o.items?.[0]?.productName || 'Product'} clampClass="truncate" className="text-xs font-semibold text-slate-700 max-w-[150px]" as="div">{o.items?.[0]?.productName || 'Product'}</ExpandableText>
-                        <div className="text-[10px] text-slate-400">Qty: {o.items?.[0]?.qty || 1}</div>
+                        <ExpandableText text={o.items?.[0]?.title || 'Product'} clampClass="truncate" className="text-xs font-semibold text-slate-700 max-w-[150px]" as="div">{o.items?.[0]?.title || 'Product'}</ExpandableText>
+                        <div className="text-[10px] text-slate-400">Qty: {o.items?.[0]?.quantity || 1}</div>
                       </td>
                       <td className="p-4 text-right font-mono font-bold text-slate-900">{formatCurrency(o.total)}</td>
-                      <td className="p-4 text-right font-mono font-bold text-lime-600">{formatCurrency(o.commission || 0)}</td>
+                      <td className="p-4 text-right font-mono font-bold text-lime-600">{formatCurrency(o.items?.[0]?.commission || 0)}</td>
                       <td className="p-4 pr-8 text-right">
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                           o.dealType === 'Rating' ? 'bg-orange-50 text-orange-600' :
@@ -1041,10 +1041,10 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
                         <div className="text-xs font-bold text-slate-700">{o.brandName || o.items?.[0]?.brandName || 'Brand'}</div>
                       </td>
                       <td className="p-4">
-                        <ExpandableText text={o.items?.[0]?.productName || 'Product'} clampClass="truncate" className="text-xs font-semibold text-slate-700 max-w-[150px]" as="div">{o.items?.[0]?.productName || 'Product'}</ExpandableText>
+                        <ExpandableText text={o.items?.[0]?.title || 'Product'} clampClass="truncate" className="text-xs font-semibold text-slate-700 max-w-[150px]" as="div">{o.items?.[0]?.title || 'Product'}</ExpandableText>
                       </td>
                       <td className="p-4 text-center">
-                        <span className="text-xs font-bold text-slate-600">{o.items?.[0]?.qty || 1}</span>
+                        <span className="text-xs font-bold text-slate-600">{o.items?.[0]?.quantity || 1}</span>
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-2">
@@ -1055,7 +1055,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
                           </div>
                         </div>
                       </td>
-                      <td className="p-4 text-right font-mono font-bold text-lime-600">{formatCurrency(o.commission || 0)}</td>
+                      <td className="p-4 text-right font-mono font-bold text-lime-600">{formatCurrency(o.items?.[0]?.commission || 0)}</td>
                       <td className="p-4 pr-8 text-right">
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                           o.dealType === 'Rating' ? 'bg-orange-50 text-orange-600' :
