@@ -90,7 +90,7 @@ export async function applyWalletCredit(input: WalletMutationInput) {
 
     // Safety limit: prevent runaway balances (default 1 crore paise = ₹1,00,000).
     // WALLET_MAX_BALANCE_PAISE is validated at startup by loadEnv() in config/env.ts.
-    const MAX_BALANCE_PAISE = Number(process.env.WALLET_MAX_BALANCE_PAISE) || 1_00_00_000;
+    const MAX_BALANCE_PAISE = Number(process.env.WALLET_MAX_BALANCE_PAISE ?? '') || 1_00_00_000;
 
     // Ensure wallet exists first
     await tx.wallet.upsert({

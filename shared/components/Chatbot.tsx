@@ -216,9 +216,9 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isVisible = true, onNavigate }
         allTickets = cache.tickets;
       } else {
         [allProducts, userOrders, allTickets] = await Promise.all([
-          api.products.getAll(user?.mediatorCode).catch(() => []),
-          user?.id ? api.orders.getUserOrders(user.id).catch(() => []) : Promise.resolve([]),
-          api.tickets.getAll().catch(() => []),
+          api.products.getAll(user?.mediatorCode).catch((err) => { console.warn('[Chatbot] Failed to fetch products for AI context:', err); return []; }),
+          user?.id ? api.orders.getUserOrders(user.id).catch((err) => { console.warn('[Chatbot] Failed to fetch orders for AI context:', err); return []; }) : Promise.resolve([]),
+          api.tickets.getAll().catch((err) => { console.warn('[Chatbot] Failed to fetch tickets for AI context:', err); return []; }),
         ]);
         // Cap cached arrays to prevent memory bloat in long sessions
         contextCacheRef.current = {
