@@ -259,8 +259,8 @@ async function canManageTicketByRole(params: {
       }
     }
 
-    // ── Agency: can manage tickets from mediators + buyers in their network ──
-    if (roles.includes('agency')) {
+    // ── Agency: can manage tickets targeted to 'agency' from network users ──
+    if (roles.includes('agency') && (!ticketTargetRole || ticketTargetRole === 'agency')) {
       const agencyCode = await resolveAgencyCode(pgUserId, user);
       if (agencyCode) {
         const mediatorCodes = await listMediatorCodesForAgency(agencyCode);
@@ -740,10 +740,6 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
               // Tickets targeted to agency from ANY user in the network (including escalated buyer tickets)
               cascadeTargets.push({ targetRole: 'agency', userId: { in: allNetworkIds } });
             }
-            // Buyer tickets still at mediator level (oversight)
-            if (buyerInMediatorNetwork.length) {
-              cascadeTargets.push({ targetRole: 'mediator', userId: { in: buyerInMediatorNetwork } });
-            }
           }
         }
 
@@ -796,7 +792,16 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
 
         const orderIds = await getScopedOrderIds({ roles, pgUserId, requesterUser: user });
         if (orderIds.length) {
-          cascadeTargets.push({ orderId: { in: orderIds } });
+          // Scope order-based tickets to the requester's role level
+          const orderTargetRoles: string[] = [];
+          if (roles.includes('mediator')) orderTargetRoles.push('mediator');
+          if (roles.includes('agency')) orderTargetRoles.push('agency');
+          if (roles.includes('brand')) orderTargetRoles.push('brand');
+          if (orderTargetRoles.length) {
+            cascadeTargets.push({ orderId: { in: orderIds }, targetRole: { in: orderTargetRoles } });
+          } else {
+            cascadeTargets.push({ orderId: { in: orderIds } });
+          }
         }
         const ticketWhere = {
             isDeleted: false,
