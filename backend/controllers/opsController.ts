@@ -1477,15 +1477,10 @@ export function makeOpsController(env: Env) {
         });
         updateData.events = newEvents;
 
-        // Atomically update order + release campaign slot inside a transaction
-        // to prevent inconsistent state if one operation fails.
-        const campaignId = (body.type === 'order') ? order.items?.[0]?.campaignId : null;
-        await db().$transaction(async (tx: any) => {
-          await tx.order.update({ where: { id: order.id }, data: updateData });
-          if (campaignId) {
-            await tx.$executeRaw`UPDATE "campaigns" SET "used_slots" = GREATEST("used_slots" - 1, 0) WHERE id = ${campaignId}::uuid AND "is_deleted" = false`;
-          }
-        });
+        // Update order — do NOT release the campaign slot here because the
+        // order still exists and the buyer can re-upload proofs.  Slots are
+        // only freed on explicit order cancellation (cancelOrder).
+        await db().order.update({ where: { id: order.id }, data: updateData });
 
         // Always transition back to ORDERED so buyer can re-upload all proofs
         await transitionOrderWorkflow({
@@ -1508,19 +1503,6 @@ export function makeOpsController(env: Env) {
         businessLog.info('Order proof rejected', { orderId: order.id, proofType: body.type, reason: body.reason, rejectedBy: req.auth?.userId, ip: req.ip });
         logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Order', entityId: order.id!, action: 'PROOF_REJECTED', changedFields: ['affiliateStatus', 'rejectionType', 'rejectionReason'], before: { affiliateStatus: order.affiliateStatus }, after: { affiliateStatus: 'Unchecked', rejectionType: body.type, rejectionReason: body.reason } });
         logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Order', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'REJECT_ORDER_PROOF', orderId: order.id, proofType: body.type } });
-
-        if (body.type === 'order') {
-          const campaignId = order.items?.[0]?.campaignId;
-          if (campaignId) {
-            writeAuditLog({
-              req,
-              action: 'CAMPAIGN_SLOT_RELEASED',
-              entityType: 'Campaign',
-              entityId: String(campaignId),
-              metadata: { orderId: order.id, reason: 'proof_rejected' },
-            }).catch((err) => { orderLog.warn('Audit log failed (slot release)', { error: err instanceof Error ? err.message : String(err) }); });
-          }
-        }
 
         const audience = await buildOrderAudience(order, agencyCode);
         publishRealtime({ type: 'orders.changed', ts: new Date().toISOString(), audience });
@@ -3147,6 +3129,7 @@ export function makeOpsController(env: Env) {
             usedSlots: 0,
             status: 'draft',
             allowedAgencyCodes: campaign.allowedAgencyCodes || [],
+            openToAll: campaign.openToAll ?? false,
             assignments: {},
             locked: false,
             createdBy: pgUserId || undefined,
