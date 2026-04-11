@@ -2280,7 +2280,7 @@ export const BrandDashboard: React.FC = () => {
     if (!user?.id) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const eventToKeys: Record<string, string[]> = {
-      'orders.changed': ['orders', 'dashboardStats', 'revenueChart'],
+      'orders.changed': ['orders', 'campaigns', 'dashboardStats', 'revenueChart'],
       'deals.changed': ['campaigns', 'dashboardStats', 'inventoryFill'],
       'users.changed': ['agencies', 'dashboardStats'],
       'wallets.changed': ['transactions'],

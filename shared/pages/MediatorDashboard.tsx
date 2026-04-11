@@ -123,12 +123,12 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
 
   const actionRequiredOrders = useMemo(() =>
     orders.filter((o: Order) => String(o.workflowStatus || '') === 'UNDER_REVIEW')
-      .filter((o: Order) => matchesSearch(searchQuery, o.items[0]?.title, o.buyerName, o.reviewerName, getPrimaryOrderId(o))),
+      .filter((o: Order) => matchesSearch(searchQuery, o.items?.[0]?.title, o.buyerName, o.reviewerName, getPrimaryOrderId(o))),
     [orders, searchQuery]
   );
   const coolingOrders = useMemo(() =>
     orders.filter((o: Order) => o.affiliateStatus === 'Pending_Cooling')
-      .filter((o: Order) => matchesSearch(searchQuery, o.items[0]?.title, o.buyerName, o.reviewerName, getPrimaryOrderId(o))),
+      .filter((o: Order) => matchesSearch(searchQuery, o.items?.[0]?.title, o.buyerName, o.reviewerName, getPrimaryOrderId(o))),
     [orders, searchQuery]
   );
 
@@ -159,14 +159,14 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
           const status = String(o.affiliateStatus || '');
           return status === 'Approved_Settled' || status === 'Pending_Cooling';
         })
-        .reduce((acc: number, o: Order) => acc + (o.items[0]?.commission || 0), 0),
+        .reduce((acc: number, o: Order) => acc + (o.items?.[0]?.commission || 0), 0),
       totalDeals: orders.length,
       totalEarnings: orders
         .filter((o: Order) => {
           const status = String(o.affiliateStatus || '');
           return status === 'Approved_Settled' || status === 'Pending_Cooling';
         })
-        .reduce((acc: number, o: Order) => acc + (o.items[0]?.commission || 0), 0),
+        .reduce((acc: number, o: Order) => acc + (o.items?.[0]?.commission || 0), 0),
       totalOrderValue: orders.reduce((acc: number, o: Order) => acc + (o.total || 0), 0),
       settledOrders: orders.filter((o: Order) => String(o.affiliateStatus || '') === 'Approved_Settled'),
       pendingOrders: orders.filter((o: Order) => {
@@ -481,8 +481,8 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                     <div className="w-14 h-14 bg-mobo-dark-100 rounded-[1rem] p-1.5 flex-shrink-0 relative overflow-hidden">
                       {o.items?.[0]?.image ? (
                         <ProxiedImage
-                          src={o.items[0].image}
-                          alt={o.items[0].title || 'Order item'}
+                          src={o.items?.[0]?.image}
+                          alt={o.items?.[0]?.title || 'Order item'}
                           className="w-full h-full object-contain mix-blend-multiply relative z-10"
                         />
                       ) : (

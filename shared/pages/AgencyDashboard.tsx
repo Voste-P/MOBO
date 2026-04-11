@@ -4615,7 +4615,7 @@ export const AgencyDashboard: React.FC = () => {
     if (!user?.id) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const eventToKeys: Record<string, string[]> = {
-      'orders.changed': ['orders', 'dashboardStats', 'revenueTrend', 'brandPerformance'],
+      'orders.changed': ['orders', 'campaigns', 'dashboardStats', 'revenueTrend', 'brandPerformance'],
       'deals.changed': ['campaigns', 'dashboardStats'],
       'users.changed': ['mediators', 'dashboardStats'],
       'wallets.changed': ['ledger'],

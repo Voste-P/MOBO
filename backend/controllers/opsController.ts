@@ -1815,6 +1815,12 @@ export function makeOpsController(env: Env) {
           throw new AppError(409, 'INVALID_WORKFLOW_STATE', `Cannot settle in state ${wf}`);
         }
 
+        // Cooling period guard: ensure expectedSettlementDate has passed before manual settlement.
+        // The automatic coolingPeriodSettler enforces this, but manual settlement must too.
+        if (order.expectedSettlementDate && new Date() < new Date(order.expectedSettlementDate)) {
+          throw new AppError(409, 'COOLING_PERIOD_ACTIVE', `Cannot settle before cooling period ends on ${new Date(order.expectedSettlementDate).toISOString().slice(0, 10)}`);
+        }
+
         // Compute the assigned cap limit for this mediator (checked atomically inside transaction)
         let assignedLimit = 0;
         if (campaignId && mediatorCode && campaign) {
