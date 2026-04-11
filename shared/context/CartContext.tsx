@@ -41,8 +41,18 @@ function getCartStorageKey(): string {
       }
     }
   } catch { /* fall through */ }
-  // No valid user session — use anonymous-scoped key to prevent cross-user leakage
-  return `${CART_STORAGE_PREFIX}_anon`;
+  // No valid user session — use a per-tab session key so anonymous carts don't leak between users.
+  // sessionStorage is tab-scoped and cleared when the tab closes.
+  try {
+    let anonId = window.sessionStorage.getItem('mobo_anon_cart_id');
+    if (!anonId) {
+      anonId = `anon_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      window.sessionStorage.setItem('mobo_anon_cart_id', anonId);
+    }
+    return `${CART_STORAGE_PREFIX}_${anonId}`;
+  } catch {
+    return `${CART_STORAGE_PREFIX}_anon`;
+  }
 }
 
 /** Validate that a parsed item looks like a valid CartItem to guard against corrupted localStorage. */

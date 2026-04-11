@@ -378,7 +378,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
     const seq = ++viewSeqRef.current;
     const params: any = { limit: PAGE_SIZE, page: auditPage };
     if (auditActionFilter) params.action = auditActionFilter;
-    if (auditDateFrom) params.from = new Date(auditDateFrom).toISOString();
+    if (auditDateFrom) params.from = new Date(auditDateFrom + 'T00:00:00Z').toISOString();
     if (auditDateTo) params.to = new Date(auditDateTo + 'T23:59:59Z').toISOString();
     api.admin
       .getAuditLogs(params)
@@ -2286,7 +2286,7 @@ export const AdminPortal: React.FC<{ onBack?: () => void }> = ({ onBack: _onBack
                       try {
                         const params: any = { limit: PAGE_SIZE, page: auditPage };
                         if (auditActionFilter) params.action = auditActionFilter;
-                        if (auditDateFrom) params.from = new Date(auditDateFrom).toISOString();
+                        if (auditDateFrom) params.from = new Date(auditDateFrom + 'T00:00:00Z').toISOString();
                         if (auditDateTo) params.to = new Date(auditDateTo + 'T23:59:59Z').toISOString();
                         const res = await api.admin.getAuditLogs(params);
                         setAuditLogs(asArray(res));

@@ -591,8 +591,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       if (capturedProduct) {
         const hasId = Boolean(safeOrderId);
         const hasAmount = typeof safeAmount === 'number';
-        const tolerance = Math.max(10, capturedProduct.price * 0.02); // 2% or ₹10 minimum
-        const amountMatch = hasAmount && Math.abs(safeAmount - capturedProduct.price) < tolerance;
+        const safePrice = Number(capturedProduct.price) || 0;
+        const tolerance = Math.max(10, safePrice * 0.02); // 2% or ₹10 minimum
+        const amountMatch = hasAmount && safePrice > 0 && Math.abs(safeAmount - safePrice) < tolerance;
         const idValid = hasId && safeOrderId.length > 5;
 
         // Product name similarity check — strict matching to prevent fraud
