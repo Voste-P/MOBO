@@ -189,7 +189,7 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
     }
 
     // Guard: buyer commission must never exceed payout — prevents negative mediator margin
-    if (buyerCommissionPaise >= payoutPaise) {
+    if (buyerCommissionPaise > payoutPaise) {
       const evts = pushOrderEvent(order.events as any, {
         type: 'FROZEN_DISPUTED',
         at: new Date(),
@@ -322,10 +322,23 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
     });
   }
 
-  if (isOverLimit || (!productId && !isOverLimit)) {
-    // Cap-exceeded or missing product: update status without wallet movement
+  if (!productId && !isOverLimit) {
+    // Missing product ID — freeze order instead of settling without payment
+    const evts = pushOrderEvent(order.events as any, {
+      type: 'FROZEN_DISPUTED',
+      at: new Date(),
+      actorUserId: SYSTEM_ACTOR,
+      metadata: { reason: 'missing_product_id', source: 'cooling-settler' },
+    });
+    await db().order.update({ where: { id: order.id }, data: { frozen: true, events: evts as any } });
+    orderLog.warn('[cooling-settler] Missing product ID, order frozen', { orderId: orderDisplayId });
+    return false;
+  }
+
+  if (isOverLimit) {
+    // Cap exceeded: update status without wallet movement
     const newEvents = pushOrderEvent(order.events as any, {
-      type: isOverLimit ? 'CAP_EXCEEDED' : 'SETTLED',
+      type: 'CAP_EXCEEDED',
       at: new Date(),
       actorUserId: SYSTEM_ACTOR,
       metadata: { source: 'cooling-settler' },
@@ -333,8 +346,8 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
     await db().order.update({
       where: { id: order.id },
       data: {
-        paymentStatus: isOverLimit ? 'Failed' : 'Paid',
-        affiliateStatus: isOverLimit ? 'Cap_Exceeded' : 'Approved_Settled',
+        paymentStatus: 'Failed',
+        affiliateStatus: 'Cap_Exceeded',
         events: newEvents as any,
       },
     });

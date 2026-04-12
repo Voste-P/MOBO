@@ -180,7 +180,7 @@ export async function finalizeApprovalIfReady(order: any, actorUserId: string, e
   // Use updateMany with workflowStatus guard to prevent duplicate events on concurrent verify.
   // If count is 0, another request already approved or modified the order — idempotent return.
   const updated = await db().order.updateMany({
-    where: { id: order.id, workflowStatus: 'UNDER_REVIEW' },
+    where: { id: order.id, workflowStatus: 'UNDER_REVIEW', frozen: { not: true } },
     data: {
       affiliateStatus: 'Pending_Cooling',
       expectedSettlementDate: settleDate,

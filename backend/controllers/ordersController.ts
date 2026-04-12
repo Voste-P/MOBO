@@ -1468,6 +1468,12 @@ export function makeOrdersController(env: Env) {
               } else if ([301, 302, 303, 307, 308, 429].includes(headResp.status)) {
                 // Redirects or rate-limited — URL exists but server didn't cooperate with HEAD
                 claimAiConfidence = Math.max(80, (env.AI_REVIEW_LINK_CONFIDENCE ?? 95) - 10);
+              } else if (headResp.status === 404 || headResp.status === 410) {
+                // Dead link — too low for bulk auto-verify (threshold 70)
+                orderLog.warn('Review link returned 404/410', {
+                  orderId: order.id, status: headResp.status, url: reviewUrl,
+                });
+                claimAiConfidence = 40;
               } else {
                 orderLog.warn('Review link HEAD returned non-OK status', {
                   orderId: order.id, status: headResp.status, url: reviewUrl,
