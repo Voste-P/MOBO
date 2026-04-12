@@ -133,7 +133,10 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
       campaign.assignments && typeof campaign.assignments === 'object'
         ? (campaign.assignments as any)
         : {};
-    const rawAssigned = assignmentsObj?.[mediatorCode];
+    // Case-insensitive lookup — assignSlots stores lowercase keys
+    const codeLower = mediatorCode.toLowerCase();
+    const rawAssigned = assignmentsObj?.[codeLower]
+      ?? Object.entries(assignmentsObj).find(([k]) => k.toLowerCase() === codeLower)?.[1];
     assignedLimit =
       typeof rawAssigned === 'number' ? rawAssigned : Number(rawAssigned?.limit ?? 0);
 

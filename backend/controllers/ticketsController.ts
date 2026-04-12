@@ -324,14 +324,14 @@ async function canManageTicketByRole(params: {
               select: { id: true },
             })
           : null,
-        db.brand.findFirst({
-          where: { ownerUserId: pgUserId, isDeleted: false },
-          select: { connectedAgencyCodes: true },
+        db.user.findFirst({
+          where: { id: pgUserId, isDeleted: false },
+          select: { connectedAgencies: true },
         }),
       ]);
       if (orderCheck) return true;
 
-      const connectedCodes = brand?.connectedAgencyCodes ?? [];
+      const connectedCodes = (Array.isArray(brand?.connectedAgencies) ? brand.connectedAgencies : []) as string[];
       if (connectedCodes.length) {
         // Wave 2: agency owners + direct registration + mediator codes (independent)
         const [connectedAgencies, regUnderAgency, allMedUsers] = await Promise.all([
@@ -427,11 +427,11 @@ async function canManageTicketByRole(params: {
             }
           }
           if (roles.includes('brand')) {
-            const brand = await db.brand.findFirst({
-              where: { ownerUserId: pgUserId, isDeleted: false },
-              select: { connectedAgencyCodes: true },
+            const brandUser = await db.user.findFirst({
+              where: { id: pgUserId, isDeleted: false },
+              select: { connectedAgencies: true },
             });
-            const connectedCodes = brand?.connectedAgencyCodes ?? [];
+            const connectedCodes = (Array.isArray(brandUser?.connectedAgencies) ? brandUser.connectedAgencies : []) as string[];
             if (connectedCodes.length > 0) {
               if (connectedCodes.includes(creatorParent) || connectedCodes.includes(creatorMediator)) return true;
               // Check if creator is under a mediator whose agency is connected (batched query)
@@ -745,8 +745,8 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
 
         if (roles.includes('brand')) {
           // Brand sees tickets from connected agencies + their downstream at ALL relevant target levels
-          const brand = await db.brand.findFirst({ where: { ownerUserId: pgUserId, isDeleted: false }, select: { connectedAgencyCodes: true } });
-          const connectedCodes = brand?.connectedAgencyCodes ?? [];
+          const brandUser = await db.user.findFirst({ where: { id: pgUserId, isDeleted: false }, select: { connectedAgencies: true } });
+          const connectedCodes = (Array.isArray(brandUser?.connectedAgencies) ? brandUser.connectedAgencies : []) as string[];
           if (connectedCodes.length) {
             // Resolve agency owner user IDs from connected agency codes
             const connectedAgencies = await db.agency.findMany({ where: { agencyCode: { in: connectedCodes }, isDeleted: false }, select: { ownerUserId: true } });
