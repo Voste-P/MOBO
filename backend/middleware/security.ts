@@ -145,10 +145,15 @@ export function securityAuditMiddleware() {
     }
 
     // Phase 2: Log suspicious-but-not-conclusive patterns — only on mutating requests
-    // GET/HEAD/OPTIONS carry minimal injection risk; skip expensive traversal for them
+    // GET/HEAD/OPTIONS carry minimal injection risk; skip expensive traversal for them.
+    // Skip scanning large payloads (>500KB) entirely — they are typically image uploads
+    // and scanning them wastes CPU without meaningful security benefit.
     if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
-      for (const source of sources) {
-        checkObjectForSuspiciousPatterns(source.data, source.label, req, res);
+      const contentLength = parseInt(req.headers['content-length'] || '0', 10);
+      if (contentLength < 512_000) {
+        for (const source of sources) {
+          checkObjectForSuspiciousPatterns(source.data, source.label, req, res);
+        }
       }
     }
 

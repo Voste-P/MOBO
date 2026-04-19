@@ -11,6 +11,7 @@ import { pgDeal } from '../utils/pgMappers.js';
 import { idWhere } from '../utils/idWhere.js';
 import { orderLog, businessLog } from '../config/logger.js';
 import { logChangeEvent, logAccessEvent, logErrorEvent } from '../config/appLogs.js';
+import { getAgencyCodeForMediatorCode } from '../services/lineage.js';
 
 function db() { return prisma(); }
 
@@ -36,28 +37,88 @@ export function makeProductsController() {
           mediatorCode: { equals: mediatorCode, mode: 'insensitive' as const },
           active: true,
           isDeleted: false,
+          campaign: { isDeleted: false, status: 'active' as any },
         };
 
-        const [deals, total, mediatorUser] = await Promise.all([
+        const [rawDeals, total, mediatorUser, agencyCode] = await Promise.all([
           db().deal.findMany({
             where,
             orderBy: { createdAt: 'desc' },
             skip,
             take: limit,
-            include: { campaign: { select: { totalSlots: true, usedSlots: true, createdAt: true } } },
+            include: { campaign: { select: { totalSlots: true, usedSlots: true, openToAll: true, assignments: true, allowedAgencyCodes: true, createdAt: true } } },
           }),
           db().deal.count({ where }),
           db().user.findFirst({
             where: { mediatorCode: { equals: mediatorCode, mode: 'insensitive' }, isDeleted: false },
             select: { name: true },
           }),
+          getAgencyCodeForMediatorCode(mediatorCode),
         ]);
 
+        // Filter out deals where the mediator's agency no longer has campaign access
+        const deals = rawDeals.filter((d: any) => {
+          const campaign = d.campaign;
+          if (!campaign) return false;
+          if (campaign.openToAll) return true;
+          const medCodeLwr = mediatorCode.toLowerCase();
+          const assignments = campaign.assignments && typeof campaign.assignments === 'object' && !Array.isArray(campaign.assignments) ? campaign.assignments as Record<string, any> : {};
+          // Case-insensitive key lookup: assignSlots stores lowercase keys but
+          // legacy data may have mixed-case keys.
+          const assignmentMatch = assignments[medCodeLwr] || Object.keys(assignments).some(k => k.toLowerCase() === medCodeLwr && assignments[k]);
+          if (assignmentMatch) return true;
+          if (agencyCode) {
+            const allowed = Array.isArray(campaign.allowedAgencyCodes) ? campaign.allowedAgencyCodes.map((c: any) => String(c).trim().toUpperCase()) : [];
+            if (allowed.includes(agencyCode.toUpperCase())) return true;
+          }
+          return false;
+        });
+
+        // For non-openToAll campaigns, count per-mediator order consumption
+        const perMedCounts = new Map<string, number>();
+        const nonOpenIds = deals
+          .filter((d: any) => d.campaign && !d.campaign.openToAll)
+          .map((d: any) => d.campaignId as string);
+        if (nonOpenIds.length > 0) {
+          const uniqueIds = [...new Set(nonOpenIds)];
+          const rows: Array<{ campaign_id: string; cnt: bigint }> =
+            await db().$queryRawUnsafe(
+              `SELECT oi.campaign_id, COUNT(*)::bigint AS cnt
+               FROM order_items oi
+               JOIN orders o ON o.id = oi.order_id AND o.is_deleted = false
+               WHERE oi.campaign_id = ANY($1::uuid[])
+                 AND oi.is_deleted = false
+                 AND LOWER(o.manager_name) = LOWER($2)
+               GROUP BY oi.campaign_id`,
+              uniqueIds,
+              mediatorCode,
+            );
+          for (const row of rows) {
+            perMedCounts.set(row.campaign_id, Number(row.cnt));
+          }
+        }
+
         const mediatorName = mediatorUser?.name || '';
+        const medCodeLower = mediatorCode.toLowerCase();
         const enrichedDeals = deals.map((d: any) => {
           const campaign = d.campaign;
-          const totalSlots = campaign?.totalSlots || 0;
-          const usedSlots = campaign?.usedSlots || 0;
+          const isOpen = campaign?.openToAll ?? false;
+          const assignments = campaign?.assignments && typeof campaign.assignments === 'object' && !Array.isArray(campaign.assignments)
+            ? campaign.assignments as Record<string, any>
+            : {};
+
+          let totalSlots: number;
+          let usedSlots: number;
+
+          if (!isOpen && assignments[medCodeLower]) {
+            const assignment = assignments[medCodeLower];
+            totalSlots = Number(typeof assignment === 'number' ? assignment : assignment?.limit ?? 0);
+            usedSlots = perMedCounts.get(d.campaignId) ?? 0;
+          } else {
+            totalSlots = campaign?.totalSlots || 0;
+            usedSlots = campaign?.usedSlots || 0;
+          }
+
           const remainingSlots = Math.max(0, totalSlots - usedSlots);
           let sellingSpeed = 0;
           if (campaign?.createdAt && usedSlots > 0) {
@@ -148,7 +209,7 @@ export function makeProductsController() {
             items: {
               create: [
                 {
-                  productId: deal.id || deal.id,
+                  productId: deal.id,
                   title: String(deal.title),
                   image: String(deal.image ?? ''),
                   priceAtPurchasePaise: Number(deal.pricePaise ?? 0),

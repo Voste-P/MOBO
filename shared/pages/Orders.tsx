@@ -176,6 +176,8 @@ const isValidReviewLink = (value: string) => {
   try {
     const url = new URL(trimmed);
     if (url.protocol !== 'https:') return false;
+    // Reject non-standard ports (only 443 or default allowed)
+    if (url.port && url.port !== '443') return false;
     const host = url.hostname.toLowerCase().replace(/^www\./, '');
     // Strict match: host must exactly equal the domain or end with '.domain'
     // Prevents subdomain spoofing like amazon.in.attacker.com
@@ -385,11 +387,11 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
         return {
           ...o,
           screenshots: {
-            order: updated.screenshots?.order ? 'exists' : o.screenshots?.order || undefined,
-            payment: updated.screenshots?.payment ? 'exists' : o.screenshots?.payment || undefined,
-            review: updated.screenshots?.review ? 'exists' : o.screenshots?.review || undefined,
-            rating: updated.screenshots?.rating ? 'exists' : o.screenshots?.rating || undefined,
-            returnWindow: updated.screenshots?.returnWindow ? 'exists' : o.screenshots?.returnWindow || undefined,
+            order: updated.screenshots && 'order' in updated.screenshots ? (updated.screenshots.order ? 'exists' : undefined) : o.screenshots?.order,
+            payment: updated.screenshots && 'payment' in updated.screenshots ? (updated.screenshots.payment ? 'exists' : undefined) : o.screenshots?.payment,
+            review: updated.screenshots && 'review' in updated.screenshots ? (updated.screenshots.review ? 'exists' : undefined) : o.screenshots?.review,
+            rating: updated.screenshots && 'rating' in updated.screenshots ? (updated.screenshots.rating ? 'exists' : undefined) : o.screenshots?.rating,
+            returnWindow: updated.screenshots && 'returnWindow' in updated.screenshots ? (updated.screenshots.returnWindow ? 'exists' : undefined) : o.screenshots?.returnWindow,
           },
           reviewLink: updated.reviewLink || o.reviewLink,
           reviewerName: updated.reviewerName || o.reviewerName,
@@ -589,8 +591,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
       if (capturedProduct) {
         const hasId = Boolean(safeOrderId);
         const hasAmount = typeof safeAmount === 'number';
-        const tolerance = Math.max(10, capturedProduct.price * 0.02); // 2% or ₹10 minimum
-        const amountMatch = hasAmount && Math.abs(safeAmount - capturedProduct.price) < tolerance;
+        const safePrice = Number(capturedProduct.price) || 0;
+        const tolerance = Math.max(10, safePrice * 0.02); // 2% or ₹10 minimum
+        const amountMatch = hasAmount && safePrice > 0 && Math.abs(safeAmount - safePrice) < tolerance;
         const idValid = hasId && safeOrderId.length > 5;
 
         // Product name similarity check — strict matching to prevent fraud
@@ -1334,7 +1337,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                     <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
                     <div>
                       <span className="uppercase text-[10px] tracking-wider font-black text-red-500 block mb-0.5">
-                        {rejectionType === 'order' ? 'Purchase Proof' : rejectionType === 'review' ? 'Review Proof' : rejectionType === 'rating' ? 'Rating Proof' : rejectionType === 'returnWindow' ? 'Return Window Proof' : 'Proof'} Rejected
+                        {rejectionType === 'order' ? 'Purchase Proof' : rejectionType === 'review' ? 'Review Proof' : rejectionType === 'rating' ? 'Rating Proof' : rejectionType === 'returnWindow' ? 'Return Window Proof' : 'Proof'} Rejected — Re-upload All Proofs
                       </span>
                       {rejectionReason}
                     </div>
@@ -1525,6 +1528,11 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                         onClick={() => {
                           setSelectedOrder(order);
                           setUploadType('order');
+                          setReviewLinkInput('');
+                          setReviewerNameInput('');
+                          setRatingFile(null); setRatingPreview(null); setRatingVerification(null);
+                          setRwFile(null); setRwPreview(null); setRwVerification(null);
+                          ratingAbortRef.current?.abort(); rwAbortRef.current?.abort();
                         }}
                         className="text-[10px] font-bold uppercase text-blue-600 bg-blue-50 border border-blue-200 px-3 py-2 rounded-lg hover:bg-blue-100 transition-colors active:scale-95"
                       >
@@ -1537,7 +1545,11 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                         onClick={() => {
                           setSelectedOrder(order);
                           setUploadType('review');
+                          setReviewLinkInput('');
                           setReviewerNameInput(order.reviewerName || '');
+                          setRatingFile(null); setRatingPreview(null); setRatingVerification(null);
+                          setRwFile(null); setRwPreview(null); setRwVerification(null);
+                          ratingAbortRef.current?.abort(); rwAbortRef.current?.abort();
                         }}
                         className="text-[10px] font-bold uppercase text-purple-600 bg-purple-50 border border-purple-200 px-3 py-2 rounded-lg hover:bg-purple-100 transition-colors active:scale-95"
                       >
@@ -1551,6 +1563,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           setSelectedOrder(order);
                           setUploadType('rating');
                           setReviewerNameInput(order.reviewerName || '');
+                          setRatingFile(null); setRatingPreview(null); setRatingVerification(null);
+                          setRwFile(null); setRwPreview(null); setRwVerification(null);
+                          ratingAbortRef.current?.abort(); rwAbortRef.current?.abort();
                         }}
                         className="text-[10px] font-bold uppercase text-purple-600 bg-purple-50 border border-purple-200 px-3 py-2 rounded-lg hover:bg-purple-100 transition-colors active:scale-95"
                       >
@@ -1567,6 +1582,9 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           setSelectedOrder(order);
                           setUploadType('returnWindow');
                           setReviewerNameInput(order.reviewerName || '');
+                          setRatingFile(null); setRatingPreview(null); setRatingVerification(null);
+                          setRwFile(null); setRwPreview(null); setRwVerification(null);
+                          ratingAbortRef.current?.abort(); rwAbortRef.current?.abort();
                         }}
                         className="text-[10px] font-bold uppercase text-teal-600 bg-teal-50 border border-teal-200 px-3 py-2 rounded-lg hover:bg-teal-100 transition-colors active:scale-95"
                       >
@@ -2001,6 +2019,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
                           <div className="relative">
                             <input
                               type="number"
+                              min="0"
                               value={extractedDetails.amount}
                               onChange={(e) =>
                                 setExtractedDetails({ ...extractedDetails, amount: e.target.value })
@@ -2183,6 +2202,15 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
             </div>
 
             <div className="mt-6 pt-4 border-t border-gray-100">
+              {!selectedProduct && (
+                <p className="text-[10px] text-zinc-500 font-bold text-center mb-2">Select a product to continue.</p>
+              )}
+              {selectedProduct && !formScreenshot && (
+                <p className="text-[10px] text-zinc-500 font-bold text-center mb-2">Upload an order screenshot to continue.</p>
+              )}
+              {formScreenshot && (!extractedDetails.orderId || !extractedDetails.amount) && matchStatus.productName !== 'mismatch' && matchStatus.productName !== 'none' && (
+                <p className="text-[10px] text-amber-600 font-bold text-center mb-2">Could not extract order details from screenshot. Please upload a clearer image.</p>
+              )}
               {(matchStatus.productName === 'mismatch' || matchStatus.productName === 'none') && formScreenshot && (
                 <p className="text-[10px] text-red-600 font-bold text-center mb-2">
                   {matchStatus.productName === 'mismatch'
@@ -2344,6 +2372,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
         <div
           className="fixed inset-0 z-modal flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
           onClick={() => {
+            ratingAbortRef.current?.abort(); rwAbortRef.current?.abort();
             setSelectedOrder(null);
             setInputValue('');
             setRatingPreview(null);
@@ -2360,6 +2389,7 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
           >
             <button
               onClick={() => {
+                ratingAbortRef.current?.abort(); rwAbortRef.current?.abort();
                 setSelectedOrder(null);
                 setInputValue('');
                 setRatingPreview(null);
@@ -2748,6 +2778,23 @@ export const Orders: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =>
               </div>
             ) : (
               <div className="space-y-3">
+                {/* Reviewer Name input — shown on re-upload after rejection so buyer can correct it */}
+                {selectedOrder?.rejection?.type === 'order' && (
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1">
+                      Reviewer / Profile Name
+                    </label>
+                    <input
+                      value={reviewerNameInput}
+                      onChange={(e) => setReviewerNameInput(e.target.value)}
+                      placeholder="Enter your marketplace reviewer name"
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1 ml-1">
+                      Enter the reviewer / profile name you use on the marketplace.
+                    </p>
+                  </div>
+                )}
                 <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">
                   Proof
                 </label>

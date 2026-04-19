@@ -4,15 +4,15 @@ import { useEffect } from 'react';
 
 export function DisableNumberScroll() {
   useEffect(() => {
-    const onWheel = (e: WheelEvent) => {
+    const onWheel = () => {
       const el = document.activeElement;
       if (!el) return;
       if (el instanceof HTMLInputElement && el.type === 'number' && !el.dataset.allowNumberScroll) {
-        e.preventDefault();
+        el.blur();
       }
     };
 
-    window.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('wheel', onWheel, { passive: true });
     return () => window.removeEventListener('wheel', onWheel);
   }, []);
 

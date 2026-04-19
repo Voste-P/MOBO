@@ -50,9 +50,12 @@ export function makeInviteController() {
               },
             });
             break; // success
-          } catch (err: any) {
+          } catch (err: unknown) {
             // P2002 = unique-constraint violation → code collision, retry
-            const isUniqueViolation = err?.code === 'P2002' || err?.meta?.target?.includes('code');
+            const isUniqueViolation =
+              err instanceof Error && 'code' in err &&
+              ((err as { code?: string }).code === 'P2002' ||
+               (err as { meta?: { target?: string[] } }).meta?.target?.includes('code'));
             if (!isUniqueViolation) throw err;
             // last attempt → surface the error
             if (attempt === 9) throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique invite code; please retry');
@@ -201,7 +204,7 @@ export function makeInviteController() {
 
         // Allow agencies to generate mediator invites for themselves. Admin/Ops can generate for any agency.
         const isAgencySelf =
-          (requester.roles as string[])?.includes('agency') && (requester.id === body.agencyId || requester.id === body.agencyId);
+          (requester.roles as string[])?.includes('agency') && requester.id === body.agencyId;
         const isPrivileged = (requester.roles as string[])?.includes('admin') || (requester.roles as string[])?.includes('ops');
         if (!isAgencySelf && !isPrivileged) {
           throw new AppError(403, 'FORBIDDEN', 'Cannot generate invites for this agency');
@@ -231,16 +234,29 @@ export function makeInviteController() {
           throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique invite code; please retry');
         }
 
-        const invite = await db().invite.create({
-          data: {
-            code,
-            role: 'mediator' as any,
-            parentUserId: agency.id,
-            parentCode: agency.mediatorCode,
-            createdBy: requester.id,
-            expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14),
-          },
-        });
+        const invite = await (async () => {
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              return await db().invite.create({
+                data: {
+                  code,
+                  role: 'mediator' as any,
+                  parentUserId: agency.id,
+                  parentCode: agency.mediatorCode,
+                  createdBy: requester.id,
+                  expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14),
+                },
+              });
+            } catch (e: any) {
+              if (e?.code === 'P2002' && attempt < 2) {
+                code = generateHumanCode('INV');
+                continue;
+              }
+              throw e;
+            }
+          }
+          throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique invite code; please retry');
+        })();
 
         await writeAuditLog({
           req,
@@ -299,16 +315,29 @@ export function makeInviteController() {
           throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique invite code; please retry');
         }
 
-        const invite = await db().invite.create({
-          data: {
-            code,
-            role: 'shopper' as any,
-            parentUserId: mediator.id,
-            parentCode: mediator.mediatorCode,
-            createdBy: requester.id,
-            expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14),
-          },
-        });
+        const invite = await (async () => {
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              return await db().invite.create({
+                data: {
+                  code,
+                  role: 'shopper' as any,
+                  parentUserId: mediator.id,
+                  parentCode: mediator.mediatorCode,
+                  createdBy: requester.id,
+                  expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14),
+                },
+              });
+            } catch (e: any) {
+              if (e?.code === 'P2002' && attempt < 2) {
+                code = generateHumanCode('INV');
+                continue;
+              }
+              throw e;
+            }
+          }
+          throw new AppError(500, 'CODE_GENERATION_FAILED', 'Unable to generate a unique invite code; please retry');
+        })();
 
         await writeAuditLog({
           req,

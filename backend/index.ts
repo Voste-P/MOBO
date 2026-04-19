@@ -121,18 +121,18 @@ async function main() {
     const db = getPrisma();
     await db.user.findFirst({ where: { isDeleted: false }, select: { id: true }, take: 1 });
     startupLog.info('Schema sanity check passed (isDeleted column accessible)');
-  } catch (schemaErr: any) {
-    const code = (schemaErr as any)?.code;
+  } catch (schemaErr: unknown) {
+    const code = (schemaErr as { code?: string })?.code;
     if (code === 'P2022' || code === 'P2010' || code === 'P2023') {
       startupLog.error(
         'SCHEMA MISMATCH: Database columns do not match Prisma schema. ' +
         'Run "npx prisma migrate deploy" to apply pending migrations.',
-        { prismaCode: code, message: schemaErr?.message },
+        { prismaCode: code, message: schemaErr instanceof Error ? schemaErr.message : String(schemaErr) },
       );
       process.exit(1);
     }
     // Non-schema errors (e.g. empty table) are fine — just log and continue
-    startupLog.warn('Schema sanity check query failed (non-fatal)', { error: schemaErr?.message });
+    startupLog.warn('Schema sanity check query failed (non-fatal)', { error: schemaErr instanceof Error ? schemaErr.message : String(schemaErr) });
   }
 
   const app = createApp(env);

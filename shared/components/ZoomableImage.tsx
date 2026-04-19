@@ -72,8 +72,7 @@ export const ZoomableImage: React.FC<{
         {/* Skeleton shimmer placeholder — visible until image loads */}
         {!loaded && (
           <div
-            className={`${className || defaultClass} flex items-center justify-center bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100 animate-pulse`}
-            style={{ minHeight: 120 }}
+            className={`${className || defaultClass} flex items-center justify-center bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100 animate-pulse min-h-[120px]`}
           >
             <ImageIcon size={32} className="text-slate-300" />
           </div>
@@ -97,8 +96,7 @@ export const ZoomableImage: React.FC<{
         {/* Error fallback */}
         {error && (
           <div
-            className={`${className || defaultClass} flex flex-col items-center justify-center gap-2 bg-slate-50 text-slate-400`}
-            style={{ minHeight: 120 }}
+            className={`${className || defaultClass} flex flex-col items-center justify-center gap-2 bg-slate-50 text-slate-400 min-h-[120px]`}
           >
             <ImageIcon size={32} />
             <span className="text-xs">Image unavailable</span>

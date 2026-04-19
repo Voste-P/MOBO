@@ -46,8 +46,8 @@ Roles: `shopper`, `mediator`, `agency`, `brand`, `admin`, `ops`.
 
 All tables implement soft delete:
 
-- Active row means `deletedAt IS NULL`.
-- Uniqueness indexes are partial on `deletedAt IS NULL`.
+- Active row means `is_deleted = false`.
+- Uniqueness indexes are partial on `is_deleted = false`.
 
 ## Core data model (conceptual)
 
@@ -81,7 +81,7 @@ erDiagram
     string mediatorCode
     string parentCode
     string brandCode
-    date deletedAt
+    bool isDeleted
   }
 
   BRAND {
@@ -98,14 +98,14 @@ erDiagram
     string[] allowedAgencyCodes
     map assignments
     bool locked
-    date deletedAt
+    bool isDeleted
   }
 
   DEAL {
     string mediatorCode
     string dealType
     bool active
-    date deletedAt
+    bool isDeleted
   }
 
   ORDER {
@@ -114,7 +114,7 @@ erDiagram
     string managerName
     json events
     bool frozen
-    date deletedAt
+    bool isDeleted
   }
 
   WALLET {
@@ -122,7 +122,7 @@ erDiagram
     int pendingPaise
     int lockedPaise
     int version
-    date deletedAt
+    bool isDeleted
   }
 
   TRANSACTION {
@@ -142,7 +142,7 @@ erDiagram
     string status
     string issueType
     string orderId
-    date deletedAt
+    bool isDeleted
   }
 ```
 
@@ -154,6 +154,15 @@ erDiagram
 - Settler interval and transaction timeout are configurable via `SETTLER_INTERVAL_MS` and `SETTLER_TX_TIMEOUT_MS` env vars.
 
 ## Order workflow
+
+State machine: `CREATED → REDIRECTED → ORDERED → PROOF_SUBMITTED → UNDER_REVIEW → APPROVED → REWARD_PENDING → COMPLETED`.
+Transitions are enforced by `assertTransition()` in `orderWorkflow.ts` with an atomic `updateMany` conditional on `workflowStatus = :from` to prevent TOCTOU races.
+
+## Quality & Performance
+
+- **Memoization**: Order filter counts in Profile page are memoized with `useMemo` to avoid redundant array traversals per render.
+- **Accessibility**: Modal backdrops use `role="presentation"` and support Escape key dismissal. Focus management follows WAI-ARIA dialog patterns.
+- **E2E tests**: Smoke tests use exact placeholder selectors matching the real UI (`"Mobile Number"`, `"Password"`, `"root"`) instead of loose regexes, preventing silent failures when UI text changes.
 
 Orders have a strict state machine (`workflowStatus`), with anti-fraud constraints:
 
@@ -176,7 +185,11 @@ Orders have a strict state machine (`workflowStatus`), with anti-fraud constrain
 - All proof-download endpoints enforce role-based authorization (brand owner, assigned agency, mediator, or buyer ownership).
 - Proof upload accepts JPEG, PNG, and WebP only (GIF excluded).
 - Token refresh uses retry with exponential backoff (3 attempts, 300/600/1200ms) before expiring the session.
-- All deletion is soft-delete via `deletedAt`/`is_deleted`; no hard deletes in application code.
+- All deletion is soft-delete via `is_deleted` (Boolean); no hard deletes in application code.
+- **Request scanning**: Security middleware blocks unambiguously malicious patterns (SQL injection, path traversal, null bytes, XSS) and logs suspicious-but-not-conclusive patterns for audit trail. Deep scanning is skipped for payloads >512 KB (typically image uploads) to prevent CPU abuse.
+- **Lineage cache coherence**: The mediator↔agency lookup cache (`lineage.ts`, 60 s TTL) is explicitly invalidated on admin user status changes, user deletion, mediator approval, and mediator rejection — ensuring downstream authorization checks reflect the latest state immediately.
+- **Cart isolation**: Frontend cart storage keys are scoped per authenticated user (`mobo_cart_v2_{userId}`). Unauthenticated sessions use a dedicated anonymous key (`mobo_cart_v2_anon`) to prevent cross-user cart leakage on shared devices.
+- **Error boundary loop protection**: The global `ErrorBoundary` limits hard reloads to 3 consecutive attempts (tracked via `sessionStorage`) to prevent infinite reload loops.
 
 ## Error handling
 

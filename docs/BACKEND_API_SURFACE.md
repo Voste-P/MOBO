@@ -1,6 +1,6 @@
 # Backend API Surface (Inventory)
 
-> **121 endpoints** across 14 route files · **21 Prisma models** · **23 enums** · Last updated: June 2025.
+> **121 endpoints** across 14 route files · **21 Prisma models** · **23 enums** · Last updated: April 2026.
 
 Base URL: `/api`
 
@@ -32,7 +32,7 @@ Roles observed: `admin`, `ops`, `brand`, `agency`, `mediator`, `shopper`.
 
 - `GET /api/health`
   - Auth: none
-  - Behavior: returns DB `readyState` + `status` (`ok` when connected, else `degraded`).
+  - Behavior: returns DB connection status (`ok` when connected, else `degraded`).
 
 - `GET /api/health/e2e`
   - Auth: none
@@ -118,13 +118,13 @@ Guard: `requireAuth` + `requireRoles('admin')`
   - Behavior: reactivates a frozen order via workflow helper (audit logged).
 
 - `DELETE /api/admin/products/:dealId`
-  - Behavior: soft-deletes a deal (sets `deletedAt`; audit logged).
+  - Behavior: soft-deletes a deal (sets `is_deleted = true`; audit logged).
 
 - `DELETE /api/admin/users/:userId`
-  - Behavior: soft-deletes a user (sets `deletedAt`; audit logged).
+  - Behavior: soft-deletes a user (sets `is_deleted = true`; audit logged).
 
 - `DELETE /api/admin/wallets/:userId`
-  - Behavior: soft-deletes a wallet (sets `deletedAt`; audit logged).
+  - Behavior: soft-deletes a wallet (sets `is_deleted = true`; audit logged).
 
 - `GET /api/admin/audit-logs`
   - Behavior: paginated audit logs with filters (`action`, `entityType`, `limit`, `page`, `from`, `to`).
@@ -226,7 +226,7 @@ Campaigns / deals / payouts
   - Behavior: updates campaign status (draft/active/paused/completed).
 
 - `DELETE /api/ops/campaigns/:campaignId`
-  - Behavior: soft-deletes a campaign (sets `deletedAt`; audit logged).
+  - Behavior: soft-deletes a campaign (sets `is_deleted = true`; audit logged).
 
 - `POST /api/ops/campaigns/assign`
   - Behavior:
@@ -290,7 +290,7 @@ Guard: `requireAuth` + `requireRoles('brand','admin','ops')`
   - Behavior: brand-only mutation; campaign becomes locked after first order or after slot assignment (except status-only updates).
 
 - `DELETE /api/brand/campaigns/:campaignId`
-  - Behavior: soft-deletes a brand campaign (sets `deletedAt`; audit logged).
+  - Behavior: soft-deletes a brand campaign (sets `is_deleted = true`; audit logged).
 
 ### Shopper products (`/api/products` and `/api/deals/*`)
 
@@ -314,6 +314,7 @@ Guard: `requireAuth` + `requireRoles('brand','admin','ops')`
     - Enforces per-buyer velocity limits
     - Blocks duplicate externalOrderId
     - Blocks duplicate deal orders per buyer
+    - Orders are allowed on locked campaigns (locked only prevents editing financial terms)
     - Enforces campaign availability to buyer lineage (agency allow-list OR mediator assignment)
     - Supports upgrading a redirect pre-order via `preOrderId`.
 
@@ -348,7 +349,7 @@ Guard: `requireAuth` + `requireRoles('brand','admin','ops')`
 
 - `DELETE /api/tickets/:id`
   - Auth: `requireAuth`
-  - Behavior: soft-deletes a ticket (sets `deletedAt`).
+  - Behavior: soft-deletes a ticket (sets `is_deleted = true`).
 
 ### Notifications (`/api/notifications/*`)
 

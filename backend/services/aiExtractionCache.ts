@@ -286,15 +286,29 @@ export async function preWarmCache(params: {
   let failed = 0;
   let skipped = 0;
 
+  // Batch-fetch all orders in one query to avoid N*M DB round-trips
+  const uniqueIds = [...new Set(orderIds)];
+  const orders = await prisma().order.findMany({
+    where: { id: { in: uniqueIds } },
+    select: {
+      id: true,
+      verification: true,
+      screenshotOrder: true,
+      screenshotPayment: true,
+      screenshotReview: true,
+      screenshotRating: true,
+      screenshotReturnWindow: true,
+    } as any,
+  });
+  const orderMap = new Map(orders.map((o: any) => [o.id, o]));
+
   for (const orderId of orderIds) {
+    const order = orderMap.get(orderId);
+    if (!order) { skipped += proofTypes.length; continue; }
+
     for (const proofType of proofTypes) {
       try {
         const screenshotKey = `screenshot${proofType.charAt(0).toUpperCase() + proofType.slice(1)}` as any;
-        const order = await prisma().order.findFirst({
-          where: { id: orderId },
-          select: { [screenshotKey]: true, verification: true } as any,
-        });
-
         const screenshot = (order as any)?.[screenshotKey];
         if (!screenshot) {
           skipped++;

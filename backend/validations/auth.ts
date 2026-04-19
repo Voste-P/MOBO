@@ -81,8 +81,8 @@ export const refreshSchema = z.object({
 
 // ── Forgot Password / Security Questions ──
 
-/** Valid question IDs (1-7 predefined questions) */
-const questionIdSchema = z.number().int().min(1).max(7);
+/** Valid question IDs — any positive integer; actual existence validated against security_question_templates table */
+const questionIdSchema = z.number().int().min(1).max(9999);
 
 /** Three distinct security question+answer pairs — set during registration */
 export const securityQuestionsPayloadSchema = z

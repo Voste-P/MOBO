@@ -5,9 +5,11 @@
  */
 
 /** Parse page/limit from query params with safe bounds */
-export function parsePagination(query: Record<string, unknown>, defaults?: { page?: number; limit?: number; maxLimit?: number }) {
+export function parsePagination(query: Record<string, unknown>, defaults?: { page?: number; limit?: number; maxLimit?: number; maxPage?: number }) {
   const maxCap = defaults?.maxLimit ?? 200;
-  const page = Math.max(1, Number(query.page) || defaults?.page || 1);
+  const maxPageCap = defaults?.maxPage ?? 5000;
+  const rawPage = Math.max(1, Number(query.page) || defaults?.page || 1);
+  const page = Math.min(rawPage, maxPageCap);
   const limit = Math.min(maxCap, Math.max(1, Number(query.limit) || defaults?.limit || 50));
   const skip = (page - 1) * limit;
   // Cap offset to prevent expensive full-table scans

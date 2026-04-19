@@ -280,7 +280,7 @@ jobs:
 
       - name: Install Playwright OS dependencies
         if: steps.pw-cache.outputs.cache-hit == 'true'
-        timeout-minutes: 5
+        timeout-minutes: 10
         run: npx playwright install-deps
 
       - name: Verify database connectivity

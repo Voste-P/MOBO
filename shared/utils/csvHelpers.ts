@@ -20,7 +20,9 @@ export function csvEscape(val: string): string {
  */
 export function csvSafe(val: unknown): string {
   let s = String(val ?? '');
-  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  // Prevent CSV formula injection: prefix dangerous chars with a tab character
+  // (single-quote prefix can itself be double-escaped, tab is safer)
+  if (/^[=+\-@\t\r]/.test(s)) s = `\t${s}`;
   return csvEscape(s);
 }
 

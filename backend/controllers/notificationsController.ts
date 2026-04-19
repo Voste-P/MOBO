@@ -22,7 +22,7 @@ type UiNotification = {
 function safeOrderShortId(order: any): string {
   const external = String(order?.externalOrderId || '').trim();
   if (external) return external.length > 20 ? external.slice(-20) : external;
-  const s = String(order?.id || order?.id || order || '').trim();
+  const s = String(order?.id || order || '').trim();
   return s.length > 6 ? s.slice(-6) : s || 'Pending';
 }
 
@@ -83,7 +83,7 @@ export function makeNotificationsController() {
               .map((r: any) => String(r?.type || '').trim())
               .filter((t: string) => (t === 'review' || t === 'rating') && missingSteps.includes(t));
 
-            const oid = o.id || o.id;
+            const oid = o.id;
 
             if (!hasPurchaseProof && (wf === 'ORDERED' || wf === 'REDIRECTED' || wf === 'CREATED')) {
               notifications.push({
@@ -220,7 +220,7 @@ export function makeNotificationsController() {
             const createdAt = safeIso(p.processedAt) ?? safeIso(p.createdAt) ?? new Date().toISOString();
             const amount = paiseToRupees(Number(p.amountPaise ?? 0));
             notifications.push({
-              id: `payout:${p.id || p.id}`,
+              id: `payout:${p.id}`,
               type: p.status === 'paid' ? 'success' : 'info',
               title: 'Payout recorded',
               message: `₹${amount} payout has been recorded (${String(p.status || 'requested')}).`,
@@ -249,7 +249,7 @@ export function makeNotificationsController() {
           });
 
           for (const t of recentTickets) {
-            const tid = String(t.id || t.id);
+            const tid = String(t.id);
             const status = String(t.status || '').trim();
             const issueType = String(t.issueType || 'Issue');
             const ts = safeIso(t.updatedAt) ?? safeIso(t.createdAt) ?? nowIso();

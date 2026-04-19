@@ -38,7 +38,7 @@ import { orderListSelectLite, getProofFlags, userListSelect, campaignListSelect,
 import { idWhere } from '../utils/idWhere.js';
 import { ensureWallet, applyWalletDebit, applyWalletCredit } from '../services/walletService.js';
 import { getRequester, isPrivileged, requireAnyRole } from '../services/authz.js';
-import { listMediatorCodesForAgency, getAgencyCodeForMediatorCode, getAgencyCodesForMediatorCodes, isAgencyActive, isMediatorActive } from '../services/lineage.js';
+import { listMediatorCodesForAgency, getAgencyCodeForMediatorCode, getAgencyCodesForMediatorCodes, isAgencyActive, isMediatorActive, clearLineageCache } from '../services/lineage.js';
 import { pushOrderEvent } from '../services/orderEvents.js';
 import { writeAuditLog } from '../services/audit.js';
 import { requestBrandConnectionSchema } from '../validations/connections.js';
@@ -143,6 +143,9 @@ export async function finalizeApprovalIfReady(order: any, actorUserId: string, e
   const wf = String(order.workflowStatus || 'CREATED');
   if (wf !== 'UNDER_REVIEW') return { approved: false, reason: 'NOT_UNDER_REVIEW' };
 
+  // Block approval of frozen orders
+  if (order.frozen) return { approved: false, reason: 'ORDER_FROZEN' };
+
   const verification = (order.verification && typeof order.verification === 'object') ? order.verification as any : {};
   if (!verification.order?.verifiedAt) {
     return { approved: false, reason: 'PURCHASE_NOT_VERIFIED' };
@@ -177,7 +180,7 @@ export async function finalizeApprovalIfReady(order: any, actorUserId: string, e
   // Use updateMany with workflowStatus guard to prevent duplicate events on concurrent verify.
   // If count is 0, another request already approved or modified the order — idempotent return.
   const updated = await db().order.updateMany({
-    where: { id: order.id, workflowStatus: 'UNDER_REVIEW' },
+    where: { id: order.id, workflowStatus: 'UNDER_REVIEW', frozen: { not: true } },
     data: {
       affiliateStatus: 'Pending_Cooling',
       expectedSettlementDate: settleDate,
@@ -387,7 +390,9 @@ export function makeOpsController(env: Env) {
           } else {
             // Lowercase code to match assignment keys (assignSlots lowercases them)
             const codeLower = code.toLowerCase();
-            // Also check parent agency — campaigns targeted to an agency should be visible to its mediators
+            // Also check parent agency — but ONLY for openToAll campaigns.
+            // Mediators must be explicitly assigned via the assignments JSONB key,
+            // otherwise they see campaigns that the agency hasn't distributed to them.
             const parentAgency = roles.includes('mediator')
               ? await getAgencyCodeForMediatorCode(code)
               : null;
@@ -395,13 +400,13 @@ export function makeOpsController(env: Env) {
             const rows = statusFilter
               ? await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false AND status = ${statusFilter}
-                  AND (EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))
-                       OR jsonb_exists(assignments, ${codeLower}))
+                  AND (jsonb_exists(assignments, ${codeLower})
+                       OR (open_to_all = true AND EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))))
                 `
               : await db().$queryRaw<{ id: string }[]>`
                   SELECT id FROM "campaigns" WHERE "is_deleted" = false
-                  AND (EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))
-                       OR jsonb_exists(assignments, ${codeLower}))
+                  AND (jsonb_exists(assignments, ${codeLower})
+                       OR (open_to_all = true AND EXISTS (SELECT 1 FROM unnest(${agencyCodes}::text[]) AS ac WHERE ac = ANY("allowed_agency_codes"))))
                 `;
             matchingIds = rows.map((r) => r.id);
           }
@@ -505,19 +510,98 @@ export function makeOpsController(env: Env) {
         }
 
         const { limit: dLimit, skip: dSkip, page: dPage, isPaginated: dIsPaginated } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
-        const dealWhere = { mediatorCode: { in: mediatorCodes }, isDeleted: false as const };
-        const [deals, dealTotal] = await Promise.all([
+        const dealWhere = { mediatorCode: { in: mediatorCodes }, isDeleted: false as const, campaign: { isDeleted: false, status: 'active' as any } };
+        const [rawDeals, dealTotal] = await Promise.all([
           db().deal.findMany({
             where: dealWhere,
             orderBy: { createdAt: 'desc' },
             skip: dSkip,
             take: dLimit,
-            select: dealListSelect,
+            select: { ...dealListSelect, campaign: { select: { totalSlots: true, usedSlots: true, openToAll: true, assignments: true, allowedAgencyCodes: true, createdAt: true } } },
           }),
           db().deal.count({ where: dealWhere }),
         ]);
 
-        const dealList = deals.map((d: any) => toUiDeal(pgDeal(d)));
+        // Filter out deals where the mediator's agency no longer has campaign access.
+        // Privileged users (admin/ops) see all; mediators/agencies see only authorized deals.
+        let deals = rawDeals;
+        if (!isPrivileged(roles)) {
+          const agencyMap = await getAgencyCodesForMediatorCodes(mediatorCodes);
+          deals = rawDeals.filter((d: any) => {
+            const campaign = d.campaign;
+            if (!campaign) return false;
+            if (campaign.openToAll) return true;
+            const medCode = String(d.mediatorCode || '').toLowerCase();
+            // Mediator has an explicit slot assignment → show
+            const assignments = campaign.assignments && typeof campaign.assignments === 'object' && !Array.isArray(campaign.assignments) ? campaign.assignments as Record<string, any> : {};
+            if (assignments[medCode]) return true;
+            // Mediator's agency is in allowedAgencyCodes → show
+            const agencyCode = agencyMap.get(d.mediatorCode) || agencyMap.get(medCode);
+            if (agencyCode) {
+              const allowed = Array.isArray(campaign.allowedAgencyCodes) ? campaign.allowedAgencyCodes.map((c: any) => String(c).trim().toUpperCase()) : [];
+              if (allowed.includes(agencyCode.toUpperCase())) return true;
+            }
+            return false;
+          });
+        }
+
+        // For non-openToAll campaigns, count per-mediator order consumption
+        // so the progress bar shows the mediator's assigned limit, not global stock.
+        const perMediatorCounts = new Map<string, number>();
+        const nonOpenCampaignIds = deals
+          .filter((d: any) => d.campaign && !d.campaign.openToAll)
+          .map((d: any) => d.campaignId as string);
+        if (nonOpenCampaignIds.length > 0) {
+          const uniqueCampaignIds = [...new Set(nonOpenCampaignIds)];
+          const orderCounts: Array<{ campaign_id: string; manager_name: string; cnt: bigint }> =
+            await db().$queryRawUnsafe(
+              `SELECT oi.campaign_id, o.manager_name, COUNT(*)::bigint AS cnt
+               FROM order_items oi
+               JOIN orders o ON o.id = oi.order_id AND o.is_deleted = false
+               WHERE oi.campaign_id = ANY($1::uuid[])
+                 AND oi.is_deleted = false
+                 AND o.manager_name = ANY($2::text[])
+               GROUP BY oi.campaign_id, o.manager_name`,
+              uniqueCampaignIds,
+              mediatorCodes,
+            );
+          for (const row of orderCounts) {
+            perMediatorCounts.set(`${row.campaign_id}::${String(row.manager_name).toLowerCase()}`, Number(row.cnt));
+          }
+        }
+
+        const enrichedDeals = deals.map((d: any) => {
+          const campaign = d.campaign;
+          const isOpen = campaign?.openToAll ?? false;
+          const assignments = campaign?.assignments && typeof campaign.assignments === 'object' && !Array.isArray(campaign.assignments)
+            ? campaign.assignments as Record<string, any>
+            : {};
+          const medCode = String(d.mediatorCode || '').toLowerCase();
+
+          let totalSlots: number;
+          let usedSlots: number;
+
+          if (!isOpen && assignments[medCode]) {
+            // Per-mediator view: show assigned limit + mediator-specific consumption
+            const assignment = assignments[medCode];
+            totalSlots = Number(typeof assignment === 'number' ? assignment : assignment?.limit ?? 0);
+            usedSlots = perMediatorCounts.get(`${d.campaignId}::${medCode}`) ?? 0;
+          } else {
+            // Open-to-all or no specific assignment: use global counters
+            totalSlots = campaign?.totalSlots || 0;
+            usedSlots = campaign?.usedSlots || 0;
+          }
+
+          const remainingSlots = Math.max(0, totalSlots - usedSlots);
+          let sellingSpeed = 0;
+          if (campaign?.createdAt && usedSlots > 0) {
+            const daysSinceCreation = Math.max(1, (Date.now() - new Date(campaign.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+            sellingSpeed = Math.round((usedSlots / daysSinceCreation) * 10) / 10;
+          }
+          const { campaign: _c, ...rest } = d;
+          return { ...rest, totalSlots, usedSlots, remainingSlots, sellingSpeed };
+        });
+        const dealList = enrichedDeals.map((d: any) => toUiDeal(pgDeal(d)));
         res.json(paginatedResponse(dealList, dealTotal, dPage, dLimit, dIsPaginated));
 
         businessLog.info('Deals listed', { userId: req.auth?.userId, resultCount: dealList.length, ip: req.ip });
@@ -788,7 +872,7 @@ export function makeOpsController(env: Env) {
         const mapped = payouts.map((p: any) => {
           const u = p.beneficiary;
           return {
-            id: p.id ?? p.id,
+            id: p.id,
             mediatorName: u?.name ?? 'Mediator',
             mediatorCode: u?.mediatorCode,
             amount: Math.round((p.amountPaise ?? 0) / 100),
@@ -836,7 +920,8 @@ export function makeOpsController(env: Env) {
           data: { kycStatus: 'verified', status: 'active' },
         });
 
-        await writeAuditLog({ req, action: 'MEDIATOR_APPROVED', entityType: 'User', entityId: mediator.id! });
+        // Invalidate lineage cache so downstream lookups reflect the new status
+        clearLineageCache();
         businessLog.info('Mediator approved', { mediatorId: mediator.id, mediatorCode: mediator.mediatorCode, agencyCode: String(mediator.parentCode || ''), approvedBy: req.auth?.userId });
         logChangeEvent({ actorUserId: String(req.auth?.userId || ''), entityType: 'User', entityId: mediator.id!, action: 'STATUS_CHANGE', changedFields: ['kycStatus', 'status'], before: { kycStatus: mediator.kycStatus, status: mediator.status }, after: { kycStatus: 'verified', status: 'active' }, metadata: { role: 'mediator' } });
         logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'User', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'MEDIATOR_APPROVED', mediatorId: mediator.id } });
@@ -892,10 +977,10 @@ export function makeOpsController(env: Env) {
         });
 
         // Evict auth cache so the suspended mediator can't act on stale tokens
-        authCacheInvalidate(mediator.id!);
         authCacheInvalidate(mediator.id);
 
-        await writeAuditLog({ req, action: 'MEDIATOR_REJECTED', entityType: 'User', entityId: mediator.id! });
+        // Invalidate lineage cache so downstream lookups reflect the status change
+        clearLineageCache();
         businessLog.info('Mediator rejected', { mediatorId: mediator.id, kycStatus: 'rejected', status: 'suspended' });
         logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'User', entityId: mediator.id!, action: 'MEDIATOR_REJECTED', changedFields: ['kycStatus', 'status'], before: { kycStatus: mediator.kycStatus, status: mediator.status }, after: { kycStatus: 'rejected', status: 'suspended' } });
         logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'User', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'MEDIATOR_REJECTED', mediatorId: mediator.id } });
@@ -959,7 +1044,6 @@ export function makeOpsController(env: Env) {
         });
 
         authCacheInvalidate(buyerBefore.id);
-        authCacheInvalidate(buyerBefore.id!);
 
         const userDisplayId = user.id ?? '';
         await writeAuditLog({ req, action: 'BUYER_APPROVED', entityType: 'User', entityId: userDisplayId });
@@ -1028,7 +1112,6 @@ export function makeOpsController(env: Env) {
 
         // Evict auth cache so the rejected buyer can't act on stale tokens
         authCacheInvalidate(buyerBefore.id!);
-        authCacheInvalidate(buyerBefore.id);
 
         const userDisplayId = user.id ?? '';
         await writeAuditLog({ req, action: 'USER_REJECTED', entityType: 'User', entityId: userDisplayId });
@@ -1346,25 +1429,15 @@ export function makeOpsController(env: Env) {
           throw new AppError(409, 'INVALID_WORKFLOW_STATE', `Cannot reject in state ${wf}`);
         }
 
-        const wasApproved = wf === 'APPROVED';
-
         const pgMapped = pgOrder(order);
-        const v = (order.verification && typeof order.verification === 'object') ? { ...(order.verification as any) } : {} as any;
         const updateData: any = {};
 
+        // Validate the specific proof type being rejected exists
         if (body.type === 'order') {
           if (!order.screenshotOrder) {
             throw new AppError(409, 'MISSING_PROOF', 'Missing order proof');
           }
-          if (v.order?.verifiedAt) {
-            throw new AppError(409, 'ALREADY_VERIFIED', 'Order proof already verified');
-          }
-          updateData.screenshotOrder = null;
-          if (v.order) { v.order = undefined; }
         } else {
-          if (!v.order?.verifiedAt) {
-            throw new AppError(409, 'PURCHASE_NOT_VERIFIED', 'Purchase proof must be verified first');
-          }
           const required = getRequiredStepsForOrder(pgMapped);
           if (!required.includes(body.type)) {
             throw new AppError(409, 'NOT_REQUIRED', `This order does not require ${body.type} verification`);
@@ -1372,33 +1445,29 @@ export function makeOpsController(env: Env) {
           if (!hasProofForRequirement(pgMapped, body.type)) {
             throw new AppError(409, 'MISSING_PROOF', `Missing ${body.type} proof`);
           }
-          if (body.type === 'review') {
-            updateData.reviewLink = null;
-            updateData.screenshotReview = null;
-            if (v.review) { v.review = undefined; }
-          }
-          if (body.type === 'rating') {
-            updateData.screenshotRating = null;
-            if (v.rating) { v.rating = undefined; }
-            updateData.ratingAiVerification = null;
-          }
-          if (body.type === 'returnWindow') {
-            updateData.screenshotReturnWindow = null;
-            if (v.returnWindow) { v.returnWindow = undefined; }
-          }
         }
+
+        // Clear ALL proofs so buyer must re-upload everything from scratch
+        updateData.screenshotOrder = null;
+        updateData.screenshotRating = null;
+        updateData.screenshotReview = null;
+        updateData.screenshotReturnWindow = null;
+        updateData.reviewLink = null;
+        updateData.verification = {};
+        updateData.orderAiVerification = null;
+        updateData.ratingAiVerification = null;
+        updateData.returnWindowAiVerification = null;
+        updateData.missingProofRequests = [];
+        // Reset reviewer name so buyer can correct it on re-upload
+        updateData.reviewerName = null;
 
         updateData.rejectionType = body.type;
         updateData.rejectionReason = body.reason;
         updateData.rejectionAt = new Date();
         updateData.rejectionBy = req.auth?.userId;
-        // When rejecting from APPROVED, reset to Unchecked so buyer can re-upload;
-        // from UNDER_REVIEW the status is terminal Rejected (mediator can still cancel later).
-        updateData.affiliateStatus = wasApproved ? 'Unchecked' : 'Rejected';
-        if (wasApproved) {
-          updateData.expectedSettlementDate = null;
-        }
-        updateData.verification = v;
+        // Always reset to Unchecked so buyer can re-upload all proofs
+        updateData.affiliateStatus = 'Unchecked';
+        updateData.expectedSettlementDate = null;
 
         const newEvents = pushOrderEvent(order.events as any, {
           type: 'REJECTED',
@@ -1408,27 +1477,20 @@ export function makeOpsController(env: Env) {
         });
         updateData.events = newEvents;
 
-        // Atomically update order + release campaign slot inside a transaction
-        // to prevent inconsistent state if one operation fails.
-        const campaignId = (body.type === 'order') ? order.items?.[0]?.campaignId : null;
-        await db().$transaction(async (tx: any) => {
-          await tx.order.update({ where: { id: order.id }, data: updateData });
-          if (campaignId) {
-            await tx.$executeRaw`UPDATE "campaigns" SET "used_slots" = GREATEST("used_slots" - 1, 0) WHERE id = ${campaignId}::uuid AND "is_deleted" = false`;
-          }
-        });
+        // Update order — do NOT release the campaign slot here because the
+        // order still exists and the buyer can re-upload proofs.  Slots are
+        // only freed on explicit order cancellation (cancelOrder).
+        await db().order.update({ where: { id: order.id }, data: updateData });
 
-        // When rejecting from APPROVED, transition back to ORDERED so buyer can re-upload
-        if (wasApproved) {
-          await transitionOrderWorkflow({
-            orderId: order.id!,
-            from: 'APPROVED' as any,
-            to: 'ORDERED' as any,
-            actorUserId: String(req.auth?.userId || ''),
-            metadata: { source: 'rejectOrderProof', reason: body.reason, proofType: body.type },
-            env,
-          });
-        }
+        // Always transition back to ORDERED so buyer can re-upload all proofs
+        await transitionOrderWorkflow({
+          orderId: order.id!,
+          from: wf as any,
+          to: 'ORDERED' as any,
+          actorUserId: String(req.auth?.userId || ''),
+          metadata: { source: 'rejectOrderProof', reason: body.reason, proofType: body.type },
+          env,
+        });
 
         await writeAuditLog({
           req,
@@ -1439,21 +1501,8 @@ export function makeOpsController(env: Env) {
         });
         orderLog.info('Order proof rejected', { orderId: order.id, proofType: body.type, reason: body.reason });
         businessLog.info('Order proof rejected', { orderId: order.id, proofType: body.type, reason: body.reason, rejectedBy: req.auth?.userId, ip: req.ip });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Order', entityId: order.id!, action: 'PROOF_REJECTED', changedFields: ['affiliateStatus', 'rejectionType', 'rejectionReason'], before: { affiliateStatus: order.affiliateStatus }, after: { affiliateStatus: wasApproved ? 'Unchecked' : 'Rejected', rejectionType: body.type, rejectionReason: body.reason } });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Order', entityId: order.id!, action: 'PROOF_REJECTED', changedFields: ['affiliateStatus', 'rejectionType', 'rejectionReason'], before: { affiliateStatus: order.affiliateStatus }, after: { affiliateStatus: 'Unchecked', rejectionType: body.type, rejectionReason: body.reason } });
         logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Order', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'REJECT_ORDER_PROOF', orderId: order.id, proofType: body.type } });
-
-        if (body.type === 'order') {
-          const campaignId = order.items?.[0]?.campaignId;
-          if (campaignId) {
-            writeAuditLog({
-              req,
-              action: 'CAMPAIGN_SLOT_RELEASED',
-              entityType: 'Campaign',
-              entityId: String(campaignId),
-              metadata: { orderId: order.id ?? order.id, reason: 'proof_rejected' },
-            }).catch((err) => { orderLog.warn('Audit log failed (slot release)', { error: err instanceof Error ? err.message : String(err) }); });
-          }
-        }
 
         const audience = await buildOrderAudience(order, agencyCode);
         publishRealtime({ type: 'orders.changed', ts: new Date().toISOString(), audience });
@@ -1466,23 +1515,23 @@ export function makeOpsController(env: Env) {
             userId: buyerId,
             app: 'buyer',
             payload: {
-              title: wasApproved ? 'Proof recalled — re-upload needed' : 'Proof rejected',
-              body: body.reason || 'Please re-upload the required proof.',
+              title: 'Proof rejected — re-upload all proofs',
+              body: body.reason || 'Please re-upload all required proofs.',
               url: '/orders',
             },
           }).catch((err: unknown) => { pushLog.warn('Push failed for rejectProof', { err, buyerId }); });
         }
 
-        // Notify mediator when proof is rejected from APPROVED state
-        if (wasApproved && audience.mediatorCodes?.length) {
+        // Notify mediator when proof is rejected
+        if (audience.mediatorCodes?.length) {
           for (const code of audience.mediatorCodes) {
             sendPushToUser({
               env,
               userId: code,
               app: 'mediator',
               payload: {
-                title: 'Approved order recalled',
-                body: `Proof rejected after approval: ${body.reason || 'Re-upload requested'}`,
+                title: 'Order proof rejected',
+                body: `Proof rejected — buyer must re-upload all proofs: ${body.reason || 'Re-upload requested'}`,
                 url: '/orders',
               },
             }).catch((err: unknown) => { pushLog.warn('Push failed for mediator rejectProof', { err, mediatorCode: code }); });
@@ -1676,7 +1725,7 @@ export function makeOpsController(env: Env) {
             app: 'buyer',
             payload: {
               title: 'Action required',
-              body: `Please upload your ${body.type} proof for order #${(order.id || order.id).slice(-6)}.`,
+              body: `Please upload your ${body.type} proof for order #${(order.id).slice(-6)}.`,
               url: '/orders',
             },
           });
@@ -1706,7 +1755,7 @@ export function makeOpsController(env: Env) {
         const agencyCode = await assertOrderAccess(order, roles, user);
 
         // Buyer must also be active — order.userId is PG UUID
-        const orderDisplayId = order.id ?? order.id;
+        const orderDisplayId = order.id;
         const campaignId = order.items?.[0]?.campaignId;
         const productId = String(order.items?.[0]?.productId || '').trim();
         const mediatorCode = String(order.managerName || '').trim();
@@ -1748,33 +1797,30 @@ export function makeOpsController(env: Env) {
           throw new AppError(409, 'INVALID_WORKFLOW_STATE', `Cannot settle in state ${wf}`);
         }
 
-        let isOverLimit = false;
-        if (campaignId && mediatorCode) {
-          if (campaign) {
-            const assignmentsObj = campaign.assignments && typeof campaign.assignments === 'object'
-              ? campaign.assignments as any
-              : {};
-            const rawAssigned = assignmentsObj?.[mediatorCode];
-            const assignedLimit =
-              typeof rawAssigned === 'number' ? rawAssigned : Number(rawAssigned?.limit ?? 0);
-
-            if (assignedLimit > 0) {
-              const settledCount = await db().order.count({
-                where: {
-                  managerName: mediatorCode,
-                  items: { some: { campaignId } },
-                  OR: [{ affiliateStatus: 'Approved_Settled' }, { paymentStatus: 'Paid' }],
-                  id: { not: order.id },
-                  isDeleted: false,
-                },
-              });
-              if (settledCount >= assignedLimit) isOverLimit = true;
-            }
-          }
+        // Cooling period guard: ensure expectedSettlementDate has passed before manual settlement.
+        // The automatic coolingPeriodSettler enforces this, but manual settlement must too.
+        if (order.expectedSettlementDate && new Date() < new Date(order.expectedSettlementDate)) {
+          throw new AppError(409, 'COOLING_PERIOD_ACTIVE', `Cannot settle before cooling period ends on ${new Date(order.expectedSettlementDate).toISOString().slice(0, 10)}`);
         }
 
+        // Compute the assigned cap limit for this mediator (checked atomically inside transaction)
+        let assignedLimit = 0;
+        if (campaignId && mediatorCode && campaign) {
+          const assignmentsObj = campaign.assignments && typeof campaign.assignments === 'object'
+            ? campaign.assignments as any
+            : {};
+          // Case-insensitive lookup — assignSlots stores lowercase keys
+          const codeLower = mediatorCode.toLowerCase();
+          const rawAssigned = assignmentsObj?.[codeLower]
+            ?? Object.entries(assignmentsObj).find(([k]) => k.toLowerCase() === codeLower)?.[1];
+          assignedLimit =
+            typeof rawAssigned === 'number' ? rawAssigned : Number(rawAssigned?.limit ?? 0);
+        }
+
+        let isOverLimit = false;
+
         // Money movements (wallet mode only)
-        if (!isOverLimit && settlementMode === 'wallet') {
+        if (settlementMode === 'wallet') {
           if (!productId) {
             throw new AppError(409, 'MISSING_DEAL_ID', 'Order is missing deal reference');
           }
@@ -1789,10 +1835,10 @@ export function makeOpsController(env: Env) {
           if (payoutPaise <= 0) {
             throw new AppError(409, 'INVALID_PAYOUT', 'Cannot settle: deal payout is invalid');
           }
-          if (buyerCommissionPaise < 0) {
-            throw new AppError(409, 'INVALID_COMMISSION', 'Cannot settle: commission is invalid');
-          }
-          if (buyerCommissionPaise > payoutPaise) {
+          // Negative commission allowed — buyer got discount in deal price,
+          // so buyer cashback is capped at 0 and mediator keeps full payout.
+          const buyerCashback = Math.max(0, buyerCommissionPaise);
+          if (buyerCashback > payoutPaise) {
             throw new AppError(409, 'INVALID_ECONOMICS', 'Cannot settle: commission exceeds payout');
           }
 
@@ -1809,7 +1855,7 @@ export function makeOpsController(env: Env) {
           await ensureWallet(brandId);
           await ensureWallet(buyerUserId);
 
-          const mediatorMarginPaise = payoutPaise - buyerCommissionPaise;
+          const mediatorMarginPaise = payoutPaise - buyerCashback;
           let mediatorUserId: string | null = null;
           if (mediatorMarginPaise > 0 && mediatorCode) {
             const mediator = await db().user.findFirst({ where: { mediatorCode, isDeleted: false }, select: { id: true } });
@@ -1835,6 +1881,27 @@ export function makeOpsController(env: Env) {
             if (guard.count === 0) {
               throw new AppError(409, 'CONCURRENT_SETTLEMENT', 'Order was already settled or modified');
             }
+
+            // Settlement cap check INSIDE transaction to prevent TOCTOU race.
+            // Two concurrent settlements could both pass a pre-transaction count check,
+            // exceeding the mediator's assigned limit. Checking inside the serialized
+            // transaction guarantees atomicity.
+            if (assignedLimit > 0 && campaignId && mediatorCode) {
+              const settledCount = await tx.order.count({
+                where: {
+                  managerName: mediatorCode,
+                  items: { some: { campaignId } },
+                  OR: [{ affiliateStatus: 'Approved_Settled' }, { paymentStatus: 'Paid' }],
+                  id: { not: order.id },
+                  isDeleted: false,
+                },
+              });
+              if (settledCount >= assignedLimit) {
+                isOverLimit = true;
+                return; // exit transaction — no wallet movements
+              }
+            }
+
             await applyWalletDebit({
               idempotencyKey: `order-settlement-debit-${order.id}-c${settleCycle}`,
               type: 'order_settlement_debit',
@@ -1848,12 +1915,12 @@ export function makeOpsController(env: Env) {
               tx,
             });
 
-            if (buyerCommissionPaise > 0) {
+            if (buyerCashback > 0) {
               await applyWalletCredit({
                 idempotencyKey: `order-commission-${order.id}-c${settleCycle}`,
                 type: 'commission_settle',
                 ownerUserId: buyerUserId,
-                amountPaise: buyerCommissionPaise,
+                amountPaise: buyerCashback,
                 orderId: order.id!,
                 campaignId: campaignId ? String(campaignId) : undefined,
                 metadata: { reason: 'ORDER_COMMISSION', dealId: productId },
@@ -1895,6 +1962,26 @@ export function makeOpsController(env: Env) {
               },
             });
           }, { timeout: 15000 });
+
+          // If cap was exceeded inside the wallet transaction, the tx exited early
+          // without updating order status. Handle it here to keep order consistent.
+          if (isOverLimit) {
+            const capEvents = pushOrderEvent(order.events as any, {
+              type: 'CAP_EXCEEDED',
+              at: new Date(),
+              actorUserId: req.auth?.userId,
+              metadata: { settlementMode },
+            });
+            await db().order.update({
+              where: { id: order.id },
+              data: {
+                paymentStatus: 'Failed',
+                affiliateStatus: 'Cap_Exceeded',
+                settlementMode,
+                events: capEvents as any,
+              },
+            });
+          }
         } else {
           // Cap-exceeded or external: no wallet movement, just update order status
           const newEvents1 = pushOrderEvent(order.events as any, {
@@ -2049,7 +2136,8 @@ export function makeOpsController(env: Env) {
 
           const payoutPaise = Number(deal.payoutPaise ?? 0);
           const buyerCommissionPaise = Number(order.items?.[0]?.commissionPaise ?? 0);
-          const mediatorMarginPaise = payoutPaise - buyerCommissionPaise;
+          const buyerCashback = Math.max(0, buyerCommissionPaise);
+          const mediatorMarginPaise = payoutPaise - buyerCashback;
 
           const buyerUserId = order.userId;
           if (!buyerUserId) {
@@ -2067,9 +2155,9 @@ export function makeOpsController(env: Env) {
             }
           }
 
-          // Cycle counter for unsettle: count past UNSETTLED events
+          // Cycle counter for unsettle: count SETTLED events (stable across retries, unlike UNSETTLED count which changes during this operation)
           const unsettleEvents = Array.isArray(order.events) ? order.events as any[] : [];
-          const unsettleCycle = unsettleEvents.filter((e: any) => e?.type === 'UNSETTLED').length;
+          const unsettleCycle = unsettleEvents.filter((e: any) => e?.type === 'SETTLED').length;
 
           // Atomic unsettlement using Prisma transaction
           await db().$transaction(async (tx: any) => {
@@ -2086,14 +2174,14 @@ export function makeOpsController(env: Env) {
               tx,
             });
 
-            if (buyerCommissionPaise > 0) {
+            if (buyerCashback > 0) {
               await applyWalletDebit({
                 idempotencyKey: `order-unsettle-debit-buyer-${order.id}-c${unsettleCycle}`,
                 type: 'commission_reversal',
                 ownerUserId: buyerUserId,
                 fromUserId: buyerUserId,
                 toUserId: brandId,
-                amountPaise: buyerCommissionPaise,
+                amountPaise: buyerCashback,
                 orderId: order.id!,
                 campaignId: campaignId ? String(campaignId) : undefined,
                 metadata: { reason: 'ORDER_UNSETTLE_COMMISSION', dealId: productId },
@@ -2192,15 +2280,15 @@ export function makeOpsController(env: Env) {
             },
           });
 
-          await writeAuditLog({ req, action: 'CAMPAIGN_CREATED', entityType: 'Campaign', entityId: campaign.id ?? campaign.id });
-          businessLog.info('Campaign created (privileged)', { campaignId: campaign.id ?? campaign.id, title: body.title, platform: body.platform, brandUserId: brand.id, totalSlots: body.totalSlots, payoutRupees: body.payout, dealType: body.dealType, createdBy: pgUserId });
-          logChangeEvent({ actorUserId: pgUserId, entityType: 'Campaign', entityId: campaign.id ?? campaign.id, action: 'CAMPAIGN_CREATED', metadata: { title: body.title, platform: body.platform, brandName: brand.name, totalSlots: body.totalSlots, payout: body.payout, dealType: body.dealType, allowedAgencies: allowed } });
-          logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_CREATED', campaignId: campaign.id ?? campaign.id, title: body.title, brandUserId: brand.id } });
+          await writeAuditLog({ req, action: 'CAMPAIGN_CREATED', entityType: 'Campaign', entityId: campaign.id });
+          businessLog.info('Campaign created (privileged)', { campaignId: campaign.id, title: body.title, platform: body.platform, brandUserId: brand.id, totalSlots: body.totalSlots, payoutRupees: body.payout, dealType: body.dealType, createdBy: pgUserId });
+          logChangeEvent({ actorUserId: pgUserId, entityType: 'Campaign', entityId: campaign.id, action: 'CAMPAIGN_CREATED', metadata: { title: body.title, platform: body.platform, brandName: brand.name, totalSlots: body.totalSlots, payout: body.payout, dealType: body.dealType, allowedAgencies: allowed } });
+          logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_CREATED', campaignId: campaign.id, title: body.title, brandUserId: brand.id } });
           const ts = new Date().toISOString();
           publishRealtime({
             type: 'deals.changed',
             ts,
-            payload: { campaignId: campaign.id ?? campaign.id },
+            payload: { campaignId: campaign.id },
             audience: {
               userIds: [brand.id!],
               agencyCodes: allowed.map((c) => String(c).trim()).filter(Boolean),
@@ -2246,15 +2334,15 @@ export function makeOpsController(env: Env) {
           },
         });
 
-        await writeAuditLog({ req, action: 'CAMPAIGN_CREATED', entityType: 'Campaign', entityId: campaign.id ?? campaign.id });
-        businessLog.info('Campaign created (self-service)', { campaignId: campaign.id ?? campaign.id, title: body.title, platform: body.platform, createdBy: req.auth?.userId, allowedCodes: normalizedAllowed, ip: req.ip });
-        logChangeEvent({ actorUserId: req.auth?.userId, actorRoles: req.auth?.roles, actorIp: req.ip, entityType: 'Campaign', entityId: campaign.id ?? campaign.id, action: 'CAMPAIGN_CREATED', requestId: String((res as any).locals?.requestId || ''), metadata: { title: body.title, platform: body.platform, allowedAgencyCodes: normalizedAllowed } });
-        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_CREATED', campaignId: campaign.id ?? campaign.id, title: body.title } });
+        await writeAuditLog({ req, action: 'CAMPAIGN_CREATED', entityType: 'Campaign', entityId: campaign.id });
+        businessLog.info('Campaign created (self-service)', { campaignId: campaign.id, title: body.title, platform: body.platform, createdBy: req.auth?.userId, allowedCodes: normalizedAllowed, ip: req.ip });
+        logChangeEvent({ actorUserId: req.auth?.userId, actorRoles: req.auth?.roles, actorIp: req.ip, entityType: 'Campaign', entityId: campaign.id, action: 'CAMPAIGN_CREATED', requestId: String((res as any).locals?.requestId || ''), metadata: { title: body.title, platform: body.platform, allowedAgencyCodes: normalizedAllowed } });
+        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_CREATED', campaignId: campaign.id, title: body.title } });
         const ts = new Date().toISOString();
         publishRealtime({
           type: 'deals.changed',
           ts,
-          payload: { campaignId: campaign.id ?? campaign.id },
+          payload: { campaignId: campaign.id },
           audience: {
             agencyCodes: normalizedAllowed,
             mediatorCodes: normalizedAllowed,
@@ -2323,7 +2411,7 @@ export function makeOpsController(env: Env) {
         publishRealtime({
           type: 'deals.changed',
           ts,
-          payload: { campaignId: campaign.id ?? campaign.id, status: nextStatus },
+          payload: { campaignId: campaign.id, status: nextStatus },
           audience: {
             userIds: [brandUserId].filter(Boolean),
             agencyCodes: allowed,
@@ -2333,7 +2421,7 @@ export function makeOpsController(env: Env) {
         publishRealtime({
           type: 'notifications.changed',
           ts,
-          payload: { source: 'campaign.status', campaignId: campaign.id ?? campaign.id, status: nextStatus },
+          payload: { source: 'campaign.status', campaignId: campaign.id, status: nextStatus },
           audience: {
             userIds: [brandUserId].filter(Boolean),
             agencyCodes: allowed,
@@ -2345,12 +2433,12 @@ export function makeOpsController(env: Env) {
           req,
           action: 'CAMPAIGN_STATUS_CHANGED',
           entityType: 'Campaign',
-          entityId: campaign.id ?? campaign.id,
+          entityId: campaign.id,
           metadata: { previousStatus, newStatus: nextStatus },
         });
-        businessLog.info('Campaign status changed', { campaignId: campaign.id ?? campaign.id, previousStatus, newStatus: nextStatus });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Campaign', entityId: campaign.id ?? campaign.id, action: 'STATUS_CHANGE', changedFields: ['status'], before: { status: previousStatus }, after: { status: nextStatus } });
-        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_STATUS_CHANGED', campaignId: campaign.id ?? campaign.id, previousStatus, newStatus: nextStatus } });
+        businessLog.info('Campaign status changed', { campaignId: campaign.id, previousStatus, newStatus: nextStatus });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Campaign', entityId: campaign.id, action: 'STATUS_CHANGE', changedFields: ['status'], before: { status: previousStatus }, after: { status: nextStatus } });
+        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_STATUS_CHANGED', campaignId: campaign.id, previousStatus, newStatus: nextStatus } });
 
         res.json(toUiCampaign(pgCampaign(updated)));
       } catch (err) {
@@ -2401,11 +2489,11 @@ export function makeOpsController(env: Env) {
           req,
           action: 'CAMPAIGN_DELETED',
           entityType: 'Campaign',
-          entityId: campaign.id ?? campaign.id,
+          entityId: campaign.id,
         });
-        businessLog.info('Campaign deleted', { campaignId: campaign.id ?? campaign.id, title: campaign.title });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Campaign', entityId: campaign.id ?? campaign.id, action: 'CAMPAIGN_DELETED', changedFields: ['isDeleted'], before: { isDeleted: false }, after: { isDeleted: new Date().toISOString() } });
-        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_DELETED', campaignId: campaign.id ?? campaign.id, title: campaign.title } });
+        businessLog.info('Campaign deleted', { campaignId: campaign.id, title: campaign.title });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Campaign', entityId: campaign.id, action: 'CAMPAIGN_DELETED', changedFields: ['isDeleted'], before: { isDeleted: false }, after: { isDeleted: new Date().toISOString() } });
+        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'CAMPAIGN_DELETED', campaignId: campaign.id, title: campaign.title } });
 
         const allowed = Array.isArray(campaign.allowedAgencyCodes)
           ? campaign.allowedAgencyCodes.map((c: any) => String(c).trim()).filter(Boolean)
@@ -2423,7 +2511,7 @@ export function makeOpsController(env: Env) {
         publishRealtime({
           type: 'deals.changed',
           ts,
-          payload: { campaignId: campaign.id ?? campaign.id },
+          payload: { campaignId: campaign.id },
           audience: {
             userIds: [brandUserId].filter(Boolean),
             agencyCodes: allowed,
@@ -2434,7 +2522,7 @@ export function makeOpsController(env: Env) {
         publishRealtime({
           type: 'notifications.changed',
           ts,
-          payload: { source: 'campaign.deleted', campaignId: campaign.id ?? campaign.id },
+          payload: { source: 'campaign.deleted', campaignId: campaign.id },
           audience: {
             userIds: [brandUserId].filter(Boolean),
             agencyCodes: allowed,
@@ -2507,20 +2595,24 @@ export function makeOpsController(env: Env) {
         }
 
         // Security: agency can only assign to active mediators under its own code.
+        // Uses case-insensitive comparison because assignment keys are stored
+        // lowercase in JSONB while User.mediatorCode retains original casing.
         if (agencyCode && !isOpenToAll) {
           const assignmentCodes = positiveEntries.map(([code]) => String(code).trim()).filter(Boolean);
+          const assignmentCodesLower = assignmentCodes.map((c) => c.toLowerCase());
           const mediators = await db().user.findMany({
             where: {
               roles: { has: 'mediator' },
-              mediatorCode: { in: assignmentCodes },
               parentCode: agencyCode,
               status: 'active',
               isDeleted: false,
             },
             select: { mediatorCode: true },
           });
-          const allowedCodes = new Set(mediators.map((m: any) => String(m.mediatorCode || '').trim()).filter(Boolean));
-          const invalid = assignmentCodes.filter((c) => !allowedCodes.has(String(c).trim()));
+          const allowedCodes = new Set(
+            mediators.map((m: any) => String(m.mediatorCode || '').trim().toLowerCase()).filter(Boolean),
+          );
+          const invalid = assignmentCodesLower.filter((c) => !allowedCodes.has(c));
           if (invalid.length) {
             throw new AppError(403, 'INVALID_MEDIATOR_CODE', 'One or more mediators are not active or not in your team');
           }
@@ -2550,6 +2642,14 @@ export function makeOpsController(env: Env) {
             };
           if (typeof commissionPaise !== 'undefined') {
             (assignmentObj as any).commissionPaise = commissionPaise;
+          }
+          // ADDITIVE: add new limit on top of existing allocation
+          const existingEntry = current[normCode];
+          if (existingEntry) {
+            const existingLimit = Number(
+              typeof existingEntry === 'number' ? existingEntry : existingEntry?.limit ?? 0,
+            );
+            assignmentObj.limit = existingLimit + assignmentObj.limit;
           }
           current[normCode] = assignmentObj;
         }
@@ -2596,18 +2696,18 @@ export function makeOpsController(env: Env) {
           if (updated.count === 0) {
             throw new AppError(409, 'CONCURRENT_MODIFICATION', 'Campaign was modified concurrently, please retry');
           }
-        } catch (saveErr: any) {
+        } catch (saveErr: unknown) {
           if (saveErr instanceof AppError) throw saveErr;
-          if (saveErr?.code === 'P2025') {
+          if ((saveErr as { code?: string })?.code === 'P2025') {
             throw new AppError(409, 'CONCURRENT_MODIFICATION', 'Campaign was modified concurrently, please retry');
           }
           throw saveErr;
         }
 
-        await writeAuditLog({ req, action: 'CAMPAIGN_SLOTS_ASSIGNED', entityType: 'Campaign', entityId: campaign.id ?? campaign.id });
-        businessLog.info('Campaign slots assigned', { campaignId: campaign.id ?? campaign.id, totalAssigned, mediators: positiveEntries.map(([c]) => c) });
-        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Campaign', entityId: campaign.id ?? campaign.id, action: 'SLOTS_ASSIGNED', changedFields: ['assignments', 'locked'], before: { locked: campaign.locked }, after: { locked: true, totalAssigned, assignedMediators: positiveEntries.map(([c]) => c) } });
-        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'SLOTS_ASSIGNED', campaignId: campaign.id ?? campaign.id, totalAssigned, mediatorCount: positiveEntries.length } });
+        await writeAuditLog({ req, action: 'CAMPAIGN_SLOTS_ASSIGNED', entityType: 'Campaign', entityId: campaign.id });
+        businessLog.info('Campaign slots assigned', { campaignId: campaign.id, totalAssigned, mediators: positiveEntries.map(([c]) => c) });
+        logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Campaign', entityId: campaign.id, action: 'SLOTS_ASSIGNED', changedFields: ['assignments', 'locked'], before: { locked: campaign.locked }, after: { locked: true, totalAssigned, assignedMediators: positiveEntries.map(([c]) => c) } });
+        logAccessEvent('RESOURCE_ACCESS', { userId: req.auth?.userId, roles: req.auth?.roles, ip: req.ip, resource: 'Campaign', requestId: String((res as any).locals?.requestId || ''), metadata: { action: 'SLOTS_ASSIGNED', campaignId: campaign.id, totalAssigned, mediatorCount: positiveEntries.length } });
 
         const assignmentCodes = positiveEntries.map(([c]) => String(c).trim()).filter(Boolean);
         const agencyCodeMap = await getAgencyCodesForMediatorCodes(assignmentCodes);
@@ -2629,7 +2729,7 @@ export function makeOpsController(env: Env) {
         publishRealtime({
           type: 'deals.changed',
           ts,
-          payload: { campaignId: campaign.id ?? campaign.id },
+          payload: { campaignId: campaign.id },
           audience: {
             userIds: [brandUserId].filter(Boolean),
             agencyCodes,
@@ -2675,6 +2775,9 @@ export function makeOpsController(env: Env) {
             throw new AppError(403, 'FORBIDDEN', 'Cannot publish deals for other mediators');
           }
 
+          const slotAssignment = findAssignmentForMediator(campaign.assignments, requestedCode);
+          const hasAssignment = !!slotAssignment && Number((slotAssignment as any)?.limit ?? 0) > 0;
+
           const agencyCode = normalizeCode((requester as any)?.parentCode);
           const allowedCodesRaw = Array.isArray(campaign.allowedAgencyCodes) ? campaign.allowedAgencyCodes : [];
           const allowedCodes = new Set(
@@ -2683,9 +2786,6 @@ export function makeOpsController(env: Env) {
               .filter((c: string): c is string => Boolean(c))
               .map((c: string) => c.toLowerCase())
           );
-
-          const slotAssignment = findAssignmentForMediator(campaign.assignments, requestedCode);
-          const hasAssignment = !!slotAssignment && Number((slotAssignment as any)?.limit ?? 0) > 0;
 
           // "Open to All" campaigns still require agency membership — they just skip per-mediator slot assignment
           const isAllowed = (agencyCode && allowedCodes.has(agencyCode.toLowerCase())) || allowedCodes.has(selfCode.toLowerCase()) || hasAssignment;
@@ -2704,10 +2804,8 @@ export function makeOpsController(env: Env) {
           throw new AppError(400, 'INVALID_PAYOUT', 'Cannot publish deal with negative payout.');
         }
 
-        const netEarnings = payoutPaise + commissionPaise;
-        if (netEarnings < 0) {
-          throw new AppError(400, 'INVALID_ECONOMICS', 'Buyer discount cannot exceed your commission from agency');
-        }
+        // Negative commission allowed — mediator can offer a buyer discount
+        // even if it exceeds their payout (marketing cost borne by mediator).
 
         if (String(campaign.status || '').toLowerCase() !== 'active') {
           throw new AppError(409, 'CAMPAIGN_NOT_ACTIVE', 'Campaign is not active; cannot publish deal');
@@ -2753,7 +2851,7 @@ export function makeOpsController(env: Env) {
           });
         }
 
-        const campaignDisplayId = campaign.id ?? campaign.id;
+        const campaignDisplayId = campaign.id;
         await writeAuditLog({
           req,
           action: 'DEAL_PUBLISHED',
@@ -2864,8 +2962,8 @@ export function makeOpsController(env: Env) {
             });
           }
 
-          const payoutDisplayId = payoutDoc.id ?? payoutDoc.id;
-          const userDisplayId = user.id ?? user.id;
+          const payoutDisplayId = payoutDoc.id;
+          const userDisplayId = user.id;
           await writeAuditLog({ req, action: 'PAYOUT_PROCESSED', entityType: 'Payout', entityId: payoutDisplayId, metadata: { beneficiaryUserId: userDisplayId, amountPaise, recordOnly: canAgency } });
           businessLog.info('Payout processed', { payoutId: payoutDisplayId, beneficiaryId: userDisplayId, amountPaise, mode: canAny ? 'paid' : 'recorded', mediatorCode: user.mediatorCode });
           logChangeEvent({ actorUserId: req.auth?.userId, entityType: 'Payout', entityId: payoutDisplayId, action: 'PAYOUT_PROCESSED', changedFields: ['status', 'amountPaise'], before: {}, after: { status: canAny ? 'paid' : 'recorded', amountPaise, beneficiaryUserId: userDisplayId } });
@@ -2921,8 +3019,8 @@ export function makeOpsController(env: Env) {
           throw new AppError(409, 'PAYOUT_ALREADY_DELETED', 'Payout already deleted');
         }
 
-        const payoutDisplayId = payout.id ?? payout.id;
-        const beneficiaryDisplayId = beneficiary.id ?? beneficiary.id;
+        const payoutDisplayId = payout.id;
+        const beneficiaryDisplayId = beneficiary.id;
         await writeAuditLog({
           req,
           action: 'PAYOUT_DELETED',
@@ -3034,13 +3132,14 @@ export function makeOpsController(env: Env) {
             usedSlots: 0,
             status: 'draft',
             allowedAgencyCodes: campaign.allowedAgencyCodes || [],
+            openToAll: campaign.openToAll ?? false,
             assignments: {},
             locked: false,
             createdBy: pgUserId || undefined,
           },
         });
 
-        const newDisplayId = newCampaign.id ?? newCampaign.id;
+        const newDisplayId = newCampaign.id;
         await writeAuditLog({
           req,
           action: 'CAMPAIGN_COPIED',
@@ -3107,7 +3206,7 @@ export function makeOpsController(env: Env) {
           data: { allowedAgencyCodes: newCodes },
         });
 
-        const campaignDisplayId = campaign.id ?? campaign.id;
+        const campaignDisplayId = campaign.id;
         await writeAuditLog({
           req,
           action: 'OFFER_DECLINED',
@@ -3268,28 +3367,29 @@ export function makeOpsController(env: Env) {
           throw new AppError(409, 'ALREADY_CANCELLED', 'This order is already cancelled');
         }
 
-        // Release campaign slot
+        // Release campaign slot + update order atomically
         const campaignId = order.items?.[0]?.campaignId;
-        if (campaignId) {
-          await db().$executeRaw`UPDATE "campaigns" SET "used_slots" = GREATEST("used_slots" - 1, 0) WHERE id = ${campaignId}::uuid AND "is_deleted" = false`;
-        }
-
         const currentEvents = Array.isArray(order.events) ? (order.events as any[]) : [];
-        await db().order.update({
-          where: { id: order.id },
-          data: {
-            affiliateStatus: 'Rejected',
-            rejectionType: 'order',
-            rejectionReason: body.reason,
-            rejectionAt: new Date(),
-            rejectionBy: req.auth?.userId,
-            events: pushOrderEvent(currentEvents, {
-              type: 'REJECTED',
-              at: new Date(),
-              actorUserId: req.auth?.userId,
-              metadata: { step: 'order_cancelled', reason: body.reason },
-            }),
-          },
+        await db().$transaction(async (tx: any) => {
+          await tx.order.update({
+            where: { id: order.id },
+            data: {
+              affiliateStatus: 'Rejected',
+              rejectionType: 'order',
+              rejectionReason: body.reason,
+              rejectionAt: new Date(),
+              rejectionBy: req.auth?.userId,
+              events: pushOrderEvent(currentEvents, {
+                type: 'REJECTED',
+                at: new Date(),
+                actorUserId: req.auth?.userId,
+                metadata: { step: 'order_cancelled', reason: body.reason },
+              }),
+            },
+          });
+          if (campaignId) {
+            await tx.$executeRaw`UPDATE "campaigns" SET "used_slots" = GREATEST("used_slots" - 1, 0) WHERE id = ${campaignId}::uuid AND "is_deleted" = false`;
+          }
         });
 
         if (!['REJECTED', 'FAILED', 'COMPLETED'].includes(wf)) {
@@ -3305,7 +3405,7 @@ export function makeOpsController(env: Env) {
 
         await writeAuditLog({ req, action: 'ORDER_CANCELLED', entityType: 'Order', entityId: order.id!, metadata: { reason: body.reason } });
         if (campaignId) {
-          writeAuditLog({ req, action: 'CAMPAIGN_SLOT_RELEASED', entityType: 'Campaign', entityId: String(campaignId), metadata: { orderId: order.id ?? order.id, reason: 'order_cancelled' } }).catch((err) => { orderLog.warn('Audit log failed (slot release on cancel)', { error: err instanceof Error ? err.message : String(err) }); });
+          writeAuditLog({ req, action: 'CAMPAIGN_SLOT_RELEASED', entityType: 'Campaign', entityId: String(campaignId), metadata: { orderId: order.id, reason: 'order_cancelled' } }).catch((err) => { orderLog.warn('Audit log failed (slot release on cancel)', { error: err instanceof Error ? err.message : String(err) }); });
         }
         orderLog.info('Order cancelled', { orderId: order.id, reason: body.reason });
         businessLog.info('Order cancelled', { orderId: order.id, cancelledBy: req.auth?.userId, ip: req.ip });

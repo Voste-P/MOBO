@@ -29,7 +29,7 @@ interface SettlePrefetch {
  * Returns true if settled, false if skipped (disputed/frozen/already settled).
  */
 async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promise<boolean> {
-  const orderDisplayId = order.id ?? order.id;
+  const orderDisplayId = order.id;
 
   // Skip frozen orders
   if (order.frozen) {
@@ -94,7 +94,18 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
         select: { id: true, status: true, isDeleted: true },
       });
   if (!buyer || buyer.isDeleted || buyer.status !== 'active') {
-    orderLog.warn('[cooling-settler] Buyer not active, skipping settlement', {
+    // Freeze: prevents perpetual retry loop — admin must investigate
+    const freezeEvents = pushOrderEvent(order.events as any, {
+      type: 'FROZEN_DISPUTED',
+      at: new Date(),
+      actorUserId: SYSTEM_ACTOR,
+      metadata: { reason: 'buyer_not_active', buyerStatus: buyer?.status ?? 'not_found', source: 'cooling-settler' },
+    });
+    await db().order.update({
+      where: { id: order.id },
+      data: { frozen: true, events: freezeEvents as any },
+    });
+    orderLog.warn('[cooling-settler] Buyer not active, order frozen', {
       orderId: orderDisplayId,
       buyerStatus: buyer?.status,
     });
@@ -116,13 +127,17 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
 
   // Cap check
   let isOverLimit = false;
+  let assignedLimit = 0;
   if (campaignId && mediatorCode && campaign) {
     const assignmentsObj =
       campaign.assignments && typeof campaign.assignments === 'object'
         ? (campaign.assignments as any)
         : {};
-    const rawAssigned = assignmentsObj?.[mediatorCode];
-    const assignedLimit =
+    // Case-insensitive lookup — assignSlots stores lowercase keys
+    const codeLower = mediatorCode.toLowerCase();
+    const rawAssigned = assignmentsObj?.[codeLower]
+      ?? Object.entries(assignmentsObj).find(([k]) => k.toLowerCase() === codeLower)?.[1];
+    assignedLimit =
       typeof rawAssigned === 'number' ? rawAssigned : Number(rawAssigned?.limit ?? 0);
 
     if (assignedLimit > 0) {
@@ -151,32 +166,60 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
           select: { id: true, payoutPaise: true },
         });
     if (!deal) {
-      orderLog.warn('[cooling-settler] Deal not found, skipping', {
-        orderId: orderDisplayId,
-        productId,
+      const evts = pushOrderEvent(order.events as any, {
+        type: 'FROZEN_DISPUTED',
+        at: new Date(),
+        actorUserId: SYSTEM_ACTOR,
+        metadata: { reason: 'deal_not_found', productId, source: 'cooling-settler' },
       });
+      await db().order.update({ where: { id: order.id }, data: { frozen: true, events: evts as any } });
+      orderLog.warn('[cooling-settler] Deal not found, order frozen', { orderId: orderDisplayId, productId });
       return false;
     }
 
     const payoutPaise = Number(deal.payoutPaise ?? 0);
     const buyerCommissionPaise = Number(order.items?.[0]?.commissionPaise ?? 0);
     if (payoutPaise <= 0) {
-      orderLog.warn('[cooling-settler] Invalid payout, skipping', {
-        orderId: orderDisplayId,
-        payoutPaise,
+      const evts = pushOrderEvent(order.events as any, {
+        type: 'FROZEN_DISPUTED',
+        at: new Date(),
+        actorUserId: SYSTEM_ACTOR,
+        metadata: { reason: 'invalid_payout', payoutPaise, source: 'cooling-settler' },
       });
+      await db().order.update({ where: { id: order.id }, data: { frozen: true, events: evts as any } });
+      orderLog.warn('[cooling-settler] Invalid payout, order frozen', { orderId: orderDisplayId, payoutPaise });
+      return false;
+    }
+
+    // Guard: buyer commission must never exceed payout — prevents negative mediator margin
+    if (buyerCommissionPaise > payoutPaise) {
+      const evts = pushOrderEvent(order.events as any, {
+        type: 'FROZEN_DISPUTED',
+        at: new Date(),
+        actorUserId: SYSTEM_ACTOR,
+        metadata: { reason: 'commission_exceeds_payout', payoutPaise, buyerCommissionPaise, source: 'cooling-settler' },
+      });
+      await db().order.update({ where: { id: order.id }, data: { frozen: true, events: evts as any } });
+      orderLog.error('[cooling-settler] Commission exceeds payout — order frozen', { orderId: orderDisplayId, payoutPaise, buyerCommissionPaise });
       return false;
     }
 
     const buyerUserId = order.userId;
     const brandId = String(order.brandUserId || campaign?.brandUserId || '').trim();
     if (!buyerUserId || !brandId) {
-      orderLog.warn('[cooling-settler] Missing buyer/brand, skipping', { orderId: orderDisplayId });
+      const evts = pushOrderEvent(order.events as any, {
+        type: 'FROZEN_DISPUTED',
+        at: new Date(),
+        actorUserId: SYSTEM_ACTOR,
+        metadata: { reason: 'missing_buyer_or_brand', source: 'cooling-settler' },
+      });
+      await db().order.update({ where: { id: order.id }, data: { frozen: true, events: evts as any } });
+      orderLog.warn('[cooling-settler] Missing buyer/brand, order frozen', { orderId: orderDisplayId });
       return false;
     }
 
-    await ensureWallet(brandId);
-    await ensureWallet(buyerUserId);
+    // Parallel wallet creation — brand and buyer wallets are independent
+    const walletEnsures: Promise<unknown>[] = [ensureWallet(brandId), ensureWallet(buyerUserId)];
 
     const mediatorMarginPaise = payoutPaise - buyerCommissionPaise;
     let mediatorUserId: string | null = null;
@@ -189,12 +232,29 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
           });
       if (mediator) {
         mediatorUserId = mediator.id;
-        await ensureWallet(mediatorUserId);
+        walletEnsures.push(ensureWallet(mediatorUserId));
       }
     }
+    await Promise.all(walletEnsures);
 
     await db().$transaction(
       async (tx: any) => {
+        // Re-check settlement cap inside transaction to prevent concurrent overcount
+        if (assignedLimit > 0 && mediatorCode && campaignId) {
+          const txSettledCount = await tx.order.count({
+            where: {
+              managerName: mediatorCode,
+              items: { some: { campaignId } },
+              OR: [{ affiliateStatus: 'Approved_Settled' }, { paymentStatus: 'Paid' }],
+              id: { not: order.id },
+              isDeleted: false,
+            },
+          });
+          if (txSettledCount >= assignedLimit) {
+            throw new Error('CAP_EXCEEDED_IN_TX');
+          }
+        }
+
         await applyWalletDebit({
           idempotencyKey: `order-settlement-debit-${order.id}`,
           type: 'order_settlement_debit',
@@ -256,11 +316,32 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
         });
       },
       { timeout: env.SETTLER_TX_TIMEOUT_MS },
-    );
-  } else {
-    // Cap-exceeded or missing product: update status without wallet movement
+    ).catch((txErr: any) => {
+      if (txErr?.message === 'CAP_EXCEEDED_IN_TX') {
+        isOverLimit = true; // Fall through to cap-exceeded path below
+        return;
+      }
+      throw txErr;
+    });
+  }
+
+  if (!productId && !isOverLimit) {
+    // Missing product ID — freeze order instead of settling without payment
+    const evts = pushOrderEvent(order.events as any, {
+      type: 'FROZEN_DISPUTED',
+      at: new Date(),
+      actorUserId: SYSTEM_ACTOR,
+      metadata: { reason: 'missing_product_id', source: 'cooling-settler' },
+    });
+    await db().order.update({ where: { id: order.id }, data: { frozen: true, events: evts as any } });
+    orderLog.warn('[cooling-settler] Missing product ID, order frozen', { orderId: orderDisplayId });
+    return false;
+  }
+
+  if (isOverLimit) {
+    // Cap exceeded: update status without wallet movement
     const newEvents = pushOrderEvent(order.events as any, {
-      type: isOverLimit ? 'CAP_EXCEEDED' : 'SETTLED',
+      type: 'CAP_EXCEEDED',
       at: new Date(),
       actorUserId: SYSTEM_ACTOR,
       metadata: { source: 'cooling-settler' },
@@ -268,8 +349,8 @@ async function settleOne(order: any, env: Env, prefetch?: SettlePrefetch): Promi
     await db().order.update({
       where: { id: order.id },
       data: {
-        paymentStatus: isOverLimit ? 'Failed' : 'Paid',
-        affiliateStatus: isOverLimit ? 'Cap_Exceeded' : 'Approved_Settled',
+        paymentStatus: 'Failed',
+        affiliateStatus: 'Cap_Exceeded',
         events: newEvents as any,
       },
     });
@@ -371,7 +452,7 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
   orderLog.info(`[cooling-settler] Found ${orders.length} orders ready for settlement`);
 
   // ── Batch prefetch: load all related data in parallel to eliminate N+1 queries ──
-  const orderIds = orders.map(o => o.id ?? o.id);
+  const orderIds = orders.map(o => o.id);
   const campaignIds = [...new Set(orders.map(o => o.items?.[0]?.campaignId).filter(Boolean))] as string[];
   const productIds = [...new Set(orders.map(o => String(o.items?.[0]?.productId || '').trim()).filter(Boolean))];
   const userIds = [...new Set(orders.flatMap(o => [o.userId, o.brandUserId].filter(Boolean)))] as string[];
@@ -418,7 +499,7 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
   // Build lookup maps for O(1) access during settlement
   const disputeOrderIds = new Set(disputes.map(t => t.orderId));
   const campaignMap = new Map(campaignsArr.map(c => [c.id, c]));
-  const dealMap = new Map(dealsArr.map(d => [d.id ?? d.id, d]));
+  const dealMap = new Map(dealsArr.map(d => [d.id, d]));
   const userMap = new Map(usersArr.map(u => [u.id, u]));
   const mediatorMap = new Map(mediatorsArr.map(m => [m.mediatorCode!, m]));
 
@@ -453,7 +534,7 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
   const prefetch = { disputeOrderIds, campaignMap, dealMap, userMap, mediatorMap, capCountMap };
 
   for (const order of orders) {
-    const orderId = order.id ?? order.id;
+    const orderId = order.id;
     // Retry up to 2 times on transient DB errors (connection, timeout, deadlock)
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -462,10 +543,10 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
         if (didSettle) settled++;
         else skipped++;
         break;
-      } catch (err: any) {
-        const code = err?.code ?? '';
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code ?? '';
         const isTransient = code === 'P1017' || code === 'P1001' || code === 'P1008' || code === 'P2034'
-          || (err?.message && /deadlock|timeout|connection/i.test(err.message));
+          || (err instanceof Error && /deadlock|timeout|connection/i.test(err.message));
         if (isTransient && attempt < 2) {
           // eslint-disable-next-line no-await-in-loop
           await new Promise(r => setTimeout(r, 500 * (attempt + 1)));

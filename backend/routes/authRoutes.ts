@@ -45,6 +45,7 @@ export function authRoutes(env: Env): Router {
   router.patch('/profile', requireAuth(env), authLimiter, controller.updateProfile);
 
   // Security questions & forgot password
+  router.get('/security-question-templates', controller.getSecurityQuestionTemplates);
   router.post('/security-questions', requireAuth(env), authLimiter, controller.saveSecurityQuestions);
   router.post('/forgot-password/lookup', authLimiter, controller.forgotPasswordLookup);
   router.post('/forgot-password/reset', authLimiter, controller.forgotPasswordReset);

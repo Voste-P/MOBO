@@ -105,8 +105,8 @@ export async function sendPushToUser(params: {
           },
           payload
         );
-      } catch (err: any) {
-        const status = Number(err?.statusCode || err?.status || 0);
+      } catch (err: unknown) {
+        const status = Number((err as { statusCode?: number; status?: number })?.statusCode || (err as { status?: number })?.status || 0);
         if (status === 404 || status === 410) {
           await removeInvalidSubscription(String(sub.endpoint || ''));
         }
@@ -183,7 +183,7 @@ export async function notifyOrderWorkflowPush(params: {
             where: { mediatorCode, roles: { has: 'mediator' }, isDeleted: false },
             select: { id: true },
           });
-          mediatorIds = pgMediators.map(m => m.id || m.id);
+          mediatorIds = pgMediators.map(m => m.id);
         }
         const payload: PushPayload = {
           title: 'New order to review',

@@ -206,6 +206,13 @@ describe('core flows: products -> redirect -> order -> claim -> ops verify/settl
     expect(verifyReturnWindowRes.body).toHaveProperty('ok', true);
     expect(verifyReturnWindowRes.body).toHaveProperty('approved', true);
 
+    // Fast-forward the cooling period so the settle call is not blocked.
+    // In production, the coolingPeriodSettler cron handles this automatically.
+    await db.order.update({
+      where: { id: orderId },
+      data: { expectedSettlementDate: new Date(Date.now() - 86_400_000) },
+    });
+
     // Force-reset brand wallet to a known balance right before settlement to
     // avoid contamination from other test files sharing the same database.
     await db.wallet.updateMany({
@@ -215,15 +222,8 @@ describe('core flows: products -> redirect -> order -> claim -> ops verify/settl
 
     // Also clean any stale settlement transactions for THIS specific order
     // (in case a previous full-suite run left them behind)
-    const thisOrderId = (await db.order.findFirst({ where: { id: orderId }, select: { id: true } }))?.id;
-    if (thisOrderId) {
-      const cycleKeys = Array.from({ length: 4 }, (_, i) => [
-        `order-settlement-debit-${thisOrderId}-c${i}`,
-        `order-commission-${thisOrderId}-c${i}`,
-        `order-margin-${thisOrderId}-c${i}`,
-      ]).flat();
-      try { await db.transaction.deleteMany({ where: { idempotencyKey: { in: [`order-settlement-debit-${thisOrderId}`, `order-commission-${thisOrderId}`, `order-margin-${thisOrderId}`, ...cycleKeys] } } }); } catch { /* ignore */ }
-    }
+    // Use orderId-based cleanup to catch ALL transaction records regardless of key format
+    try { await db.transaction.deleteMany({ where: { orderId } }); } catch { /* ignore */ }
 
     // Snapshot wallet balance immediately BEFORE settling
     const walletSnap = await db.wallet.findFirst({ where: { ownerUserId: campaignBrandUserId, isDeleted: false } });

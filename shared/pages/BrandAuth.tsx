@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Button, Input, Spinner, AnimatedView } from '../components/ui';
 import { SecurityQuestionsSetup, type SecurityQA } from '../components/SecurityQuestionsSetup';
 import { ForgotPassword } from './ForgotPassword';
+import { validatePassword } from '../utils/passwordValidation';
 import {
   Building2,
   ArrowRight,
@@ -57,7 +58,7 @@ export const BrandAuthScreen: React.FC<BrandAuthProps> = ({ onBack }) => {
         setIsLoading(false);
         return;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(formatErrorMessage(err, 'Login failed'));
       setIsLoading(false);
     }
@@ -69,10 +70,8 @@ export const BrandAuthScreen: React.FC<BrandAuthProps> = ({ onBack }) => {
       setError('All fields are required');
       return;
     }
-    if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
-      setError('Password needs 8+ chars with uppercase, lowercase, number, and special character.');
-      return;
-    }
+    const pwErr = validatePassword(password);
+    if (pwErr) { setError(pwErr); return; }
     setError('');
     pendingRegRef.current = { name, mobile, password, brandCode };
     setView('securityQuestions');
@@ -85,7 +84,7 @@ export const BrandAuthScreen: React.FC<BrandAuthProps> = ({ onBack }) => {
     setError('');
     try {
       await registerBrand(reg.name, reg.mobile, reg.password, reg.brandCode, questions);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(formatErrorMessage(err, 'Registration failed'));
       setView('register');
       setIsLoading(false);
@@ -117,7 +116,7 @@ export const BrandAuthScreen: React.FC<BrandAuthProps> = ({ onBack }) => {
   if (view === 'splash') {
     return (
       <AnimatedView viewKey="splash" variant="fade">
-      <div className="flex w-full bg-zinc-950 text-white overflow-x-hidden relative font-sans" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
+      <div className="flex w-full bg-zinc-950 text-white overflow-x-hidden relative font-sans" style={{ minHeight: '100dvh' }}>
         {/* Abstract Background */}
         <div className="absolute inset-0 z-0">
           <div className="absolute top-[-10%] left-[-10%] w-[60vw] h-[60vw] bg-lime-500/10 rounded-full blur-[150px] animate-pulse motion-reduce:animate-none"></div>
@@ -181,7 +180,7 @@ export const BrandAuthScreen: React.FC<BrandAuthProps> = ({ onBack }) => {
   // --- SPLIT LAYOUT FOR FORMS ---
   return (
     <AnimatedView viewKey={view} variant="slideUp">
-    <div className="flex w-full bg-white font-sans" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
+    <div className="flex w-full bg-white font-sans" style={{ minHeight: '100dvh' }}>
       {/* Left Visual Side */}
       <div className="hidden lg:flex lg:w-1/2 bg-zinc-950 relative overflow-hidden flex-col justify-between p-12 text-white">
         <div className="absolute inset-0 z-0">

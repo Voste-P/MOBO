@@ -22,7 +22,7 @@ async function enrichTicketsWithResolverNames(tickets: any[]): Promise<any[]> {
   const resolverIds = [...new Set(tickets.map(t => t.resolvedBy).filter(Boolean))];
   if (!resolverIds.length) return tickets;
   const resolvers = await db.user.findMany({
-    where: { id: { in: resolverIds } },
+    where: { id: { in: resolverIds.slice(0, 500) } },
     select: { id: true, name: true },
   });
   const nameMap = new Map(resolvers.map(r => [r.id, r.name]));
@@ -45,7 +45,6 @@ async function enrichTicketsWithExternalOrderIds(tickets: any[]): Promise<any[]>
   for (const o of orders) {
     if (o.externalOrderId) {
       extMap.set(o.id, o.externalOrderId);
-      if (o.id) extMap.set(o.id, o.externalOrderId);
     }
   }
   return tickets.map(t => ({
@@ -72,7 +71,7 @@ async function enrichTickets(tickets: any[]): Promise<any[]> {
 async function buildTicketAudience(ticket: any) {
   const privilegedRoles: Role[] = ['admin', 'ops'];
   const userIds = new Set<string>();
-  const ticketOwnerId = String(ticket?._id || ticket?.id || '').trim();
+  const ticketOwnerId = String(ticket?.userId || '').trim();
 
   let mediatorCodes: string[] | undefined;
   let agencyCodes: string[] | undefined;
@@ -260,8 +259,8 @@ async function canManageTicketByRole(params: {
       }
     }
 
-    // ── Agency: can manage tickets from mediators + buyers in their network ──
-    if (roles.includes('agency')) {
+    // ── Agency: can manage tickets targeted to 'agency' from network users ──
+    if (roles.includes('agency') && (!ticketTargetRole || ticketTargetRole === 'agency')) {
       const agencyCode = await resolveAgencyCode(pgUserId, user);
       if (agencyCode) {
         const mediatorCodes = await listMediatorCodesForAgency(agencyCode);
@@ -325,14 +324,14 @@ async function canManageTicketByRole(params: {
               select: { id: true },
             })
           : null,
-        db.brand.findFirst({
-          where: { ownerUserId: pgUserId, isDeleted: false },
-          select: { connectedAgencyCodes: true },
+        db.user.findFirst({
+          where: { id: pgUserId, isDeleted: false },
+          select: { connectedAgencies: true },
         }),
       ]);
       if (orderCheck) return true;
 
-      const connectedCodes = brand?.connectedAgencyCodes ?? [];
+      const connectedCodes = (Array.isArray(brand?.connectedAgencies) ? brand.connectedAgencies : []) as string[];
       if (connectedCodes.length) {
         // Wave 2: agency owners + direct registration + mediator codes (independent)
         const [connectedAgencies, regUnderAgency, allMedUsers] = await Promise.all([
@@ -428,11 +427,11 @@ async function canManageTicketByRole(params: {
             }
           }
           if (roles.includes('brand')) {
-            const brand = await db.brand.findFirst({
-              where: { ownerUserId: pgUserId, isDeleted: false },
-              select: { connectedAgencyCodes: true },
+            const brandUser = await db.user.findFirst({
+              where: { id: pgUserId, isDeleted: false },
+              select: { connectedAgencies: true },
             });
-            const connectedCodes = brand?.connectedAgencyCodes ?? [];
+            const connectedCodes = (Array.isArray(brandUser?.connectedAgencies) ? brandUser.connectedAgencies : []) as string[];
             if (connectedCodes.length > 0) {
               if (connectedCodes.includes(creatorParent) || connectedCodes.includes(creatorMediator)) return true;
               // Check if creator is under a mediator whose agency is connected (batched query)
@@ -741,17 +740,13 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
               // Tickets targeted to agency from ANY user in the network (including escalated buyer tickets)
               cascadeTargets.push({ targetRole: 'agency', userId: { in: allNetworkIds } });
             }
-            // Buyer tickets still at mediator level (oversight)
-            if (buyerInMediatorNetwork.length) {
-              cascadeTargets.push({ targetRole: 'mediator', userId: { in: buyerInMediatorNetwork } });
-            }
           }
         }
 
         if (roles.includes('brand')) {
           // Brand sees tickets from connected agencies + their downstream at ALL relevant target levels
-          const brand = await db.brand.findFirst({ where: { ownerUserId: pgUserId, isDeleted: false }, select: { connectedAgencyCodes: true } });
-          const connectedCodes = brand?.connectedAgencyCodes ?? [];
+          const brandUser = await db.user.findFirst({ where: { id: pgUserId, isDeleted: false }, select: { connectedAgencies: true } });
+          const connectedCodes = (Array.isArray(brandUser?.connectedAgencies) ? brandUser.connectedAgencies : []) as string[];
           if (connectedCodes.length) {
             // Resolve agency owner user IDs from connected agency codes
             const connectedAgencies = await db.agency.findMany({ where: { agencyCode: { in: connectedCodes }, isDeleted: false }, select: { ownerUserId: true } });
@@ -797,7 +792,16 @@ export function makeTicketsController(env: import('../config/env.js').Env) {
 
         const orderIds = await getScopedOrderIds({ roles, pgUserId, requesterUser: user });
         if (orderIds.length) {
-          cascadeTargets.push({ orderId: { in: orderIds } });
+          // Scope order-based tickets to the requester's role level
+          const orderTargetRoles: string[] = [];
+          if (roles.includes('mediator')) orderTargetRoles.push('mediator');
+          if (roles.includes('agency')) orderTargetRoles.push('agency');
+          if (roles.includes('brand')) orderTargetRoles.push('brand');
+          if (orderTargetRoles.length) {
+            cascadeTargets.push({ orderId: { in: orderIds }, targetRole: { in: orderTargetRoles } });
+          } else {
+            cascadeTargets.push({ orderId: { in: orderIds } });
+          }
         }
         const ticketWhere = {
             isDeleted: false,

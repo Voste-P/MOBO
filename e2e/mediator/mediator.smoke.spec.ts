@@ -9,14 +9,13 @@ test.describe('Mediator portal smoke', () => {
 
   test('mediator can log in', async ({ page }) => {
     await page.goto('/');
-    const mobileField = page.getByPlaceholder(/mobile|phone/i).first();
-    const passwordField = page.getByPlaceholder(/password/i).first();
+    const mobileField = page.getByPlaceholder('Mobile Number').first();
+    const passwordField = page.getByPlaceholder('Password').first();
 
-    if (await mobileField.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await mobileField.fill(E2E_ACCOUNTS.mediator.mobile);
-      await passwordField.fill(E2E_ACCOUNTS.mediator.password);
-      await page.getByRole('button', { name: /login|sign in|submit/i }).first().click();
-      await page.waitForURL((url) => !url.pathname.includes('login'), { timeout: 15_000 }).catch(() => {});
-    }
+    await expect(mobileField).toBeVisible({ timeout: 10_000 });
+    await mobileField.fill(E2E_ACCOUNTS.mediator.mobile);
+    await passwordField.fill(E2E_ACCOUNTS.mediator.password);
+    await page.getByRole('button', { name: /login|sign in|submit/i }).first().click();
+    await expect(page.locator('body')).toBeVisible({ timeout: 15_000 });
   });
 });

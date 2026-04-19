@@ -248,15 +248,21 @@ export async function seedE2E(): Promise<SeededE2E> {
         usedSlots: 0,
         status: 'active' as any,
         allowedAgencyCodes: [E2E_ACCOUNTS.agency.agencyCode],
-        assignments: { [E2E_ACCOUNTS.mediator.mediatorCode]: { limit: 100 } },
+        assignments: { [E2E_ACCOUNTS.mediator.mediatorCode.toLowerCase()]: { limit: 100 } },
         createdBy: admin.id,
       },
     });
-  } else if (campaign.brandUserId !== brand.id) {
-    // Ensure campaign points to the current brand user
+  } else {
+    // Always reconcile critical campaign fields so stale state never breaks tests
     campaign = await db.campaign.update({
       where: { id: campaign.id },
-      data: { brandUserId: brand.id, brandName: E2E_ACCOUNTS.brand.name },
+      data: {
+        brandUserId: brand.id,
+        brandName: E2E_ACCOUNTS.brand.name,
+        status: 'active' as any,
+        allowedAgencyCodes: [E2E_ACCOUNTS.agency.agencyCode],
+        assignments: { [E2E_ACCOUNTS.mediator.mediatorCode.toLowerCase()]: { limit: 100 } },
+      },
     });
   }
 

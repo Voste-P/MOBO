@@ -75,6 +75,7 @@ function withRequestId(init?: RequestInit): RequestInit {
 type TokenPair = { accessToken: string; refreshToken?: string };
 
 let refreshPromise: Promise<TokenPair | null> | null = null;
+let refreshCooldownUntil = 0; // prevents retry storms after refresh failure
 
 const canUseStorage = () => typeof window !== 'undefined' && !!window.localStorage;
 
@@ -172,6 +173,9 @@ async function refreshTokens(): Promise<TokenPair | null> {
   const refreshToken = current?.refreshToken;
   if (!refreshToken) return null;
 
+  // Cooldown: after a failed refresh, avoid retry storms for 5 seconds
+  if (Date.now() < refreshCooldownUntil) return null;
+
   if (!refreshPromise) {
     refreshPromise = (async () => {
       const MAX_REFRESH_RETRIES = 3;
@@ -200,10 +204,14 @@ async function refreshTokens(): Promise<TokenPair | null> {
           return readTokens();
         } catch (_err) {
           if (attempt < MAX_REFRESH_RETRIES) {
-            const delay = REFRESH_BASE_DELAY * Math.pow(2, attempt - 1);
-            await new Promise(r => setTimeout(r, delay));
+            // Exponential backoff with jitter to prevent synchronized retries
+            const baseDelay = REFRESH_BASE_DELAY * Math.pow(2, attempt - 1);
+            const jitter = Math.random() * baseDelay * 0.3;
+            await new Promise(r => setTimeout(r, baseDelay + jitter));
             continue;
           }
+          // All retries exhausted — cooldown to prevent thundering herd
+          refreshCooldownUntil = Date.now() + 5000;
           clearTokens();
           notifyAuthExpired();
           return null;
@@ -330,11 +338,11 @@ const inflightGets = new Map<string, Promise<any>>();
 
 // --- GET Response Cache with TTL + LRU eviction ---
 // Prevents redundant network calls when switching tabs or rapid navigation.
-// Default TTL: 15 seconds. Automatically invalidated on any mutation.
+// Default TTL: 5 seconds. Automatically invalidated on any mutation.
 // LRU eviction when capacity exceeded (promotes on read, evicts least-recently-accessed).
 interface GETCacheEntry { data: any; expiresAt: number }
 const getCache = new Map<string, GETCacheEntry>();
-const GET_CACHE_TTL_MS = 15_000;
+const GET_CACHE_TTL_MS = 5_000;
 const GET_CACHE_MAX = 200;
 
 function getCachedResponse(path: string): any | undefined {
@@ -357,11 +365,12 @@ function cacheResponse(path: string, data: any) {
 }
 
 // Periodic cleanup of expired entries (every 30s)
-// Guard against HMR creating duplicate intervals in development
-let _cacheCleanupTimer: ReturnType<typeof setInterval> | undefined;
+// Guard against HMR creating duplicate intervals via globalThis
+const CACHE_TIMER_KEY = '__mobo_cache_cleanup_timer';
 if (typeof window !== 'undefined') {
-  if (_cacheCleanupTimer) clearInterval(_cacheCleanupTimer);
-  _cacheCleanupTimer = setInterval(() => {
+  const prev = (globalThis as Record<string, unknown>)[CACHE_TIMER_KEY] as ReturnType<typeof setInterval> | undefined;
+  if (prev) clearInterval(prev);
+  (globalThis as Record<string, unknown>)[CACHE_TIMER_KEY] = setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of getCache) {
       if (now > entry.expiresAt) getCache.delete(key);
@@ -402,7 +411,7 @@ function mutationCachePrefixes(path: string): string[] | null {
     google:        [],
     media:         [],
   };
-  return scopeMap[seg] ?? null; // null = unknown → clear all
+  return scopeMap[seg] ?? [`/${seg}`]; // unknown segment → only invalidate its own prefix
 }
 
 async function fetchJson(path: string, init?: RequestInit): Promise<any> {
@@ -686,12 +695,16 @@ export const api = {
       });
     },
 
+    getSecurityQuestionTemplates: async () => {
+      return fetchJson('/auth/security-question-templates') as Promise<{ templates: { questionId: number; label: string }[] }>;
+    },
+
     forgotPasswordLookup: async (mobile: string) => {
       return fetchJson('/auth/forgot-password/lookup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mobile }),
-      }) as Promise<{ questionIds: number[] }>;
+      }) as Promise<{ questionIds: number[]; questions?: { id: number; label: string }[] }>;
     },
 
     forgotPasswordReset: async (
@@ -801,14 +814,14 @@ export const api = {
       // First attempt: 60s timeout
       try {
         return await attemptExtraction(60_000);
-      } catch (err: any) {
-        const isTimeout = err?.name === 'AbortError' || /timed?\s*out|took too long/i.test(err?.message || '');
+      } catch (err: unknown) {
+        const isTimeout = err instanceof Error && (err.name === 'AbortError' || /timed?\s*out|took too long/i.test(err.message));
         if (!isTimeout) throw err;
         // Auto-retry once on timeout (server may have just finished cold-starting)
         try {
           return await attemptExtraction(60_000);
-        } catch (retryErr: any) {
-          const isRetryTimeout = retryErr?.name === 'AbortError' || /timed?\s*out|took too long/i.test(retryErr?.message || '');
+        } catch (retryErr: unknown) {
+          const isRetryTimeout = retryErr instanceof Error && (retryErr.name === 'AbortError' || /timed?\s*out|took too long/i.test(retryErr.message));
           if (isRetryTimeout) {
             throw new Error('Screenshot analysis timed out after retrying. The server may be under heavy load — please try again in a minute.');
           }
