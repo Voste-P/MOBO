@@ -45,7 +45,7 @@ export function Modal({
         const focusable = panelRef.current.querySelectorAll<HTMLElement>(
           'a[href]:not([hidden]):not([aria-hidden="true"]), button:not([disabled]):not([hidden]):not([aria-hidden="true"]), textarea:not([disabled]):not([hidden]):not([aria-hidden="true"]), input:not([disabled]):not([hidden]):not([aria-hidden="true"]), select:not([disabled]):not([hidden]):not([aria-hidden="true"]), [tabindex]:not([tabindex="-1"]):not([hidden]):not([aria-hidden="true"])',
         );
-        if (focusable.length === 0) return;
+        if (focusable.length === 0) { panelRef.current?.focus(); return; }
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
         if (e.shiftKey && document.activeElement === first) {
@@ -60,14 +60,21 @@ export function Modal({
     [onClose],
   );
 
+  // Restore focus to trigger element when modal closes
+  const triggerRef = useRef<Element | null>(null);
+
   useEffect(() => {
     if (open) {
+      triggerRef.current = document.activeElement;
       document.addEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'hidden';
     }
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
+      if (triggerRef.current instanceof HTMLElement) {
+        triggerRef.current.focus();
+      }
     };
   }, [open, handleKeyDown]);
 

@@ -123,12 +123,12 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
 
   const actionRequiredOrders = useMemo(() =>
     orders.filter((o: Order) => String(o.workflowStatus || '') === 'UNDER_REVIEW')
-      .filter((o: Order) => matchesSearch(searchQuery, o.items[0]?.title, o.buyerName, o.reviewerName, getPrimaryOrderId(o))),
+      .filter((o: Order) => matchesSearch(searchQuery, o.items?.[0]?.title, o.buyerName, o.reviewerName, getPrimaryOrderId(o))),
     [orders, searchQuery]
   );
   const coolingOrders = useMemo(() =>
     orders.filter((o: Order) => o.affiliateStatus === 'Pending_Cooling')
-      .filter((o: Order) => matchesSearch(searchQuery, o.items[0]?.title, o.buyerName, o.reviewerName, getPrimaryOrderId(o))),
+      .filter((o: Order) => matchesSearch(searchQuery, o.items?.[0]?.title, o.buyerName, o.reviewerName, getPrimaryOrderId(o))),
     [orders, searchQuery]
   );
 
@@ -159,14 +159,14 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
           const status = String(o.affiliateStatus || '');
           return status === 'Approved_Settled' || status === 'Pending_Cooling';
         })
-        .reduce((acc: number, o: Order) => acc + (o.items[0]?.commission || 0), 0),
+        .reduce((acc: number, o: Order) => acc + (o.items?.[0]?.commission || 0), 0),
       totalDeals: orders.length,
       totalEarnings: orders
         .filter((o: Order) => {
           const status = String(o.affiliateStatus || '');
           return status === 'Approved_Settled' || status === 'Pending_Cooling';
         })
-        .reduce((acc: number, o: Order) => acc + (o.items[0]?.commission || 0), 0),
+        .reduce((acc: number, o: Order) => acc + (o.items?.[0]?.commission || 0), 0),
       totalOrderValue: orders.reduce((acc: number, o: Order) => acc + (o.total || 0), 0),
       settledOrders: orders.filter((o: Order) => String(o.affiliateStatus || '') === 'Approved_Settled'),
       pendingOrders: orders.filter((o: Order) => {
@@ -254,18 +254,18 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
         <section>
           <div className="flex items-center justify-between mb-3 px-1">
             <h3 className="font-bold text-base text-zinc-900 tracking-tight">New Joiners</h3>
-            <span className="bg-orange-100 text-orange-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+            <span className="bg-orange-100 text-orange-700 text-xs font-bold px-2.5 py-1 rounded-full">
               {pendingUsers.length} requests
             </span>
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-styled px-1 snap-x">
+          <div className="flex flex-col gap-3 px-1">
             {pendingUsers.map((u: User) => (
               <div
                 key={u.id}
-                className="min-w-[220px] bg-white p-3 rounded-[1.2rem] border border-zinc-100 shadow-sm flex items-center justify-between snap-center"
+                className="w-full bg-white p-4 rounded-2xl border border-zinc-100 shadow-sm flex items-center justify-between"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-[0.8rem] flex items-center justify-center font-black text-sm shadow-inner overflow-hidden">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-12 h-12 shrink-0 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center font-black text-base shadow-inner overflow-hidden">
                     {u.avatar ? (
                       <ProxiedImage
                         src={u.avatar}
@@ -276,14 +276,12 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                       (u.name || '?').charAt(0)
                     )}
                   </div>
-                  <div>
-                    <ExpandableText text={u.name || 'Unknown'} clampClass="line-clamp-1" className="font-bold text-zinc-900 text-xs" as="h4">
-                      {u.name || 'Unknown'}
-                    </ExpandableText>
-                    <p className="text-[10px] text-zinc-400 font-mono tracking-wide">{maskMobile(u.mobile)}</p>
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-zinc-900 text-sm truncate">{u.name || 'Unknown'}</h4>
+                    <p className="text-xs text-zinc-400 font-mono tracking-wide">{maskMobile(u.mobile)}</p>
                   </div>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex gap-2 shrink-0 ml-3">
                   <button
                     type="button"
                     aria-label={`Approve ${u.name}`}
@@ -293,11 +291,12 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                         await api.ops.approveUser(u.id);
                         if (setPendingUsers) setPendingUsers(prev => prev.filter(p => p.id !== u.id));
                         onRefresh(['pending', 'verified']);
-                      } catch (e: any) { toast.error(formatErrorMessage(e, 'Failed to approve user')); }
+                      } catch (e: unknown) { toast.error(formatErrorMessage(e, 'Failed to approve user')); }
                     }}
-                    className="w-10 h-10 rounded-lg bg-zinc-900 text-white flex items-center justify-center hover:bg-mobo-accent hover:text-black transition-all shadow-md active:scale-90"
+                    className="h-10 px-4 rounded-xl bg-zinc-900 text-white flex items-center justify-center gap-1.5 hover:bg-mobo-accent hover:text-black transition-all shadow-md active:scale-95 text-xs font-semibold"
                   >
-                    <Check size={14} strokeWidth={3} />
+                    <Check size={16} strokeWidth={3} />
+                    <span>Approve</span>
                   </button>
                   <button
                     type="button"
@@ -308,11 +307,11 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                         await api.ops.rejectUser(u.id);
                         if (setPendingUsers) setPendingUsers(prev => prev.filter(p => p.id !== u.id));
                         onRefresh(['pending']);
-                      } catch (e: any) { toast.error(formatErrorMessage(e, 'Failed to reject user')); }
+                      } catch (e: unknown) { toast.error(formatErrorMessage(e, 'Failed to reject user')); }
                     }}
-                    className="w-10 h-10 rounded-lg bg-zinc-50 text-zinc-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all active:scale-90"
+                    className="h-10 px-3 rounded-xl bg-zinc-50 text-zinc-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all active:scale-95"
                   >
-                    <X size={14} strokeWidth={3} />
+                    <X size={16} strokeWidth={3} />
                   </button>
                 </div>
               </div>
@@ -480,16 +479,22 @@ const InboxView = ({ orders, pendingUsers, tickets, loading, onRefresh, onViewPr
                   )}
                   <div className="p-2 pb-0 flex gap-3 mb-3">
                     <div className="w-14 h-14 bg-mobo-dark-100 rounded-[1rem] p-1.5 flex-shrink-0 relative overflow-hidden">
-                      <ProxiedImage
-                        src={o.items?.[0]?.image}
-                        alt={o.items?.[0]?.title || 'Order item'}
-                        className="w-full h-full object-contain mix-blend-multiply relative z-10"
-                      />
+                      {o.items?.[0]?.image ? (
+                        <ProxiedImage
+                          src={o.items?.[0]?.image}
+                          alt={o.items?.[0]?.title || 'Order item'}
+                          className="w-full h-full object-contain mix-blend-multiply relative z-10"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-zinc-300">
+                          <ShoppingBag size={20} />
+                        </div>
+                      )}
                     </div>
                     <div className="min-w-0 flex-1 py-0.5">
                       <div className="flex justify-between items-start">
-                        <ExpandableText text={o.items?.[0]?.title || ''} clampClass="line-clamp-1" className="font-bold text-zinc-900 text-sm pr-2" as="h4">
-                          {o.items?.[0]?.title}
+                        <ExpandableText text={o.items?.[0]?.title || 'Untitled Item'} clampClass="line-clamp-1" className="font-bold text-zinc-900 text-sm pr-2" as="h4">
+                          {o.items?.[0]?.title || 'Untitled Item'}
                         </ExpandableText>
                         <span
                           className={`text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap uppercase border ${getDealTypeBadge(dealType)}`}
@@ -935,23 +940,29 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                 >
                   <div className="flex gap-4 mb-4">
                     <div className="w-16 h-16 bg-mobo-dark-100 rounded-[1rem] p-2 flex-shrink-0">
+                      {d.image ? (
                         <ProxiedImage
                           src={d.image}
-                          alt={d.title}
+                          alt={d.title || 'Deal'}
                           className="w-full h-full object-contain mix-blend-multiply"
                         />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-zinc-300">
+                          <Tag size={20} />
+                        </div>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0 py-0.5">
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border border-zinc-100 px-1.5 py-0.5 rounded-md">
-                          {d.platform}
+                          {d.platform || 'N/A'}
                         </span>
                         <span className="bg-emerald-500/10 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide">
                           Published
                         </span>
                       </div>
-                      <ExpandableText text={d.title || ''} clampClass="line-clamp-1" className="font-bold text-zinc-900 text-base leading-tight mb-1" as="h4">
-                        {d.title}
+                      <ExpandableText text={d.title || 'Untitled Deal'} clampClass="line-clamp-1" className="font-bold text-zinc-900 text-base leading-tight mb-1" as="h4">
+                        {d.title || 'Untitled Deal'}
                       </ExpandableText>
                       {d.campaignId && (
                         <span
@@ -984,6 +995,20 @@ const MarketView = ({ campaigns, deals, loading, user, onRefresh, onPublish, set
                           </div>
                         )}
                       </div>
+                      {/* Slot availability */}
+                      {(d.totalSlots != null && d.totalSlots > 0) && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <div className="flex-1 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-emerald-500 rounded-full transition-all"
+                              style={{ width: `${Math.min(100, ((d.usedSlots || 0) / d.totalSlots) * 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] font-bold text-zinc-500 whitespace-nowrap">
+                            {d.remainingSlots ?? (d.totalSlots - (d.usedSlots || 0))} / {d.totalSlots} left
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1331,6 +1356,22 @@ const MediatorProfileView = () => {
   const qrInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = async () => {
+    if (mobile && !/^\d{10}$/.test(mobile.replace(/\D/g, ''))) {
+      toast.error('Please enter a valid 10-digit mobile number');
+      return;
+    }
+    if (bankDetails.ifsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bankDetails.ifsc.toUpperCase())) {
+      toast.error('Please enter a valid IFSC code (e.g. SBIN0001234)');
+      return;
+    }
+    if (bankDetails.accountNumber && (bankDetails.accountNumber.length < 9 || bankDetails.accountNumber.length > 18 || !/^\d+$/.test(bankDetails.accountNumber))) {
+      toast.error('Please enter a valid bank account number (9-18 digits)');
+      return;
+    }
+    if (upiId && !/^[\w.-]+@[\w.-]+$/.test(upiId)) {
+      toast.error('Please enter a valid UPI ID (e.g. name@upi)');
+      return;
+    }
     setLoading(true);
     try {
       await updateUser({
@@ -2074,7 +2115,7 @@ export const MediatorDashboard: React.FC = () => {
       if (process.env.NODE_ENV !== 'production') console.error(e);
       if (!silent) {
         const msg = (e as Error)?.message ? String((e as Error).message) : 'Failed to refresh dashboard.';
-        toast.error(msg.includes('fetch') || msg.includes('network') ? 'Network error. Please check your connection.' : msg);
+        toast.error(msg.includes('fetch') || msg.includes('network') ? 'Network error. Check your connection and try again.' : msg);
       }
     } finally {
       for (const k of needed) inFlightRef.current.delete(k);
@@ -3135,7 +3176,7 @@ export const MediatorDashboard: React.FC = () => {
                   Base Price
                 </p>
                 <p className="text-2xl font-black text-zinc-900">
-                  {formatCurrency(dealBuilder.price + (dealBuilder.assignmentCommission || 0))}
+                  {formatCurrency(dealBuilder.originalPrice ?? (dealBuilder.price + (dealBuilder.assignmentCommission || 0)))}
                 </p>
               </div>
               <div className="text-zinc-300 relative z-10">

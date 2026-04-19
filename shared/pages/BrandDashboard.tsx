@@ -619,7 +619,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
     const external = String(o.externalOrderId || '').toLowerCase();
     const textMatch = internal.includes(q) || external.includes(q) || title.includes(q);
     if (statusFilter !== 'All') {
-      const st = String(o.affiliateStatus === 'Unchecked' ? o.paymentStatus : o.affiliateStatus || '').toLowerCase();
+      const st = String(o.affiliateStatus === 'Unchecked' ? o.paymentStatus : o.affiliateStatus || 'unknown').toLowerCase();
       if (st !== statusFilter.toLowerCase()) return false;
     }
     if (dealTypeFilter !== 'All') {
@@ -1081,7 +1081,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                           <div className="text-[10px] text-zinc-400">Qty: {o.items?.[0]?.quantity || 1}</div>
                         </td>
                         <td className="p-6 text-right font-bold text-zinc-900">{formatCurrency(o.total)}</td>
-                        <td className="p-6 text-right font-mono font-bold text-green-600">{formatCurrency(o.commission || 0)}</td>
+                        <td className="p-6 text-right font-mono font-bold text-green-600">{formatCurrency(o.items?.[0]?.commission || 0)}</td>
                         <td className="p-6 text-right">
                           <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
                             o.dealType === 'Rating' ? 'bg-orange-50 text-orange-600' :
@@ -1143,7 +1143,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                           <span className="text-xs font-bold text-zinc-600">{o.items?.[0]?.quantity || 1}</span>
                         </td>
                         <td className="p-6 text-right font-bold text-zinc-900">{formatCurrency(o.total)}</td>
-                        <td className="p-6 text-right font-mono font-bold text-green-600">{formatCurrency(o.commission || 0)}</td>
+                        <td className="p-6 text-right font-mono font-bold text-green-600">{formatCurrency(o.items?.[0]?.commission || 0)}</td>
                         <td className="p-6 text-right">
                           <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
                             o.dealType === 'Rating' ? 'bg-orange-50 text-orange-600' :
@@ -1161,7 +1161,7 @@ const OrdersView = ({ orders, isLoading }: { orders: Order[]; isLoading: boolean
                     <tr className="bg-zinc-50 border-t-2 border-zinc-200">
                       <td colSpan={5} className="p-6 text-xs font-extrabold text-zinc-700 uppercase">Total Payable</td>
                       <td className="p-6 text-right font-mono font-extrabold text-zinc-900">{formatCurrency(filtered.reduce((s, o) => s + (o.total || 0), 0))}</td>
-                      <td className="p-6 text-right font-mono font-extrabold text-lg text-green-600">{formatCurrency(filtered.reduce((s, o) => s + (o.commission || 0), 0))}</td>
+                      <td className="p-6 text-right font-mono font-extrabold text-lg text-green-600">{formatCurrency(filtered.reduce((s, o) => s + (o.items?.[0]?.commission || 0), 0))}</td>
                       <td className="p-6"></td>
                     </tr>
                   </tfoot>
@@ -1518,6 +1518,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
     const originalPrice = Number(form.originalPrice);
 
     if (!form.title.trim()) { toast.error('Title is required'); return; }
+    if (!form.platform) { toast.error('Platform is required'); return; }
     if (!Number.isFinite(price) || price < 0) { toast.error('Deal price must be 0 or more'); return; }
     if (!Number.isFinite(originalPrice) || originalPrice < 0) { toast.error('Original price must be 0 or more'); return; }
     if (!Number.isFinite(payout) || payout < 0) { toast.error('Payout must be 0 or more'); return; }
@@ -1602,7 +1603,7 @@ const CampaignsView = ({ campaigns, agencies, user, loading, onRefresh, setCampa
       setCampaigns((prev: any[]) => prev.filter(c => c.id !== campaign.id));
       toast.success('Campaign deleted');
       onRefresh(['campaigns']);
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(formatErrorMessage(err, 'Failed to delete campaign'));
     } finally {
       setDeletingId(null);
@@ -2279,7 +2280,7 @@ export const BrandDashboard: React.FC = () => {
     if (!user?.id) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const eventToKeys: Record<string, string[]> = {
-      'orders.changed': ['orders', 'dashboardStats', 'revenueChart'],
+      'orders.changed': ['orders', 'campaigns', 'dashboardStats', 'revenueChart'],
       'deals.changed': ['campaigns', 'dashboardStats', 'inventoryFill'],
       'users.changed': ['agencies', 'dashboardStats'],
       'wallets.changed': ['transactions'],
@@ -2703,7 +2704,7 @@ export const BrandDashboard: React.FC = () => {
                                 await api.tickets.escalate(t.id);
                                 toast.success('Ticket escalated to admin.');
                                 fetchData({ keys: ['tickets'] });
-                              } catch (err: any) {
+                              } catch (err: unknown) {
                                 toast.error(formatErrorMessage(err, 'Failed to escalate ticket.'));
                               }
                             }}
@@ -2719,10 +2720,10 @@ export const BrandDashboard: React.FC = () => {
                             className="w-full px-2 py-1.5 text-xs rounded-lg border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-lime-300 resize-none" />
                           <div className="flex items-center gap-2">
                             <button type="button" onClick={async () => {
-                              try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
+                              try { await api.tickets.update(t.id, 'Resolved', resolutionNote || undefined); toast.success('Ticket resolved.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: unknown) { toast.error(formatErrorMessage(err, 'Failed to resolve.')); }
                             }} className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">✓ Resolve</button>
                             <button type="button" onClick={async () => {
-                              try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: any) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
+                              try { await api.tickets.update(t.id, 'Rejected', resolutionNote || undefined); toast.success('Ticket rejected.'); setResolvingTicketId(null); setResolutionNote(''); fetchData({ keys: ['tickets'] }); } catch (err: unknown) { toast.error(formatErrorMessage(err, 'Failed to reject.')); }
                             }} className="px-3 py-1 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600">✗ Reject</button>
                             <button type="button" onClick={() => { setResolvingTicketId(null); setResolutionNote(''); }}
                               className="px-3 py-1 rounded-lg text-xs font-bold bg-zinc-100 text-zinc-500 hover:bg-zinc-200">Cancel</button>
@@ -2738,7 +2739,7 @@ export const BrandDashboard: React.FC = () => {
                                 await api.tickets.update(t.id, 'Open');
                                 toast.success('Ticket reopened.');
                                 fetchData({ keys: ['tickets'] });
-                              } catch (err: any) {
+                              } catch (err: unknown) {
                                 toast.error(formatErrorMessage(err, 'Failed to reopen ticket.'));
                               }
                             }}
@@ -2753,7 +2754,7 @@ export const BrandDashboard: React.FC = () => {
                                 await api.tickets.delete(t.id);
                                 toast.success('Ticket deleted.');
                                 fetchData({ keys: ['tickets'] });
-                              } catch (err: any) {
+                              } catch (err: unknown) {
                                 toast.error(formatErrorMessage(err, 'Failed to delete ticket.'));
                               }
                             }}

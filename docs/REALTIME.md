@@ -86,7 +86,7 @@ Important: events **must** include an explicit `audience` (fail-closed).
 Broadcasts must be explicit (`{ audience: { broadcast: true } }`).
 
 - `broadcast: true` — deliver to all connected users (avoid for high-volume events)
-- `userIds: string[]` — deliver to specific users by `_id`
+- `userIds: string[]` — deliver to specific users by `id`
 - `roles: Role[]` — deliver to all connected users with matching roles
 - `agencyCodes: string[]` — deliver to agency users whose `mediatorCode` matches
 - `mediatorCodes: string[]` — deliver to mediator users whose `mediatorCode` matches

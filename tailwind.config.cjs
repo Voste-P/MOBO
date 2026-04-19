@@ -44,6 +44,7 @@ module.exports = {
         'toast-in': 'toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
         'shimmer': 'shimmer 1.5s infinite',
         'subtle-pulse': 'subtlePulse 2s ease-in-out infinite',
+        'beta-pulse': 'betaPulse 2.5s ease-in-out infinite',
       },
       keyframes: {
         fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
@@ -60,6 +61,10 @@ module.exports = {
         subtlePulse: {
           '0%, 100%': { opacity: '0.6', transform: 'scale(1)' },
           '50%': { opacity: '1', transform: 'scale(1.05)' },
+        },
+        betaPulse: {
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(250, 204, 21, 0.7)', transform: 'scale(1)' },
+          '50%': { boxShadow: '0 0 8px 3px rgba(250, 204, 21, 0.45)', transform: 'scale(1.04)' },
         },
       },
     },

@@ -6,7 +6,7 @@
  * (e.g. "Avimee Herbal Scalptone") from matching a deal for another product
  * (e.g. "Avimee Herbal Keshpallav Hair Oil").
  *
- * Shared across Orders page, ProductCard inline form, and QuickOrderModal.
+ * Shared across Orders page and ProductCard inline form.
  */
 
 // Expanded noise words aligned with backend PRODUCT_STOP_WORDS

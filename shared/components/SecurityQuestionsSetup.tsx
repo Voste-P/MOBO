@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShieldQuestion, ArrowLeft, CheckCircle } from 'lucide-react';
 import { Button, Input } from './ui';
+import { api } from '../services/api';
 import { SECURITY_QUESTIONS } from '../utils/securityQuestions';
 
 export interface SecurityQA {
@@ -16,13 +17,31 @@ interface SecurityQuestionsSetupProps {
 }
 
 export const SecurityQuestionsSetup: React.FC<SecurityQuestionsSetupProps> = ({ onComplete, onBack }) => {
+  const [questions, setQuestions] = useState<{ id: number; label: string }[]>([]);
+  const [loadingQuestions, setLoadingQuestions] = useState(true);
   const [selectedIds, setSelectedIds] = useState<[number, number, number]>([0, 0, 0]);
   const [answers, setAnswers] = useState<[string, string, string]>(['', '', '']);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    let cancelled = false;
+    api.auth.getSecurityQuestionTemplates()
+      .then((res) => {
+        if (!cancelled) {
+          const list = res?.templates?.map((t) => ({ id: t.questionId, label: t.label })) ?? [];
+          setQuestions(list.length > 0 ? list : SECURITY_QUESTIONS);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setQuestions(SECURITY_QUESTIONS);
+      })
+      .finally(() => { if (!cancelled) setLoadingQuestions(false); });
+    return () => { cancelled = true; };
+  }, []);
+
   const getAvailableQuestions = (slotIndex: number) => {
     const usedIds = selectedIds.filter((_, i) => i !== slotIndex && selectedIds[i] !== 0);
-    return SECURITY_QUESTIONS.filter((q) => !usedIds.includes(q.id));
+    return questions.filter((q) => !usedIds.includes(q.id));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -58,7 +77,7 @@ export const SecurityQuestionsSetup: React.FC<SecurityQuestionsSetupProps> = ({ 
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-white relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
+    <div className="flex-1 flex flex-col bg-white relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled" style={{ minHeight: '100dvh' }}>
       {/* Back button */}
       <button
         type="button"
@@ -88,10 +107,15 @@ export const SecurityQuestionsSetup: React.FC<SecurityQuestionsSetupProps> = ({ 
         </div>
       )}
 
+      {loadingQuestions ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-spin h-8 w-8 border-4 border-lime-400 border-t-transparent rounded-full" />
+        </div>
+      ) : (
       <form onSubmit={handleSubmit} className="space-y-5 fade-in flex-1 flex flex-col" noValidate>
         <div className="flex-1 space-y-4">
           {[0, 1, 2].map((idx) => {
-            const selectedQ = SECURITY_QUESTIONS.find((q) => q.id === selectedIds[idx]);
+            const selectedQ = questions.find((q) => q.id === selectedIds[idx]);
             return (
               <div key={idx} className="bg-gray-50 border border-gray-100 rounded-2xl p-4">
                 <div className="flex items-center gap-2 mb-3">
@@ -158,6 +182,7 @@ export const SecurityQuestionsSetup: React.FC<SecurityQuestionsSetupProps> = ({ 
           Save &amp; Continue
         </Button>
       </form>
+      )}
     </div>
   );
 };

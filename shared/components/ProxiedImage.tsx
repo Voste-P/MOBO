@@ -39,12 +39,28 @@ export interface ProxiedImageProps
 
 export const ProxiedImage = React.memo<ProxiedImageProps>(
   ({ src, alt = 'Product image', className, ...rest }) => {
+    const [proxyFailed, setProxyFailed] = useState(false);
     const [errored, setErrored] = useState(false);
-    // Reset error state when src changes so new URLs get a fresh attempt
-    useEffect(() => { setErrored(false); }, [src]);
-    const resolved = errored ? PLACEHOLDER : proxyImageUrl(src);
+    // Reset states when src changes so new URLs get a fresh attempt
+    useEffect(() => { setProxyFailed(false); setErrored(false); }, [src]);
 
-    const onError = useCallback(() => setErrored(true), []);
+    const trimmed = src ? String(src).replace(/["\\]/g, '').trim() : '';
+    const isExternal = /^https?:\/\//i.test(trimmed);
+
+    // Try proxy first → direct URL fallback → placeholder
+    const resolved = errored
+      ? PLACEHOLDER
+      : proxyFailed && isExternal
+        ? trimmed
+        : proxyImageUrl(src);
+
+    const onError = useCallback(() => {
+      if (!proxyFailed && isExternal) {
+        setProxyFailed(true); // Proxy failed — try direct URL
+      } else {
+        setErrored(true);     // Direct URL also failed — show placeholder
+      }
+    }, [proxyFailed, isExternal]);
 
     return (
       <img

@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../components/ui/ConfirmDialog';
@@ -46,6 +46,10 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
   const [orders, setOrders] = useState<Order[]>([]);
   const [totalSpent, setTotalSpent] = useState(0);
   const [isStatsLoading, setIsStatsLoading] = useState(false);
+
+  // Memoize payment status counts to avoid re-filtering each render
+  const settledCount = useMemo(() => orders.filter((o) => o.paymentStatus === 'Paid').length, [orders]);
+  const pendingCount = useMemo(() => orders.filter((o) => o.paymentStatus === 'Pending').length, [orders]);
   const statsLoadingRef = useRef(false);
   const mountedRef = useRef(true);
 
@@ -215,7 +219,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-mobo-dark-100 relative overflow-y-auto scrollbar-styled overscroll-none">
-      <div className="max-w-xl mx-auto w-full p-6 space-y-6" style={{ paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))' }}>
+      <div className="max-w-xl mx-auto w-full p-6 space-y-6" style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom, 0px))' }}>
         {/* Identity Card */}
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-zinc-100 relative overflow-hidden animate-enter">
           <div className="flex justify-between items-center mb-8">
@@ -426,7 +430,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
             <div className="grid grid-cols-2 gap-3 pt-2">
               <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 text-center">
                 <p className="text-xl font-black text-zinc-900">
-                  {orders.filter((o) => o.paymentStatus === 'Paid').length}
+                  {settledCount}
                 </p>
                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
                   Settled
@@ -434,7 +438,7 @@ export const Profile: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
               </div>
               <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 text-center">
                 <p className="text-xl font-black text-zinc-900">
-                  {orders.filter((o) => o.paymentStatus === 'Pending').length}
+                  {pendingCount}
                 </p>
                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
                   Pending

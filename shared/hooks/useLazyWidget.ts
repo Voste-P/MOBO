@@ -38,8 +38,8 @@ export function useLazyWidget<T>(
       const result = await fetchFnRef.current();
       setData(result);
       fetchedRef.current = true;
-    } catch (e: any) {
-      setError(e?.message || 'Failed to load data');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to load data');
     } finally {
       inFlightRef.current = false;
       setLoading(false);

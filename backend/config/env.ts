@@ -71,10 +71,24 @@ const envSchema = z.object({
   // and bulk auto-verify thresholds that previously allowed 70-79% proofs through).
   AI_PROOF_CONFIDENCE_THRESHOLD: z.coerce.number().int().min(0).max(100).default(80),
 
+  // Lower threshold for bulk auto-verification: when ALL required proofs are
+  // present and every one meets this minimum, the order skips mediator review
+  // entirely and goes straight to cooling period. Default 70 allows orders
+  // where every proof is reasonably confident (70-79%) to bypass review even
+  // though no single proof exceeds the individual auto-verify threshold (80).
+  AI_BULK_VERIFY_THRESHOLD: z.coerce.number().int().min(0).max(100).default(70),
+
   // AI confidence score (0-100) at or above which a proof step is auto-verified
   // without manual mediator review.  Set to 101 to disable auto-verification.
   // 80 balances speed and fraud safety; more proofs auto-verify without mediator.
   AI_AUTO_VERIFY_THRESHOLD: z.coerce.number().int().min(0).max(101).default(80),
+
+  // High-confidence threshold for individual proof fast-path auto-approval.
+  // When a single proof exceeds this score, it is auto-verified immediately
+  // even if it doesn't meet the standard auto-verify threshold in edge cases.
+  // 85 provides extra safety headroom over the default 80 while enabling
+  // faster approval for clearly genuine proofs.
+  AI_HIGH_CONFIDENCE_THRESHOLD: z.coerce.number().int().min(0).max(100).default(85),
 
   // Confidence score assigned to review links from recognized marketplace domains.
   // URL validation acts as the "AI" for review proofs — no screenshot analysis needed.

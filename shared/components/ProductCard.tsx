@@ -85,6 +85,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
     setReviewerName('');
     setFieldsLocked(false);
     setProductNameMismatch(false);
+    setPlatformMismatch(false);
     setReviewerNameMismatch(false);
     setFormOpen(false);
   }, []);
@@ -210,7 +211,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
       setSubmitted(true);
       toast.success('Order submitted! Track it in the Orders tab.');
       setTimeout(resetForm, 1500);
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(formatErrorMessage(err, 'Failed to submit order. Try again.'));
     } finally {
       setSubmitting(false);
@@ -224,7 +225,7 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
   };
 
   return (
-    <div className="flex-shrink-0 w-full max-w-[300px] bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-100 snap-center flex flex-col relative overflow-hidden group transition-all duration-300 hover:shadow-xl hover:-translate-y-1 active:scale-[0.98]">
+    <div className="flex-shrink-0 w-full max-w-[300px] bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-100 snap-center flex flex-col relative overflow-hidden group transition-[box-shadow,transform] duration-300 hover:shadow-xl hover:-translate-y-1 active:scale-[0.98]">
       {/* Platform Tag (Top Right) */}
       <div className="absolute top-4 right-4 bg-zinc-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm uppercase tracking-wider z-10">
         {platformLabel}
@@ -265,13 +266,13 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
                 <Star
                   key={`star-${i}`}
                   size={12}
-                  fill={i < Math.floor(product.rating || 5) ? 'currentColor' : 'none'}
-                  strokeWidth={i < Math.floor(product.rating || 5) ? 0 : 1.5}
-                  className={i < Math.floor(product.rating || 5) ? '' : 'text-slate-200'}
+                  fill={i < Math.floor(product.rating ?? 5) ? 'currentColor' : 'none'}
+                  strokeWidth={i < Math.floor(product.rating ?? 5) ? 0 : 1.5}
+                  className={i < Math.floor(product.rating ?? 5) ? '' : 'text-slate-200'}
                 />
               ))}
             </div>
-            <span className="text-[10px] font-bold text-slate-400">({product.rating || 5})</span>
+            <span className="text-[10px] font-bold text-slate-400">({product.rating ?? 5})</span>
           </div>
 
           <div>
@@ -311,10 +312,26 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
         <div className="absolute top-3 right-3 w-2 h-2 rounded-full bg-lime-500 animate-pulse shadow-lg shadow-lime-500/50"></div>
       </div>
 
+      {/* Slot Availability */}
+      {(product.totalSlots != null && product.totalSlots > 0) && (() => {
+        const remaining = product.remainingSlots ?? (product.totalSlots! - (product.usedSlots || 0));
+        const pct = Math.min(100, ((product.usedSlots || 0) / product.totalSlots!) * 100);
+        return (
+          <div className="flex items-center gap-2 mb-3 px-1">
+            <div className="flex-1 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+              <div className="h-full bg-lime-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+            </div>
+            <span className={`text-[10px] font-bold whitespace-nowrap ${remaining <= 3 ? 'text-red-500' : 'text-zinc-500'}`}>
+              {remaining} left
+            </span>
+          </div>
+        );
+      })()}
+
       {/* Action Buttons */}
       <button
         onClick={handleLinkClick}
-        className="w-full py-3.5 bg-black text-white font-extrabold rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-zinc-900/10 active:scale-95 transition-all flex items-center justify-center gap-2 group-hover:bg-zinc-800"
+        className="w-full py-3.5 bg-black text-white font-extrabold rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-zinc-900/10 active:scale-95 transition-[transform,background-color] flex items-center justify-center gap-2 group-hover:bg-zinc-800"
       >
         <ExternalLink size={14} className="stroke-[3]" /> GET DEAL LINK
       </button>

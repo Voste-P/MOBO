@@ -154,6 +154,22 @@ const AgencyProfile = ({ user }: { user: User }) => {
   }, [user?.id]);
 
   const handleSave = async () => {
+    if (form.mobile && !/^\d{10}$/.test(form.mobile.replace(/\D/g, ''))) {
+      toast.error('Please enter a valid 10-digit mobile number');
+      return;
+    }
+    if (form.ifsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.ifsc.toUpperCase())) {
+      toast.error('Please enter a valid IFSC code (e.g. SBIN0001234)');
+      return;
+    }
+    if (form.accountNumber && (form.accountNumber.length < 9 || form.accountNumber.length > 18 || !/^\d+$/.test(form.accountNumber))) {
+      toast.error('Please enter a valid bank account number (9-18 digits)');
+      return;
+    }
+    if (form.upiId && !/^[\w.-]+@[\w.-]+$/.test(form.upiId)) {
+      toast.error('Please enter a valid UPI ID (e.g. name@upi)');
+      return;
+    }
     setLoading(true);
     try {
       await updateUser({
@@ -181,6 +197,7 @@ const AgencyProfile = ({ user }: { user: User }) => {
   const handleFile = (e: any) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (!file.type.startsWith('image/')) { toast.error('Please upload an image file'); return; }
       if (file.size > 2 * 1024 * 1024) { toast.error('Avatar must be under 2 MB'); return; }
       if (!isEditing) setIsEditing(true);
       const reader = new FileReader();
@@ -973,11 +990,11 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
                         </div>
                       </td>
                       <td className="p-4">
-                        <ExpandableText text={o.items?.[0]?.productName || 'Product'} clampClass="truncate" className="text-xs font-semibold text-slate-700 max-w-[150px]" as="div">{o.items?.[0]?.productName || 'Product'}</ExpandableText>
-                        <div className="text-[10px] text-slate-400">Qty: {o.items?.[0]?.qty || 1}</div>
+                        <ExpandableText text={o.items?.[0]?.title || 'Product'} clampClass="truncate" className="text-xs font-semibold text-slate-700 max-w-[150px]" as="div">{o.items?.[0]?.title || 'Product'}</ExpandableText>
+                        <div className="text-[10px] text-slate-400">Qty: {o.items?.[0]?.quantity || 1}</div>
                       </td>
                       <td className="p-4 text-right font-mono font-bold text-slate-900">{formatCurrency(o.total)}</td>
-                      <td className="p-4 text-right font-mono font-bold text-lime-600">{formatCurrency(o.commission || 0)}</td>
+                      <td className="p-4 text-right font-mono font-bold text-lime-600">{formatCurrency(o.items?.[0]?.commission || 0)}</td>
                       <td className="p-4 pr-8 text-right">
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                           o.dealType === 'Rating' ? 'bg-orange-50 text-orange-600' :
@@ -1024,10 +1041,10 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
                         <div className="text-xs font-bold text-slate-700">{o.brandName || o.items?.[0]?.brandName || 'Brand'}</div>
                       </td>
                       <td className="p-4">
-                        <ExpandableText text={o.items?.[0]?.productName || 'Product'} clampClass="truncate" className="text-xs font-semibold text-slate-700 max-w-[150px]" as="div">{o.items?.[0]?.productName || 'Product'}</ExpandableText>
+                        <ExpandableText text={o.items?.[0]?.title || 'Product'} clampClass="truncate" className="text-xs font-semibold text-slate-700 max-w-[150px]" as="div">{o.items?.[0]?.title || 'Product'}</ExpandableText>
                       </td>
                       <td className="p-4 text-center">
-                        <span className="text-xs font-bold text-slate-600">{o.items?.[0]?.qty || 1}</span>
+                        <span className="text-xs font-bold text-slate-600">{o.items?.[0]?.quantity || 1}</span>
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-2">
@@ -1038,7 +1055,7 @@ const FinanceView = ({ allOrders, mediators: _mediators, loading, onRefresh, use
                           </div>
                         </div>
                       </td>
-                      <td className="p-4 text-right font-mono font-bold text-lime-600">{formatCurrency(o.commission || 0)}</td>
+                      <td className="p-4 text-right font-mono font-bold text-lime-600">{formatCurrency(o.items?.[0]?.commission || 0)}</td>
                       <td className="p-4 pr-8 text-right">
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                           o.dealType === 'Rating' ? 'bg-orange-50 text-orange-600' :
@@ -1132,13 +1149,13 @@ const BrandsView = () => {
       setSuccessMsg(`Request sent to Brand ${code}.`);
       setBrandCode('');
       await refreshSession();
-    } catch (e: any) {
+    } catch (e: unknown) {
       // Idempotent UX: if it's already connected/pending, treat as success.
-      if (e?.code === 'ALREADY_REQUESTED') {
+      if ((e as { code?: string })?.code === 'ALREADY_REQUESTED') {
         setSuccessMsg(`Already connected or already pending for ${code}.`);
         setBrandCode('');
       } else {
-        setErrorMsg(String(e?.message || 'Failed to send request.'));
+        setErrorMsg(e instanceof Error ? e.message : 'Failed to send request.');
       }
     } finally {
       setLoading(false);
@@ -1605,7 +1622,7 @@ const DashboardView = ({ stats, revenueTrendData, brandPerfData, onRangeChange }
 const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrders, setCampaigns }: { campaigns: Campaign[]; user: User; loading: boolean; onRefresh: (keys?: string[]) => void; mediators: User[]; allOrders: Order[]; setCampaigns: React.Dispatch<React.SetStateAction<Campaign[]>> }) => {
   const { toast } = useToast();
   const { confirm, ConfirmDialogElement: InventoryConfirmDialog } = useConfirm();
-  const [subTab, setSubTab] = useState<'inventory' | 'offered'>('inventory');
+  const [subTab, setSubTab] = useState<'inventory' | 'offered' | 'myCampaigns'>('inventory');
   const [assignModal, setAssignModal] = useState<Campaign | null>(null);
   const [createModal, setCreateModal] = useState(false);
   const [assignments, setAssignments] = useState<Record<string, number>>({});
@@ -1629,16 +1646,21 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
 
   useEffect(() => {
     if (!assignModal) return;
-    // Normalize existing assignments: DB stores either number or {limit, payout} objects
-    const raw = assignModal.assignments || {};
-    const normalized: Record<string, number> = {};
-    for (const [code, val] of Object.entries(raw)) {
-      normalized[code] = typeof val === 'number' ? val : Number((val as Record<string, unknown>)?.limit ?? 0);
-    }
-    setAssignments(normalized);
+    // Start inputs at 0 — values represent ADDITIONAL slots to add on top of existing.
+    // Existing allocations are shown via "Current:" label beneath each input.
+    setAssignments({});
     setAssignSearch('');
     setMediatorPayouts({});
     setOpenToAll(assignModal.openToAll ?? false);
+  }, [assignModal]);
+
+  // Sum of already-assigned slots in the DB (existing allocations)
+  const existingAssignedTotal = useMemo(() => {
+    if (!assignModal?.assignments) return 0;
+    const raw = assignModal.assignments as Record<string, any>;
+    return Object.values(raw).reduce((sum: number, v: any) => {
+      return sum + Number(typeof v === 'number' ? v : v?.limit ?? 0);
+    }, 0);
   }, [assignModal]);
 
   // Get list of mediator codes for this agency (lowercase for case-insensitive matching with assignment keys)
@@ -1682,33 +1704,47 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
     return Array.from(brands).sort();
   }, [campaigns]);
 
-  // Active Inventory = agency-created campaigns OR campaigns with sub-mediator assignments OR openToAll distributed
+  // Active Inventory = drafts (for editing) OR campaigns with sub-mediator assignments OR openToAll distributed
+  // Agency-created campaigns without assignments appear in "My Campaigns" tab for allocation.
   const activeInventory = useMemo(() => {
     const base = campaigns.filter(
       (c: Campaign) =>
         c.allowedAgencies.includes(user.mediatorCode ?? '') &&
         (
           c.status === 'Draft' ||
-          String(c.brandId || '') === String(user.id || '') ||
           c.openToAll ||
           Object.keys(c.assignments || {}).some((code) => myMediatorCodes.includes(code.toLowerCase()))
         )
     );
     return applyFilters(base);
-  }, [campaigns, user.mediatorCode, user.id, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
+  }, [campaigns, user.mediatorCode, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
 
-  // Offered by Brands = external brand campaigns without assignments, not self-created, not openToAll distributed
-  const offeredCampaigns = useMemo(() => {
+  // My Campaigns = agency-created campaigns (brandId matches current user) without sub-mediator assignments yet.
+  // These are campaigns the agency created themselves and needs to distribute to mediators.
+  const myCampaigns = useMemo(() => {
     const base = campaigns.filter(
       (c: Campaign) =>
         c.allowedAgencies.includes(user.mediatorCode ?? '') &&
+        String(c.brandId || '') === String(user?.id || '') &&
         c.status !== 'Draft' &&
-        String(c.brandId || '') !== String(user.id || '') &&
         !c.openToAll &&
         !Object.keys(c.assignments || {}).some((code) => myMediatorCodes.includes(code.toLowerCase()))
     );
     return applyFilters(base);
-  }, [campaigns, user.mediatorCode, user.id, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
+  }, [campaigns, user.mediatorCode, user?.id, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
+
+  // Offered by Brands = published campaigns from brands (NOT created by this agency), without sub-mediator assignments, not openToAll.
+  const offeredCampaigns = useMemo(() => {
+    const base = campaigns.filter(
+      (c: Campaign) =>
+        c.allowedAgencies.includes(user.mediatorCode ?? '') &&
+        String(c.brandId || '') !== String(user?.id || '') &&
+        c.status !== 'Draft' &&
+        !c.openToAll &&
+        !Object.keys(c.assignments || {}).some((code) => myMediatorCodes.includes(code.toLowerCase()))
+    );
+    return applyFilters(base);
+  }, [campaigns, user.mediatorCode, user?.id, myMediatorCodes, inventorySearch, filterDealType, filterBrand, filterDateFrom, filterDateTo]);
 
   // New Campaign Form
   const [newCampaign, setNewCampaign] = useState({
@@ -1883,9 +1919,10 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
 
     const newAssignments: Record<string, number> = {};
     active.forEach((m: User, index: number) => {
+      if (!m.mediatorCode) return;
       let amount = perUser;
       if (index < remainder) amount += 1;
-      newAssignments[m.mediatorCode!] = amount;
+      newAssignments[m.mediatorCode.toLowerCase()] = amount;
     });
     setAssignments(newAssignments);
     // Reset per-mediator overrides so everyone uses the global commission
@@ -1959,8 +1996,9 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
 
   const availableForAssign = useMemo(() => {
     if (!assignModal) return 0;
-    return Math.max(0, assignModal.totalSlots - assignModal.usedSlots);
-  }, [assignModal]);
+    // Available = totalSlots minus slots already assigned to mediators in DB
+    return Math.max(0, assignModal.totalSlots - existingAssignedTotal);
+  }, [assignModal, existingAssignedTotal]);
 
   const remainingForAssign = useMemo(() => {
     return Math.max(0, availableForAssign - assignedTotal);
@@ -1988,6 +2026,15 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
             className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${subTab === 'inventory' ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
           >
             <Layers size={14} /> Active Inventory
+          </button>
+          <button
+            onClick={() => setSubTab('myCampaigns')}
+            className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${subTab === 'myCampaigns' ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+          >
+            <Package size={14} /> My Campaigns{' '}
+            {myCampaigns.length > 0 && (
+              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
+            )}
           </button>
           <button
             onClick={() => setSubTab('offered')}
@@ -2282,6 +2329,93 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                 )}
               </tbody>
             </table>
+          ) : subTab === 'myCampaigns' ? (
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-enter">
+              {myCampaigns.length === 0 ? (
+                <div className="col-span-full">
+                  {loading ? (
+                    <EmptyState
+                      title="Loading campaigns"
+                      description="Fetching your agency campaigns."
+                      icon={<Spinner className="w-5 h-5 text-slate-400" />}
+                      className="bg-slate-50 border-slate-200 rounded-[2.5rem] py-20"
+                    />
+                  ) : (
+                    <EmptyState
+                      title="No undistributed campaigns"
+                      description="Create a campaign and distribute it to your mediators."
+                      icon={<Package size={22} className="text-slate-400" />}
+                      className="bg-slate-50 border-slate-200 rounded-[2.5rem] py-20"
+                    />
+                  )}
+                </div>
+              ) : (
+                myCampaigns.map((c: Campaign) => (
+                  <div
+                    key={c.id}
+                    className="bg-white rounded-3xl border border-blue-100 shadow-sm p-5 hover:shadow-xl transition-all group flex flex-col"
+                  >
+                    <div className="flex gap-4 mb-5">
+                      <div className="w-20 h-20 bg-blue-50 rounded-2xl p-2 border border-blue-100 flex-shrink-0 flex items-center justify-center">
+                        <ProxiedImage
+                          src={c.image}
+                          alt={c.title || 'Campaign'}
+                          className="w-full h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            {c.platform}
+                          </span>
+                          <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                            {c.dealType || 'Discount'}
+                          </span>
+                        </div>
+                        <ExpandableText text={c.title || ''} clampClass="line-clamp-2" className="font-bold text-slate-900 text-sm leading-tight mb-2" as="h4">
+                          {c.title}
+                        </ExpandableText>
+                        <p className="text-[10px] font-bold text-blue-500 flex items-center gap-1">
+                          <Package size={10} /> Agency Campaign
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mb-5">
+                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">Price</p>
+                        <p className="text-sm font-black text-slate-900">{formatCurrency(c.price)}</p>
+                      </div>
+                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">Payout</p>
+                        <p className="text-sm font-black text-slate-900">{formatCurrency(c.payout)}</p>
+                      </div>
+                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">Slots</p>
+                        <p className="text-sm font-black text-slate-900">{c.totalSlots}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-auto">
+                      <button
+                        onClick={() => handleClaimOffered(c)}
+                        className="flex-1 py-3.5 bg-blue-600 text-white rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-blue-700 transition-all shadow-lg active:scale-95"
+                      >
+                        <Users size={16} /> Distribute to Mediators
+                      </button>
+                      <button
+                        onClick={() => handleDelete(c)}
+                        disabled={deletingId === c.id}
+                        className={`px-4 py-3.5 bg-red-50 text-red-600 border border-red-200 rounded-2xl font-bold text-xs flex items-center justify-center gap-1 hover:bg-red-100 transition-all active:scale-95 ${
+                          deletingId === c.id ? 'opacity-60 cursor-not-allowed' : ''
+                        }`}
+                        title="Delete this campaign"
+                      >
+                        {deletingId === c.id ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           ) : (
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-enter">
               {offeredCampaigns.length === 0 ? (
@@ -2610,8 +2744,11 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                     <span className="text-[10px] font-bold text-slate-500 bg-white px-2 py-1 rounded-lg border border-slate-200 shadow-sm">
                       Total Stock: {assignModal.totalSlots}
                     </span>
+                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100 shadow-sm">
+                      Already Assigned: {existingAssignedTotal}
+                    </span>
                     <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100 shadow-sm">
-                      Available: {assignModal.totalSlots - assignModal.usedSlots}
+                      Available: {availableForAssign}
                     </span>
                     <span
                       className={`text-[10px] font-bold px-2 py-1 rounded-lg border shadow-sm ${
@@ -2880,17 +3017,17 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                             step={1}
                             className={`w-20 p-2 text-center bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none transition-all group-hover/input:shadow-md ${isActive ? 'focus:border-purple-500 focus:bg-white focus:ring-4 focus:ring-purple-100' : 'cursor-not-allowed'}`}
                             placeholder={commissionToMediator || '0'}
-                            value={mediatorPayouts[m.mediatorCode!] ?? ''}
+                            value={mediatorPayouts[m.mediatorCode!.toLowerCase()] ?? ''}
                             disabled={!isActive}
                             onChange={(e) =>
                               setMediatorPayouts({
                                 ...mediatorPayouts,
-                                [m.mediatorCode!]: e.target.value,
+                                [m.mediatorCode!.toLowerCase()]: e.target.value,
                               })
                             }
                           />
                         </div>
-                        {mediatorPayouts[m.mediatorCode!]?.trim() && (
+                        {mediatorPayouts[m.mediatorCode!.toLowerCase()]?.trim() && (
                           <span className="text-[10px] text-purple-500 font-bold mt-0.5">Override</span>
                         )}
                       </div>
@@ -2905,12 +3042,13 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                             step={1}
                             className={`w-36 p-2 text-center bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none transition-all group-hover/input:shadow-md ${isActive ? 'focus:border-purple-500 focus:bg-white focus:ring-4 focus:ring-purple-100' : 'cursor-not-allowed'}`}
                             placeholder="0"
-                            value={assignments[m.mediatorCode!] || ''}
+                            value={assignments[m.mediatorCode!.toLowerCase()] || ''}
                             disabled={!isActive}
                             onChange={(e) =>
                               {
                                 const nextRaw = parseInt(e.target.value) || 0;
-                                const currentVal = Number(assignments[m.mediatorCode!] || 0);
+                                const mKey = m.mediatorCode!.toLowerCase();
+                                const currentVal = Number(assignments[mKey] || 0);
                                 const remaining = Math.max(0, availableForAssign - (assignedTotal - currentVal));
                                 const nextVal = Math.max(0, Math.min(nextRaw, remaining));
                                 if (nextRaw > nextVal) {
@@ -2918,26 +3056,27 @@ const InventoryView = ({ campaigns, user, loading, onRefresh, mediators, allOrde
                                 }
                                 setAssignments({
                                   ...assignments,
-                                  [m.mediatorCode!]: nextVal,
+                                  [mKey]: nextVal,
                                 });
                               }
                             }
                             onBlur={(e) => {
                               const nextRaw = parseInt(e.target.value) || 0;
-                              const currentVal = Number(assignments[m.mediatorCode!] || 0);
+                              const mKey = m.mediatorCode!.toLowerCase();
+                              const currentVal = Number(assignments[mKey] || 0);
                               const remaining = Math.max(0, availableForAssign - (assignedTotal - currentVal));
                               const nextVal = Math.max(0, Math.min(nextRaw, remaining));
                               if (nextVal !== currentVal) {
                                 setAssignments({
                                   ...assignments,
-                                  [m.mediatorCode!]: nextVal,
+                                  [mKey]: nextVal,
                                 });
                               }
                             }}
                           />
                         </div>
                         <span className="text-[10px] text-slate-400 font-bold mt-1">
-                          Current: {assignModal?.assignments?.[m.mediatorCode!] || 0}
+                          Current: {(() => { const raw = assignModal?.assignments?.[m.mediatorCode!.toLowerCase()] ?? assignModal?.assignments?.[m.mediatorCode!]; if (!raw) return 0; return typeof raw === 'number' ? raw : (raw as any)?.limit ?? 0; })()}
                         </span>
                       </div>
                     </div>
@@ -3049,7 +3188,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
       setRejectModal(null);
       setRejectReason('');
       onRefresh(['orders']);
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error(formatErrorMessage(e, 'Failed to reject proof'));
     } finally {
       setRejecting(false);
@@ -3062,7 +3201,7 @@ const OrderReviewView = ({ allOrders, campaigns, mediators: _mediators, loading,
       await api.ops.forceApproveOrder(order.id, 'Agency approved');
       toast.success('Order approved — moved to cooling period');
       onRefresh(['orders']);
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error(formatErrorMessage(e, 'Failed to approve order'));
     } finally {
       setApprovingId(null);
@@ -4476,7 +4615,7 @@ export const AgencyDashboard: React.FC = () => {
     if (!user?.id) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const eventToKeys: Record<string, string[]> = {
-      'orders.changed': ['orders', 'dashboardStats', 'revenueTrend', 'brandPerformance'],
+      'orders.changed': ['orders', 'campaigns', 'dashboardStats', 'revenueTrend', 'brandPerformance'],
       'deals.changed': ['campaigns', 'dashboardStats'],
       'users.changed': ['mediators', 'dashboardStats'],
       'wallets.changed': ['ledger'],

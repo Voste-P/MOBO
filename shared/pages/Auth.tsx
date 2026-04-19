@@ -6,6 +6,7 @@ import { SecurityQuestionsSetup, type SecurityQA } from '../components/SecurityQ
 import { ForgotPassword } from './ForgotPassword';
 import { normalizeMobileTo10Digits } from '../utils/mobiles';
 import { formatErrorMessage } from '../utils/errors';
+import { validatePassword } from '../utils/passwordValidation';
 
 interface AuthScreenProps {
   onBack?: () => void;
@@ -39,30 +40,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
       return;
     }
 
-    if (!password || password.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return;
-    }
-    if (password.length > 200) {
-      setError('Password must not exceed 200 characters.');
-      return;
-    }
-
     if (view === 'register') {
-      if (!/[A-Z]/.test(password)) {
-        setError('Password must contain at least one uppercase letter.');
-        return;
-      }
-      if (!/[a-z]/.test(password)) {
-        setError('Password must contain at least one lowercase letter.');
-        return;
-      }
-      if (!/[0-9]/.test(password)) {
-        setError('Password must contain at least one number.');
-        return;
-      }
-      if (!/[^A-Za-z0-9]/.test(password)) {
-        setError('Password must contain at least one special character.');
+      const pwErr = validatePassword(password);
+      if (pwErr) { setError(pwErr); return; }
+    } else {
+      if (!password || password.length < 8) {
+        setError('Password must be at least 8 characters.');
         return;
       }
     }
@@ -98,7 +81,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
         }
         return;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (mountedRef.current) setError(formatErrorMessage(err, 'Authentication failed'));
     } finally {
       if (mountedRef.current) setIsLoading(false);
@@ -113,7 +96,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
     setError('');
     try {
       await register(reg.name, reg.mobile, reg.password, reg.mediatorCode, questions);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (mountedRef.current) {
         setError(formatErrorMessage(err, 'Registration failed'));
         setView('register');
@@ -152,7 +135,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
   if (view === 'splash') {
     return (
       <AnimatedView viewKey="splash" variant="fade">
-      <div className="flex-1 flex flex-col bg-black text-white relative overflow-x-hidden pb-[env(safe-area-inset-bottom)]" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
+      <div className="flex-1 flex flex-col bg-black text-white relative overflow-x-hidden pb-[env(safe-area-inset-bottom)]" style={{ minHeight: '100dvh' }}>
         {/* Background Effects */}
         <div className="absolute top-[-20%] right-[-20%] w-[500px] h-[500px] bg-lime-500/20 rounded-full blur-[120px] pointer-events-none animate-pulse motion-reduce:animate-none"></div>
         <div className="absolute bottom-[-10%] left-[-10%] w-[300px] h-[300px] bg-lime-600/15 rounded-full blur-[100px] pointer-events-none"></div>
@@ -207,7 +190,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onBack }) => {
   // 2. Login / Register Form
   return (
     <AnimatedView viewKey={view} variant="slideUp">
-    <div className="flex-1 flex flex-col bg-white relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
+    <div className="flex-1 flex flex-col bg-white relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled" style={{ minHeight: '100dvh' }}>
       <div className="mb-8">
         <Button
           type="button"

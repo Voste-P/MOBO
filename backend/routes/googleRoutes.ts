@@ -290,7 +290,7 @@ export function googleRoutes(env: Env): Router {
       });
 
       return res.send(makeCallbackHtml(true, 'Google account connected successfully!'));
-    } catch (err: any) {
+    } catch (err: unknown) {
       logErrorEvent({ error: err instanceof Error ? err : new Error(String(err)), message: err instanceof Error ? err.message : String(err), category: 'EXTERNAL_SERVICE', severity: 'high', requestId: String((res as any).locals?.requestId || ''), metadata: { handler: 'google/callback' } });
       authLog.error('Google OAuth callback error', { error: err });
       return res.send(makeCallbackHtml(false, 'An unexpected error occurred. Please try again.'));

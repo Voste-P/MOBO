@@ -8,7 +8,7 @@ export const orderItemSchema = z.object({
   commission: z.number().nonnegative().max(10_00_000),
   campaignId: z.string().min(1),
   dealType: z.string().min(1),
-  quantity: z.number().int().min(1),
+  quantity: z.number().int().min(1).max(100),
   platform: z.string().optional(),
   brandName: z.string().optional(),
 });
@@ -78,6 +78,20 @@ export const createOrderSchema = z
         code: z.ZodIssueCode.custom,
         path: ['screenshots', 'review'],
         message: 'Review proof must be a valid image data URL',
+      });
+    }
+    if (value.screenshots?.payment && !isImageDataUrl(value.screenshots.payment)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['screenshots', 'payment'],
+        message: 'Payment proof must be a valid image data URL',
+      });
+    }
+    if (value.screenshots?.returnWindow && !isImageDataUrl(value.screenshots.returnWindow)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['screenshots', 'returnWindow'],
+        message: 'Return window proof must be a valid image data URL',
       });
     }
   });

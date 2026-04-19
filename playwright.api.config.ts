@@ -18,7 +18,6 @@ export default defineConfig({
   workers: 1,
   // No webServer — backend must already be running on port 8080
   testMatch: [
-    /.*\.security\.api\.spec\.ts$/,
-    /lifecycle\..*\.spec\.ts$/,
+    /.*\.api\.spec\.ts$/,
   ],
 });

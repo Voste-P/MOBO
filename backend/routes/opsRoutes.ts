@@ -26,6 +26,20 @@ export function opsRoutes(env: Env): Router {
   });
   router.use(opsLimiter);
 
+  // Stricter rate limit for financial / destructive operations (per-user)
+  const financialLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: env.NODE_ENV === 'production' ? 10 : 1_000,
+    keyGenerator: (req) => (req as any).auth?.userId || req.ip || 'unknown',
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (_req, res) => {
+      res.status(429).json({
+        error: { code: 'RATE_LIMITED', message: 'Too many financial requests. Please wait.' },
+      });
+    },
+  });
+
   router.post('/invites/generate', invites.opsGenerateMediatorInvite);
   router.post('/invites/generate-buyer', invites.opsGenerateBuyerInvite);
 
@@ -51,8 +65,8 @@ export function opsRoutes(env: Env): Router {
   router.post('/mediators/reject', ops.rejectMediator);
   router.post('/users/approve', ops.approveUser);
   router.post('/users/reject', ops.rejectUser);
-  router.post('/orders/settle', ops.settleOrderPayment);
-  router.post('/orders/unsettle', ops.unsettleOrderPayment);
+  router.post('/orders/settle', financialLimiter, ops.settleOrderPayment);
+  router.post('/orders/unsettle', financialLimiter, ops.unsettleOrderPayment);
   router.post('/verify', ops.verifyOrderClaim);
   router.post('/orders/verify-requirement', ops.verifyOrderRequirement);
   router.post('/orders/verify-all', ops.verifyAllSteps);
@@ -68,7 +82,7 @@ export function opsRoutes(env: Env): Router {
   router.delete('/campaigns/:campaignId', ops.deleteCampaign);
   router.post('/campaigns/assign', ops.assignSlots);
   router.post('/deals/publish', ops.publishDeal);
-  router.post('/payouts', ops.payoutMediator);
+  router.post('/payouts', financialLimiter, ops.payoutMediator);
   router.delete('/payouts/:payoutId', ops.deletePayout);
 
   return router;

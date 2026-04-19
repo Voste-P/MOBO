@@ -67,5 +67,11 @@ export function adminRoutes(env: Env): Router {
 
   router.get('/audit-logs', admin.getAuditLogs);
 
+  // Security question templates CRUD
+  router.get('/security-question-templates', admin.getSecurityQuestionTemplates);
+  router.post('/security-question-templates', admin.createSecurityQuestionTemplate);
+  router.patch('/security-question-templates/:questionId', admin.updateSecurityQuestionTemplate);
+  router.delete('/security-question-templates/:questionId', admin.deleteSecurityQuestionTemplate);
+
   return router;
 }

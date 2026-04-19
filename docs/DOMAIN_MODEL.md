@@ -1,6 +1,6 @@
 # Domain Model (Current Implementation)
 
-> **21 Prisma models, 23 enums** — PostgreSQL via Prisma ORM. Last updated: June 2025.
+> **22 Prisma models, 23 enums** — PostgreSQL via Prisma ORM. Last updated: April 2026.
 
 Source: [backend/prisma/schema.prisma](../backend/prisma/schema.prisma)
 
@@ -26,6 +26,7 @@ This document summarizes the current backend domain entities and how they relate
 | `TransactionType`     | brand_deposit, platform_fee, commission_lock/settle, cashback_lock/settle, order_settlement_debit, commission_reversal, margin_reversal, agency_payout/receipt, payout_request/complete/failed, refund |
 | `TransactionStatus`   | pending, completed, failed, reversed                                                                                                                                                                   |
 | `PayoutStatus`        | requested, processing, paid, failed, canceled, recorded                                                                                                                                                |
+| `Currency`            | INR                                                                                                                                                                                                    |
 | `InviteStatus`        | active, used, revoked, expired                                                                                                                                                                         |
 | `TicketStatus`        | Open, Resolved, Rejected                                                                                                                                                                               |
 | `SuspensionAction`    | suspend, unsuspend                                                                                                                                                                                     |
@@ -171,4 +172,4 @@ Agency ─── MediatorProfile ─── User ─── ShopperProfile
 
 ## Soft-Delete Rule
 
-Every destructive operation sets `deletedAt` — **no hard deletes in production code**. Only test cleanup scripts use `.delete()`.
+Every destructive operation sets `is_deleted = true` — **no hard deletes in production code**. Only test cleanup scripts use `.delete()`.

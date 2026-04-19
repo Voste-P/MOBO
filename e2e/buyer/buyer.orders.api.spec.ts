@@ -27,6 +27,24 @@ test.describe('Buyer order creation flow', () => {
     expect(Array.isArray(deals)).toBeTruthy();
   });
 
+  test('product image field is a valid URL or empty string (no SVG placeholder)', async ({ request }) => {
+    const res = await request.get('/api/products', {
+      headers: authHeaders(buyerToken),
+    });
+    expect(res.ok()).toBeTruthy();
+    const body = await res.json();
+    const deals = body.data ?? body;
+    if (Array.isArray(deals) && deals.length > 0) {
+      for (const deal of deals) {
+        if (deal.image) {
+          // Image should be a valid URL, not a data:image/svg+xml placeholder
+          expect(deal.image).not.toContain('data:image/svg+xml');
+          expect(typeof deal.image).toBe('string');
+        }
+      }
+    }
+  });
+
   test('buyer can paginate products', async ({ request }) => {
     const res = await request.get('/api/products?page=1&limit=5', {
       headers: authHeaders(buyerToken),

@@ -16,24 +16,43 @@ import { Product } from '../types';
 
 export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) => {
   const { toast } = useToast();
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedDealType, setSelectedDealType] = useState('All');
   const [ticketOpen, setTicketOpen] = useState(false);
 
+  // Debounce search input to avoid re-filtering on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchTerm(searchInput), 250);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const loadingRef = useRef(false);
+  const pageRef = useRef(1);
+  const PAGE_SIZE = 50;
 
-  const loadProducts = useCallback(async () => {
+  const loadProducts = useCallback(async (reset = true) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
     setLoading(true);
     setFetchError(false);
+    const page = reset ? 1 : pageRef.current;
     try {
-      const data = await api.products.getAll(undefined, 1, 200);
-      setProducts(asArray<Product>(data));
+      const data = await api.products.getAll(undefined, page, PAGE_SIZE);
+      const batch = asArray<Product>(data);
+      if (reset) {
+        setProducts(batch);
+        pageRef.current = 2;
+      } else {
+        setProducts((prev) => [...prev, ...batch]);
+        pageRef.current = page + 1;
+      }
+      setHasMore(batch.length >= PAGE_SIZE);
     } catch {
       setFetchError(true);
     } finally {
@@ -53,21 +72,22 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
 
   // Realtime: refresh products on deals.changed (debounce 1.5s to batch rapid changes)
   useEffect(() => {
-    let timer: any = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const unsub = subscribeRealtime((msg: any) => {
       if (msg.type === 'deals.changed') {
         if (timer) clearTimeout(timer);
-        timer = setTimeout(() => { timer = null; loadProducts(); }, 500);
+        timer = setTimeout(() => { timer = null; loadProducts(true); }, 500);
       }
     });
     return () => { unsub(); if (timer) clearTimeout(timer); };
   }, [loadProducts]);
 
   useEffect(() => {
-    if (fetchError) toast.error('Failed to load deals. Please try again.');
+    if (fetchError) toast.error('Could not load deals. Check your connection and pull to refresh.');
   }, [fetchError]);
 
   const handlePullRefresh = useCallback(async () => {
+    setSearchInput('');
     setSearchTerm('');
     setSelectedCategory('All');
     setSelectedDealType('All');
@@ -107,7 +127,10 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
       const selectedLower = selectedCategory.toLowerCase();
       result = result.filter((p) => {
         const category = String(p.category || '').toLowerCase();
-        return category === selectedLower;
+        const dealType = String(p.dealType || '').toLowerCase();
+        const platform = String(p.platform || '').toLowerCase();
+        const title = String(p.title || '').toLowerCase();
+        return category === selectedLower || dealType === selectedLower || platform === selectedLower || title.includes(selectedLower);
       });
     }
 
@@ -115,10 +138,10 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
       const lower = searchTerm.toLowerCase();
       result = result.filter(
         (p) =>
-          p.title.toLowerCase().includes(lower) ||
-          p.description.toLowerCase().includes(lower) ||
-          p.platform.toLowerCase().includes(lower) ||
-          p.brandName.toLowerCase().includes(lower)
+          String(p.title || '').toLowerCase().includes(lower) ||
+          String(p.description || '').toLowerCase().includes(lower) ||
+          String(p.platform || '').toLowerCase().includes(lower) ||
+          String(p.brandName || '').toLowerCase().includes(lower)
       );
     }
 
@@ -159,8 +182,8 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
         <div className="mb-2">
           <Input
             placeholder="Search deals, brands, platforms..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             leftIcon={<Search size={16} />}
             aria-label="Search deals"
           />
@@ -209,7 +232,7 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6 scrollbar-styled overscroll-none" style={{ paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))' }} {...pullHandlers}>
+      <div className="flex-1 overflow-y-auto p-6 scrollbar-styled overscroll-none" style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom, 0px))' }} {...pullHandlers}>
         <PullToRefreshIndicator distance={pullDistance} isRefreshing={isRefreshing} />
         {loading ? (
           <div className="flex flex-col items-center gap-6">
@@ -229,13 +252,13 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
             ))}
           </div>
         ) : fetchError && products.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <div className="flex flex-col items-center justify-center py-20 gap-4" role="alert" aria-live="assertive">
             <AlertTriangle size={40} className="text-red-300" />
             <p className="text-sm font-bold text-zinc-600">Could not load deals</p>
             <p className="text-xs text-zinc-400 max-w-[240px] text-center">Please check your internet connection and try again.</p>
             <button
               type="button"
-              onClick={() => loadProducts()}
+              onClick={() => loadProducts(true)}
               className="px-6 py-2.5 bg-black text-white rounded-full text-xs font-bold hover:bg-zinc-800 transition-colors active:scale-95"
             >
               Try Again
@@ -254,6 +277,15 @@ export const Explore: React.FC<{ isActive?: boolean }> = ({ isActive = true }) =
                 <ProductCard product={p} inlineOrder />
               </div>
             ))}
+            {hasMore && !loading && (
+              <button
+                type="button"
+                onClick={() => loadProducts(false)}
+                className="mt-2 px-8 py-3 bg-black text-white rounded-full text-xs font-bold hover:bg-zinc-800 transition-colors active:scale-95"
+              >
+                Load More
+              </button>
+            )}
           </div>
         )}
       </div>

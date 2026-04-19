@@ -51,9 +51,9 @@ export async function ensureWallet(ownerUserId: string) {
       },
       select: { id: true, ownerUserId: true, availablePaise: true, pendingPaise: true, lockedPaise: true, currency: true, version: true },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Handle P2002 (unique constraint violation)
-    if (err?.code === 'P2002') {
+    if (err instanceof Error && 'code' in err && (err as { code?: string }).code === 'P2002') {
       const existing = await db.wallet.findUnique({ where: { ownerUserId }, select: { id: true, ownerUserId: true, availablePaise: true, pendingPaise: true, lockedPaise: true, currency: true, version: true } });
       if (existing) return existing;
     }
@@ -62,6 +62,9 @@ export async function ensureWallet(ownerUserId: string) {
 }
 
 export async function applyWalletCredit(input: WalletMutationInput) {
+  if (!input.idempotencyKey || typeof input.idempotencyKey !== 'string' || input.idempotencyKey.length > 255 || !/^[\w\-:.]+$/.test(input.idempotencyKey)) {
+    throw new AppError(400, 'INVALID_IDEMPOTENCY_KEY', 'Idempotency key must be 1-255 alphanumeric/dash/dot/colon characters');
+  }
   if (input.amountPaise <= 0) throw new AppError(400, 'INVALID_AMOUNT', 'Amount must be positive');
   if (!Number.isInteger(input.amountPaise)) throw new AppError(400, 'INVALID_AMOUNT', 'Amount must be an integer (paise)');
   if (input.amountPaise > Number.MAX_SAFE_INTEGER) throw new AppError(400, 'INVALID_AMOUNT', 'Amount exceeds safe integer limit');
@@ -87,7 +90,7 @@ export async function applyWalletCredit(input: WalletMutationInput) {
 
     // Safety limit: prevent runaway balances (default 1 crore paise = ₹1,00,000).
     // WALLET_MAX_BALANCE_PAISE is validated at startup by loadEnv() in config/env.ts.
-    const MAX_BALANCE_PAISE = Number(process.env.WALLET_MAX_BALANCE_PAISE) || 1_00_00_000;
+    const MAX_BALANCE_PAISE = Number(process.env.WALLET_MAX_BALANCE_PAISE ?? '') || 1_00_00_000;
 
     // Ensure wallet exists first
     await tx.wallet.upsert({
@@ -170,6 +173,9 @@ export async function applyWalletCredit(input: WalletMutationInput) {
 }
 
 export async function applyWalletDebit(input: WalletMutationInput) {
+  if (!input.idempotencyKey || typeof input.idempotencyKey !== 'string' || input.idempotencyKey.length > 255 || !/^[\w\-:.]+$/.test(input.idempotencyKey)) {
+    throw new AppError(400, 'INVALID_IDEMPOTENCY_KEY', 'Idempotency key must be 1-255 alphanumeric/dash/dot/colon characters');
+  }
   if (input.amountPaise <= 0) throw new AppError(400, 'INVALID_AMOUNT', 'Amount must be positive');
   if (!Number.isInteger(input.amountPaise)) throw new AppError(400, 'INVALID_AMOUNT', 'Amount must be an integer (paise)');
   if (input.amountPaise > Number.MAX_SAFE_INTEGER) throw new AppError(400, 'INVALID_AMOUNT', 'Amount exceeds safe integer limit');
@@ -187,6 +193,9 @@ export async function applyWalletDebit(input: WalletMutationInput) {
       // cross-type collisions (e.g., a credit key being reused as a debit).
       if (existingTx.type !== input.type) {
         throw new AppError(409, 'IDEMPOTENCY_CONFLICT', `Idempotency key already used for a different transaction type (${existingTx.type})`);
+      }
+      if (existingTx.amountPaise !== input.amountPaise) {
+        throw new AppError(409, 'IDEMPOTENCY_CONFLICT', `Idempotency key already used with a different amount (${existingTx.amountPaise} vs ${input.amountPaise})`);
       }
       walletLog.info('Wallet debit idempotency hit (duplicate key)', { userId: input.ownerUserId, type: input.type, key: input.idempotencyKey });
       return existingTx;

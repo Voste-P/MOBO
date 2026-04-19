@@ -47,8 +47,8 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
         setIsLoading(false);
         return;
       }
-    } catch (err: any) {
-      const code = (err as any)?.code;
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
       if (code === 'USER_NOT_ACTIVE') {
         setPendingMessage(
           'Your account is not active yet. If you joined using an agency code, please wait for agency approval.'
@@ -88,7 +88,7 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
       const result = await registerOps(reg.name, reg.mobile, reg.password, 'mediator', reg.agencyCode.toUpperCase(), questions);
 
       if (result && typeof result === 'object' && 'pendingApproval' in result && result.pendingApproval) {
-        const msg = (result as any)?.message;
+        const msg = (result as { message?: string })?.message;
         setPendingMessage(
           typeof msg === 'string' && msg.trim().length
             ? msg
@@ -98,7 +98,7 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
         setIsLoading(false);
         return;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(formatErrorMessage(err, 'Registration failed'));
       setView('register');
     } finally {
@@ -132,7 +132,7 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
   if (view === 'pending') {
     return (
       <AnimatedView viewKey="pending" variant="scale">
-      <div className="flex-1 flex flex-col bg-white relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
+      <div className="flex-1 flex flex-col bg-white relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled" style={{ minHeight: '100dvh' }}>
         <Button
           type="button"
           variant="secondary"
@@ -210,7 +210,7 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
   if (view === 'splash') {
     return (
       <AnimatedView viewKey="splash" variant="fade">
-      <div className="flex-1 flex flex-col bg-zinc-900 text-white relative overflow-x-hidden pb-[env(safe-area-inset-bottom)]" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
+      <div className="flex-1 flex flex-col bg-zinc-900 text-white relative overflow-x-hidden pb-[env(safe-area-inset-bottom)]" style={{ minHeight: '100dvh' }}>
         <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-black"></div>
         {onBack && (
           <div className="absolute top-6 left-6 z-50">
@@ -256,7 +256,7 @@ export const MediatorAuthScreen: React.FC<MediatorAuthProps> = ({ onBack }) => {
 
   return (
     <AnimatedView viewKey={view} variant="slideUp">
-    <div className="flex-1 flex flex-col bg-white relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled" style={{ minHeight: 'calc(100dvh - var(--banner-h, 0px))' }}>
+    <div className="flex-1 flex flex-col bg-white relative px-6 pt-10 pb-8 overflow-y-auto scrollbar-styled" style={{ minHeight: '100dvh' }}>
       <Button
         type="button"
         variant="secondary"

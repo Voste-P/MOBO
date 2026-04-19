@@ -59,6 +59,17 @@ export class ErrorBoundary extends Component<Props, State> {
   private handleReload = () => {
     const nextCount = this.state.retryCount + 1;
     if (nextCount >= MAX_RETRIES) {
+      // Guard against infinite reload loops across page loads
+      try {
+        const key = 'mobo_eb_reload_count';
+        const reloads = parseInt(sessionStorage.getItem(key) || '0', 10);
+        if (reloads >= 3) {
+          // Stop reloading — show persistent error message
+          this.setState({ retryCount: nextCount });
+          return;
+        }
+        sessionStorage.setItem(key, String(reloads + 1));
+      } catch { /* sessionStorage unavailable */ }
       this.setState({ reloading: true });
       window.location.reload();
       return;
@@ -102,7 +113,7 @@ export class ErrorBoundary extends Component<Props, State> {
             type="button"
             onClick={this.handleReload}
             disabled={this.state.reloading}
-            className="px-8 py-3 rounded-xl border-none bg-lime-400 text-lime-950 font-bold text-sm cursor-pointer hover:bg-lime-500 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-8 py-3 rounded-xl border-none bg-lime-400 text-lime-950 font-bold text-sm cursor-pointer hover:bg-lime-500 active:scale-95 transition-[background-color,transform] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {this.state.reloading ? 'Reloading…' : exhausted ? 'Force Reload' : 'Reload'}
           </button>

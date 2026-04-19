@@ -1,7 +1,7 @@
-# BUZZMA — Complete System Flow
+# MOBO — Complete System Flow
 
-> **What is BUZZMA?**
-> BUZZMA is a multi-stakeholder commerce ecosystem connecting **Brands**, **Agencies**, **Mediators**, and **Buyers** in a structured deal-driven marketplace. Brands list products via campaigns, Agencies manage regional distribution through Mediator networks, Mediators connect Buyers to deals, and Buyers purchase through their assigned Mediator. An Admin panel governs the entire platform.
+> **What is MOBO?**
+> MOBO is a multi-stakeholder commerce ecosystem connecting **Brands**, **Agencies**, **Mediators**, and **Buyers** in a structured deal-driven marketplace. Brands list products via campaigns, Agencies manage regional distribution through Mediator networks, Mediators connect Buyers to deals, and Buyers purchase through their assigned Mediator. An Admin panel governs the entire platform.
 
 ---
 
@@ -56,10 +56,10 @@
 
 | Role         | Portal                 | Purpose                                             | Auth Method         |
 | ------------ | ---------------------- | --------------------------------------------------- | ------------------- |
-| **Brand**    | brand-web (`:3004`)    | Manage products, campaigns, payouts, inventory      | Mobile + OTP        |
-| **Agency**   | agency-web (`:3003`)   | Run campaigns, create deals, manage mediator squads | Mobile + OTP        |
-| **Mediator** | mediator-app (`:3002`) | Share deals, manage buyers, track earnings (PWA)    | Mobile + OTP        |
-| **Buyer**    | buyer-app (`:3001`)    | Browse deals, place orders, track shipments (PWA)   | Mobile + OTP        |
+| **Brand**    | brand-web (`:3004`)    | Manage products, campaigns, payouts, inventory      | Mobile + Password   |
+| **Agency**   | agency-web (`:3003`)   | Run campaigns, create deals, manage mediator squads | Mobile + Password   |
+| **Mediator** | mediator-app (`:3002`) | Share deals, manage buyers, track earnings (PWA)    | Mobile + Password   |
+| **Buyer**    | buyer-app (`:3001`)    | Browse deals, place orders, track shipments (PWA)   | Mobile + Password   |
 | **Admin**    | admin-web (`:3005`)    | Platform governance, user management, financials    | Username + Password |
 | **Ops**      | admin-web (`:3005`)    | Limited admin operations, support                   | Username + Password |
 
@@ -104,7 +104,7 @@
 ### A. Onboarding Flow
 
 ```text
-1. User opens portal → Auth page (Mobile + OTP or Username + Password)
+1. User opens portal → Auth page (Mobile + Password or Username + Password)
 2. First-time users register with name, mobile, role
 3. Backend creates User record + Wallet (balance: 0)
 4. Role-specific setup:
@@ -149,6 +149,8 @@ Brand                    Agency                   Mediator
 - Deals have limited slots per mediator
 - One active deal per product per agency at a time
 - Campaigns can be paused/resumed by Brand or Admin
+- **Mediators only see campaigns where they have explicit slot assignments** — agency-level access alone is not sufficient for visibility
+- Commission cannot exceed the payout amount when publishing a deal
 
 ### C. Buyer Purchase Lifecycle
 
@@ -208,7 +210,7 @@ Buyer                  Backend AI              Mediator              Agency/Admi
 
 **AI Auto-Verification (Bulk Path):**
 
-When ALL required proofs are uploaded and each has AI confidence ≥ `AI_PROOF_CONFIDENCE_THRESHOLD` (default 80%):
+When ALL required proofs are uploaded and each has AI confidence ≥ `AI_BULK_VERIFY_THRESHOLD` (default 70%):
 
 1. System bulk-verifies ALL unverified steps at once
 2. Order moves directly to **cooling period** (`Pending_Cooling` status)
@@ -220,6 +222,17 @@ This path triggers automatically after each proof upload via `autoVerifyStep()` 
 **Individual Step Auto-Verification:**
 
 If a single proof's AI confidence ≥ `AI_AUTO_VERIFY_THRESHOLD` (default 80%), that individual step is auto-verified immediately. The system then checks if all steps are now verified to trigger the bulk approval.
+
+**High-Confidence Fast Path:**
+
+If a single proof's AI confidence ≥ `AI_HIGH_CONFIDENCE_THRESHOLD` (default 85%), it is auto-verified immediately regardless of other thresholds. This allows clearly genuine proofs to bypass review faster while maintaining safety. The tiered confidence system:
+
+| Threshold                        | Default | Effect                                                     |
+| -------------------------------- | ------- | ---------------------------------------------------------- |
+| `AI_BULK_VERIFY_THRESHOLD`       | 70%     | Bulk auto-verify all proofs when ALL meet this minimum     |
+| `AI_AUTO_VERIFY_THRESHOLD`       | 80%     | Individual proof auto-verified without mediator            |
+| `AI_HIGH_CONFIDENCE_THRESHOLD`   | 85%     | Fast-path auto-verify for high-confidence proofs           |
+| `AI_REVIEW_LINK_CONFIDENCE`      | 95%     | Confidence assigned to validated marketplace review links  |
 
 **AI Extraction:**
 
@@ -370,7 +383,7 @@ Every significant action in the system is traceable:
 | **Money trail**                      | `Transaction` table: every credit/debit with `idempotencyKey`, `walletId`, `orderId`, timestamps |
 | **Who verified the order**           | `Order.verifiedAt`, `Order.verifiedBy` fields                                                    |
 | **AI extraction data**               | `Order.extractedData` JSON field (amount, date, UTR from OCR)                                    |
-| **User status changes**              | `User.suspendedAt`, `User.deletedAt` with soft-delete pattern                                    |
+| **User status changes**              | `User.is_deleted` (Boolean) + `Suspension` table for suspension tracking                         |
 | **Login history**                    | Auth logs via Winston structured logging (domain: auth)                                          |
 | **API access**                       | HTTP request logs with userId, role, IP, route, duration                                         |
 | **System errors**                    | Error logs with correlationId, stack traces, memory metrics                                      |
@@ -391,32 +404,36 @@ logs/
 
 ## AI Integration Points
 
-| Feature               | Technology            | Purpose                                                     |
-| --------------------- | --------------------- | ----------------------------------------------------------- |
-| **Payment Proof OCR** | Google Gemini Vision  | Extract amount, date, UTR from payment screenshots          |
-| **AI Chatbot**        | Google Gemini         | Buyer assistance — product search, order status, FAQ        |
-| **Extraction Cache**  | In-memory (15min TTL) | Prevent duplicate Gemini API calls for same proof           |
-| **Smart Field Lock**  | Frontend logic        | Lock extracted fields to prevent manual override of AI data |
+| Feature                   | Technology            | Purpose                                                              |
+| ------------------------- | --------------------- | -------------------------------------------------------------------- |
+| **Payment Proof OCR**     | Google Gemini Vision  | Extract amount, date, UTR from payment screenshots                   |
+| **Rating Verification**   | Google Gemini Vision  | Verify reviewer name, product name, star rating from screenshot      |
+| **Return Window Check**   | Google Gemini Vision  | Verify return window status from marketplace screenshot              |
+| **AI Auto-Verify**        | Backend logic         | Auto-approve proofs at configurable confidence thresholds (70/80/85) |
+| **AI Chatbot**            | Google Gemini         | Buyer assistance — product search, order status, FAQ                 |
+| **Extraction Cache**      | In-memory (15min TTL) | Prevent duplicate Gemini API calls for same proof                    |
+| **Smart Field Lock**      | Frontend logic        | Lock extracted fields to prevent manual override of AI data          |
 
 ---
 
 ## Security Model
 
-| Layer                  | Implementation                                                    |
-| ---------------------- | ----------------------------------------------------------------- |
-| **Authentication**     | JWT access + refresh tokens, bcrypt password hashing              |
-| **Authorization**      | Role-based access control (RBAC) on every route                   |
-| **Zero-trust tokens**  | Role verified from DB on every request (not just JWT claims)      |
-| **Cascade suspension** | Upstream suspension blocks downstream access                      |
-| **Rate limiting**      | Per-IP and per-user rate limits on sensitive endpoints            |
-| **CORS**               | Strict origin whitelist                                           |
-| **Helmet**             | Security headers (CSP, HSTS, X-Frame-Options)                     |
-| **Input validation**   | Zod schemas on all request bodies                                 |
-| **SQL injection**      | Prisma parameterized queries                                      |
-| **XSS**                | React auto-escaping + CSP headers                                 |
-| **Sensitive data**     | Redaction engine masks passwords, tokens, emails, mobiles in logs |
-| **Idempotency**        | Unique keys on financial transactions                             |
-| **Soft delete**        | Data preservation — `deletedAt` timestamp, never hard delete      |
+| Layer                  | Implementation                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Authentication**     | JWT access + refresh tokens, bcrypt password hashing                                                   |
+| **Authorization**      | Role-based access control (RBAC) on every route                                                        |
+| **Zero-trust tokens**  | Role verified from DB on every request (not just JWT claims)                                           |
+| **Cascade suspension** | Upstream suspension blocks downstream access                                                           |
+| **Rate limiting**      | Per-IP and per-user rate limits; stricter per-user financial rate limit on settlement/payout endpoints |
+| **CORS**               | Strict origin whitelist                                                                                |
+| **Helmet**             | Security headers (CSP, HSTS, X-Frame-Options)                                                          |
+| **Input validation**   | Zod schemas on all request bodies                                                                      |
+| **SQL injection**      | Prisma parameterized queries                                                                           |
+| **XSS**                | React auto-escaping + CSP headers                                                                      |
+| **Sensitive data**     | Redaction engine masks passwords, tokens, emails, mobiles in logs                                      |
+| **Idempotency**        | Unique keys on financial transactions (validated: 1-128 chars, alphanumeric)                           |
+| **Frozen orders**      | Admin-frozen orders blocked from auto-approval in all verification paths                               |
+| **Soft delete**        | Data preservation — `is_deleted` Boolean flag, never hard delete                                       |
 
 ---
 

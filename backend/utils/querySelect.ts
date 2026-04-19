@@ -1,4 +1,4 @@
-﻿import { Prisma as _Prisma } from '../generated/prisma/client.js';
+import { Prisma as _Prisma } from '../generated/prisma/client.js';
 
 /**
  * Reusable Prisma `select` configurations for list queries.
@@ -74,7 +74,7 @@ export const userAdminListSelect = {
   bankIfsc: true,
   bankName: true,
   bankHolderName: true,
-  // avatar included â€” typically 5-20KB compressed JPEG; needed for profile photos in lists
+  // avatar included — typically 5-20KB compressed JPEG; needed for profile photos in lists
   avatar: true,
   createdAt: true,
   // EXCLUDED: passwordHash, googleRefreshToken, fcmTokens, isDeleted
@@ -107,7 +107,7 @@ export const userListSelect = {
   isVerifiedByMediator: true,
   upiId: true,
   // qrCode excluded from list queries (50-500KB blobs, only needed in pay/detail views)
-  // avatar included â€” typically 5-20KB compressed JPEG; needed for profile photos in lists
+  // avatar included — typically 5-20KB compressed JPEG; needed for profile photos in lists
   avatar: true,
   bankAccountNumber: true,
   bankIfsc: true,
@@ -280,7 +280,7 @@ export const orderListSelectLite = {
   extractedProductName: true,
   settlementRef: true,
   settlementMode: true,
-  // Screenshot columns EXCLUDED â€” use getProofFlags() helper instead
+  // Screenshot columns EXCLUDED — use getProofFlags() helper instead
   reviewLink: true,
   returnWindowDays: true,
   // Rejection flat fields
@@ -301,7 +301,7 @@ export const orderListSelectLite = {
   expectedSettlementDate: true,
   createdAt: true,
   updatedAt: true,
-  // Relations â€” items only need deal type / platform info for list view
+  // Relations — items only need deal type / platform info for list view
   items: { select: { dealType: true, platform: true, brandName: true, title: true, image: true, quantity: true, priceAtPurchasePaise: true } },
   // missingProofRequests: small JSONB array needed for "Action Required" banners
   missingProofRequests: true,
@@ -318,13 +318,18 @@ export async function getProofFlags(
 ): Promise<Map<string, { hasOrderProof: boolean; hasReviewProof: boolean; hasRatingProof: boolean; hasReturnWindowProof: boolean }>> {
   if (orderIds.length === 0) return new Map();
 
+  // Guard against unbounded arrays — callers should never pass more than 10 000 IDs
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const validIds = orderIds.filter((id) => UUID_RE.test(id)).slice(0, 10_000);
+  if (validIds.length === 0) return new Map();
+
   const rows: Array<{ id: string; hop: boolean; hrp: boolean; hrap: boolean; hrwp: boolean }> =
     await prisma.$queryRaw`SELECT id,
         (screenshot_order IS NOT NULL OR screenshot_payment IS NOT NULL) AS hop,
         (review_link IS NOT NULL OR screenshot_review IS NOT NULL) AS hrp,
         (screenshot_rating IS NOT NULL) AS hrap,
         (screenshot_return_window IS NOT NULL) AS hrwp
-       FROM orders WHERE id = ANY(${orderIds}::uuid[])`;
+       FROM orders WHERE id = ANY(${validIds}::uuid[])`;
 
   const map = new Map<string, { hasOrderProof: boolean; hasReviewProof: boolean; hasRatingProof: boolean; hasReturnWindowProof: boolean }>();
   for (const r of rows) {
