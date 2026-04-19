@@ -516,8 +516,8 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
     const rows = await db().$queryRaw<Array<{ manager_name: string; campaign_id: string; cnt: bigint }>>(
       Prisma.sql`
         SELECT o."managerName" AS manager_name, oi."campaignId" AS campaign_id, COUNT(DISTINCT o.id)::bigint AS cnt
-        FROM "Order" o
-        JOIN "OrderItem" oi ON oi."orderId" = o.id AND oi."isDeleted" = false
+        FROM "Orders" o
+        JOIN "OrderItems" oi ON oi."orderId" = o.id AND oi."isDeleted" = false
         WHERE o."managerName" IN (${Prisma.join(mcCodes)})
           AND oi."campaignId" IN (${Prisma.join(cids)})
           AND (o."affiliateStatus" = 'Approved_Settled' OR o."paymentStatus" = 'Paid')
