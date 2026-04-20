@@ -268,16 +268,16 @@ export default function TicketDetailModal({ open, onClose, ticket, onRefresh }: 
                   <div><span className="text-zinc-500">Brand:</span> <strong className="text-zinc-800">{orderDetails.brand}</strong></div>
                 )}
                 {orderDetails.unitPrice != null && (
-                  <div><span className="text-zinc-500">Unit Price:</span> <strong className="text-zinc-800">₹{orderDetails.unitPrice}</strong></div>
+                  <div><span className="text-zinc-500">Unit Price:</span> <strong className="text-zinc-800">₹{Number(orderDetails.unitPrice).toLocaleString('en-IN')}</strong></div>
                 )}
                 {orderDetails.quantity != null && (
                   <div><span className="text-zinc-500">Qty:</span> <strong className="text-zinc-800">{orderDetails.quantity}</strong></div>
                 )}
                 {orderDetails.total != null && (
-                  <div><span className="text-zinc-500">Total:</span> <strong className="text-zinc-800">₹{orderDetails.total}</strong></div>
+                  <div><span className="text-zinc-500">Total:</span> <strong className="text-zinc-800">₹{Number(orderDetails.total).toLocaleString('en-IN')}</strong></div>
                 )}
                 {orderDetails.commission != null && (
-                  <div><span className="text-zinc-500">Commission:</span> <strong className="text-zinc-800">₹{orderDetails.commission}</strong></div>
+                  <div><span className="text-zinc-500">Commission:</span> <strong className="text-zinc-800">₹{Number(orderDetails.commission).toLocaleString('en-IN')}</strong></div>
                 )}
                 {orderDetails.dealType && (
                   <div><span className="text-zinc-500">Deal Type:</span> <strong className="text-zinc-800">{orderDetails.dealType}</strong></div>

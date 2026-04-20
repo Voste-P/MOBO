@@ -256,6 +256,9 @@ export const ProductCard = React.memo<ProductCardComponentProps>(({ product, onP
             className={`font-bold text-slate-900 text-sm leading-tight mb-2 cursor-pointer ${titleExpanded ? '' : 'line-clamp-2'}`}
             title={titleExpanded ? undefined : product.title}
             onClick={() => setTitleExpanded(!titleExpanded)}
+            onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTitleExpanded(!titleExpanded); } }}
+            role="button"
+            tabIndex={0}
           >
             {product.title}
           </h3>

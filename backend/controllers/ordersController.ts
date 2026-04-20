@@ -1901,12 +1901,13 @@ export function makeOrdersController(env: Env) {
           },
         });
 
-        // Ownership guard: non-privileged users require userId match to prevent TOCTOU race
+        // Ownership + frozen guard: prevent TOCTOU race where order is frozen between check and update
         if (privileged) {
-          await db().order.update({ where: { id: order.id }, data: updateData });
+          const result = await db().order.updateMany({ where: { id: order.id, frozen: false }, data: updateData });
+          if (result.count === 0) throw new AppError(409, 'ORDER_FROZEN', 'Order was frozen during submission');
         } else {
-          const result = await db().order.updateMany({ where: { id: order.id, userId: requesterPgId }, data: updateData });
-          if (result.count === 0) throw new AppError(403, 'FORBIDDEN', 'Order ownership changed');
+          const result = await db().order.updateMany({ where: { id: order.id, userId: requesterPgId, frozen: false }, data: updateData });
+          if (result.count === 0) throw new AppError(403, 'FORBIDDEN', 'Order frozen or ownership changed');
         }
 
         // If order is already APPROVED (e.g. during cooling period), save the proof
