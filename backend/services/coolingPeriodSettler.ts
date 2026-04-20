@@ -515,14 +515,14 @@ export async function processCoolingPeriodSettlements(env: Env): Promise<{ settl
     const cids = [...new Set(capPairs.map(p => p.split('::')[1]))];
     const rows = await db().$queryRaw<Array<{ manager_name: string; campaign_id: string; cnt: bigint }>>(
       Prisma.sql`
-        SELECT o."managerName" AS manager_name, oi."campaignId" AS campaign_id, COUNT(DISTINCT o.id)::bigint AS cnt
-        FROM "Order" o
-        JOIN "OrderItem" oi ON oi."orderId" = o.id AND oi."isDeleted" = false
-        WHERE o."managerName" IN (${Prisma.join(mcCodes)})
-          AND oi."campaignId" IN (${Prisma.join(cids)})
-          AND (o."affiliateStatus" = 'Approved_Settled' OR o."paymentStatus" = 'Paid')
-          AND o."isDeleted" = false
-        GROUP BY o."managerName", oi."campaignId"
+        SELECT o."manager_name", oi."campaign_id", COUNT(DISTINCT o.id)::bigint AS cnt
+        FROM "orders" o
+        JOIN "order_items" oi ON oi."order_id" = o.id AND oi."is_deleted" = false
+        WHERE o."manager_name" IN (${Prisma.join(mcCodes)})
+          AND oi."campaign_id" IN (${Prisma.join(cids)})
+          AND (o."affiliate_status" = 'Approved_Settled' OR o."payment_status" = 'Paid')
+          AND o."is_deleted" = false
+        GROUP BY o."manager_name", oi."campaign_id"
       `
     );
     for (const r of rows) {
