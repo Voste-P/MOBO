@@ -65,6 +65,35 @@ export function realtimeRoutes(env: Env) {
   r.get('/stream', requireAuth(env), (req, res) => {
     const requestId = String((res.locals as any)?.requestId || res.getHeader?.('x-request-id') || '').trim();
 
+    const userId = String(req.auth?.userId || '');
+    const roles = (req.auth?.roles || []) as Role[];
+    const mediatorCode = String((req.auth?.user as any)?.mediatorCode || '').trim();
+    const parentCode = String((req.auth?.user as any)?.parentCode || '').trim();
+    const brandCode = String((req.auth?.user as any)?.brandCode || '').trim();
+
+    // ── Guard checks MUST happen BEFORE headers are flushed ──
+    // If we flush 200-level SSE headers first, we can never send a proper
+    // 429/503 JSON response — it becomes garbage inside the event-stream.
+
+    // Enforce global connection cap to prevent DDoS resource exhaustion
+    if (isAtCapacity()) {
+      realtimeLog.warn('SSE global capacity reached', { userId });
+      res.status(503).json({ error: 'Server at capacity, retry later' });
+      return;
+    }
+
+    // Enforce per-user connection limit to prevent resource exhaustion
+    const currentCount = userConnections.get(userId) || 0;
+    if (currentCount >= MAX_SSE_PER_USER) {
+      realtimeLog.warn('SSE per-user limit reached', { userId, currentCount });
+      res.status(429).json({ error: 'Too many SSE connections' });
+      return;
+    }
+
+    // ── All guards passed — now safe to commit to the SSE response ──
+
+    userConnections.set(userId, currentCount + 1);
+
     // Avoid proxy / load balancer / Node defaults closing the connection.
     try {
       req.socket.setNoDelay(true);
@@ -88,28 +117,6 @@ export function realtimeRoutes(env: Env) {
 
     // Flush headers if supported (depends on runtime).
     if (typeof (res as any).flushHeaders === 'function') (res as any).flushHeaders();
-
-    const userId = String(req.auth?.userId || '');
-    const roles = (req.auth?.roles || []) as Role[];
-    const mediatorCode = String((req.auth?.user as any)?.mediatorCode || '').trim();
-    const parentCode = String((req.auth?.user as any)?.parentCode || '').trim();
-    const brandCode = String((req.auth?.user as any)?.brandCode || '').trim();
-
-    // Enforce global connection cap to prevent DDoS resource exhaustion
-    if (isAtCapacity()) {
-      realtimeLog.warn('SSE global capacity reached', { userId });
-      res.status(503).json({ error: 'Server at capacity, retry later' });
-      return;
-    }
-
-    // Enforce per-user connection limit to prevent resource exhaustion
-    const currentCount = userConnections.get(userId) || 0;
-    if (currentCount >= MAX_SSE_PER_USER) {
-      realtimeLog.warn('SSE per-user limit reached', { userId, currentCount });
-      res.status(429).json({ error: 'Too many SSE connections' });
-      return;
-    }
-    userConnections.set(userId, currentCount + 1);
 
     realtimeLog.info('SSE stream opened', { requestId, userId, roles });
 
@@ -217,6 +224,7 @@ export function realtimeRoutes(env: Env) {
     maxLifetimeTimer.unref();
     req.on('close', cleanup);
     req.on('aborted', cleanup);
+    req.on('error', cleanup);
     res.on('close', cleanup);
     res.on('error', cleanup);
   });
