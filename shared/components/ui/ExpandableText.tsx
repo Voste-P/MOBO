@@ -35,6 +35,9 @@ export function ExpandableText({
       className={`cursor-pointer ${expanded ? '' : clampClass} ${className}`}
       title={expanded ? undefined : (typeof text === 'string' ? text : undefined)}
       onClick={(e: React.MouseEvent) => { e.stopPropagation(); setExpanded(v => !v); }}
+      onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(v => !v); } }}
+      role="button"
+      tabIndex={0}
     >
       {content}
     </Tag>
