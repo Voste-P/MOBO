@@ -47,7 +47,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@faker-js/faker": "^10.2.0",
-    "@testcontainers/postgresql": "^11.12.0",
+    "@testcontainers/postgresql": "^12.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/compression": "^1.8.1",
     "@types/cors": "^2.8.19",
@@ -61,7 +61,7 @@
     "eslint": "^9.39.2",
     "seedrandom": "^3.0.5",
     "supertest": "^7.2.2",
-    "testcontainers": "^11.12.0",
+    "testcontainers": "^12.0.0",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "typescript-eslint": "^8.52.0",
